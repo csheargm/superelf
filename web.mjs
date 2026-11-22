@@ -51,7 +51,7 @@ import { modelReviewJobs } from './lib/model-review.mjs';
 import { hashPassword, verifyPassword, makeAudit, readAudit } from './lib/auth.mjs';
 import { notifyBriefingEmail } from './lib/notify.mjs';
 import { readShell } from './lib/shellhtml.mjs';
-import { makeBuildId, BUILD_MARKER } from './lib/buildid.mjs';
+import { makeBuildId, BUILD_MARKER, readRevision } from './lib/buildid.mjs';
 import { SW_PATH, OFFLINE_CONFIG_PATH, bibleIndex, withCspMeta, APP_CSP } from './lib/offline.mjs';
 import { corsHeaders } from './lib/local-origin.mjs';
 import { loadJobs as loadJobFiles, saveJob, deleteJob, validateJob } from './lib/jobs/store.mjs';
@@ -158,7 +158,7 @@ function commitShelf(slug, message) {
 // native stderr to a NativeCommandError, and with ErrorActionPreference=Stop that killed run.ps1
 // and the node with it. The server bound its port, logged it, and vanished seconds later.
 const GIT_QUIET = { stdio: ['ignore', 'pipe', 'ignore'] };
-const gitHead = () => { try { return execSync('git rev-parse HEAD', { cwd: ROOT, encoding: 'utf8', ...GIT_QUIET }).trim(); } catch { return null; } };
+const gitHead = () => { try { return execSync('git rev-parse HEAD', { cwd: ROOT, encoding: 'utf8', ...GIT_QUIET }).trim(); } catch { return readRevision(ROOT); } };   // no .git: the deploy's REVISION (lib/buildid.mjs)
 const buildId = makeBuildId(ROOT, gitHead);
 const GIT_REF_RE = /^[0-9a-f]{7,40}$/;
 const bumpPatch = (v) => { const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(v || ''); return m ? `${m[1]}.${m[2]}.${+m[3] + 1}` : '1.0.0'; };

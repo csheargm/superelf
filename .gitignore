@@ -77,3 +77,6 @@ setup-code
 /ops/private/
 /docs/private-*.md
 /test/private-*.test.mjs
+
+# Written by the VM deploy (the deployed commit, lib/buildid.mjs readRevision); never committed
+/REVISION
