@@ -17,8 +17,12 @@ HTML/JS (its design, any text in it) leaked for apps the author never shared.
   the cookie is never sent to `/api/*`: no CSRF surface; only the app-page route reads it. It is the
   session itself, so logout (which also clears it) and expiry revoke it. A bearer header is accepted
   too (srcdoc route fetch, tests).
+- Signed-out state (sign-out, or any boot with no live session): the shell posts `/app/-/signout`
+  (the cookie's own path; destroys its session, clears it) and deletes every `/app/` entry from the
+  `pa-*` service-worker caches, so the next account on the browser can read neither. The srcdoc
+  route fetches with `credentials:'same-origin'` so the cookie rides it.
 - Demo nodes keep visitors' app pages public-by-link (unchanged); `/app/shared/` is shared by definition.
 
 ## Consequences
-A shared-then-unshared app stops loading for others at once. Offline copies already in a device's
-service-worker cache stay on that device (the device's own signed-in user fetched them).
+A shared-then-unshared app stops loading for others at once. App sub-resources need no cookie: APP_CSP
+already forbids loading anything from the server inside the app (no `'self'`).
