@@ -1,13 +1,19 @@
 // The marketing page (site/index.html) is static and public. Fail-closed checks: only reviewed
 // tags, attributes, classes and links; one pinned inline script (the EN / 中文 toggle) that cannot
-// reach the network; every English string has a Chinese twin; readable colours; and the whole file
+// reach the network; exactly one external script, the pinned Cloudflare Web Analytics beacon (visit
+// stats for the owner's dashboard only, nothing shown on the page); every English string has a Chinese twin; readable colours; and the whole file
 // is pinned, so any edit fails until its claims are re-checked against the code.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 
-const raw = readFileSync(new URL('../site/index.html', import.meta.url), 'utf8');
+const file = readFileSync(new URL('../site/index.html', import.meta.url), 'utf8');
+// The ONLY external script: Cloudflare's own snippet, byte for byte, right before </body>. It is
+// cut out before parsing, so every other check (no comments, no src, one inline script) still
+// fails closed on any other external script or any change to this one.
+const BEACON = `<!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "14a84d11c8cf4193887b205ee38aaa86"}'></script><!-- End Cloudflare Web Analytics -->`;
+const raw = file.replace(`${BEACON}\n</body>`, '</body>');
 const sha = (s) => createHash('sha256').update(s).digest('hex');
 const VOID = new Set(['meta']);
 
@@ -93,6 +99,13 @@ test('links go only to the demo, the repo, or an anchor on this page', () => {
   assert.ok(links.some((a) => a.attrs.href === 'https://github.com/csheargm/superelf'), 'code is linked');
 });
 
+test('the analytics beacon appears once, exactly as pinned, just before </body>', () => {
+  assert.equal(file.split(BEACON).length, 2, 'beacon present exactly once');
+  assert.ok(file.includes(`${BEACON}\n</body>`), 'beacon sits just before </body>');
+  assert.equal(raw.length, file.length - BEACON.length - 1, 'only the beacon was cut out');
+  assert.doesNotMatch(raw, /cloudflareinsights|data-cf-beacon/i, 'no second beacon');
+});
+
 test('one inline script, which only toggles the language', () => {
   const scripts = byTag('script');
   assert.equal(scripts.length, 1);
@@ -171,7 +184,7 @@ test('light and dark palettes keep text readable (WCAG AA 4.5:1)', () => {
 
 // Every claim was checked against the code (README, web.mjs CSP, lib/offline.mjs, lib/bible.mjs,
 // docs/demo-node.md, backup.sh). Change anything, re-verify what you touched, then re-pin.
-const FILE_SHA256 = 'c224c0f605aece72e764b1fd9b99bc9769abfb4381a5fafd6fa40b0a30929c51';
+const FILE_SHA256 = '9c11510eb7748985bdb0fe7466905daf14ad13b3e7fc4159bea896a9c9bd2094';
 test('page matches the claims-verified version', () => {
-  assert.equal(sha(raw), FILE_SHA256, 'page changed: re-verify claims, links, contrast and the script, then update FILE_SHA256');
+  assert.equal(sha(file), FILE_SHA256, 'page changed: re-verify claims, links, contrast and the script, then update FILE_SHA256');
 });

@@ -12,7 +12,14 @@ import { skip, chromium } from './helpers-note-link.mjs';
 const PAGE = pathToFileURL(path.join(ROOT, 'site', 'index.html')).href;
 const SIZES = [{ width: 320, height: 640 }, { width: 375, height: 812 }, { width: 1280, height: 800 }];
 let browser;
-before(async () => { if (!skip) browser = await chromium.launch(); });
+// Hermetic: the page's one external request (the Cloudflare analytics beacon) is blocked, so
+// tests never reach the network; every check here must hold without it.
+before(async () => {
+  if (skip) return;
+  browser = await chromium.launch();
+  const real = browser.newContext.bind(browser);
+  browser.newContext = async (o) => { const c = await real(o); await c.route(/^https?:/, (r) => r.abort()); return c; };
+});
 after(async () => { if (browser) await browser.close(); });
 
 // What the reader sees: the language of the visible hero headline.
