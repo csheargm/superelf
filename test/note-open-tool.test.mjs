@@ -128,7 +128,7 @@ test('mutation control: with the content rule removed, the first scenario fails'
 
 test('wiring: boot and reload call the rule, reload only for a different note', () => {
   assert.match(E, /const BY_CONTENT=!\(opts&&opts\.toolByContent===false\);/, 'default on');
-  assert.match(E, /const wasId=NB\.id; await pull\(true\);[\s\S]*?const nf=NB\.id!==wasId\?applyOpenTool\(\):false;\s*if\(tool==='text'\) enterTextMode\(nf\);/,
+  assert.match(E, /userPicked=false;[^\n]*\n\s*const wasId=NB\.id; await pull\(true\);[\s\S]*?const rule=NB\.id!==wasId&&!userPicked;[\s\S]*?const nf=rule\?applyOpenTool\(\):false;\s*if\(tool==='text'\) enterTextMode\(nf\);/,
     'reload: a different notebook id → choose; same id → keep');
   assert.match(E, /await pull\(false\);[^\n]*\n\s*if\(!userPicked\)\{ if\(tool==='text'\) exitTextMode\(\); const nf=applyOpenTool\(\); if\(tool==='text'\) enterTextMode\(nf\); \}/,
     'boot: after the first pull, unless the user picked a tool in the load window');
@@ -150,7 +150,8 @@ test('a tool tapped while the note is still loading wins over the content rule (
   assert.equal((ENG.match(/userPicked=true; (?:if\(!inking\) )?await setTool\(/g) || []).length, 2, 'both mode tabs set it');
   assert.match(ENG, /if\(!userPicked\)\{ if\(tool==='text'\) exitTextMode\(\); const nf=applyOpenTool\(\);/, 'boot gates the rule on the flag, not on tool===OPEN_TOOL');
   assert.ok(!/if\(tool===OPEN_TOOL\)\{ if\(tool==='text'\) exitTextMode/.test(ENG), 'CONTROL: the old equality gate is gone');
-  assert.match(ENG, /if\(NB\.id!==wasId\)\{ userPicked=false; if\(tool==='text'\) exitTextMode\(\); \}/, 'a new note lets the content pick again, out of text mode first');
+  assert.match(ENG, /if\(rule&&tool==='text'\) exitTextMode\(\);/, 'a new note leaves text mode before the content picks');
+  assert.ok(ENG.indexOf('userPicked=false;   // from the START') < ENG.indexOf('const wasId=NB.id; await pull(true);'), 'the flag resets before the load, so a tap during it wins');
 });
 
 // Owner 2026-11-13 (iPhone): an AI summary — typed headings and bullets, plus a stray ink dot from
@@ -178,4 +179,8 @@ test('textStartsFirst compares the first typed line with the top-most ink, in pa
   assert.match(STARTS, /for\(const im of images\) if\(\(im\.y\|\|0\)<inkTop\) inkTop=im\.y\|\|0;/, 'a picture\'s top counts as the top-most visual');
   assert.match(STARTS, /return \(b\.top-pr\.top\)\/\(pr\.width\/W\) <= inkTop\*W;/, 'screen px → page px, ink y is normalised by W');
   assert.match(APPLY, /openToolFor\(pg,OPEN_TOOL,BY_CONTENT,BY_CONTENT&&pg\?textStartsFirst\(pg\):false\)/, 'the measured answer reaches the rule');
+});
+
+test('a pane that cannot be measured (hidden) opens a page with text on T, never on a pen', () => {
+  assert.match(STARTS, /if\(!pr\.width\|\|!W\) return true;/);
 });

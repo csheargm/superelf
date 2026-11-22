@@ -4004,7 +4004,9 @@
       const strokes=(pg&&pg.strokes)||[], images=(pg&&pg.images)||[]; if(!strokes.length&&!images.length) return true;
       let inkTop=Infinity; for(const s of strokes) for(const pt of (s.p||[])) if(pt[1]<inkTop) inkTop=pt[1];
       for(const im of images) if((im.y||0)<inkTop) inkTop=im.y||0;   // a picture is placed in the same page units as ink
-      const pr=pageInner.getBoundingClientRect(); if(!pr.width||!W) return false;
+      // Not measurable (the pane is hidden, e.g. a collapsed Bible note): text wins, so a tap meant
+      // to type can never land as a stroke (review 2026-11-22).
+      const pr=pageInner.getBoundingClientRect(); if(!pr.width||!W) return true;
       const it=document.createTreeWalker(textLayer,NodeFilter.SHOW_TEXT);
       for(let n; (n=it.nextNode());){ if(!n.nodeValue.trim()) continue;
         const rg=document.createRange(); rg.selectNodeContents(n); const b=rg.getBoundingClientRect();
@@ -4338,11 +4340,13 @@
         const r=await flushSave();                              // still the OLD scope here
         guard.reset();                                          // a failure becomes a sticky carried-over notice
         if(applyScope) await applyScope();                      // …only now does the app repoint its closures
+        userPicked=false;   // from the START of the switch: a tool tapped while it loads wins (review 2026-11-22)
         const wasId=NB.id; await pull(true); setupCanvases(); syncToolsTop(); redrawPage(); renderTextLayer(); updateUndo();
         // A DIFFERENT notebook id = another note opened: choose its tool. The same id = a refresh, and
         // the tool the user chose stays. TODO(R4 seam): the open-tool rules could move to their own file.
-        if(NB.id!==wasId){ userPicked=false; if(tool==='text') exitTextMode(); }   // a new note: the content picks again; leave text first, as boot does
-        const nf=NB.id!==wasId?applyOpenTool():false;
+        const rule=NB.id!==wasId&&!userPicked;   // a new note with no tap during the load: the content picks
+        if(rule&&tool==='text') exitTextMode();      // leave text first, as boot does
+        const nf=rule?applyOpenTool():false;
         if(tool==='text') enterTextMode(nf);
         return r; },
       resize:()=>{ setupCanvases(); syncToolsTop(); },

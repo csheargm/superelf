@@ -22,14 +22,14 @@ const DOT = { p: [[0.1, 0.9, 0.5], [0.12, 0.91, 0.5]], c: '#1c1e1d', w: 0.004, t
 const TOP_INK = { p: [[0.1, 0.004, 0.5], [0.4, 0.008, 0.5]], c: '#1c1e1d', w: 0.004, t: 'pen' };     // above any text
 const SUMMARY = '<h2>AI summary · AI 总结 — This week · 本周 Nov 9–15, 2026</h2><ul><li>FDE stands for forward deployed engineer, a role that sits with customers and ships integrations in their environment every week</li></ul>';
 const SPECK = { p: [[0.3, 0.089, 0.5]], c: '#1c1e1d', w: 0.004, t: 'pen' };   // one point: the owner's real summary carried exactly this
-const NOTES = { speck: [SUMMARY, [SPECK]], sumdot: [SUMMARY, [DOT]], summary: [SUMMARY, []], inkfirst: ['<div>typed under the ink</div>', [TOP_INK]], ink: ['', [TOP_INK]] };
+const NOTES = { speck: [SUMMARY, [SPECK]], sumdot: [SUMMARY, [DOT]], summary: [SUMMARY, []], inkfirst: ['<div>typed under the ink</div>', [TOP_INK]], ink: ['', [TOP_INK]], photo: ['', [], [{ path: 'missing.jpg', x: 0.1, y: 0.05, w: 0.5, h: 0.3 }]] };   // photo: a picture and nothing else (owner 2026-11-22)
 
 function seed(root) {
   const d = path.join(root, 'workspace', 'data', 'notes'); fs.mkdirSync(d, { recursive: true });
   const t = Date.now(); const entries = [];
-  Object.entries(NOTES).forEach(([id, [html, strokes]], i) => {
+  Object.entries(NOTES).forEach(([id, [html, strokes, images = []]], i) => {
     fs.writeFileSync(path.join(d, `entry-${id}.json`), JSON.stringify({ v: 2, id, created: t, updated: t, template: 'plain',
-      pages: [{ id: 'p' + id, created: t, updated: t, strokes, pageHtml: html, images: [] }] }));
+      pages: [{ id: 'p' + id, created: t, updated: t, strokes, pageHtml: html, images }] }));
     entries.push({ id, title: id, created: t - i, updated: t - i, preview: '' });
   });
   fs.writeFileSync(path.join(d, 'journal.json'), JSON.stringify({ v: 1, entries }));
@@ -43,7 +43,7 @@ after(teardown);
 test('iPhone: each note opens in the mode it starts with, and one tab is always lit', { skip }, async () => {
   const ctx = await newContext(PHONE); const page = await ctx.newPage();
   const frame = await openJournal(page, { touch: true });
-  for (const [id, want] of [['ink', 'draw'], ['sumdot', 'text'], ['inkfirst', 'draw'], ['summary', 'text'], ['ink', 'draw'], ['sumdot', 'text']]) {
+  for (const [id, want] of [['ink', 'draw'], ['sumdot', 'text'], ['inkfirst', 'draw'], ['summary', 'text'], ['ink', 'draw'], ['sumdot', 'text'], ['photo', 'draw'], ['summary', 'text']]) {
     await open(page, frame, id);
     const l = await lit(frame);
     assert.ok(l.text || l.draw, `${id}: a mode tab is selected (was: neither)`);
