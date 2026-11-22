@@ -22,14 +22,14 @@ const codeOnly = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|\s)\/\/[^
 
 // The REAL mapper, run — not a retyped copy.
 const R = loadRelayCore(async () => {});
-const SERVER_401 = 'Wrong username or PIN · 用户名或 PIN 错误';
+const SERVER_401 = 'Wrong username or password · 用户名或密码错误';
 
 test('a refused sign-in shows the server reason, not "signed out"', async () => {
   const f = await R.relayHttpFail(new Response(JSON.stringify({ error: SERVER_401 }), { status: 401 }));
   assert.equal(f.code, 'unauthorized', 'the code is still the shared one — no new vocabulary');
   const shown = R.relayText(f, 0, 'credentials');
-  assert.match(shown, /Wrong username or PIN/, 'the actual reason must reach the user');
-  assert.match(shown, /用户名或 PIN 错误/, 'bilingual, house style');
+  assert.match(shown, /Wrong username or password/, 'the actual reason must reach the user');
+  assert.match(shown, /用户名或密码错误/, 'bilingual, house style');
   assert.equal(/Signed out/.test(shown), false, 'nobody signing in was "signed out"');
   assert.equal(/Sign in again/.test(shown), false, 'telling someone on the sign-in form to sign in again is circular');
 });
@@ -66,11 +66,18 @@ test('the sign-in call site declares its context', () => {
 
 test('the server states the reason bilingually', () => {
   const web = fs.readFileSync(path.join(ROOT, 'web.mjs'), 'utf8');
-  assert.match(web, /Wrong username or PIN · 用户名或 PIN 错误/, 'the 401 body carries the bilingual reason');
+  assert.match(web, /Wrong username or password · 用户名或密码错误/, 'the 401 body carries the bilingual reason');
   assert.equal(/"wrong username or PIN"/.test(web), false, 'the English-only version is gone');
 });
 
 test('other 401 renderings did not drift: still exactly one house sign-out sentence', () => {
   const n = (codeOnly(SHELL).match(/Signed out · 登录已过期/g) || []).length;
   assert.equal(n, 1, 'one sentence, one place (R3)');
+});
+
+test('the sign-in form asks for a password, not only a PIN (any password is accepted)', () => {
+  const html = fs.readFileSync(new URL('../web/index.html', import.meta.url), 'utf8');
+  assert.match(html, /id="lpin" type="password" placeholder="Password or PIN · 密码或 PIN"/);
+  assert.match(html, /No password yet: sign in with access token/);
+  assert.equal(/No PIN yet/.test(html), false, 'the PIN-only hint is gone');
 });
