@@ -6,6 +6,13 @@ FROM node:22-bookworm-slim
 RUN apt-get update \
  && apt-get install -y --no-install-recommends gnupg rclone openssl ca-certificates tar \
  && rm -rf /var/lib/apt/lists/*
+# AGENT_CLIS (the private owner node only, ops/private/docker-compose.yml): the Claude Code and
+# Codex CLIs the owner lane runs. Empty for the demo, which stays Ollama-only. Pinned versions.
+ARG AGENT_CLIS=
+RUN if [ -n "$AGENT_CLIS" ]; then \
+      apt-get update && apt-get install -y --no-install-recommends git ripgrep && rm -rf /var/lib/apt/lists/* \
+      && npm install -g --no-fund --no-audit $AGENT_CLIS && npm cache clean --force; \
+    fi
 WORKDIR /opt/superelf
 COPY . /opt/superelf
 RUN chmod +x /opt/superelf/ops/demo/entrypoint.sh /opt/superelf/backup.sh /opt/superelf/restore.sh \

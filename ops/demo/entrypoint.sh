@@ -26,7 +26,8 @@ tar -C /opt/superelf -cf - . | tar -C "$NODE_DIR" -xf -
 chmod 700 "$NODE_DIR"   # tar's "." entry resets it to the image's 755; visitor data is private
 SEED=/opt/superelf/ops/demo/config.demo.json; [[ -n "$PRIVATE" ]] && SEED=/opt/superelf/ops/private/config.private.json
 [[ -f "$NODE_DIR/config.json" ]] || cp "$SEED" "$NODE_DIR/config.json"
-mkdir -p "$NODE_DIR/workspace"   # the unused default project folder config.demo.json names
+mkdir -p "$NODE_DIR/workspace"
+[[ -n "$PRIVATE" ]] && mkdir -p "$NODE_DIR/.agent-home"   # HOME for the Claude/Codex CLIs (compose)   # the unused default project folder config.demo.json names
 cd "$NODE_DIR"
 [[ $# -gt 0 ]] && exec "$@"
 exec node web.mjs
