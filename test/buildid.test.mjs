@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { blobId, makeBuildId, BUILD_MARKER, HEAD_TTL_MS, GIT_SHORT, NOTE_SHORT } from '../lib/buildid.mjs';
+import { blobId, makeBuildId, BUILD_MARKER, HEAD_TTL_MS, GIT_SHORT, NOTE_SHORT, readRevision, REVISION_FILE } from '../lib/buildid.mjs';
 import { ROOT } from './helpers-panote-routing.mjs';
 
 const WEB = fs.readFileSync(path.join(ROOT, 'web.mjs'), 'utf8');
@@ -58,7 +58,7 @@ test('no git, or no PANote on disk: the id names what it can and never throws', 
 });
 
 test('web.mjs shows it in the shell version line and stamps it into every app page', () => {
-  assert.match(WEB, /import \{ makeBuildId, BUILD_MARKER \} from '\.\/lib\/buildid\.mjs';/);
+  assert.match(WEB, /import \{ makeBuildId, BUILD_MARKER, readRevision \} from '\.\/lib\/buildid\.mjs';/);
   assert.match(WEB, /const buildId = makeBuildId\(ROOT, gitHead\);/, 'one git invocation, the existing gitHead (R3)');
   assert.match(WEB, /const appVersion = \(\) => \{ try \{ const b = buildId\(\); return 'v' \+ [^\n]*\+ \(b \? ' · ' \+ b : ''\); \}/);
   const loop = WEB.indexOf('html = html.split(c.marker).join(snippet);');
@@ -86,4 +86,24 @@ test('id.head() is the same TTL\'d HEAD the id uses — one git invocation share
   assert.equal(heads, 2, 'and both notice a new HEAD after the TTL');
   assert.match(WEB, /const plusN = \(\) => \{ const n = autoSince\(ROOT, buildId\.head\(\)\)\.n;/, 'appVersion\'s +N reads the SAME HEAD');
   assert.match(WEB, /appNotesJson\(ROOT, undefined, buildId\.head\(\)\)/, 'and so does the Release Notes sheet');
+});
+
+test('a folder with no .git takes its commit from REVISION, so the build id changes on every deploy', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pa-rev-'));
+  assert.equal(readRevision(root), null, 'no file: no git half');
+  fs.writeFileSync(path.join(root, REVISION_FILE), 'abc1234def5678abc1234def5678abc1234def56\n');
+  assert.equal(readRevision(root), 'abc1234def5678abc1234def5678abc1234def56');
+  const a = makeBuildId(root, () => readRevision(root), () => 0)();
+  fs.writeFileSync(path.join(root, REVISION_FILE), 'fedcba9876543210fedcba9876543210fedcba98\n');
+  const b = makeBuildId(root, () => readRevision(root), () => 0)();
+  assert.equal(a, 'abc1234');
+  assert.notEqual(a, b, 'a new deploy is a new build id (the update signal)');
+  fs.writeFileSync(path.join(root, REVISION_FILE), 'not a sha; rm -rf /\n');
+  assert.equal(readRevision(root), null, 'only a hex sha is believed');
+});
+
+test('web.mjs falls back to REVISION when git has no answer; the image lets the file in', () => {
+  const web = fs.readFileSync(new URL('../web.mjs', import.meta.url), 'utf8');
+  assert.match(web, /catch \{ return readRevision\(ROOT\); \}/);
+  assert.match(fs.readFileSync(new URL('../ops/demo/Dockerfile.dockerignore', import.meta.url), 'utf8'), /^!REVISION$/m);
 });
