@@ -283,3 +283,19 @@ test('destroying the rail during a drag ends the gesture', async () => {
   p.rail.destroy();
   assert.equal(p.html.classList.contains('pch-moving'), false, 'gesture ended by destroy');
 });
+
+test('two floating panes: the one pressed comes to the front (regression: Note stuck under Ask AI)', async () => {
+  const p = page(); await settle();
+  p.rail.open(); p.rail.expand('chat'); p.btn('chat', 'pch-float-btn').fire('click');
+  p.rail.expand('note'); p.btn('note', 'pch-float-btn').fire('click');
+  const wins = byClass(p.body, 'pch-win').filter((w) => w.parentNode === p.body);
+  assert.equal(wins.length, 2, 'both panes float');
+  const holds = (w, k) => byClass(w, 'pas-head').some((h) => h === p.head(k));
+  const chat = wins.find((w) => holds(w, 'chat')), note = wins.find((w) => holds(w, 'note'));
+  const front = () => wins.filter((w) => w.classList.contains('pch-front'));
+  assert.deepEqual(front(), [note], 'the pane floated last starts on top');
+  chat.fire('pointerdown', { target: chat });
+  assert.deepEqual(front(), [chat], 'pressing the chat raises it, and only it');
+  note.fire('pointerdown', { target: note });
+  assert.deepEqual(front(), [note], 'pressing the note brings it back to the front');
+});
