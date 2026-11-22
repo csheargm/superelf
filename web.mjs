@@ -760,6 +760,9 @@ const PA_COMPONENTS = [
   { marker: '/* PA_BAR_HANDLE_CSS */', file: 'bar-handle.css' },
   // PAReadingHistory, the last chapter read and the recent-chapters list (reading.json): the Bible carries its marker. Appended last.
   { marker: '<!--PA_READING_HISTORY_UI-->', file: 'reading-history.inline.html' },
+  // PAInkFrame, the verse ink's handwriting frame and stroke geometry: its marker is at the top of ink-anchor.inline.html,
+  // so it is inlined just above PAInkAnchor's script (appended last: the loop runs in order, so it finds the marker once ink-anchor is in the page).
+  { marker: '<!--PA_INK_FRAME_UI-->', file: 'ink-frame.inline.html' },
 ];
 // Injected into EVERY served app page, unconditionally. The shell broadcasts the user's A-/A+
 // scale to each app (sendAppPrefs -> pa:'prefs'), but only chat-ui.inline.html ever applied it,

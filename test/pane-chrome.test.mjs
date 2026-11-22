@@ -247,8 +247,8 @@ test('served: split-ui carries the marker after its script; web.mjs registers pa
   const web = fs.readFileSync(path.join(ROOT, 'web.mjs'), 'utf8');
   const list = web.slice(web.indexOf('const PA_COMPONENTS = ['), web.indexOf('\n];', web.indexOf('const PA_COMPONENTS = [')));
   const files = [...list.matchAll(/file: '([^']+)'/g)].map((m) => m[1]);
-  assert.equal(files[files.length - 4], 'pane-chrome.inline.html');
-  assert.deepEqual(files.slice(-3), ['app-bar.inline.html', 'bar-handle.css', 'reading-history.inline.html'], 'PAAppBar, appended after it (ADR 0032), then its handle size (ADR 0034), then PAReadingHistory');
+  assert.equal(files[files.length - 5], 'pane-chrome.inline.html');
+  assert.deepEqual(files.slice(-4), ['app-bar.inline.html', 'bar-handle.css', 'reading-history.inline.html', 'ink-frame.inline.html'], 'PAAppBar, appended after it (ADR 0032), then its handle size (ADR 0034), then PAReadingHistory, then PAInkFrame');
 });
 
 // Browser test 2026-11-13: the FIRST float (no saved rect) opened at the minimum size in the top-left
