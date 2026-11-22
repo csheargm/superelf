@@ -54,6 +54,8 @@ const TEXT = { id: 'summary', page: { strokes: [], pageHtml: '<div>Summary of Oc
 const INK = { id: 'ink', page: { strokes: [{ p: [[0.1, 0.1]] }], pageHtml: '' } };
 const MIXED = { id: 'mixed', page: { strokes: [{ p: [[0.1, 0.1]] }], pageHtml: '<div>words</div>' } };
 const EMPTY = { id: 'empty', page: { strokes: [], pageHtml: '<div><br></div>&nbsp;' } };
+const PHOTO = { id: 'photo', page: { strokes: [], images: [{ path: 'p.jpg', x: 0.1, y: 0.05, w: 0.5, h: 0.3 }], pageHtml: '' } };
+const PHOTO_TEXT = { id: 'photo-text', page: { strokes: [], images: [{ path: 'p.jpg', x: 0.1, y: 0.4, w: 0.5, h: 0.3 }], pageHtml: '<div>notes</div>' } };
 
 test('a text-only note opened after drawing on an ink note opens on T; a click adds no stroke', () => {
   for (const host of ['select', 'pen']) {                    // Journal desktop / iPad
@@ -86,12 +88,21 @@ test('empty note → opts.tool; mixed text + ink → the draw tool', () => {
   assert.equal(f(INK.page, 'pen', true, true), 'pen', 'ink only → draw, whatever textFirst says');
 });
 
-test('Bible (opts.tool text): every page stays text, ink or not — a tap meant to type never becomes a stroke (review 2026-11-12)', () => {
+test('Bible (opts.tool text): a page with ink or a picture opens on Draw (the pen); a text page stays text (owner 2026-11-22)', () => {
   const p = pad('text');
   p.load(TEXT); assert.equal(p.st.tool, 'text');
-  assert.equal(p.st.entered.at(-1), 'focus', 'the Bible asked for text, so it still takes the caret');
-  p.load(EMPTY); assert.equal(p.st.tool, 'text');
-  p.load(INK); assert.equal(p.st.tool, 'text', 'the Bible keeps text on an ink page, as before this change');
+  assert.equal(p.st.entered.at(-1), 'focus', 'the Bible asked for text, so a text page still takes the caret');
+  p.load(EMPTY); assert.equal(p.st.tool, 'text', 'an empty page keeps the host tool');
+  p.load(INK); assert.equal(p.st.tool, 'pen', 'an ink page opens on the pen, as in the Journal');
+  p.load(PHOTO); assert.equal(p.st.tool, 'pen', 'a picture page opens on the pen');
+  p.load(TEXT); assert.equal(p.st.tool, 'text', 'and the next text note goes back to T');
+});
+
+test('pictures count like ink in every host; a text-first page with a picture opens on T', () => {
+  const f = decide();
+  for (const host of ['pen', 'text']) assert.equal(f(PHOTO.page, host, true, false), 'pen', `${host}: picture only → Draw`);
+  assert.equal(f(PHOTO_TEXT.page, 'text', true, true), 'text', 'words above the picture → T');
+  assert.equal(f(PHOTO_TEXT.page, 'text', true, false), 'pen', 'picture above the words → Draw');
 });
 
 test('a Draw chosen inside the text note stays until the next open; a same-note refresh keeps it', () => {
@@ -139,7 +150,7 @@ test('a tool tapped while the note is still loading wins over the content rule (
   assert.equal((ENG.match(/userPicked=true; (?:if\(!inking\) )?await setTool\(/g) || []).length, 2, 'both mode tabs set it');
   assert.match(ENG, /if\(!userPicked\)\{ if\(tool==='text'\) exitTextMode\(\); const nf=applyOpenTool\(\);/, 'boot gates the rule on the flag, not on tool===OPEN_TOOL');
   assert.ok(!/if\(tool===OPEN_TOOL\)\{ if\(tool==='text'\) exitTextMode/.test(ENG), 'CONTROL: the old equality gate is gone');
-  assert.match(ENG, /if\(NB\.id!==wasId\) userPicked=false;/, 'a new note lets the content pick again');
+  assert.match(ENG, /if\(NB\.id!==wasId\)\{ userPicked=false; if\(tool==='text'\) exitTextMode\(\); \}/, 'a new note lets the content pick again, out of text mode first');
 });
 
 // Owner 2026-11-13 (iPhone): an AI summary — typed headings and bullets, plus a stray ink dot from
@@ -163,7 +174,8 @@ test('a note that starts with ink opens with Draw LIT — never neither tab', ()
   assert.notEqual(e.st.lit, 'text', 'CONTROL: an empty page does not pick Text');
 });
 test('textStartsFirst compares the first typed line with the top-most ink, in page px', () => {
-  assert.match(STARTS, /if\(!strokes\.length\) return true;/);
+  assert.match(STARTS, /if\(!strokes\.length&&!images\.length\) return true;/);
+  assert.match(STARTS, /for\(const im of images\) if\(\(im\.y\|\|0\)<inkTop\) inkTop=im\.y\|\|0;/, 'a picture\'s top counts as the top-most visual');
   assert.match(STARTS, /return \(b\.top-pr\.top\)\/\(pr\.width\/W\) <= inkTop\*W;/, 'screen px → page px, ink y is normalised by W');
   assert.match(APPLY, /openToolFor\(pg,OPEN_TOOL,BY_CONTENT,BY_CONTENT&&pg\?textStartsFirst\(pg\):false\)/, 'the measured answer reaches the rule');
 });
