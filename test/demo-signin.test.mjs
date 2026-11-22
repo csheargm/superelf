@@ -32,6 +32,11 @@ function jwt(claims = {}, { key = privateKey, kid = KID, alg = 'ES256' } = {}) {
 }
 const listen = (srv) => new Promise((r) => srv.listen(0, '127.0.0.1', () => r(srv)));
 
+// Resolved when the fake model receives a SLOW turn: from then on the turn is in flight. A fixed
+// sleep raced a busy CI runner (the turn was not yet in flight, so the delete got 200).
+let slowArrived = () => {};
+const nextSlowTurn = () => new Promise((r) => { slowArrived = r; });
+
 before(async () => {
   const jwk = { ...publicKey.export({ format: 'jwk' }), kid: KID, alg: 'ES256', use: 'sig' };
   sb = await listen(http.createServer((req, res) => {
@@ -39,7 +44,7 @@ before(async () => {
     res.writeHead(404); res.end();
   }));
   ollama = await listen(http.createServer((req, res) => {
-    let body = ''; req.on('data', (c) => { body += c; }); req.on('end', () => setTimeout(() => { res.writeHead(200, { 'content-type': 'application/x-ndjson' });
+    let body = ''; req.on('data', (c) => { body += c; }); req.on('end', () => { if (body.includes('SLOW')) slowArrived(); }); req.on('end', () => setTimeout(() => { res.writeHead(200, { 'content-type': 'application/x-ndjson' });
       res.end(JSON.stringify({ message: { role: 'assistant', content: 'FAST-ANSWER' }, done: true }) + '\n'); }, body.includes('SLOW') ? 600 : 0));
   }));
   const url = `http://127.0.0.1:${sb.address().port}`;
@@ -217,8 +222,9 @@ test("delete my account removes only that member's workspace and quota rows, the
   assert.ok(fs.existsSync(path.join(wsA, 'conversations')) && fs.existsSync(path.join(wsB, 'conversations')));
   const quota = () => JSON.parse(fs.readFileSync(path.join(root, 'demo-quota.json'), 'utf8')).counts;
   assert.ok(quota()[`user:${a.j.uid}`] && quota()[`user:${b.j.uid}`]);
+  const inFlight = nextSlowTurn();
   const slow = chat(a, 'SLOW');
-  await new Promise((r) => setTimeout(r, 150));
+  await inFlight;
   assert.equal((await req(DEMO_DELETE_PATH, { method: 'POST', token: a.j.token, ip: a.ip })).status, 409, 'not while a turn can still write');
   const sr = await slow;
   assert.equal(sr.status, 200);

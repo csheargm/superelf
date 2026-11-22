@@ -64,11 +64,15 @@ jobs:
         # → 45 skipped); 8 were already counted, 37 were added after 2026-11-13 without a ceiling raise.
         # Without the opt-out those files now FAIL (test/helpers-e2e-gate.mjs).
         # 2026-11-21: EVERY OS +6, from landing-page-e2e.test.mjs (6 Playwright layout checks, skip on CI).
+        # 2026-11-22: windows 143 (measured 142 in run 44990421956, +1 slack like ubuntu). The 12 new
+        # Windows-only skips are bash+gpg backup tests (13 counted above, 25 now): backup-linux.test.mjs
+        # (11, the Linux passphrase file for backup.sh/restore.sh) plus one more in the backup files.
+        # All of them run on ubuntu.
         include:
           - os: ubuntu-latest
             max_skipped: 61
           - os: windows-latest
-            max_skipped: 131
+            max_skipped: 143
     env:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED

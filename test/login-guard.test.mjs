@@ -43,7 +43,9 @@ test('setup code: minted once, compared in constant time, gone after use', () =>
   try {
     const c = ensureSetupCode(root);
     assert.equal(ensureSetupCode(root), c, 'reused across restarts');
-    assert.equal((fs.statSync(path.join(root, SETUP_CODE_FILE)).mode & 0o077), 0, 'owner-only file');
+    // Windows has no POSIX mode bits: Node reports every writable file as 0o666, so the check
+    // would test Node, not this code. The file's privacy there rests on the user profile ACL.
+    if (process.platform !== 'win32') assert.equal((fs.statSync(path.join(root, SETUP_CODE_FILE)).mode & 0o077), 0, 'owner-only file');
     assert.equal(setupCodeOk(root, c.toLowerCase()), true, 'case-insensitive');
     assert.equal(setupCodeOk(root, 'x'), false);
     consumeSetupCode(root);
