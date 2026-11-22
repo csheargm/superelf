@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Rise 🌟</title>
+<style>
+html{font-size:calc(16px * var(--fs,1))}
+:root{--bg:#f5f3ff;--card:#fff;--text:#1a1530;--muted:#7570a0;--line:#e5e0f8;
+  --v:#8b5cf6;--s:#14b8a6;--l:#f59e0b;--h1:#7c3aed;--h2:#0d9488;--sh:0 2px 10px rgba(0,0,0,.08)}
+@media(prefers-color-scheme:dark){:root{--bg:#0f0d1c;--card:#1c1933;--text:#ede8ff;--muted:#9d99c0;
+  --line:#272450;--h1:#6d28d9;--h2:#0f766e}}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font:1rem/1.5 -apple-system,system-ui,sans-serif;min-height:100dvh}
+.hero{background:linear-gradient(135deg,var(--h1),var(--h2));color:#fff;
+  padding:calc(env(safe-area-inset-top,0px)+12px) 16px 20px;overflow:hidden;position:relative}
+.hero::after{content:'';position:absolute;inset:0;background:radial-gradient(circle at 78% 18%,
+  rgba(255,255,255,.18),transparent 60%);pointer-events:none}
+.hero-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.hero-title{font-size:20px;font-weight:800;letter-spacing:-.3px}
+.hero-sub{font-size:11px;opacity:.8;margin-top:1px}
+.stats{display:flex;gap:8px}
+.stat{background:rgba(255,255,255,.18);border-radius:10px;padding:8px 12px;flex:1;backdrop-filter:blur(6px)}
+.stat-v{font-size:20px;font-weight:800;line-height:1}
+.stat-l{font-size:10px;opacity:.85;margin-top:2px}
+.scroll{padding:12px 14px calc(env(safe-area-inset-bottom,0px)+68px)}
+.sec{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:14px 0 6px}
+.card{background:var(--card);border-radius:12px;padding:11px 13px;margin-bottom:7px;
+  box-shadow:var(--sh);display:flex;align-items:flex-start;gap:9px;border-left:3px solid var(--v)}
+.card.s{border-left-color:var(--s)}.card.l{border-left-color:var(--l)}
+.card-icon{font-size:20px;flex-shrink:0;margin-top:1px;line-height:1}
+.card-body{flex:1;min-width:0}
+.card-title{font-weight:600;font-size:13px}
+.card-meta{font-size:11px;color:var(--muted);margin-top:1px}
+.card-note{font-size:12px;margin-top:3px;opacity:.82}
+.del{background:none;border:none;color:var(--muted);font-size:17px;cursor:pointer;padding:1px 3px;line-height:1}
+.del.arm{color:var(--l);font-weight:700}
+.empty{text-align:center;padding:28px 16px;color:var(--muted);font-size:13px}
+.fab{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px)+62px);right:16px;
+  width:52px;height:52px;border-radius:50%;border:none;cursor:pointer;
+  background:linear-gradient(135deg,var(--h1),var(--h2));color:#fff;font-size:28px;
+  box-shadow:0 4px 16px rgba(124,58,237,.5);z-index:40;display:flex;align-items:center;justify-content:center}
+.fab:active{filter:brightness(.9)}
+.tabs{position:fixed;bottom:0;left:0;right:0;display:flex;border-top:1px solid var(--line);
+  background:var(--card);padding-bottom:env(safe-area-inset-bottom,0px);z-index:50}
+.tab{flex:1;border:none;background:none;padding:8px 4px 7px;cursor:pointer;color:var(--muted);
+  font-size:10px;display:flex;flex-direction:column;align-items:center;gap:2px}
+.tab span:first-child{font-size:21px;line-height:1}
+.tab.on{color:var(--v)}
+.view{display:none}.view.on{display:block}
+/* sheet */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:60;display:none;align-items:flex-end}
+.ov.on{display:flex}
+.sheet{background:var(--card);border-radius:18px 18px 0 0;padding:18px 16px calc(env(safe-area-inset-bottom,0px)+18px);
+  width:100%;animation:up .22s ease}
+@keyframes up{from{transform:translateY(50px);opacity:0}to{transform:none;opacity:1}}
+.sh-title{font-size:15px;font-weight:700;margin-bottom:14px}
+.type-row{display:flex;gap:7px;margin-bottom:12px}
+.tb{flex:1;padding:9px 2px;border-radius:9px;border:2px solid var(--line);background:none;
+  color:var(--text);cursor:pointer;font-size:12px;font-weight:600;text-align:center}
+.tb.vn{border-color:var(--v);background:var(--v);color:#fff}
+.tb.so{border-color:var(--s);background:var(--s);color:#fff}
+.tb.ld{border-color:var(--l);background:var(--l);color:#fff}
+.fl{font-size:11px;font-weight:700;color:var(--muted);display:block;margin-bottom:3px}
+.fr{margin-bottom:11px}
+.mrow{display:flex;align-items:center;gap:9px}
+.mrow input[type=range]{flex:1;accent-color:var(--v)}
+.mv{font-size:14px;font-weight:700;min-width:3ch;text-align:right}
+textarea{width:100%;font:inherit;font-size:13px;padding:7px 9px;border:1px solid var(--line);
+  border-radius:8px;background:var(--bg);color:var(--text);resize:none;min-height:64px}
+.go{width:100%;padding:12px;background:linear-gradient(135deg,var(--h1),var(--h2));color:#fff;
+  border:none;border-radius:11px;font:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:4px}
+#st{font-size:11px;color:var(--muted);text-align:center;min-height:16px;padding:3px 0 0}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-top">
+    <div><div class="hero-title">🌟 Rise</div><div class="hero-sub">Violin · Softball · Leadership</div></div>
+    <!--PA_SETTINGS_UI-->
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="stat-v" id="ss">–</div><div class="stat-l">🔥 streak</div></div>
+    <div class="stat"><div class="stat-v" id="sm">0</div><div class="stat-l">min today</div></div>
+    <div class="stat"><div class="stat-v" id="se">0</div><div class="stat-l">total entries</div></div>
+  </div>
+</div>
+
+<div id="v-home" class="view on">
+  <div class="scroll">
+    <div class="sec" id="td-label">Today</div>
+    <div id="td-list"></div>
+    <div class="sec">Recent</div>
+    <div id="re-list"></div>
+  </div>
+</div>
+<div id="v-chat" class="view"><!--PA_CHAT_UI--></div>
+<div id="st"></div>
+<button class="fab" id="fab">+</button>
+<nav class="tabs">
+  <button class="tab on" data-t="home"><span>🏠</span><span>Home</span></button>
+  <button class="tab" data-t="chat"><span>💬</span><span>Ask Coach</span></button>
+</nav>
+
+<div class="ov" id="ov">
+  <div class="sheet">
+    <div class="sh-title">Log Something</div>
+    <div class="type-row">
+      <button class="tb vn" data-tp="v">🎻 Violin</button>
+      <button class="tb" data-tp="s">🥎 Softball</button>
+      <button class="tb" data-tp="l">🌟 Lead</button>
+    </div>
+    <div class="fr" id="mr"><label class="fl">Minutes</label>
+      <div class="mrow"><input type="range" id="msl" min="5" max="120" step="5" value="30"><span class="mv" id="mv">30</span></div>
+    </div>
+    <div class="fr"><label class="fl">Notes (optional)</label>
+      <textarea id="ni" placeholder="What did you work on? How did it feel?"></textarea>
+    </div>
+    <button class="go" id="sv">Save</button>
+  </div>
+</div>
+
+<script>
+const SYS = `You are a warm, encouraging coach for a young person who plays violin and softball and is a natural leader. Help them reflect on practice, improve their skills, set goals, and grow as a leader. Be specific, brief, and upbeat — they read this on a phone.`;
+const ICON = {v:'🎻',s:'🥎',l:'🌟'};
+const LBL  = {v:'Violin practice',s:'Softball',l:'Leadership moment'};
+const CLS  = {v:'',s:'s',l:'l'};
+let tp='v', data={entries:[]};
+const store = PAStore.file('rise.json',{
+  shape:d=>d&&Array.isArray(d.entries)?'':'missing entries',
+  unreadable:w=>'Could not load ('+w+')',
+});
+const da = PATwoTap.rows();
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const toDay=()=>new Date().toISOString().slice(0,10);
+const fmtD=d=>{const o=new Date(d+'T12:00');return o.toLocaleDateString(undefined,{month:'short',day:'numeric'});};
+
+function calcStreak(){
+  const days=[...new Set(data.entries.map(e=>e.date))].sort().reverse();
+  let n=0,cur=new Date(toDay()+'T12:00');
+  for(const d of days){
+    const dd=new Date(d+'T12:00'),diff=Math.round((cur-dd)/86400000);
+    if(diff===0||diff===1){n++;cur=dd;}else break;
+  }
+  return n;
+}
+
+function row(e){
+  const arm=da.asking(e.id);
+  return `<div class="card ${CLS[e.type]||''}" data-id="${esc(e.id)}">
+    <div class="card-icon">${ICON[e.type]||'📝'}</div>
+    <div class="card-body">
+      <div class="card-title">${esc(LBL[e.type]||e.type)}${e.mins?` · <b>${e.mins}m</b>`:''}</div>
+      <div class="card-meta">${esc(fmtD(e.date))}</div>
+      ${e.note?`<div class="card-note">${esc(e.note)}</div>`:''}
+    </div>
+    <button class="del${arm?' arm':''}" data-del="${esc(e.id)}">${arm?PATwoTap.LABEL:'×'}</button>
+  </div>`;
+}
+
+function render(){
+  const td=toDay(), todayEnt=data.entries.filter(e=>e.date===td).reverse();
+  const recEnt=data.entries.filter(e=>e.date!==td).slice().reverse().slice(0,15);
+  const todayMins=todayEnt.reduce((s,e)=>s+(e.mins||0),0);
+  document.getElementById('ss').textContent=calcStreak();
+  document.getElementById('sm').textContent=todayMins;
+  document.getElementById('se').textContent=data.entries.length;
+  document.getElementById('td-label').textContent=todayEnt.length?`Today · ${td}`:'Today — nothing yet';
+  document.getElementById('td-list').innerHTML=todayEnt.length?todayEnt.map(row).join('')
+    :'<div class="empty">Tap + to log practice or a great moment!</div>';
+  document.getElementById('re-list').innerHTML=recEnt.length?recEnt.map(row).join('')
+    :'<div class="empty">Your history will appear here 🌱</div>';
+}
+
+async function persist(){
+  const mins=data.entries.filter(e=>e.date===toDay()).reduce((s,e)=>s+(e.mins||0),0);
+  const r=await store.save(data);
+  status(r||'Saved ✓',r?0:1800);
+  PA.req('save-data',{path:'face.json',what:'data',data:{value:mins+'m',ts:Date.now()}});
+}
+function status(msg,ttl){
+  const el=document.getElementById('st');el.textContent=msg;
+  if(ttl)setTimeout(()=>{if(el.textContent===msg)el.textContent='';},ttl);
+}
+
+// Tabs
+document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{
+  const t=b.dataset.t;
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.t===t));
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+t));
+  document.getElementById('fab').style.display=t==='chat'?'none':'';
+}));
+
+// Add sheet
+const ov=document.getElementById('ov');
+document.getElementById('fab').addEventListener('click',()=>ov.classList.add('on'));
+ov.addEventListener('click',e=>{if(e.target===ov)ov.classList.remove('on');});
+const msl=document.getElementById('msl'),mv=document.getElementById('mv');
+msl.addEventListener('input',()=>{mv.textContent=msl.value;});
+document.querySelectorAll('.tb').forEach(b=>b.addEventListener('click',()=>{
+  tp=b.dataset.tp;
+  document.querySelectorAll('.tb').forEach(x=>{x.className='tb';});
+  b.className='tb '+(tp==='v'?'vn':tp==='s'?'so':'ld');
+  document.getElementById('mr').style.display=tp==='l'?'none':'';
+}));
+document.getElementById('sv').addEventListener('click',async()=>{
+  const note=document.getElementById('ni').value.trim();
+  const mins=tp==='l'?0:+msl.value;
+  data.entries.push({id:Date.now()+'-'+Math.random().toString(36).slice(2,6),type:tp,date:toDay(),mins,note});
+  render();ov.classList.remove('on');document.getElementById('ni').value='';
+  await persist();
+});
+
+// Delete
+document.getElementById('v-home').addEventListener('click',async e=>{
+  const id=e.target.closest('[data-del]')?.dataset.del;if(!id)return;
+  if(!da.press(id,render))return;
+  data.entries=data.entries.filter(x=>x.id!==id);render();await persist();
+});
+
+// PAChat
+const chat=PAChat.fullscreen({
+  defaultModel:'claude',placeholder:'Ask your coach anything…',system:SYS,
+  greeting:'Hi! I\'m your coach 🌟 Ask me about violin, softball drills, or how to be a great leader.',
+  persist:'rise-chats',
+  onClose:()=>document.querySelector('[data-t="home"]').click(),
+  onShow:()=>{document.getElementById('fab').style.display='none';},
+});
+document.querySelector('[data-t="chat"]').addEventListener('click',()=>setTimeout(()=>chat.open('general'),10));
+PASettings.attach({host:document.querySelector('.hero-top'),appPrompt:SYS});
+
+(async()=>{
+  const r=await store.load();
+  if(r.state==='ok')data=r.value;
+  else if(r.state==='failed'){status(r.text);return;}
+  render();
+})();
+</script>
+</body>
+</html>

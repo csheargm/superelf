@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" media="(prefers-color-scheme:light)" content="#f6f3ee">
+<meta name="theme-color" media="(prefers-color-scheme:dark)" content="#17171c">
+<title>教会 · Church</title>
+<style>
+html{font-size:calc(17px * var(--fs,1))}
+:root{--bg:#f6f3ee;--card:#fff;--text:#25222b;--muted:#7a7480;--line:#e4dfd8;--accent:#5b4a9e;--gold:#b8862b;--bad:#c0392b}
+@media(prefers-color-scheme:dark){:root{--bg:#17171c;--card:#23232b;--text:#ece9f2;--muted:#9a95a6;--line:#34343f;--accent:#9d8bec;--gold:#d9a84a;--bad:#ef7a6c}}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--text);font:1rem/1.5 -apple-system,system-ui,sans-serif;min-height:100dvh;display:flex;flex-direction:column}
+#nav{display:flex;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top,0px) + 10px) 14px 10px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+#nav h1{flex:1;font-size:1.1rem}
+button{font:inherit;cursor:pointer}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:8px 14px;font-weight:600}
+.btn.ghost{background:none;color:var(--accent);border:1.5px solid var(--accent)}
+.btn.arm,.x.arm{background:var(--bad);color:#fff;border-color:var(--bad)}
+#tabs{display:flex;background:var(--card);border-bottom:1px solid var(--line)}
+#tabs button{flex:1;background:none;border:0;padding:11px 4px;color:var(--muted);font-weight:600;border-bottom:3px solid transparent}
+#tabs button.on{color:var(--accent);border-color:var(--accent)}
+main{flex:1;padding:14px 14px calc(env(safe-area-inset-bottom,0px) + 70px)}
+.pane{display:none}.pane.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px}
+.row{display:flex;align-items:flex-start;gap:8px}.row .grow{flex:1;min-width:0}
+.t{font-weight:700}.m{color:var(--muted);font-size:.85rem}
+.x{background:none;border:0;color:var(--muted);font-size:1.1rem;padding:2px 8px;border-radius:8px}
+.done .t{text-decoration:line-through;color:var(--muted)}
+input,textarea{font:inherit;width:100%;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:9px 10px;margin-bottom:8px}
+textarea{min-height:120px;resize:vertical}
+.empty{text-align:center;color:var(--muted);padding:30px 10px}
+.notes{white-space:pre-wrap;margin-top:6px;font-size:.95rem}
+#status{position:fixed;left:14px;right:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);background:var(--card);color:var(--bad);border:1.5px solid var(--bad);border-radius:12px;padding:9px 12px;font-size:.85rem;text-align:center}
+#status:empty{display:none}
+.sec{font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:14px 0 8px}
+</style>
+</head>
+<body>
+<div id="nav"><h1>⛪ 教会 · Church</h1><button class="btn ghost" id="ask" type="button">✨ Ask · 提问</button></div>
+<div id="tabs">
+  <button type="button" data-tab="sermons" class="on">Sermons 讲道</button>
+  <button type="button" data-tab="prayers">Prayer 祷告</button>
+  <button type="button" data-tab="events">Events 活动</button>
+</div>
+<main>
+  <section class="pane on" id="p-sermons">
+    <div class="card">
+      <input id="s-title" placeholder="Sermon title · 讲道题目">
+      <input id="s-speaker" placeholder="Speaker · 讲员">
+      <input id="s-passage" placeholder="Passage · 经文 (e.g. John 3:16-21)">
+      <textarea id="s-notes" placeholder="Notes, takeaways, application · 笔记与应用"></textarea>
+      <button class="btn" id="s-add" type="button">Save sermon · 保存</button>
+    </div>
+    <div id="s-list"></div>
+  </section>
+  <section class="pane" id="p-prayers">
+    <div class="card">
+      <input id="pr-text" placeholder="Who or what to pray for · 为谁/为何祷告">
+      <button class="btn" id="pr-add" type="button">Add · 添加</button>
+    </div>
+    <div id="pr-list"></div>
+  </section>
+  <section class="pane" id="p-events">
+    <div class="card">
+      <input id="e-title" placeholder="Event · 活动 (e.g. Small group)">
+      <input id="e-date" type="date">
+      <input id="e-note" placeholder="Time / place / note · 时间地点">
+      <button class="btn" id="e-add" type="button">Add · 添加</button>
+    </div>
+    <div id="e-list"></div>
+  </section>
+</main>
+<div id="status"></div>
+
+<!--PA_CHAT_UI-->
+<!--PA_SETTINGS_UI-->
+<script>
+const SYSTEM='You are a warm, grounded companion for a Christian\'s church life. Help with understanding sermons and Scripture passages, turning notes into application, prayer, small-group questions and church-life decisions. Quote Scripture accurately and name the reference; say plainly where Christians disagree. Do not give medical or legal advice. Short, plain language; key terms in English / 中文.';
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+
+let data={sermons:[],prayers:[],events:[]};
+const file=PAStore.file('church-data.json',{
+  shape:(d)=>(d&&Array.isArray(d.sermons)&&Array.isArray(d.prayers)&&Array.isArray(d.events)?'':'missing sermons/prayers/events'),
+  unreadable:(why)=>'Church file unreadable · 教会数据无法读取 ('+why+')',
+});
+const setStatus=(t)=>{$('status').textContent=t||'';};
+
+function openPrayers(){return data.prayers.filter(p=>!p.answered).length;}
+function writeFace(){
+  // Extra for the home tile; a plain tile is the visible result of a failure, so silent is right (R5).
+  PA.req('save-data',{path:'face.json',what:'data',data:{value:String(openPrayers()),ts:Date.now()}}).catch(()=>{});
+}
+async function persist(){
+  if(!file.loaded){setStatus(file.error||'Not loaded yet · 尚未读取');return;}
+  setStatus(await file.save(data));
+  writeFace();
+}
+
+const delArm=PATwoTap.rows();
+function delBtn(key,render){return '<button type="button" class="x'+(delArm.asking(key)?' arm':'')+'" data-del="'+esc(key)+'">'+(delArm.asking(key)?PATwoTap.LABEL:'×')+'</button>';}
+
+function renderSermons(){
+  const l=[...data.sermons].sort((a,b)=>b.date.localeCompare(a.date));
+  $('s-list').innerHTML=l.length?l.map(s=>'<div class="card"><div class="row"><div class="grow"><div class="t">'+esc(s.title)+'</div>'
+    +'<div class="m">'+esc(s.date)+(s.speaker?' · '+esc(s.speaker):'')+(s.passage?' · '+esc(s.passage):'')+'</div></div>'
+    +'<button type="button" class="x" data-ask="'+esc(s.id)+'" title="Ask AI">✨</button>'+delBtn('s:'+s.id)+'</div>'
+    +(s.notes?'<div class="notes">'+esc(s.notes)+'</div>':'')+'</div>').join(''):'<div class="empty">No sermons yet · 还没有讲道笔记</div>';
+}
+function renderPrayers(){
+  const l=[...data.prayers].sort((a,b)=>(a.answered?1:0)-(b.answered?1:0)||b.added.localeCompare(a.added));
+  $('pr-list').innerHTML=l.length?l.map(p=>'<div class="card'+(p.answered?' done':'')+'"><div class="row">'
+    +'<button type="button" class="x" data-ans="'+esc(p.id)+'" title="Answered">'+(p.answered?'✅':'⬜')+'</button>'
+    +'<div class="grow"><div class="t">'+esc(p.text)+'</div><div class="m">'+(p.answered?'Answered · 已蒙应允 '+esc(p.answered):'Since · 自 '+esc(p.added))+'</div></div>'
+    +delBtn('p:'+p.id)+'</div></div>').join(''):'<div class="empty">No prayer requests · 暂无祷告事项</div>';
+}
+function renderEvents(){
+  const t=today(),l=[...data.events].sort((a,b)=>a.date.localeCompare(b.date));
+  const up=l.filter(e=>e.date>=t),past=l.filter(e=>e.date<t).reverse();
+  const card=(e)=>'<div class="card"><div class="row"><div class="grow"><div class="t">'+esc(e.title)+'</div><div class="m">'+esc(e.date)+(e.note?' · '+esc(e.note):'')+'</div></div>'+delBtn('e:'+e.id)+'</div></div>';
+  $('e-list').innerHTML=(up.length?up.map(card).join(''):'<div class="empty">No upcoming events · 暂无活动</div>')+(past.length?'<div class="sec">Past · 过去</div>'+past.map(card).join(''):'');
+}
+function renderAll(){renderSermons();renderPrayers();renderEvents();}
+
+async function add(kind){
+  if(!file.loaded){setStatus(file.error||'Not loaded yet · 尚未读取');return;}
+  if(kind==='s'){
+    const title=$('s-title').value.trim(); if(!title){setStatus('Title needed · 请填写题目');return;}
+    data.sermons.push({id:uid(),date:today(),title,speaker:$('s-speaker').value.trim(),passage:$('s-passage').value.trim(),notes:$('s-notes').value.trim()});
+    ['s-title','s-speaker','s-passage','s-notes'].forEach(i=>$(i).value='');
+  }else if(kind==='p'){
+    const text=$('pr-text').value.trim(); if(!text){setStatus('Write a request · 请填写内容');return;}
+    data.prayers.push({id:uid(),text,added:today(),answered:''}); $('pr-text').value='';
+  }else{
+    const title=$('e-title').value.trim(),date=$('e-date').value; if(!title||!date){setStatus('Event and date needed · 请填写活动和日期');return;}
+    data.events.push({id:uid(),title,date,note:$('e-note').value.trim()}); ['e-title','e-date','e-note'].forEach(i=>$(i).value='');
+  }
+  renderAll(); await persist();
+}
+$('s-add').addEventListener('click',()=>add('s'));
+$('pr-add').addEventListener('click',()=>add('p'));
+$('e-add').addEventListener('click',()=>add('e'));
+$('pr-text').addEventListener('keydown',e=>{if(e.key==='Enter')add('p');});
+$('e-title').addEventListener('keydown',e=>{if(e.key==='Enter')add('e');});
+
+document.querySelector('main').addEventListener('click',async(ev)=>{
+  const del=ev.target.closest('[data-del]'),ans=ev.target.closest('[data-ans]'),ask=ev.target.closest('[data-ask]');
+  if(ask){const s=data.sermons.find(x=>x.id===ask.dataset.ask); if(s) openChat('Help me apply this sermon.\nTitle: '+s.title+'\nPassage: '+s.passage+'\nSpeaker: '+s.speaker+'\nMy notes:\n'+s.notes);return;}
+  if(ans){const p=data.prayers.find(x=>x.id===ans.dataset.ans); if(p){p.answered=p.answered?'':today();renderAll();await persist();}return;}
+  if(del){
+    const key=del.dataset.del;
+    if(!delArm.press(key,renderAll)) return;
+    const [k,id]=[key[0],key.slice(2)];
+    const list={s:'sermons',p:'prayers',e:'events'}[k];
+    data[list]=data[list].filter(x=>x.id!==id); renderAll(); await persist();
+  }
+});
+
+document.querySelectorAll('#tabs button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id==='p-'+b.dataset.tab));
+}));
+
+const chat=PAChat.fullscreen({
+  defaultModel:'claude',placeholder:'Ask about a sermon, passage, or prayer…',system:SYSTEM,
+  greeting:'Peace · 平安。Ask about a sermon, a passage, or how to pray · 问点什么。',
+  getLabel:()=>'Church 教会',persist:'church-chats',
+});
+function openChat(seed){chat.open('general',seed?{seed}:undefined);}
+$('ask').addEventListener('click',()=>openChat());
+PASettings.attach({host:$('nav'),appPrompt:SYSTEM});
+
+(async()=>{
+  const r=await file.load();
+  if(r.state==='ok') data=r.value; else if(r.state==='failed') setStatus(r.text);
+  renderAll();
+  if(file.loaded) writeFace();
+})();
+</script>
+</body>
+</html>
