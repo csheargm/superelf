@@ -81,3 +81,8 @@ test('the sign-in form asks for a password, not only a PIN (any password is acce
   assert.match(html, /No password yet: sign in with access token/);
   assert.equal(/No PIN yet/.test(html), false, 'the PIN-only hint is gone');
 });
+
+test('no server reason asks for a PIN only', () => {
+  const web = fs.readFileSync(new URL('../web.mjs', import.meta.url), 'utf8');
+  assert.equal(/Sign in with your PIN|Wrong username or PIN/.test(web), false);
+});

@@ -524,7 +524,7 @@ const enqueue = (fn) => new Promise((resolve, reject) => {
 // /api/admin once the account has a PIN (a leaked Shortcut key must not become the owner's login).
 const apiKeyReqs = new WeakSet();
 const apiKeyBlocked = (req, user) => apiKeyReqs.has(req) && !!user.passHash;
-const API_KEY_REFUSED = JSON.stringify({ error: 'Sign in with your PIN for this · 此操作需用 PIN 登录' });
+const API_KEY_REFUSED = JSON.stringify({ error: 'Sign in with your password for this · 此操作需用密码登录' });
 const bearerOf = (req) => (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
 function userFor(req) {
   const given = bearerOf(req);
