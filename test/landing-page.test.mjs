@@ -69,7 +69,7 @@ test('only reviewed tags, attributes and classes', () => {
   const CLASSES = new Set(['wrap', 'bar', 'top', 'logo', 'nav', 'toggle', 'hero', 'eyebrow', 'grad', 'sub', 'cta',
     'btn', 'primary', 'band', 'intro', 'grid', 'card', 'foot', 'grow', 'split', 'mark', 'art', 'icon', 'big',
     'choice', 'diagram', 'fill1', 'fill2', 'fill3', 'fill4', 'soft', 'soft2', 'paper', 'ink', 'on', 'lo', 'lb', 'la',
-    'edge', 'dash', 'frame']);
+    'edge', 'dash', 'frame', 'join']);
   assert.doesNotMatch(raw, /<!--/, 'no comments: they would hide from the copy checks');
   for (const e of all) {
     assert.ok(TAGS.has(e.tag), `<${e.tag}>`);
@@ -87,7 +87,7 @@ test('only reviewed tags, attributes and classes', () => {
 });
 
 test('links go only to the demo, the repo, or an anchor on this page', () => {
-  const OK = new Set(['https://try.superelf.app', 'https://github.com/csheargm/superelf']);
+  const OK = new Set(['https://try.superelf.app', 'https://try.superelf.app/?join=1', 'https://github.com/csheargm/superelf']);
   const ids = new Set(all.map((e) => e.attrs.id).filter(Boolean));
   const links = byTag('a');
   assert.ok(links.length > 0);
@@ -97,6 +97,7 @@ test('links go only to the demo, the repo, or an anchor on this page', () => {
   }
   assert.ok(links.some((a) => a.attrs.href === 'https://try.superelf.app'), 'demo is linked');
   assert.ok(links.some((a) => a.attrs.href === 'https://github.com/csheargm/superelf'), 'code is linked');
+  assert.ok(links.some((a) => a.attrs.href === 'https://try.superelf.app/?join=1'), 'the waiting list opens on the demo (no cross-origin form here)');
 });
 
 test('the analytics beacon appears once, exactly as pinned, just before </body>', () => {
@@ -184,7 +185,7 @@ test('light and dark palettes keep text readable (WCAG AA 4.5:1)', () => {
 
 // Every claim was checked against the code (README, web.mjs CSP, lib/offline.mjs, lib/bible.mjs,
 // docs/demo-node.md, backup.sh). Change anything, re-verify what you touched, then re-pin.
-const FILE_SHA256 = '9c11510eb7748985bdb0fe7466905daf14ad13b3e7fc4159bea896a9c9bd2094';
+const FILE_SHA256 = 'ca22c42909b589bf10aec93dd684f8ea4632ad81e632f77ee0e84934914bce26';
 test('page matches the claims-verified version', () => {
   assert.equal(sha(file), FILE_SHA256, 'page changed: re-verify claims, links, contrast and the script, then update FILE_SHA256');
 });
