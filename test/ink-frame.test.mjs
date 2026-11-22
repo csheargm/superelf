@@ -54,7 +54,8 @@ test('handwriting goes on the line frame and moves as one block: same shape at e
 });
 
 test('REGRESSION: the same sentence on the shipped-before engine scattered across the verse when it re-wrapped', () => {
-  const before = execFileSync('git', ['show', 'origin/main:web/ink-anchor.inline.html'], { cwd: ROOT, encoding: 'utf8' });
+  // the engine before the line frame (origin/main has had the frame since 1a654f7, so it no longer shows the bug)
+  const before = execFileSync('git', ['show', '1a654f7^:web/ink-anchor.inline.html'], { cwd: ROOT, encoding: 'utf8' });
   const { dom, I } = writeSentence(before);
   const shape = rel(I);
   setWidth(dom, 200);
@@ -113,7 +114,7 @@ test('old records (one per stroke, pinned to words) are READ as one block: a let
   assert.equal(I.groups().length, 2, 'the eraser took the stroke under it');
 });
 
-test('pure: placeLine shares one scale and never enlarges; joinsBurst needs time, the same line, small pieces, side by side', () => {
+test('pure: placeLine shares one scale and never enlarges; joinsBurst needs time, small pieces, side by side (on ANY line: the caller puts it on the last stroke line)', () => {
   const Fr = makeDom().window.PAInkFrame;
   const items = [{ fx: 0, fy: 0, ext: { w: 100, h: 10 } }, { fx: 300, fy: 5, ext: { w: 100, h: 10 } }];
   assert.deepEqual(Fr.placeLine({ left: 10, top: 50 }, 200, items), [{ ox: 10, oy: 50, s: 0.5 }, { ox: 160, oy: 52.5, s: 0.5 }]);
@@ -122,7 +123,8 @@ test('pure: placeLine shares one scale and never enlarges; joinsBurst needs time
   const prev = { g, t: 1000, ext, box: { l: 12, t: 0, r: 22, b: 10 } };
   assert.equal(Fr.joinsBurst(prev, 1500, g, ext, box), true);
   assert.equal(Fr.joinsBurst(prev, 1000 + Fr.BURST_MS + 1, g, ext, box), false, 'too late');
-  assert.equal(Fr.joinsBurst(prev, 1500, { verse: 2, lang: 'en' }, ext, box), false, 'another line');
+  assert.equal(Fr.joinsBurst(prev, 1500, { verse: 2, lang: 'en' }, ext, box), true, 'a piece just over the line boundary is the same word (owner, Romans 7:5-6)');
+  assert.equal(Fr.joinsBurst({ ...prev, g: { verse: null } }, 1500, g, ext, box), false, 'unanchored ink seeds no burst');
   assert.equal(Fr.joinsBurst(prev, 1500, g, { w: 200, h: 10 }, box), false, 'a long stroke is a mark');
   assert.equal(Fr.joinsBurst({ ...prev, box: { l: 60, t: 0, r: 70, b: 10 } }, 1500, g, ext, box), false, 'too far from the last');
 });
