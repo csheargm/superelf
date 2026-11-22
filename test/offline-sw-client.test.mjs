@@ -17,7 +17,7 @@ const BLOCK = between(SHELL, '/* ══ PA_SW_CLIENT_BEGIN', 'PA_SW_CLIENT_END �
 assert.ok(BLOCK, 'the PA_SW_CLIENT block is in the composed shell');
 const CORE = BLOCK.slice(0, BLOCK.indexOf('const PASW=makeSwClient('));
 // eslint-disable-next-line no-new-func
-const { makeSwClient, swBuildOf, SW_PROBE_MS, swForgetAppPages } = new Function(`${CORE}\nreturn { makeSwClient, swBuildOf, SW_PROBE_MS, swForgetAppPages };`)();
+const { makeSwClient, swBuildOf, SW_PROBE_MS, swForgetAppPages, swSignedOut } = new Function(`${CORE}\nreturn { makeSwClient, swBuildOf, SW_PROBE_MS, swForgetAppPages, swSignedOut };`)();
 const FOOTER = '管家 · v5.0.0+3 · abc1234 · note deadbeef';
 
 function frameStub() {
@@ -255,4 +255,18 @@ test('sign-out drops every stored app page from the pa-* caches and keeps the sh
   assert.deepEqual([...store['pa-abc'].m.keys()], ['https://x/'], 'the shell page stays');
   assert.equal(store.other.m.size, 1, 'a cache that is not ours is untouched');
   assert.equal(await swForgetAppPages(null), 0, 'no Cache API: nothing to do');
+});
+
+test('signed-out: both the cache forget and the cookie sign-out run; either failure reaches the caller', async () => {
+  const posted = [];
+  await swSignedOut(null, async (u) => { posted.push(u); });
+  assert.deepEqual(posted, ['/app/-/signout']);
+  await assert.rejects(swSignedOut(null, async () => { throw new Error('offline'); }), /offline/);
+  let posted2 = 0;
+  await assert.rejects(swSignedOut({ keys: async () => { throw new Error('no cache'); } }, async () => { posted2++; }), /no cache/);
+  assert.equal(posted2, 1, 'the cookie sign-out still ran');
+});
+test('the shell enters the signed-out state through swSignedOut: at sign-out and at a boot with no live session', () => {
+  assert.match(SHELL, /async function logout\(\)\{[^\n]*swSignedOut\(window\.caches/);
+  assert.match(SHELL, /async function ensureToken\(\)\{[^]*?await swSignedOut\(window\.caches[^]*?setup-status/);
 });

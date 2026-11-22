@@ -89,6 +89,13 @@ async function swForgetAppPages(cachesApi){
   }
   return n;
 }
+// Entering the signed-out state (sign-out, or a boot whose session is gone): forget this device's
+// stored app pages and end the app cookie's session, so the next account on this browser can read
+// neither (ADR 0037). Both steps run; a failure of either reaches the caller.
+async function swSignedOut(cachesApi,post){
+  const [a,b]=await Promise.allSettled([swForgetAppPages(cachesApi),post('/app/-/signout')]);
+  const bad=[a,b].find((r)=>r.status==='rejected'); if(bad) throw bad.reason;
+}
 function makeSwClient(d){
   let route=SW_ROUTE_SRC, reg=null;
   const status={worker:'',bundle:'',probe:'',bible:'',error:''};

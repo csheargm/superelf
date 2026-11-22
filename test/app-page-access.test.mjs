@@ -101,3 +101,13 @@ test('shared app: loads for member B and signed out; data files stay 404 for eve
     assert.equal((await get('/app/alice/diary/meta.json', h)).status, 404);
   }
 });
+
+test('POST /app/-/signout ends the app cookie\'s session even when /api/logout never ran (offline sign-out)', async () => {
+  const { token } = await (await fetch(`http://127.0.0.1:${port}/api/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: TOK_A }) })).json();
+  const cookie = ((await get('/api/ping', bearer(token))).headers.get('set-cookie') || '').split(';')[0];
+  assert.equal((await get('/app/alice/diary/', { cookie })).status, 200);
+  const r = await fetch(`http://127.0.0.1:${port}/app/-/signout`, { method: 'POST', headers: { cookie } });
+  assert.equal(r.status, 200); assert.match(r.headers.get('set-cookie') || '', /pa_app=;.*Max-Age=0/);
+  assert.equal((await get('/app/alice/diary/', { cookie })).status, 404, 'the cookie is dead');
+  assert.equal((await get('/api/ping', bearer(token))).status, 401, 'and so is its session');
+});

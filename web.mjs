@@ -7,7 +7,7 @@ import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { demoOn, limitAudit, makeDiskMeter, makeQuotaStore, DEMO_QUOTA_FILE } from './lib/demo-quota.mjs';
 import { makeDemoUsers } from './lib/demo.mjs';
-import { appPageCookie, clearAppPageCookie, appPageToken, appIsShared, canViewAppPage } from './lib/app-page-access.mjs';
+import { appPageCookie, clearAppPageCookie, appPageToken, appPageCookieToken, appIsShared, canViewAppPage, APP_SIGNOUT_PATH } from './lib/app-page-access.mjs';
 import { injectDemoBoot } from './lib/demo-boot.mjs';
 import { makeSigninGate, authConfig } from './lib/demo-auth.mjs';
 import { makeDemoRoutes } from './lib/demo-routes.mjs';
@@ -1656,6 +1656,11 @@ const server = http.createServer(async (req, res) => {
     // user id is a public namespace, not a secret. Strict CSP + sandbox give the
     // app an opaque origin with NO network — it cannot read data or a token; it
     // only renders what its own shell brokers to it via postMessage.
+    if (req.method === 'POST' && p === APP_SIGNOUT_PATH) {   // ADR 0037: the signed-out shell ends the app cookie's session
+      const ck = appPageCookieToken(req);
+      if (ck) cfg.sessions.destroy(ck);
+      return send(res, 200, 'application/json', '{"ok":true}', { 'set-cookie': clearAppPageCookie(req) });
+    }
     if (req.method === 'GET' && p.startsWith('/app/')) {
       const parts = p.slice('/app/'.length).split('/');
       const uid = parts.shift();
