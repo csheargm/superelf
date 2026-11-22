@@ -599,3 +599,6 @@ Without it they now FAIL (R14), not pass as `# pass 0 / # fail 0`. To run them:
 - bible-data/ is exempt wholesale; exempt only known Scripture blobs instead.
 - Sign-in: a 401 without a JSON error shows relayHttpFail's "signed out" text, so the client's own
   "Wrong username or password" fallback is unreachable (the server always sends the reason). (GPT review 2026-11-22)
+- Waiting list (lib/demo-waitlist-ui.mjs): the form lives in the demo shell, so a first-time visitor
+  from a network over `new_users_per_ip_per_day` (or when `total_disk_gb` is reached) gets the quota page instead of the form, though
+  `POST /api/waitlist` needs no session. Fix: a tiny standalone `/join` page. (GPT review 2026-11-22)

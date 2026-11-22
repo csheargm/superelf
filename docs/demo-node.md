@@ -62,6 +62,32 @@ project (`demo.auth.supabase_url`). Signed out, a visitor still gets the shell a
 - Owner: add the demo origin (https://try.superelf.app) to Supabase > Authentication > URL
   Configuration > Redirect URLs, and put the project's public anon key in `demo.auth.supabase_anon_key`.
 
+## Waiting list · 等候名单 (lib/demo-waitlist.mjs)
+
+Visitors who want their own private superelf leave an email (optional note) from the drawer row
+"Want your own private superelf? · 想要自己的私人 superelf？", or from the front page's link to
+`https://try.superelf.app/?join=1`, which opens the same form. `POST /api/waitlist` exists on demo
+nodes only. Caps (`config.json` `"demo"`): `waitlist_per_ip_per_day` 5 (429), `waitlist_max_entries`
+5000 (507). The same email twice is stored once; the reply is the same either way, and never
+carries other entries. No email is sent.
+
+**Privacy · 隐私:** stored in `waitlist.jsonl` in the data root (beside `demo-users.json`, mode 600,
+outside every visitor workspace): one JSON line per entry, `{t, email, name, note}`. No IP, cookie
+or visitor id. It is in the nightly backup like the rest of the data root. **Retention:** kept until
+private hosting opens and each person is written to, then the file is deleted; any single entry is
+removed on request.
+
+- Read: `docker compose -p superelf-demo exec superelf cat /data/superelf/waitlist.jsonl`
+  (run in `ops/demo/`; `/data/superelf` is the node folder, `entrypoint.sh`).
+- Delete one entry: stop the node first, so no sign-up is appended while the file is rewritten
+  (run in `ops/demo/`): `docker compose -p superelf-demo stop superelf`, then
+  `docker compose -p superelf-demo run --rm --no-deps --entrypoint sh superelf -c "cd /data/superelf && grep -vF '\"email\":\"ann@example.org\"' waitlist.jsonl > waitlist.tmp; [ \$? -le 1 ] && chmod 600 waitlist.tmp && mv waitlist.tmp waitlist.jsonl"`
+  (a fixed-string match on the whole stored value, emails lower-cased; the file is replaced only
+  when grep succeeded), then `docker compose -p superelf-demo start superelf`. Delete
+  all: the same, with `rm /data/superelf/waitlist.jsonl` as the command.
+- Known limit: the form needs the demo shell, so a network over `new_users_per_ip_per_day` sees the
+  quota message instead (docs/TODO.md).
+
 ## Files · 文件 (`ops/demo/`)
 
 `Dockerfile` (code only, whitelist in `Dockerfile.dockerignore`), `docker-compose.yml` (project
