@@ -68,11 +68,14 @@ jobs:
         # Windows-only skips are bash+gpg backup tests (13 counted above, 25 now): backup-linux.test.mjs
         # (11, the Linux passphrase file for backup.sh/restore.sh) plus one more in the backup files.
         # All of them run on ubuntu.
+        # 2026-11-22: EVERY OS +12 (ubuntu 73, windows 155; measured 72 and 154 in run 45054412816, +1
+        # slack): demo-account-ui-e2e.test.mjs + demo-home-link.test.mjs, 12 Playwright e2e checks
+        # that skip on CI (PA_E2E_SKIP), from the sync of the private repo's demo work.
         include:
           - os: ubuntu-latest
-            max_skipped: 61
+            max_skipped: 73
           - os: windows-latest
-            max_skipped: 143
+            max_skipped: 155
     env:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED
