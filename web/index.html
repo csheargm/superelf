@@ -693,7 +693,7 @@ async function ensureToken(){
   }
   $('#dot').classList.add('ok');
 }
-async function logout(){ try{ await api('/api/logout',{method:'POST'}); }catch{} localStorage.removeItem('pa_session'); location.reload(); }
+async function logout(){ try{ await api('/api/logout',{method:'POST'}); }catch{} try{ await swForgetAppPages(window.caches); }catch(err){ alert('Could not clear saved app pages · 未能清除已保存的应用页面 — '+(err&&err.message||err)); } localStorage.removeItem('pa_session'); location.reload(); }
 
 /* ── New-feature key registry: maps feature-key → version added ── */
 // Update this when shipping new UI features; markNew() + PANewDot.mark() use these keys.

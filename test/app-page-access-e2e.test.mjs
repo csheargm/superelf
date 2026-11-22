@@ -40,15 +40,19 @@ async function shellOpens(token) {
     for (let i = 0; i < 200 && !statuses.length; i++) await page.waitForTimeout(50);
     const frame = page.frames().find((f) => f.url().includes('/app/alice/diary/'));
     const body = frame ? await frame.evaluate(() => document.body ? document.body.innerText : '') : '';
-    return { statuses, body };
+    // the srcdoc route (web/sw-client.js fetchText) fetches the same page with credentials:'same-origin'
+    const viaFetch = await page.evaluate(() => fetch('/app/alice/diary/', { credentials: 'same-origin' }).then((r) => r.status));
+    return { statuses, body, viaFetch };
   } finally { await ctx.close(); }
 }
 
 test('the author opens her unshared app in the shell iframe; another member gets 404', { skip, timeout: 90000 }, async () => {
   const a = await shellOpens(TOK_A);
-  assert.deepEqual(a.statuses, [200], 'author: the iframe navigation is allowed');
+  assert.equal(a.statuses[0], 200, 'author: the iframe navigation is allowed');
   assert.match(a.body, /diary-body/);
+  assert.equal(a.viaFetch, 200, 'author: the srcdoc-route fetch is allowed too');
   const b = await shellOpens(TOK_B);
-  assert.deepEqual(b.statuses, [404], 'other member: refused, as if missing');
+  assert.equal(b.statuses[0], 404, 'other member: refused, as if missing');
   assert.doesNotMatch(b.body, /diary-body/);
+  assert.equal(b.viaFetch, 404);
 });

@@ -17,7 +17,7 @@ const BLOCK = between(SHELL, '/* ══ PA_SW_CLIENT_BEGIN', 'PA_SW_CLIENT_END �
 assert.ok(BLOCK, 'the PA_SW_CLIENT block is in the composed shell');
 const CORE = BLOCK.slice(0, BLOCK.indexOf('const PASW=makeSwClient('));
 // eslint-disable-next-line no-new-func
-const { makeSwClient, swBuildOf, SW_PROBE_MS } = new Function(`${CORE}\nreturn { makeSwClient, swBuildOf, SW_PROBE_MS };`)();
+const { makeSwClient, swBuildOf, SW_PROBE_MS, swForgetAppPages } = new Function(`${CORE}\nreturn { makeSwClient, swBuildOf, SW_PROBE_MS, swForgetAppPages };`)();
 const FOOTER = '管家 · v5.0.0+3 · abc1234 · note deadbeef';
 
 function frameStub() {
@@ -212,7 +212,7 @@ test('the wiring in the composed shell: the part, openApp\'s one call, frameRef 
   assert.match(raw, /if\(T\)\{ const p=await ping\(\); if\(p===true\|\|\(p==='offline'&&\(UID=PASW\.recall\(SW_UID_KEY\)\)\)\)\{/, 'offline with a remembered sign-in: no login dialog; a 401 online still signs in again');
   assert.match(raw, /if\(Array\.isArray\(apps\)\) PASW\.remember\(SW_APPS_KEY,apps\); \}catch\{ apps=PASW\.recall\(SW_APPS_KEY\)\|\|\[\];/, 'the app list from the last online load');
   assert.match(BLOCK, /probeFrame:\(u\)=>\{ const f=document\.createElement\('iframe'\); f\.setAttribute\('sandbox','allow-scripts'\);/, 'the probe frame is sandboxed like the app frame');
-  assert.match(BLOCK, /fetchText:async\(u\)=>\{ const r=await fetch\(u,\{credentials:'omit'\}\);/, 'an app page is public: no token travels with it');
+  assert.match(BLOCK, /fetchText:async\(u\)=>\{ const r=await fetch\(u,\{credentials:'same-origin'\}\);/, 'the Path=/app/ cookie travels: an unshared app page needs its author (ADR 0037)');
   assert.match(BLOCK, /return \(await r\.arrayBuffer\(\)\)\.byteLength; \}/, 'the cap counts bytes, not characters');
 });
 
@@ -245,4 +245,14 @@ test('lib/offline: the tunables validate and default; the meta CSP drops what a 
   assert.deepEqual(bibleIndex(path.join(dir, 'gone')), new Array(66).fill(0));
   const real = path.join(ROOT, 'bible-data');
   if (fs.existsSync(real)) assert.equal(bibleIndex(real).reduce((a, b) => a + b, 0), 1189, 'the whole corpus: 1,189 chapters');
+});
+
+test('sign-out drops every stored app page from the pa-* caches and keeps the shell (ADR 0037)', async () => {
+  const mk = (urls) => { const m = new Map(urls.map((u) => [u, 1])); return { keys: async () => [...m.keys()].map((url) => ({ url })), delete: async (r) => m.delete(r.url), m }; };
+  const store = { 'pa-abc': mk(['https://x/', 'https://x/app/alice/diary/', 'https://x/app/bob/p/']), other: mk(['https://x/app/keep/']) };
+  const n = await swForgetAppPages({ keys: async () => Object.keys(store), open: async (k) => store[k] });
+  assert.equal(n, 2);
+  assert.deepEqual([...store['pa-abc'].m.keys()], ['https://x/'], 'the shell page stays');
+  assert.equal(store.other.m.size, 1, 'a cache that is not ours is untouched');
+  assert.equal(await swForgetAppPages(null), 0, 'no Cache API: nothing to do');
 });
