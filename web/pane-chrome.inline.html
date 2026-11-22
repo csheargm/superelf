@@ -33,6 +33,9 @@ html .pas-rail.pas-single .pas-head{display:flex}
 /* z-index LITERAL (see split-ui): above the rail (45), below .pac-fs/.pan-fs (50). */
 .pch-win{position:fixed;z-index:46;display:flex;flex-direction:column;background:var(--card,#fff);
   border:1px solid var(--line,#e2e2de);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.18);overflow:hidden}
+/* The window pressed last sits one step up (47, still below the 50 full-screen views): with two
+   floating panes, the one you touch comes to the front. */
+.pch-win.pch-front{z-index:47}
 .pch-win>.pas-slot{flex:1 1 auto;min-height:0}
 .pch-win .pas-head{cursor:move;touch-action:none}
 .pch-win .pas-dock{display:none}
@@ -52,6 +55,8 @@ html.pch-moving .pas-body{pointer-events:none}
   const L_FLOAT='Float · 浮动', L_DOCK='Dock · 停靠', L_CLOSE='Close · 关闭';
   const L_SAVE_ERR='Layout not saved · 布局未保存', L_READ_ERR='Layout not loaded · 布局未读取';
   const root=document.documentElement;
+  let front=null;   // the floating window on top (class pch-front); one per page, shared by every pane
+  function raise(w){ if(front===w) return; if(front) front.classList.remove('pch-front'); w.classList.add('pch-front'); front=w; }
 
   function clamp(r,vw,vh){
     const n=(v,d)=>{ if(v==null) return d; v=Number(v); return isFinite(v)?v:d; };   // null is 'unset', not 0 (browser test: first float opened 240x160 at 0,0)
@@ -121,6 +126,9 @@ html.pch-moving .pas-body{pointer-events:none}
         endDrag=drag(e,(dx,dy)=>{ const v=vp();   // cap the size at the far edges: a resize never moves the window
           rect={x:r0.x,y:r0.y,w:Math.max(MIN_W,Math.min(r0.w+dx,v.w-r0.x)),h:Math.max(MIN_H,Math.min(r0.h+dy,v.h-r0.y))}; place(); },()=>{ ctx.relayout(); save(); }); });
       ctx.head.addEventListener('pointerdown',onHeadDown);
+      // Capture: a press anywhere in the window (note, chat, header) raises it, even where an inner
+      // handler stops the event.
+      win.addEventListener('pointerdown',()=>raise(win),true);
       window.addEventListener('resize',onResize);
     }
     // Drag by the header while floating; a real move swallows the click that follows it, so a drag
@@ -143,6 +151,7 @@ html.pch-moving .pas-body{pointer-events:none}
       if(!win) build();
       win.insertBefore(ctx.slot,win.firstChild); win.style.display='';
       if(!win.parentNode) document.body.appendChild(win);
+      raise(win);   // a pane just floated is the one in use
       place(); fl.textContent='⇲'; fl.setAttribute('aria-label',L_DOCK); fl.title=L_DOCK;
       ctx.relayout(); save();
     }
