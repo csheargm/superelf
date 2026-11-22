@@ -11,6 +11,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { freePort, mkWebRoot, startWeb, stopWeb, waitReady } from './helpers-web.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
+import { waitBuilt } from './helpers-demo-build.mjs';
 import { QUOTA_MESSAGES } from '../lib/demo-quota.mjs';
 import { APP_MARKER, DEMO_APP_MESSAGES, parseIntent, parseApp, slugFrom } from '../lib/demo-app.mjs';
 import { DEMO_APP_TIP } from '../lib/demo-boot.mjs';
@@ -67,14 +68,17 @@ async function visit() {
 const chat = async (v, message) => (await (await req('/api/chat', { method: 'POST', token: v.token, ip: v.ip, body: JSON.stringify({ message }) })).text())
   .trim().split('\n').filter(Boolean).map((l) => JSON.parse(l));
 const doneOf = (ev) => ev.find((e) => e.type === 'done');
+// The build runs after the chat reply (lib/demo-build-job.mjs): wait for its job to end.
+const built = (v) => waitBuilt(req, v);
+const chatBuilt = async (v, message) => { const ev = await chat(v, message); return { ev, job: ev.some((e) => e.type === 'build') ? await built(v) : null }; };
 
 test('a visitor asks for an app: it is written to their namespace, listed, and served with the sandbox CSP', async () => {
   const v = await visit();
-  const ev = await chat(v, 'can you make me an app that says hello world');
-  const made = ev.find((e) => e.type === 'app-made');
-  assert.deepEqual(made, { type: 'app-made', uid: v.uid, slug: 'hello-world', title: 'Hello World' }, JSON.stringify(ev));
+  const { ev, job } = await chatBuilt(v, 'can you make me an app that says hello world');
+  assert.equal(job.status, 'done', JSON.stringify(job));
+  assert.equal(job.slug, 'hello-world'); assert.equal(job.title, 'Hello World');
   assert.ok(!ev.some((e) => e.type === 'delta' && e.text.includes(APP_MARKER)), 'the marker line is never streamed');
-  assert.match(doneOf(ev).text, /Created your app \*\*Hello World\*\*.*已创建应用/);
+  assert.match(doneOf(ev).text, /Building .*正在创建/);
   const page0 = fs.readFileSync(path.join(v.dir, 'hello-world', 'index.html'), 'utf8');
   assert.match(page0, /HELLO-DEMO/);
   assert.match(page0, /^<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'[^"]*connect-src 'none'">/, 'the policy is the page\'s first element (srcdoc route)');
@@ -87,8 +91,8 @@ test('a visitor asks for an app: it is written to their namespace, listed, and s
   assert.match(page.headers.get('content-security-policy'), /sandbox allow-scripts; default-src 'none'.*connect-src 'none'/);
   assert.match(await page.text(), /HELLO-DEMO/);
   // "change my app": the same slug is rewritten, no second app
-  const ev2 = await chat(v, 'change my app hello-world to say red');
-  assert.match(doneOf(ev2).text, /Updated your app/, JSON.stringify(ev2));
+  const r2 = await chatBuilt(v, 'change my app hello-world to say red');
+  assert.equal(r2.job.edited, true, JSON.stringify(r2));
   assert.match(fs.readFileSync(path.join(v.dir, 'hello-world', 'index.html'), 'utf8'), /RED-DEMO/);
   assert.ok(!fs.existsSync(path.join(v.dir, 'hello-world-2')));
 });
@@ -96,35 +100,35 @@ test('a visitor asks for an app: it is written to their namespace, listed, and s
 test('an edit naming a seeded app makes a new app; the seeded one is never overwritten', async () => {
   const v = await visit();
   const tasks = path.join(v.dir, 'tasks', 'index.html'), was = fs.readFileSync(tasks, 'utf8');
-  const ev = await chat(v, 'change my app tasks EDITSEEDED');
-  assert.match(doneOf(ev).text, /Created your app/, JSON.stringify(ev));
+  const { job } = await chatBuilt(v, 'change my app tasks EDITSEEDED');
+  assert.equal(job.edited, false, JSON.stringify(job));
   assert.equal(fs.readFileSync(tasks, 'utf8'), was);
 });
 
 test('another visitor cannot see or edit that app', async () => {
   const a = await visit(), b = await visit();
-  await chat(a, 'make me an app please');
+  await chatBuilt(a, 'make me an app please');
   const bApps = await (await req('/api/apps', { token: b.token })).json();
   assert.ok(!bApps.some((x) => x.name === 'hello-world'), 'not in another visitor\'s list');
   assert.equal((await req(`/app/${b.uid}/hello-world/`)).status, 404, 'not under the other visitor\'s path');
-  await chat(b, 'change my app hello-world to say red');   // b has no such app: a NEW app in b's own folder
+  await chatBuilt(b, 'change my app hello-world to say red');   // b has no such app: a NEW app in b's own folder
   assert.match(fs.readFileSync(path.join(a.dir, 'hello-world', 'index.html'), 'utf8'), /HELLO-DEMO/, 'a\'s app untouched');
 });
 
 test('bad model output is retried once; twice bad is a clear bilingual error, nothing written', async () => {
   const v = await visit();
-  const ok = await chat(v, 'make me an app FIRSTFORM');
-  assert.ok(ok.some((e) => e.type === 'app-made'), 'a <form> page is refused and the retry succeeds');
+  const ok = await chatBuilt(v, 'make me an app FIRSTFORM');
+  assert.equal(ok.job.status, 'done', 'a <form> page is refused and the retry succeeds');
   const retry = build[build.length - 1];
   assert.match(retry[retry.length - 1].content, /refused: .*<form>/, 'the retry says why');
   const before = fs.readdirSync(v.dir).length;
-  const bad = await chat(v, 'make me an app ALWAYSBAD');
-  assert.equal(bad.find((e) => e.type === 'error').text, `⚠ ${DEMO_APP_MESSAGES.bad_output}`);
-  assert.ok(!doneOf(bad));
+  const bad = await chatBuilt(v, 'make me an app ALWAYSBAD');
+  assert.equal(bad.job.status, 'failed');
+  assert.equal(bad.job.error, DEMO_APP_MESSAGES.bad_output);
   assert.equal(fs.readdirSync(v.dir).length, before, 'no app written');
 });
 
-test('over the disk cap the build is refused with the quota message', async () => {
+test('over the disk cap the build is refused with the quota message', async () => {   // checked before the turn, so no job starts
   const v = await visit();
   fs.writeFileSync(path.join(root, `workspace-${v.uid}`, 'big.bin'), Buffer.alloc(DEMO.user_disk_mb * 1024 * 1024 + 1));
   const r = await req('/api/chat', { method: 'POST', token: v.token, ip: v.ip, body: JSON.stringify({ message: 'make me an app' }) });
@@ -141,7 +145,7 @@ test('an ordinary question streams as before; the shell shows the first-use tip'
 });
 
 test('parsing: lenient marker, traversal-proof slugs, size cap', () => {
-  assert.deepEqual(parseIntent(`${APP_MARKER} {"edit":"../x","request":"a timer"}`), { edit: '', request: 'a timer' });
+  assert.deepEqual(parseIntent(`${APP_MARKER} {"edit":"../x","title":" My  Timer ","request":"a timer"}`), { edit: '', title: 'My Timer', request: 'a timer' });
   assert.equal(parseIntent(`${APP_MARKER} a timer`).request, 'a timer');
   assert.equal(parseIntent('hello'), null);
   assert.equal(slugFrom('../../etc/passwd'), 'etc-passwd');

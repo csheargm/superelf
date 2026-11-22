@@ -71,5 +71,5 @@ cap the reason is shown and the answer comes unsearched. Owner nodes keep their 
 (seeded from `ops/demo/ollama-models.json`), benches at most 8 new names, writes
 `/data/model-watch/model-watch-<date>.md`, and never switches a model. Unit:
 `ops/demo/superelf-demo-model-watch.{service,timer}` (Mondays 04:30). It needs root `docker exec`
-(no user-level unit can reach Docker on this VM), so it is NOT installed — install steps are in the
-service file's header. Run benches one at a time: the account's concurrency cap returns 429.
+(no user-level unit can reach Docker on this VM), so it is a root system unit: installed and enabled on
+the demo VM 2026-11-22 (first run Mon 2026-11-23 04:30 VM time; the VM runs on UTC); install steps are in the service file's header. Run benches one at a time: the account's concurrency cap returns 429.

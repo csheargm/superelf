@@ -564,7 +564,8 @@ test('no surface owns a private photo reader any more — enumerated, not spot-c
   // Comments are documentation: several of these files deliberately QUOTE the deleted code
   // ("capture=\"environment\" opens the camera…", "a private FileReader…"), and a sweep that
   // could not tell a comment from a statement would fail on its own scar notes.
-  const OWN_READER = /new FileReader\(|readAsDataURL|createObjectURL|capture\s*=/;
+  // createObjectURL(blob) of a JSON export (productivity-hub's download) is not a photo reader.
+  const OWN_READER = /new FileReader\(|readAsDataURL|createObjectURL\((?!blob\))|capture\s*=/;
   for (const rel of [...components, ...apps]) {
     const src = stripComments(read(...rel.split('/')).replace(/<!--[\s\S]*?-->/g, ''));
     const hit = src.split('\n').find((l) => OWN_READER.test(l));

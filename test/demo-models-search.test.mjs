@@ -10,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { freePort, mkWebRoot, startWeb, stopWeb, waitReady } from './helpers-web.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
+import { waitBuilt } from './helpers-demo-build.mjs';
 import { QUOTA_MESSAGES } from '../lib/demo-quota.mjs';
 import { APP_MARKER } from '../lib/demo-app.mjs';
 import { SEARCH_MARKER, parseSearch } from '../lib/demo-search.mjs';
@@ -77,11 +78,13 @@ async function visit() {
 const chat = async (v, body) => (await (await req('/api/chat', { method: 'POST', token: v.token, ip: v.ip, body: JSON.stringify(body) })).text())
   .trim().split('\n').filter(Boolean).map((l) => JSON.parse(l));
 const doneOf = (ev) => ev.find((e) => e.type === 'done') || {};
+const built = (v) => waitBuilt(req, v);
 
 test('the app is built by demo.app_model, chat stays on the lane model, and the app has Ask AI', async () => {
   const v = await visit(); calls.length = 0;
   const ev = await chat(v, { message: 'make me an app that counts water' });
-  assert.ok(ev.some((e) => e.type === 'app-made'), JSON.stringify(ev));
+  assert.ok(ev.some((e) => e.type === 'build'), JSON.stringify(ev));
+  assert.equal((await built(v)).status, 'done');   // the build runs after the reply (lib/demo-build-job.mjs)
   assert.deepEqual(calls.map((c) => c.model), ['chat-model', 'builder-model']);
   const page = fs.readFileSync(path.join(v.dir, 'counter', 'index.html'), 'utf8');
   assert.ok(hasAskAi(page), 'marker + PAChat mount written into the page');
@@ -103,6 +106,7 @@ test('an Ask AI turn from the app goes through the demo chat route and counts th
 test('app builds are capped per visitor per day with a bilingual reason', async () => {
   const v = await visit();
   await chat(v, { message: 'make me an app one' });
+  await built(v);
   const ev = await chat(v, { message: 'make me an app two' });
   assert.ok(ev.some((e) => e.type === 'error' && e.text.includes(QUOTA_MESSAGES.app_builds)), JSON.stringify(ev));
 });
@@ -125,11 +129,11 @@ test('web search: searched answer with server-added sources; over the cap it is 
 test('a marker after search results is never acted on; an app marker in an app chat is plain text', async () => {
   const v = await visit(); calls.length = 0;
   const ev = await chat(v, { message: 'WEBAPP find something' });
-  assert.ok(!ev.some((e) => e.type === 'app-made'), 'search results cannot steer an app build');
+  assert.ok(!ev.some((e) => e.type === 'build'), 'search results cannot steer an app build');
   assert.ok(!calls.some((c) => c.model === 'builder-model'));
   const ev2 = await chat(v, { message: 'APPINAPP', app: 'tasks' });
   assert.ok(ev2.some((e) => e.type === 'delta' && e.text.startsWith(APP_MARKER)), 'streamed, not held');
-  assert.ok(!ev2.some((e) => e.type === 'app-made'));
+  assert.ok(!ev2.some((e) => e.type === 'build'));
 });
 
 test('repeated component markers are kept once; the search URL must be Ollama\'s', () => {

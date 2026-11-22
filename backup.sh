@@ -19,7 +19,7 @@ set -euo pipefail
 umask 077   # every temp file this script makes is private
 # SUPERELF_REQUIRE_MARKER (the demo container): refuse unless that file exists — the capped disk
 # is mounted — before anything is written, so nothing is ever staged on the host disk.
-if [[ -n "${SUPERELF_REQUIRE_MARKER:-}" && ! -f "$SUPERELF_REQUIRE_MARKER" ]]; then echo "$(basename "$0"): $SUPERELF_REQUIRE_MARKER missing: the demo data disk is not mounted" >&2; exit 1; fi
+if [[ -n "${SUPERELF_REQUIRE_MARKER:-}" && ! -f "$SUPERELF_REQUIRE_MARKER" ]]; then echo "$(basename "$0"): $SUPERELF_REQUIRE_MARKER missing: the data disk is not mounted (or still locked)" >&2; exit 1; fi
 # SUPERELF_BUSY_MARKER (the demo container): a restore is running or did not finish — a backup of
 # that tree would replace a good archive of the same day, so none is made.
 if [[ -n "${SUPERELF_BUSY_MARKER:-}" && -e "$SUPERELF_BUSY_MARKER" ]]; then echo "backup: $SUPERELF_BUSY_MARKER exists (a restore is running or failed); not backing up" >&2; exit 1; fi

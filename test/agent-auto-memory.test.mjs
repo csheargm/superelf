@@ -198,6 +198,7 @@ const PROCESS_STARTS = {
   'lib/version-auto.mjs': { why: 'git', refs: ["execFileSync('git'"] },
   'tools/fetch-daily-digest.mjs': { why: 'node tools/websearch.mjs (its claude run goes through lib/runner.mjs runClaude)',
     refs: ['execFileSync(process.execPath'] },
+  'tools/privacy-scan.mjs': { why: 'git ls-files, rev-list, show (the public privacy scan)', refs: ["execFileSync('git'", "execFileSync('git'"] },
   'web.mjs': { why: 'git', refs: ["execFileSync('git'", "execFileSync('git'", "execSync('git rev-parse HEAD'"] },
 };
 const CHILD_PROCESS = /['"`](?:node:)?child_process['"`]/g;

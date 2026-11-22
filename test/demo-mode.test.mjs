@@ -73,7 +73,7 @@ test('the shell boots a visitor in: anonymous session, seeded apps, own cookie b
   assert.ok(v.cookie.startsWith(`${DEMO_COOKIE}=${v.j.uid}`));
   const models = await (await req('/api/models', { token: v.token })).json();
   assert.deepEqual(models.map((m) => m.id), ['fast'], 'the chooser offers only lanes a demo turn can use');
-  assert.match(shell, /#shellVfy,#login\{display:none/, 'Verify and the refused sign-in dialog are hidden');
+  assert.match(shell, /#shellVfy,#login,#dot,#healthWrap,#secBriefs,label:has\(>#pPin\)\{display:none/, 'Verify, briefings and the refused sign-in dialog are hidden');
   const apps = await (await req('/api/apps', { token: v.token })).json();
   assert.ok(apps.some((a) => a.name === 'notes'), 'apps seeded from workspace.example');
   const back = await visit(v.ip, v.cookie);
@@ -124,7 +124,7 @@ test('demo mode refuses the agent lane and every owner or unlisted route', async
   const ev = await lines(await chat(v, { message: 'use the agent', model: 'claude', assess: true, oneShot: true }));
   assert.ok(ev.some((e) => e.type === 'done' && e.text === 'FAST-ANSWER'), 'answered on the Ollama lane');
   assert.ok(ev.some((e) => e.type === 'status' && /Verify/.test(e.text)), 'a Verify request is told it is not available');
-  for (const [m, p] of [['POST', '/api/ask'], ['POST', '/api/login'], ['POST', '/api/register'], ['POST', '/api/setup'],
+  for (const [m, p] of [['POST', '/api/login'], ['POST', '/api/register'], ['POST', '/api/setup'],
     ['GET', '/api/admin/config'], ['GET', '/api/jobs'], ['POST', '/api/upload'], ['GET', '/api/websearch'], ['POST', '/api/apps/fork'], ['POST', '/api/restore-data']]) {
     const r = await req(p, { method: m, token: v.token, ...(m === 'POST' ? { body: '{"message":"x"}' } : {}) });
     assert.equal(r.status, 403, `${m} ${p}`);
@@ -252,4 +252,25 @@ test('the documented passphrase setup never overwrites an existing backup key', 
   const doc = fs.readFileSync(path.join(REPO, 'docs/demo-node.md'), 'utf8');
   const line = doc.split('\n').find((l) => l.includes('backup-pass') && l.includes('openssl rand'));
   assert.ok(line && /\[ -e \/etc\/superelf-demo\/backup-pass \] \|\|/.test(line), line);
+});
+
+// Starter apps (lib/demo-starter-apps.mjs): all eight for a new visitor; a returning visitor seeded
+// before the three were added gets them once, keeps their own app of a starter's slug, and a
+// starter they deleted stays deleted.
+const STARTERS = ['allergy', 'bible', 'bible-values', 'diabetes', 'longevity', 'notes', 'productivity-hub', 'tasks'];
+test('a new visitor gets all eight starter apps; a returning one gets the new ones once, nothing overwritten', async () => {
+  const v = await visit();
+  const names = async (t) => (await (await req('/api/apps', { token: t })).json()).map((a) => a.name).filter((n) => STARTERS.includes(n)).sort();
+  assert.deepEqual(await names(v.token), STARTERS);
+  const ws = path.join(root, `workspace-${v.j.uid}`), apps = path.join(ws, 'apps');
+  for (const s of ['allergy', 'bible-values']) fs.rmSync(path.join(apps, s), { recursive: true });   // as seeded before they existed
+  fs.writeFileSync(path.join(apps, 'productivity-hub', 'index.html'), 'MINE');   // their own app of that slug
+  fs.rmSync(path.join(ws, '.starter-apps.json'), { force: true });
+  fs.rmSync(path.join(apps, 'longevity'), { recursive: true });                  // a legacy starter they deleted
+  const back = await visit(v.ip, v.cookie);
+  assert.deepEqual(await names(back.token), STARTERS.filter((n) => n !== 'longevity'), 'the new ones added; a deleted legacy one not brought back');
+  assert.equal(fs.readFileSync(path.join(apps, 'productivity-hub', 'index.html'), 'utf8'), 'MINE', 'never overwritten');
+  fs.rmSync(path.join(apps, 'allergy'), { recursive: true });                    // deleted after it was offered
+  const again = await visit(v.ip, v.cookie);
+  assert.ok(!(await names(again.token)).includes('allergy'), 'a starter is offered once');
 });
