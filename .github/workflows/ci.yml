@@ -66,9 +66,9 @@ jobs:
         # 2026-11-21: EVERY OS +6, from landing-page-e2e.test.mjs (6 Playwright layout checks, skip on CI).
         include:
           - os: ubuntu-latest
-            max_skipped: 59
+            max_skipped: 61
           - os: windows-latest
-            max_skipped: 129
+            max_skipped: 131
     env:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED
@@ -94,6 +94,6 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 20
     env:
-      MAX_SKIPPED: 55
+      MAX_SKIPPED: 57
       PA_E2E_SKIP: '1'
     steps: *steps

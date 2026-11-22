@@ -75,7 +75,7 @@ another project), `entrypoint.sh`, `config.demo.json` (seeded on first start), `
    (Free plan), then in Porkbun > Domain Management > `superelf.app` > Authoritative Nameservers
    replace Porkbun's nameservers with the two Cloudflare shows. Wait until Cloudflare says the site
    is Active (the tunnel needs Cloudflare DNS). The demo lives at `try.superelf.app`; the bare
-   `superelf.app` is kept for the front page (`docs/site`), see `docs/plans/per-user-hosting.md`.
+   `superelf.app` is kept for the front page (`site/`), see `docs/plans/per-user-hosting.md`.
 2. **Tunnel（隧道）:** Zero Trust > Networks > Tunnels > Create (cloudflared). Public hostname
    subdomain `try`, domain `superelf.app` (= `try.superelf.app`) → service `http://superelf:8787`. Copy the token.
    Keep SSL/TLS > Edge Certificates > **Always Use HTTPS** on (the visitor cookie is `Secure`;

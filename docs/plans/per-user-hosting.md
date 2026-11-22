@@ -18,7 +18,7 @@ into a service by giving **each user their own node** (per-user instance ·
 
 | Name | Use | Stage |
 |---|---|---|
-| `superelf.app` | front page (`docs/site`) | now |
+| `superelf.app` | front page (`site/`) | now |
 | `try.superelf.app` | public demo: anonymous, capped, no lasting personal data | now |
 | `<user>.superelf.app` | one user's own node | pilot onward |
 
