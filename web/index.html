@@ -373,12 +373,12 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
 <dialog id="login"><form method="dialog">
   <h3 id="loginTitle" style="margin-bottom:12px">Sign in</h3>
   <input id="luser" placeholder="username" autocapitalize="none" autocomplete="username" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
-  <input id="lpin" type="password" placeholder="PIN" autocomplete="current-password" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
+  <input id="lpin" type="password" placeholder="Password or PIN · 密码或 PIN" autocomplete="current-password" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
   <input id="lname" placeholder="Your name" style="display:none;width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
   <div id="loginErr" style="color:var(--danger);font-size:13px;min-height:18px"></div>
   <button class="primary" id="loginBtn" style="width:100%;padding:10px;margin-top:6px">Sign in</button>
   <div style="text-align:center;margin-top:10px;font-size:14px"><a href="#" id="toReg" style="color:var(--accent)">Create an account</a></div>
-  <div style="text-align:center;margin-top:6px;font-size:12px"><a href="#" id="toTok" style="color:var(--muted)">No PIN yet: sign in with access token · 尚无 PIN：用访问令牌登录</a></div>
+  <div style="text-align:center;margin-top:6px;font-size:12px"><a href="#" id="toTok" style="color:var(--muted)">No password yet: sign in with access token · 尚无密码：用访问令牌登录</a></div>
   <input id="ltok" placeholder="access token (config.json web_token)" style="display:none;width:100%;padding:9px;margin-top:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
 </form></dialog>
 <script>
@@ -656,7 +656,7 @@ $('#toTok').onclick=(e)=>{ e.preventDefault(); $('#ltok').style.display=$('#ltok
 async function doAuth(){
   const username=$('#luser').value.trim().toLowerCase(), password=$('#lpin').value, name=$('#lname').value.trim();
   const tok=$('#ltok').value.trim();
-  if(!tok && (!username||!password)){ $('#loginErr').textContent='Enter a username and PIN.'; return false; } // token-only sign-in is allowed
+  if(!tok && (!username||!password)){ $('#loginErr').textContent='Enter a username and password · 请输入用户名和密码'; return false; } // token-only sign-in is allowed
   const path=regMode?'/api/register':'/api/login';
   // relayJson, not `await r.json()`: the auth gate can answer a non-JSON body, and parsing
   // it threw — leaving the sign-in form frozen with no message at all.
@@ -1473,7 +1473,7 @@ function relayText(f,sentBytes,what){
   // a session bug and hid the real reason (R5: the specific reason always wins).
   if(e.code==='unauthorized'&&e.signin) return String(e.error)+'。';   // demo: never signed in, not "expired"
   if(e.code==='unauthorized') return w===RELAY_NOUNS.credentials
-    ? String(e.error||'Wrong username or PIN · 用户名或 PIN 错误')+'。'
+    ? String(e.error||'Wrong username or password · 用户名或密码错误')+'。'
     : 'Signed out · 登录已过期 — '+w.en+' '+w.did+'. Sign in again, then retry · 请重新登录后重试。';
   // NOT the `sent` clause: nothing was sent, so naming a "sent" size here would contradict
   // the sentence it sits in. The size is stated as what is still waiting on the device.

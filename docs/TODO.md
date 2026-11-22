@@ -597,3 +597,5 @@ Without it they now FAIL (R14), not pass as `# pass 0 / # fail 0`. To run them:
 - Annotated tags are not inspected (tagger, tag message); `rev-list` peels them. Push tags only after a manual look.
 - A new ref excludes commits on the destination's remote-tracking refs; stale refs could hide commits. Fetch before pushing.
 - bible-data/ is exempt wholesale; exempt only known Scripture blobs instead.
+- Sign-in: a 401 without a JSON error shows relayHttpFail's "signed out" text, so the client's own
+  "Wrong username or password" fallback is unreachable (the server always sends the reason). (GPT review 2026-11-22)

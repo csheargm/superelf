@@ -524,7 +524,7 @@ const enqueue = (fn) => new Promise((resolve, reject) => {
 // /api/admin once the account has a PIN (a leaked Shortcut key must not become the owner's login).
 const apiKeyReqs = new WeakSet();
 const apiKeyBlocked = (req, user) => apiKeyReqs.has(req) && !!user.passHash;
-const API_KEY_REFUSED = JSON.stringify({ error: 'Sign in with your PIN for this · 此操作需用 PIN 登录' });
+const API_KEY_REFUSED = JSON.stringify({ error: 'Sign in with your password for this · 此操作需用密码登录' });
 const bearerOf = (req) => (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
 function userFor(req) {
   const given = bearerOf(req);
@@ -1614,7 +1614,7 @@ const server = http.createServer(async (req, res) => {
         for (const cand of cfg.users) if (cand.status === 'active' && !cand.passHash && tokenOk(b.token, cand.token)) { u = cand; ok = true; break; }
       }
       audit('login', { who: String(b.username || '').slice(0, 40), ok: !!ok });
-      if (!ok) { loginGuard.fail(gkeys); await sleep(400); return send(res, 401, 'application/json', '{"error":"Wrong username or PIN · 用户名或 PIN 错误"}'); }
+      if (!ok) { loginGuard.fail(gkeys); await sleep(400); return send(res, 401, 'application/json', '{"error":"Wrong username or password · 用户名或密码错误"}'); }
       if (byPin) loginGuard.success(gkeys.slice(1));   // the account only: one member's own good login must not reset the client's count
       const token = cfg.sessions.create(u.id, Date.now());
       return send(res, 200, 'application/json', JSON.stringify({ ok: true, token, uid: u.id, name: u.name, role: u.role }));
