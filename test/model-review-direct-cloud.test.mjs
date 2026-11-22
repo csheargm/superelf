@@ -93,7 +93,7 @@ async function setupNode(tmp, { onCall = () => {} } = {}) {
   const cfg = await loadConfig(root, { readOnly: true });
   const calls = [];
   const jobs = modelReviewJobs({ cfg, root, healthFile: () => path.join(root, MODEL_HEALTH_FILENAME), ask: grade,
-    auth: () => KEY, fetchImpl: async (u, o) => { onCall(cfg); return fakeOllamaCom(calls)(u, o); } });
+    auth: () => KEY, fetchImpl: async (u, o) => { onCall(root); return fakeOllamaCom(calls)(u, o); } });
   return { root, cfg, calls, catalog, jobs };
 }
 
@@ -113,13 +113,22 @@ test('a review on an ollama.com node calls bare names with the key and writes ch
   } finally { rmTemp(tmp); }
 });
 
+// The owner saves a new ollama_url to config.json mid-run; the live config (reloaded after a
+// debounce) still holds the old one, so only the fresh read at apply time can see it.
 test('the endpoint switched to a local daemon mid-review: nothing is written (the names were built for ollama.com)', async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pa-mrcloud-'));
   try {
-    const { root, cfg, jobs } = await setupNode(tmp, { onCall: (c) => { c.ollama_url = LOCAL; } });
-    const before = fs.readFileSync(configPath(root), 'utf8');
+    let before = null;
+    const switchFile = (root) => {
+      if (before) return;
+      const raw = JSON.parse(fs.readFileSync(configPath(root), 'utf8'));
+      before = JSON.stringify({ ...raw, ollama_url: LOCAL }, null, 2);
+      fs.writeFileSync(configPath(root), before);
+    };
+    const { root, cfg, jobs } = await setupNode(tmp, { onCall: switchFile });
     const out = await jobs['model-review'].run(cfg.users[0], { manual: true });
     assert.match(out.body, /ollama_url was edited/);
-    assert.equal(fs.readFileSync(configPath(root), 'utf8'), before, 'config.json untouched');
+    assert.equal(cfg.ollama_url, CLOUD, 'the in-memory config never saw the switch');
+    assert.equal(fs.readFileSync(configPath(root), 'utf8'), before, 'config.json is the owner\'s edit, untouched by the review');
   } finally { rmTemp(tmp); }
 });
