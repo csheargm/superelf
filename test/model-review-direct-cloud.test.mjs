@@ -76,7 +76,7 @@ async function grade({ prompt }) {
   return { ok: true, text: JSON.stringify(out) };
 }
 
-async function setupNode(tmp, { onCall = () => {} } = {}) {
+async function setupNode(tmp, { onCall = () => {}, declined = [] } = {}) {
   const root = path.join(tmp, 'root');
   fs.mkdirSync(path.join(root, 'workspace'), { recursive: true });
   const lane = (id, group, model) => ({ id, label: id.toUpperCase(), group, provider: 'ollama', model });
@@ -89,7 +89,7 @@ async function setupNode(tmp, { onCall = () => {} } = {}) {
   const catalog = ['fast-a', 'fast-b', 'fast-c', 'deep-a', 'deep-b', 'deep-c', 'star'];
   fs.writeFileSync(path.join(root, MODEL_HEALTH_FILENAME), JSON.stringify({ checked: 1, gone: {}, catalog, unknown: [], catalogError: null }));
   // Not the first review, so the run applies its change (a first review only reports).
-  fs.writeFileSync(path.join(root, MODEL_REVIEW_FILENAME), JSON.stringify({ reviewedAt: 1, catalogSeen: catalog, undo: null, declined: [] }));
+  fs.writeFileSync(path.join(root, MODEL_REVIEW_FILENAME), JSON.stringify({ reviewedAt: 1, catalogSeen: catalog, undo: null, declined }));
   const cfg = await loadConfig(root, { readOnly: true });
   const calls = [];
   const jobs = modelReviewJobs({ cfg, root, healthFile: () => path.join(root, MODEL_HEALTH_FILENAME), ask: grade,
@@ -130,5 +130,16 @@ test('the endpoint switched to a local daemon mid-review: nothing is written (th
     assert.match(out.body, /ollama_url was edited/);
     assert.equal(cfg.ollama_url, CLOUD, 'the in-memory config never saw the switch');
     assert.equal(fs.readFileSync(configPath(root), 'utf8'), before, 'config.json is the owner\'s edit, untouched by the review');
+  } finally { rmTemp(tmp); }
+});
+
+test('a model the owner undid on a local daemon (beam:cloud) stays declined after the switch to ollama.com', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pa-mrcloud-'));
+  try {
+    const { root, cfg, calls, jobs } = await setupNode(tmp, { declined: ['star:cloud'] });
+    const before = fs.readFileSync(configPath(root), 'utf8');
+    await jobs['model-review'].run(cfg.users[0], { manual: true });
+    assert.equal(calls.filter((c) => c.model === 'star').length, 0, 'the vetoed model is never called');
+    assert.equal(fs.readFileSync(configPath(root), 'utf8'), before, 'nothing changes');
   } finally { rmTemp(tmp); }
 });
