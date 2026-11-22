@@ -123,7 +123,8 @@ test('pure: placeLine shares one scale and never enlarges; joinsBurst needs time
   const prev = { g, t: 1000, ext, box: { l: 12, t: 0, r: 22, b: 10 } };
   assert.equal(Fr.joinsBurst(prev, 1500, g, ext, box), true);
   assert.equal(Fr.joinsBurst(prev, 1000 + Fr.BURST_MS + 1, g, ext, box), false, 'too late');
-  assert.equal(Fr.joinsBurst(prev, 1500, { verse: 2, lang: 'en' }, ext, box), true, 'a piece just over the line boundary is the same word (owner, Romans 7:5-6)');
+  assert.equal(Fr.joinsBurst(prev, 1500, { verse: 2, lang: 'en' }, ext, box), false, 'a word mark seeds no burst on another line (GPT review)');
+  assert.equal(Fr.joinsBurst({ ...prev, g: { ...g, frame: 'line' } }, 1500, { verse: 2, lang: 'en' }, ext, box), true, 'a piece just over the line boundary is the same word (owner, Romans 7:5-6)');
   assert.equal(Fr.joinsBurst({ ...prev, g: { verse: null } }, 1500, g, ext, box), false, 'unanchored ink seeds no burst');
   assert.equal(Fr.joinsBurst(prev, 1500, g, { w: 200, h: 10 }, box), false, 'a long stroke is a mark');
   assert.equal(Fr.joinsBurst({ ...prev, box: { l: 60, t: 0, r: 70, b: 10 } }, 1500, g, ext, box), false, 'too far from the last');

@@ -89,8 +89,10 @@
   const gap=(a,b)=>Math.max(0,a.l-b.r,b.l-a.r,a.t-b.b,b.t-a.b);
   // NOT same-line only: a dot of a character just over the line boundary is the same word, and the
   // caller puts it on the last stroke's line (owner, Romans 7:5-6, landscape→portrait, 2026-11-22).
+  // Across lines only from WRITING already on a line frame: a quick underline on the English words and
+  // then a mark on the Chinese words below are two marks, each on its own line (GPT review).
   function joinsBurst(prev,now,g,ext,box){
-    return !!(prev&&prev.g&&prev.g.verse!=null&&now-prev.t<=BURST_MS&&isSmall(prev.ext)&&isSmall(ext)&&gap(prev.box,box)<=NEAR);
+    return !!(prev&&prev.g&&prev.g.verse!=null&&(sameLine(prev.g,g)||isLine(prev.g))&&now-prev.t<=BURST_MS&&isSmall(prev.ext)&&isSmall(ext)&&gap(prev.box,box)<=NEAR);
   }
   // ── One word, one frame, on READ (old and new records, never rewritten): small handwriting pieces
   //    within NEAR of each other at the width they were written at, on two ADJACENT lines, are one word;

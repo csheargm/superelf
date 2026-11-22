@@ -117,6 +117,15 @@ test('pure: rehost moves a tiny dot on a boundary onto its word\'s line by the l
   assert.deepEqual(two.map((x) => x.k), ['a', 'a', 'a']);
 });
 
+test('a quick underline on English words and a mark on the Chinese words below stay two marks on their own lines (GPT review)', () => {
+  const P = page(); const e = P.v5.en.getBoundingClientRect(), z = P.v5.zh.getBoundingClientRect();
+  const yu = e.top + e.height - 4; stroke(P, [[PADL + 40, yu], [PADL + 70, yu], [PADL + 98, yu]], 1, 0);
+  stroke(P, [[PADL + 40, z.top + 4], [PADL + 55, z.top + 10], [PADL + 70, z.top + 4]], 2, 200);
+  assert.deepEqual(P.I.groups().map((g) => `${g.verse}${g.lang}`), ['5en', '5zh']);
+  const zTop = P.v5.zh.top, before = at(P.I); setWidth(P, PORTRAIT);
+  assert.equal(Math.round(at(P.I)[1].oy - before[1].oy), P.v5.zh.top - zTop, 'the Chinese mark follows the Chinese line');
+});
+
 test('erasing one stroke of a split word after the turn moves none of the others (GPT review)', () => {
   const P = page(); writeGapSentence(P, 200, 600);
   const shift = P.v6.en.top - P.v5.zh.top;
