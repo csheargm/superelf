@@ -135,6 +135,16 @@ test('old notes: small marks on the English text and on the Chinese text just be
   assert.ok(z.top - (e.top + e.height) <= 16, 'and they were within NEAR');
 });
 
+test('a small X on the English line, then a quick mark inside the Chinese line below: two notes (GPT review)', () => {
+  const P = page(); const e = P.v5.en.getBoundingClientRect(), z = P.v5.zh.getBoundingClientRect(), x0 = PADL + e.width + 0, yb = e.top + e.height - 12;
+  // an X past the end of the line's last row (over no character: writing), then a mark on the Chinese text
+  const lx = PADL + 900;
+  stroke(P, [[lx, yb], [lx + 8, yb + 8]], 1, 0); stroke(P, [[lx + 8, yb], [lx, yb + 8]], 2, 200);
+  stroke(P, [[lx, z.top + 2], [lx + 6, z.top + 8], [lx + 12, z.top + 2]], 3, 200);
+  assert.equal(P.I.groups()[0].frame, 'line', 'the X is writing');
+  assert.deepEqual(P.I.groups().map((g) => `${g.verse}${g.lang}`), ['5en', '5en', '5zh']);
+});
+
 test('erasing one stroke of a split word after the turn moves none of the others (GPT review)', () => {
   const P = page(); writeGapSentence(P, 200, 600);
   const shift = P.v6.en.top - P.v5.zh.top;

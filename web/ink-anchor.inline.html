@@ -193,7 +193,7 @@
     // stroke, pinned to a word until the second showed it was writing, moves onto the frame with it.
     function toWriting(g,at,L,t0,box){
       const ext=extentOf(g), prev=last&&groups.includes(last.g)?last:null; last={g:null,t:Date.now(),ext,box};   // an erased or undone stroke seeds nothing
-      const burst=Frame.joinsBurst(prev,t0,g,ext,box), pel=burst&&!Frame.sameLine(prev.g,g)&&lineEl(prev.g.verse,prev.g.lang);
+      const B=Frame.burstOf(prev,t0,g,ext,box,L.rect,lineEl,local), burst=B.burst, pel=B.el;
       if(burst) last.box=Frame.union(prev.box,box); if(pel){ g=Object.assign({},g,{verse:prev.g.verse,lang:prev.g.lang}); L={el:pel}; }   // one word, one frame: a piece over the line boundary joins its word's line
       const lr=local(L.el.getBoundingClientRect()), cw=colW(lr);
       // A BIG stroke over the whole line (an underline of the verse, a bracket) is a mark on it, never writing.

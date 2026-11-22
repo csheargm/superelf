@@ -94,6 +94,16 @@
   function joinsBurst(prev,now,g,ext,box){
     return !!(prev&&prev.g&&prev.g.verse!=null&&(sameLine(prev.g,g)||isLine(prev.g))&&now-prev.t<=BURST_MS&&isSmall(prev.ext)&&isSmall(ext)&&gap(prev.box,box)<=NEAR);
   }
+  // The burst a new stroke joins and, across lines, the line it moves to ({burst, el}). Across lines only
+  // through the boundary: the new stroke or the writing in progress reaches past its own line's text
+  // (rects in the list's px); two marks each inside its own line are two notes (GPT review).
+  const outside=(b,r)=>!!r&&(b.t<r.top||b.b>r.top+r.height);
+  function burstOf(prev,now,g,ext,box,own,lineEl,local){
+    if(!joinsBurst(prev,now,g,ext,box)) return {burst:false,el:null};
+    if(sameLine(prev.g,g)) return {burst:true,el:null};
+    const el=lineEl(prev.g.verse,prev.g.lang), pr=el&&local(el.getBoundingClientRect());
+    return el&&(outside(box,own)||outside(prev.box,pr))?{burst:true,el}:{burst:false,el:null};
+  }
   // ── One word, one frame, on READ (old and new records, never rewritten): small handwriting pieces
   //    within NEAR of each other at the width they were written at, on two ADJACENT lines, are one word;
   //    the upper of its lines hosts it, and the others are moved onto that line's frame by
@@ -194,6 +204,6 @@
     }
     return {lineEl:o.lineEl,lineEls:o.lineEls,local:o.local,colW,measureAt,heightAt,wholeOf,extentOf,memo:new WeakMap()};
   }
-  window.PAInkFrame={env,NEAR,isSmall,bboxOf,isScrub,hitGroups,extentOf,SCRUB,ERASE_HIT,BURST_MS,SMALL,NEIGHBOR,isLine,sameLine,handwriting,writtenWidth,placeLine,joinsBurst,frameOf,places,toLine,rehost,union};
+  window.PAInkFrame={env,NEAR,isSmall,bboxOf,isScrub,hitGroups,extentOf,SCRUB,ERASE_HIT,BURST_MS,SMALL,NEIGHBOR,isLine,sameLine,handwriting,writtenWidth,placeLine,joinsBurst,frameOf,places,toLine,rehost,union,burstOf};
 })();
 </script>
