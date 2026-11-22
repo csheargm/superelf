@@ -110,13 +110,13 @@ test('every committed app page gets PA once, ahead of its own script, after PALe
 // The scripts of a page, comments removed, so a rule is not tripped by prose about it.
 const codeOnly = (html) => execScripts(html).join('\n').replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
 const HAND_WRITTEN = /postMessage\(\s*(?:Object\.assign\(\s*)?\{\s*pa\s*:\s*['"]req['"]/;
-// The twenty-one that predate PA.req (TODO: move each to PA.req and shrink this list; an app's own
+// The twenty that predate PA.req (TODO: move each to PA.req and shrink this list; an app's own
 // copy is the defect). A slug added here needs that reason; a NEW app uses PA.req.
 const CENSUS = [
   'ex-bible', 'ex-diabetes', 'ex-longevity', 'ex-notes', 'ex-tasks',
   'sh-bible', 'sh-notes', 'sh-productivity-hub',
   'ws-allergy', 'ws-bible', 'ws-bible-values', 'ws-brainstorm', 'ws-daily-digest', 'ws-diabetes', 'ws-family',
-  'ws-longevity', 'ws-matrix-conf', 'ws-notes', 'ws-productivity-hub', 'ws-rental-hunt', 'ws-tasks',
+  'ws-longevity', 'ws-notes', 'ws-productivity-hub', 'ws-rental-hunt', 'ws-tasks',
 ];
 test('no app beyond the pinned census posts to the broker itself: a new app uses PA.req', () => {
   const found = committedApps().filter(({ html }) => HAND_WRITTEN.test(codeOnly(html))).map(({ slug }) => slug).sort();

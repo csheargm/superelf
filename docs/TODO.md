@@ -488,9 +488,6 @@ Without it they now FAIL (R14), not pass as `# pass 0 / # fail 0`. To run them:
   a shell-side `load` watcher that kills a frame leaving its origin, or `frame-src` on the shell. Found by
   gpt-review of the landing page; the page now claims only "blocked from fetch, XHR and WebSockets".
 
-- **Bible app label says WEB (2026-11-21).** `workspace.example/apps/bible/meta.json` describes the
-  English text as WEB, but the bundled corpus is BSB (`lib/bible.mjs` TRANSLATIONS). Fix the label.
-
 ## Public demo · 公开演示 (final gpt-review of feat/public-demo, 2026-11-21)
 - Two tabs opened before either has the cookie each create a visitor; a later reload can switch a
   tab to the other workspace. Serialize first boot across tabs (lock + recheck localStorage). (feat/public-demo)
