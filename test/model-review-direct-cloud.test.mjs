@@ -76,26 +76,31 @@ async function grade({ prompt }) {
   return { ok: true, text: JSON.stringify(out) };
 }
 
+async function setupNode(tmp, { onCall = () => {} } = {}) {
+  const root = path.join(tmp, 'root');
+  fs.mkdirSync(path.join(root, 'workspace'), { recursive: true });
+  const lane = (id, group, model) => ({ id, label: id.toUpperCase(), group, provider: 'ollama', model });
+  const LANES = [lane('fast1', 'Fast', 'fast-a'), lane('fast2', 'Fast', 'fast-b'), lane('fast3', 'Fast', 'fast-c'),
+    lane('deep1', 'Deep', 'deep-a'), lane('deep2', 'Deep', 'deep-b'), lane('deep3', 'Deep', 'deep-c')];
+  fs.writeFileSync(configPath(root), JSON.stringify({ default_project: 'assistant', projects: { assistant: { dir: 'workspace' } },
+    web_token: 'test-web-token-abcdefgh', chat_models: LANES, ollama_url: CLOUD,
+    users: [{ id: 'owner', name: 'Owner', role: 'owner', token: 'test-owner-token-mr-0123456789', workspace: 'workspace' }],
+    model_review: { concurrency: 4, call_timeout_s: 10, agent_lanes: false, tests: path.join(REPO, 'model-review', 'tests.json') } }, null, 2));
+  const catalog = ['fast-a', 'fast-b', 'fast-c', 'deep-a', 'deep-b', 'deep-c', 'star'];
+  fs.writeFileSync(path.join(root, MODEL_HEALTH_FILENAME), JSON.stringify({ checked: 1, gone: {}, catalog, unknown: [], catalogError: null }));
+  // Not the first review, so the run applies its change (a first review only reports).
+  fs.writeFileSync(path.join(root, MODEL_REVIEW_FILENAME), JSON.stringify({ reviewedAt: 1, catalogSeen: catalog, undo: null, declined: [] }));
+  const cfg = await loadConfig(root, { readOnly: true });
+  const calls = [];
+  const jobs = modelReviewJobs({ cfg, root, healthFile: () => path.join(root, MODEL_HEALTH_FILENAME), ask: grade,
+    auth: () => KEY, fetchImpl: async (u, o) => { onCall(cfg); return fakeOllamaCom(calls)(u, o); } });
+  return { root, cfg, calls, catalog, jobs };
+}
+
 test('a review on an ollama.com node calls bare names with the key and writes chat_models with bare names', async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pa-mrcloud-'));
   try {
-    const root = path.join(tmp, 'root');
-    fs.mkdirSync(path.join(root, 'workspace'), { recursive: true });
-    const lane = (id, group, model) => ({ id, label: id.toUpperCase(), group, provider: 'ollama', model });
-    const LANES = [lane('fast1', 'Fast', 'fast-a'), lane('fast2', 'Fast', 'fast-b'), lane('fast3', 'Fast', 'fast-c'),
-      lane('deep1', 'Deep', 'deep-a'), lane('deep2', 'Deep', 'deep-b'), lane('deep3', 'Deep', 'deep-c')];
-    fs.writeFileSync(configPath(root), JSON.stringify({ default_project: 'assistant', projects: { assistant: { dir: 'workspace' } },
-      web_token: 'test-web-token-abcdefgh', chat_models: LANES, ollama_url: CLOUD,
-      users: [{ id: 'owner', name: 'Owner', role: 'owner', token: 'test-owner-token-mr-0123456789', workspace: 'workspace' }],
-      model_review: { concurrency: 4, call_timeout_s: 10, agent_lanes: false, tests: path.join(REPO, 'model-review', 'tests.json') } }, null, 2));
-    const catalog = ['fast-a', 'fast-b', 'fast-c', 'deep-a', 'deep-b', 'deep-c', 'star'];
-    fs.writeFileSync(path.join(root, MODEL_HEALTH_FILENAME), JSON.stringify({ checked: 1, gone: {}, catalog, unknown: [], catalogError: null }));
-    // Not the first review, so the run applies its change (a first review only reports).
-    fs.writeFileSync(path.join(root, MODEL_REVIEW_FILENAME), JSON.stringify({ reviewedAt: 1, catalogSeen: catalog, undo: null, declined: [] }));
-    const cfg = await loadConfig(root, { readOnly: true });
-    const calls = [];
-    const jobs = modelReviewJobs({ cfg, root, healthFile: () => path.join(root, MODEL_HEALTH_FILENAME), ask: grade,
-      auth: () => KEY, fetchImpl: fakeOllamaCom(calls) });
+    const { root, cfg, calls, catalog, jobs } = await setupNode(tmp);
     const out = await jobs['model-review'].run(cfg.users[0], { manual: true });
     assert.ok(out && out.body, 'a briefing');
     assert.deepEqual(calls.filter((c) => /[:-]cloud$/.test(c.model)), [], 'no suffixed name reached ollama.com');
@@ -105,5 +110,16 @@ test('a review on an ollama.com node calls bare names with the key and writes ch
     const models = written.filter((l) => l.provider === 'ollama').map((l) => l.model);
     assert.ok(models.includes('star'), `star joined Fast with its bare name: ${JSON.stringify(models)}`);
     assert.deepEqual(models.filter((m) => /[:-]cloud$/.test(m)), [], 'no suffixed name written');
+  } finally { rmTemp(tmp); }
+});
+
+test('the endpoint switched to a local daemon mid-review: nothing is written (the names were built for ollama.com)', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pa-mrcloud-'));
+  try {
+    const { root, cfg, jobs } = await setupNode(tmp, { onCall: (c) => { c.ollama_url = LOCAL; } });
+    const before = fs.readFileSync(configPath(root), 'utf8');
+    const out = await jobs['model-review'].run(cfg.users[0], { manual: true });
+    assert.match(out.body, /ollama_url was edited/);
+    assert.equal(fs.readFileSync(configPath(root), 'utf8'), before, 'config.json untouched');
   } finally { rmTemp(tmp); }
 });
