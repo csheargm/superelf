@@ -1672,6 +1672,7 @@ const server = http.createServer(async (req, res) => {
       // a missing file, so existence is not revealed (lib/app-page-access.mjs, ADR 0037). Demo visitors'
       // apps stay public-by-link; the shared library is shared by definition.
       // TODO(R4): web.mjs is over budget — split the /app/ route into lib/app-page-access.mjs.
+      if (owner && !noLinkOnTheWay(owner.workspace, path.join(base, slug))) return send(res, 404, 'text/plain', 'not found');   // a linked app folder could borrow another author's app
       if (owner && !demoOn(cfg) && !canViewAppPage({ authorId: uid, shared: appIsShared(path.join(base, slug)), viewer: userForToken(appPageToken(req), req) })) return send(res, 404, 'text/plain', 'not found');
       if (!p.endsWith('/') && parts.length === 0) { res.writeHead(301, { location: `/app/${uid}/${slug}/` }); return res.end(); }
       const f = safeJoin(path.join(base, slug), parts.join('/') || 'index.html');

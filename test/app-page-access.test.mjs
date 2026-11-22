@@ -71,6 +71,15 @@ test('unshared app: 404 for member B and for anyone signed out, page and code al
   assert.equal((await get('/app/alice/nosuch/')).status, 404, 'same answer as a missing app');
 });
 
+test('a member\'s app folder linked to another author\'s unshared app is 404, even for that member', async () => {
+  const link = path.join(root, 'workspace-bob', 'apps', 'borrowed');
+  fs.mkdirSync(path.dirname(link), { recursive: true });
+  fs.symlinkSync(path.join(root, 'workspace-alice', 'apps', 'diary'), link);
+  try {
+    for (const f of ['', 'app.js']) assert.equal((await get(`/app/bob/borrowed/${f}`, bearer(TOK_B))).status, 404, f);
+  } finally { fs.unlinkSync(link); }
+});
+
 test('unshared app: the author and the owner load it', async () => {
   const a = await get('/app/alice/diary/', bearer(TOK_A));
   assert.equal(a.status, 200); assert.match(await a.text(), /diary-body/);
