@@ -94,7 +94,7 @@
   }
   // ── One word, one frame, on READ (old and new records, never rewritten): small handwriting pieces
   //    within NEAR of each other at the width they were written at, on two ADJACENT lines, are one word;
-  //    the line holding most of its pieces hosts it, and the others are moved onto that line's frame by
+  //    the upper of its lines hosts it, and the others are moved onto that line's frame by
   //    the offset between the two lines' top-lefts at that width (the upper line's height measured on a
   //    hidden copy at that width + today's gap between them). Pieces two lines away keep their own frame.
   const wkey=w=>w==null?'':String(Math.round(w));
@@ -120,8 +120,9 @@
     const groups=new Map(); items.forEach((it,i)=>{ const r=find(i); if(!groups.has(r)) groups.set(r,[]); groups.get(r).push(it); });
     for(const mem of groups.values()){
       const els=new Set(mem.map(m=>m.el)); if(els.size<2) continue;
-      const cnt=new Map(); for(const m of mem) cnt.set(m.el,(cnt.get(m.el)||0)+1);
-      let host=null; for(const [e,c] of cnt) if(!host||c>cnt.get(host)||(c===cnt.get(host)&&idx.get(e)<idx.get(host))) host=e;
+      // The UPPER line hosts, not the one with most pieces: erasing one stroke must never flip the host
+      // and move the rest of the word by a row (GPT review). It changes only when that line's pieces are all gone.
+      let host=null; for(const e of els) if(!host||idx.get(e)<idx.get(host)) host=e;
       const hi=idx.get(host), hk=mem.find(x=>x.el===host).k;
       for(const m of mem){ const mi=idx.get(m.el); if(m.el===host||Math.abs(mi-hi)!==1) continue;
         const o=mi<hi?off(m.el,host,m.w):off(host,m.el,m.w), sg=mi<hi?-1:1;

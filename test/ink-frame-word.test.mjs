@@ -111,4 +111,17 @@ test('pure: rehost moves a tiny dot on a boundary onto its word\'s line by the l
   Fr.rehost(items, env);
   assert.deepEqual([items[2].k, items[2].fx, items[2].fy], ['a', 100, 52], 'onto a, by a\'s height at 500 (48) + gap (6)');
   assert.deepEqual([items[3].k, items[4].k, items[5].k], ['b', 'b', 'c']);
+  // the upper line hosts even when the lower holds more pieces: erasing one never flips the host (GPT review)
+  const two = [{ el: a, k: 'a', fx: 100, fy: 40, ext, small: true, w: 500 }, { el: b, k: 'b', fx: 100, fy: -2, ext, small: true, w: 500 }, { el: b, k: 'b', fx: 112, fy: -2, ext, small: true, w: 500 }];
+  Fr.rehost(two, env);
+  assert.deepEqual(two.map((x) => x.k), ['a', 'a', 'a']);
+});
+
+test('erasing one stroke of a split word after the turn moves none of the others (GPT review)', () => {
+  const P = page(); writeGapSentence(P, 200, 600);
+  const shift = P.v6.en.top - P.v5.zh.top;
+  const old = P.I.groups().map((g, i) => (i % 4 >= 2 ? { ...g, verse: 6, lang: 'en', fy: Math.round((g.fy - shift) * 100) / 100 } : g));   // split evenly
+  const Q = page(); Q.I.load(old); setWidth(Q, PORTRAIT);
+  const before = at(Q.I); Q.I.load(old.slice(1)); setWidth(Q, PORTRAIT);
+  assert.deepEqual(at(Q.I), before.slice(1));
 });
