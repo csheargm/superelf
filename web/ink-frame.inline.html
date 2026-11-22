@@ -116,6 +116,10 @@
     const ra=env.local(a.getBoundingClientRect()), rb=env.local(b.getBoundingClientRect());
     return {dx:rb.left-ra.left,dy:env.heightAt(a,w)+(rb.top-(ra.top+ra.height))};
   }
+  // Two pieces can be one word: line-frame records written at the same width; old (pre-frame) records
+  // carry only each line's own written width (its text's width), so any two whose widths are known.
+  // An old piece's w is its LINE's written width: the upper line's height is measured at the upper's w.
+  const pairable=(A,B)=>A.old===B.old&&(A.old?A.w!=null&&B.w!=null:wkey(A.w)===wkey(B.w));
   function rehost(items,env){
     const order=env.lineEls?env.lineEls().map(L=>L.el):[], idx=new Map(order.map((e,i)=>[e,i])), n=items.length, par=items.map((_,i)=>i);
     const find=i=>par[i]===i?i:(par[i]=find(par[i])), D=new Map();
@@ -125,12 +129,12 @@
     const box=(it,o)=>({l:it.fx+o.dx,t:it.fy+o.dy,r:it.fx+o.dx+it.ext.w,b:it.fy+o.dy+it.ext.h});
     const Z={dx:0,dy:0};
     for(let i=0;i<n;i++) for(let j=i+1;j<n;j++){
-      const A=items[i],B=items[j]; if(!A.small||!B.small||wkey(A.w)!==wkey(B.w)) continue;
+      const A=items[i],B=items[j]; if(!A.small||!B.small||!pairable(A,B)) continue;
       const ia=idx.get(A.el), ib=idx.get(B.el); if(ia==null||ib==null||Math.abs(ia-ib)>1) continue;
-      let ga,gb; if(ia===ib){ ga=box(A,Z); gb=box(B,Z); } else { const [U,L]=ia<ib?[A,B]:[B,A], o=off(U.el,L.el,A.w); ga=box(U,Z); gb=box(L,o);
+      let ga,gb; if(ia===ib){ ga=box(A,Z); gb=box(B,Z); } else { const [U,L]=ia<ib?[A,B]:[B,A], o=off(U.el,L.el,U.w); ga=box(U,Z); gb=box(L,o);
         // Across lines only through the boundary: one of the two reaches past its own line's text toward
         // the other. Two marks each on its own line's text are two notes, however close (GPT review).
-        if(!(ga.b>hgt(U.el,A.w)||L.fy<0)) continue; }
+        if(!(ga.b>hgt(U.el,U.w)||L.fy<0)) continue; }
       if(gap(ga,gb)<=NEAR) par[find(i)]=find(j);
     }
     const groups=new Map(); items.forEach((it,i)=>{ const r=find(i); if(!groups.has(r)) groups.set(r,[]); groups.get(r).push(it); });
@@ -139,9 +143,9 @@
       // The UPPER line hosts, not the one with most pieces: erasing one stroke must never flip the host
       // and move the rest of the word by a row (GPT review). It changes only when that line's pieces are all gone.
       let host=null; for(const e of els) if(!host||idx.get(e)<idx.get(host)) host=e;
-      const hi=idx.get(host), hk=mem.find(x=>x.el===host).k;
+      const hi=idx.get(host), hm=mem.find(x=>x.el===host), hk=hm.k;
       for(const m of mem){ const mi=idx.get(m.el); if(m.el===host||Math.abs(mi-hi)!==1) continue;
-        const o=mi<hi?off(m.el,host,m.w):off(host,m.el,m.w), sg=mi<hi?-1:1;
+        const o=mi<hi?off(m.el,host,m.w):off(host,m.el,hm.w), sg=mi<hi?-1:1;
         m.fx+=sg*o.dx; m.fy+=sg*o.dy; m.el=host; m.k=hk; }
     }
   }
@@ -170,7 +174,7 @@
       const el=env.lineEl(g.verse,g.lang); if(!el) return;
       const w=measuredAt(g,groups,el,env), m=env.memo.get(g);
       const f=m&&m.w===w?m.f:frameOf(g,groups,el,env); if(!m||m.w!==w) env.memo.set(g,{w,f}); if(!f) return;
-      const ext=env.extentOf(g); items.push({g,el,k:g.verse+'|'+g.lang,fx:f.fx,fy:f.fy,ext,small:isSmall(ext),w:isLine(g)?g.fw:w});
+      const ext=env.extentOf(g); items.push({g,el,k:g.verse+'|'+g.lang,fx:f.fx,fy:f.fy,ext,small:isSmall(ext),old:!isLine(g),w:isLine(g)?g.fw:writtenWidth(groups,g,x=>env.wholeOf(x,el))});
     });
     if(env.heightAt) rehost(items,env);
     for(const it of items){ if(!lines.has(it.k)) lines.set(it.k,{el:it.el,items:[]}); lines.get(it.k).items.push(it); }

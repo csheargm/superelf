@@ -8,7 +8,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ENG_INK } from './helpers-app.mjs';
+import { execFileSync } from 'node:child_process';
 import { RH, PADL, makeDom } from './helpers-ink-dom.mjs';
+
+const ROOT = new URL('..', import.meta.url).pathname;
 
 const EN5 = 'For when we lived according to the flesh, the sinful passions aroused by the law were at work in our bodies, bearing fruit for death.';
 const ZH5 = '因为我们属肉体的时候，那因律法而生的恶欲就在我们肢体中发动，以致结成死亡的果子。';
@@ -16,8 +19,8 @@ const EN6 = 'But now, having died to what bound us, we have been released from t
 const ZH6 = '但我们既然在捆我们的律法上死了，现今就脱离了律法，叫我们服事主，要按着心灵的新样，不按着仪文的旧样。';
 const LANDSCAPE = 1194, PORTRAIT = 834, CHAR_W = 21;
 
-function page(width = LANDSCAPE) {
-  const dom = makeDom({ width }); dom.L.cw = CHAR_W;
+function page(width = LANDSCAPE, src) {
+  const dom = makeDom(src ? { width, src } : { width }); dom.L.cw = CHAR_W;
   const v5 = dom.addVerse(5, EN5, ZH5), v6 = dom.addVerse(6, EN6, ZH6);
   const I = dom.PAInkAnchor.attach({ container: dom.container, ink: ENG_INK });
   return { dom, v5, v6, I, clock: { now: 1e6 } };
@@ -152,4 +155,23 @@ test('erasing one stroke of a split word after the turn moves none of the others
   const Q = page(); Q.I.load(old); setWidth(Q, PORTRAIT);
   const before = at(Q.I); Q.I.load(old.slice(1)); setWidth(Q, PORTRAIT);
   assert.deepEqual(at(Q.I), before.slice(1));
+});
+
+// Rigid move of a block: every piece's offset from the first scales by one factor (0 = one block).
+function rigidErr(b, a) {
+  const k = a[0].s / b[0].s; let e = 0;
+  for (let i = 1; i < a.length; i++) e = Math.max(e, Math.abs(a[i].ox - a[0].ox - (b[i].ox - b[0].ox) * k), Math.abs(a[i].oy - a[0].oy - (b[i].oy - b[0].oy) * k));
+  return Math.round(e * 100) / 100;
+}
+test('notes written BEFORE 1a654f7 (word-pinned, split across v5zh and v6en) move as one block at 834, 1366 and 390', () => {
+  const pre = execFileSync('git', ['show', '1a654f7^:web/ink-anchor.inline.html'], { cwd: ROOT, encoding: 'utf8' });
+  const W = page(LANDSCAPE, pre); writeGapSentence(W, 200, 600);
+  const old = W.I.groups(), lines = new Set(old.map((g) => `${g.verse}${g.lang}`));
+  assert.ok(!old.some((g) => g.frame) && lines.has('5zh') && lines.has('6en'), 'the old engine split the word over two lines');
+  for (const w of [PORTRAIT, 1366, 390]) {
+    const Q = page(); Q.I.load(old); const stored = JSON.stringify(Q.I.groups()), before = at(Q.I);
+    setWidth(Q, w);
+    assert.equal(rigidErr(before, at(Q.I)), 0, `old word comes apart at ${w}`);
+    assert.equal(JSON.stringify(Q.I.groups()), stored, 'records untouched');
+  }
 });
