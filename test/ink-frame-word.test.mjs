@@ -126,6 +126,15 @@ test('a quick underline on English words and a mark on the Chinese words below s
   assert.equal(Math.round(at(P.I)[1].oy - before[1].oy), P.v5.zh.top - zTop, 'the Chinese mark follows the Chinese line');
 });
 
+test('old notes: small marks on the English text and on the Chinese text just below are never merged (GPT review)', () => {
+  const P = page(); const e = P.v5.en.getBoundingClientRect(), z = P.v5.zh.getBoundingClientRect();
+  const lf = (lang, fy) => ({ verse: 5, lang, frame: 'line', fx: 200, fy, fw: P.dom.L.width - 2 * PADL, strokes: [{ p: [[0, 0, 0.5], [8, 8, 0.5]], c: '#00f', w: 2, t: 'pen' }] });
+  P.I.load([lf('en', e.height - 12), lf('zh', 1)]);   // the en mark ends 2px above its line's bottom, the zh mark starts 1px into its line
+  const zTop = P.v5.zh.top, before = at(P.I); setWidth(P, PORTRAIT);
+  assert.equal(Math.round(at(P.I)[1].oy - before[1].oy), P.v5.zh.top - zTop, 'the Chinese mark follows the Chinese line');
+  assert.ok(z.top - (e.top + e.height) <= 16, 'and they were within NEAR');
+});
+
 test('erasing one stroke of a split word after the turn moves none of the others (GPT review)', () => {
   const P = page(); writeGapSentence(P, 200, 600);
   const shift = P.v6.en.top - P.v5.zh.top;

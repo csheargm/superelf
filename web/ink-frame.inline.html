@@ -109,6 +109,7 @@
   function rehost(items,env){
     const order=env.lineEls?env.lineEls().map(L=>L.el):[], idx=new Map(order.map((e,i)=>[e,i])), n=items.length, par=items.map((_,i)=>i);
     const find=i=>par[i]===i?i:(par[i]=find(par[i])), D=new Map();
+    const H=new Map(), hgt=(el,w)=>{ const k=idx.get(el)+'|'+wkey(w); if(!H.has(k)) H.set(k,env.heightAt(el,w)); return H.get(k); };
     const off=(a,b,w)=>{ const k=idx.get(a)+'|'+wkey(w); if(!D.has(k)) D.set(k,lineOffset(env,a,b,w)); return D.get(k); };
     // b's frame point in a's frame (a directly above b): p + offset
     const box=(it,o)=>({l:it.fx+o.dx,t:it.fy+o.dy,r:it.fx+o.dx+it.ext.w,b:it.fy+o.dy+it.ext.h});
@@ -116,7 +117,10 @@
     for(let i=0;i<n;i++) for(let j=i+1;j<n;j++){
       const A=items[i],B=items[j]; if(!A.small||!B.small||wkey(A.w)!==wkey(B.w)) continue;
       const ia=idx.get(A.el), ib=idx.get(B.el); if(ia==null||ib==null||Math.abs(ia-ib)>1) continue;
-      let ga,gb; if(ia===ib){ ga=box(A,Z); gb=box(B,Z); } else { const [U,L]=ia<ib?[A,B]:[B,A], o=off(U.el,L.el,A.w); ga=box(U,Z); gb=box(L,o); }
+      let ga,gb; if(ia===ib){ ga=box(A,Z); gb=box(B,Z); } else { const [U,L]=ia<ib?[A,B]:[B,A], o=off(U.el,L.el,A.w); ga=box(U,Z); gb=box(L,o);
+        // Across lines only through the boundary: one of the two reaches past its own line's text toward
+        // the other. Two marks each on its own line's text are two notes, however close (GPT review).
+        if(!(ga.b>hgt(U.el,A.w)||L.fy<0)) continue; }
       if(gap(ga,gb)<=NEAR) par[find(i)]=find(j);
     }
     const groups=new Map(); items.forEach((it,i)=>{ const r=find(i); if(!groups.has(r)) groups.set(r,[]); groups.get(r).push(it); });
