@@ -11,8 +11,18 @@ that found it in brackets. Pick from here; do not open a side session per item.
 - Old records: erasing the last whole-line stroke next to old letter-pieces sends those pieces back to
   their word anchors (they no longer classify as writing).
 - Two short underlines drawn within 1.5 s and under 16 px apart count as writing (no shape test).
-- Old letter-pieces that reached into the Chinese line (3 of 316 strokes in Romans 7) sit on that
-  line's frame, not the English line's, so on another width they part from the sentence.
+- Old letter-pieces that reached into the Chinese line (3 of 316 strokes in Romans 7) are now read onto
+  their word's line (rehost) only when they classify as writing on their own line; a lone pinned piece
+  that does not still follows its characters.
+- rehost (ink-rotation fix): a word spanning THREE lines moves only the pieces on the two lines next to
+  its host; links are pairwise O(n^2) per redraw (fine for a chapter, slow for thousands of strokes);
+  writing below a line's last row still sits at the line's top-left, so a line gaining rows pushes the
+  word into the next line's text (anchor a word to the nearest edge of its host line).
+- rehost host flip (GPT review round 5): erasing the ONLY piece of a split word stored on the upper
+  line, on a width other than the one it was written at, sends the rest back to the lower line's
+  frame (a one-row jump). Fix: on erase, rewrite the survivors onto the host frame they were drawn on.
+- A burst's NEAR box grows with the writing in progress (union), so within 1.5 s a stroke near any part
+  of a long written line joins it.
 
 ## First-use tips · 首次提示
 - The 8 tips are pinned at source level and the component runs for real in test/tips.test.mjs; no
