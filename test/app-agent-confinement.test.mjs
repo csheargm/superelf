@@ -24,6 +24,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { api, OWNER_TOKEN, PNG_B64 } from './helpers-web.mjs';
 import { readShell } from '../lib/shellhtml.mjs';
+import { APP_CSP } from '../lib/offline.mjs';
 import { APP_ORIGIN_HEADER, APP_ORIGIN_VALUE, appOriginated, agentConfined } from '../lib/agent-origin.mjs';
 import { startLaneServer, assertAppLane, assessDone as assessDoneOn, SKIP, MEMBER_TOKEN } from './helpers-agent-lane.mjs';
 
@@ -225,8 +226,11 @@ test('R3: the header literal is identical in the shell and lib/agent-origin.mjs'
 });
 
 test('an app cannot call /api itself — the premise the marker rests on', () => {
-  assert.match(WEB_SRC, /const csp = "sandbox allow-scripts; default-src 'none';[^"]*connect-src 'none'";/, 'apps are served sandboxed with no network');
-  assert.ok(!/allow-same-origin/.test(WEB_SRC.slice(WEB_SRC.indexOf('const csp = "sandbox'), WEB_SRC.indexOf('const csp = "sandbox') + 200)), 'and at an opaque origin');
+  // The policy lives once in lib/offline.mjs (R3, shared with the demo app's meta tag); web.mjs
+  // serves exactly that constant on every /app/ response.
+  assert.match(APP_CSP, /^sandbox allow-scripts; default-src 'none';.*connect-src 'none'$/, 'apps are served sandboxed with no network');
+  assert.ok(!/allow-same-origin/.test(APP_CSP), 'and at an opaque origin');
+  assert.match(WEB_SRC, /const csp = APP_CSP;\n[^]*?'content-security-policy': csp \+/, 'the /app/ route sends that policy');
   assert.match(SHELL, /<iframe id="fr" sandbox="allow-scripts"/, 'the frame is sandboxed by the shell as well');
   // The page in #fr, or a page held while it leaves; run by test/app-leave.test.mjs (ADR 0018).
   assert.match(BROKER, /const fr=appFrameOf\(e\.source\); if\(!fr\) return;/, 'only an app frame is relayed');
