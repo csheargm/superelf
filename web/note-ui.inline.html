@@ -641,12 +641,13 @@
   const pageHasText=(p)=>!!String((p&&p.pageHtml)||'').replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ').trim();
   // The tool a note OPENS in, chosen by the page it opens on (owner 2026-11-12: a typed AI summary
   // opened on Draw, and the first click drew on it). DOM-free so the test runs it as written.
-  //   a host whose opening tool is 'text' (Bible) keeps text, ink or not: its notes are typed first and
-  //     a tap meant to type must never become a stroke (review 2026-11-12)
-  //   ink and text → whichever the page STARTS with (owner 2026-11-13: "when the note starts with
+  //   pictures count like ink (owner 2026-11-22: "if the note has images, Draw; mostly text, Text")
+  //   a text host (Bible, opts.tool 'text') follows the same rule; its draw tool is the pen
+  //     (owner 2026-11-22, reversing review 2026-11-12 that kept the Bible on text everywhere)
+  //   ink/pictures and text → whichever the page STARTS with (owner 2026-11-13: "when the note starts with
   //     text, Text mode"); textFirst is measured by the caller (textStartsFirst) — a stray dot under
   //     a typed summary no longer turns the whole note into a drawing
-  //   ink only         → the host's DRAW tool (Pencil expected)
+  //   ink/pictures only → the host's DRAW tool (Pencil expected)
   //   typed text, no ink → 'text'
   //   empty            → the host's opening tool, as before
   // A stroke a reader cannot see as writing: a dot or smudge spanning under STRAY_INK_SPAN of
@@ -662,9 +663,10 @@
   function hasRealInk(pg){ return ((pg&&pg.strokes)||[]).some(s=>!isStrayStroke(s)); }
   function openToolFor(pg,hostTool,byContent,textFirst){
     if(!byContent||!pg) return hostTool;
-    if(hostTool==='text') return hostTool;
+    const draw=hostTool==='text'?'pen':hostTool;
     const text=pageHasText(pg);
-    if(Array.isArray(pg.strokes)&&pg.strokes.length) return text&&textFirst?'text':hostTool;
+    const visual=(Array.isArray(pg.strokes)&&pg.strokes.length)||(Array.isArray(pg.images)&&pg.images.length);
+    if(visual) return text&&textFirst?'text':draw;
     return text?'text':hostTool;
   }
   // Template/background validators — legacy notebooks carry `paper` (plain/ruled/grid) and no
@@ -3999,9 +4001,12 @@
     // (renderTextLayer has run in both callers), in page px. Unmeasurable (hidden pad) → false: ink wins, as before.
     // TODO(R4 seam): grows this over-budget file; openToolFor/textStartsFirst/applyOpenTool/fitTextToView split into a note-open part.
     function textStartsFirst(pg){
-      const strokes=(pg&&pg.strokes)||[]; if(!strokes.length) return true;
+      const strokes=(pg&&pg.strokes)||[], images=(pg&&pg.images)||[]; if(!strokes.length&&!images.length) return true;
       let inkTop=Infinity; for(const s of strokes) for(const pt of (s.p||[])) if(pt[1]<inkTop) inkTop=pt[1];
-      const pr=pageInner.getBoundingClientRect(); if(!pr.width||!W) return false;
+      for(const im of images) if((im.y||0)<inkTop) inkTop=im.y||0;   // a picture is placed in the same page units as ink
+      // Not measurable (the pane is hidden, e.g. a collapsed Bible note): text wins, so a tap meant
+      // to type can never land as a stroke (review 2026-11-22).
+      const pr=pageInner.getBoundingClientRect(); if(!pr.width||!W) return true;
       const it=document.createTreeWalker(textLayer,NodeFilter.SHOW_TEXT);
       for(let n; (n=it.nextNode());){ if(!n.nodeValue.trim()) continue;
         const rg=document.createRange(); rg.selectNodeContents(n); const b=rg.getBoundingClientRect();
@@ -4013,7 +4018,7 @@
       if(t!==tool){ if(t!=='select') clearSelection(); tool=t; closePops(); if(INKS[t]) lastDraw=t; }
       // A page that STARTS with ink opens with Draw LIT (its row open), not on a pen behind a closed row —
       // the header showed neither tab selected (owner 2026-11-13, iPhone).
-      if(topBar&&BY_CONTENT&&t!=='text'&&pg&&(pg.strokes||[]).length&&OPEN_TOOL!=='text'){ drawRowOpen=true; if(typeof dockTools==='function') dockTools(); }
+      if(topBar&&BY_CONTENT&&t!=='text'&&pg&&((pg.strokes||[]).length||(pg.images||[]).length)){ drawRowOpen=true; if(typeof dockTools==='function') dockTools(); }
       syncMode(); toolBtns.forEach(b=>b.classList.toggle('on',b.dataset.tool===tool));
       return t==='text'&&OPEN_TOOL!=='text';                   // true = enter text mode without focus
     }
@@ -4330,7 +4335,7 @@
       //   * apps switched their scope variable BEFORE calling reload, so this flush wrote the
       //     OUTGOING notebook under the INCOMING key and destroyed the destination's handwriting.
       // Returns the flush outcome so the app can tell the user the outgoing note did not land.
-      reload:async(applyScope)=>{ if(tool==='text') exitTextMode();
+      reload:async(applyScope)=>{ if(tool==='text') exitTextMode(); userPicked=false;   // reset at the START: a tool tapped during the switch wins
         if(textPanel) textPanel.close();                        // the OLD note's transcript must not stay painted over the new one
         const r=await flushSave();                              // still the OLD scope here
         guard.reset();                                          // a failure becomes a sticky carried-over notice
@@ -4338,8 +4343,8 @@
         const wasId=NB.id; await pull(true); setupCanvases(); syncToolsTop(); redrawPage(); renderTextLayer(); updateUndo();
         // A DIFFERENT notebook id = another note opened: choose its tool. The same id = a refresh, and
         // the tool the user chose stays. TODO(R4 seam): the open-tool rules could move to their own file.
-        if(NB.id!==wasId) userPicked=false;   // a new note: the content picks again until the user taps
-        const nf=NB.id!==wasId?applyOpenTool():false;
+        const rule=NB.id!==wasId&&!userPicked;   // a new note with no tap during the switch: the content picks
+        const nf=rule?applyOpenTool():false;
         if(tool==='text') enterTextMode(nf);
         return r; },
       resize:()=>{ setupCanvases(); syncToolsTop(); },
