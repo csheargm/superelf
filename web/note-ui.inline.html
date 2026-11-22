@@ -4335,17 +4335,15 @@
       //   * apps switched their scope variable BEFORE calling reload, so this flush wrote the
       //     OUTGOING notebook under the INCOMING key and destroyed the destination's handwriting.
       // Returns the flush outcome so the app can tell the user the outgoing note did not land.
-      reload:async(applyScope)=>{ if(tool==='text') exitTextMode();
+      reload:async(applyScope)=>{ if(tool==='text') exitTextMode(); userPicked=false;   // reset at the START: a tool tapped during the switch wins
         if(textPanel) textPanel.close();                        // the OLD note's transcript must not stay painted over the new one
         const r=await flushSave();                              // still the OLD scope here
         guard.reset();                                          // a failure becomes a sticky carried-over notice
         if(applyScope) await applyScope();                      // …only now does the app repoint its closures
-        userPicked=false;   // from the START of the switch: a tool tapped while it loads wins (review 2026-11-22)
         const wasId=NB.id; await pull(true); setupCanvases(); syncToolsTop(); redrawPage(); renderTextLayer(); updateUndo();
         // A DIFFERENT notebook id = another note opened: choose its tool. The same id = a refresh, and
         // the tool the user chose stays. TODO(R4 seam): the open-tool rules could move to their own file.
-        const rule=NB.id!==wasId&&!userPicked;   // a new note with no tap during the load: the content picks
-        if(rule&&tool==='text') exitTextMode();      // leave text first, as boot does
+        const rule=NB.id!==wasId&&!userPicked;   // a new note with no tap during the switch: the content picks
         const nf=rule?applyOpenTool():false;
         if(tool==='text') enterTextMode(nf);
         return r; },
