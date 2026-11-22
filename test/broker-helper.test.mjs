@@ -110,10 +110,11 @@ test('every committed app page gets PA once, ahead of its own script, after PALe
 // The scripts of a page, comments removed, so a rule is not tripped by prose about it.
 const codeOnly = (html) => execScripts(html).join('\n').replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
 const HAND_WRITTEN = /postMessage\(\s*(?:Object\.assign\(\s*)?\{\s*pa\s*:\s*['"]req['"]/;
-// The twenty that predate PA.req (TODO: move each to PA.req and shrink this list; an app's own
-// copy is the defect). A slug added here needs that reason; a NEW app uses PA.req.
+// The twenty-three that predate PA.req (TODO: move each to PA.req and shrink this list; an app's own
+// copy is the defect). A slug added here needs that reason; a NEW app uses PA.req. The three ex-
+// starters (allergy, bible-values, productivity-hub) are seeded copies of the ws- apps below.
 const CENSUS = [
-  'ex-bible', 'ex-diabetes', 'ex-longevity', 'ex-notes', 'ex-tasks',
+  'ex-allergy', 'ex-bible', 'ex-bible-values', 'ex-diabetes', 'ex-longevity', 'ex-notes', 'ex-productivity-hub', 'ex-tasks',
   'sh-bible', 'sh-notes', 'sh-productivity-hub',
   'ws-allergy', 'ws-bible', 'ws-bible-values', 'ws-brainstorm', 'ws-daily-digest', 'ws-diabetes', 'ws-family',
   'ws-longevity', 'ws-notes', 'ws-productivity-hub', 'ws-rental-hunt', 'ws-tasks',

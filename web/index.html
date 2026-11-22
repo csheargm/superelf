@@ -469,6 +469,7 @@ const BRIEFS_MAX=15;
 function briefWhen(ms){ const d=new Date(ms),now=new Date(),p=(n)=>String(n).padStart(2,'0');
   return d.toDateString()===now.toDateString()?`${p(d.getHours())}:${p(d.getMinutes())}`:`${d.getMonth()+1}/${d.getDate()}`; }
 async function loadBriefs(){
+  if(window.PADemoAuth) return;   // the demo node (lib/demo-boot.mjs) hides #secBriefs: briefings are an owner-node feature, so no request
   const box=$('#briefs'); let list=null;
   // Three-state on purpose: a FAILURE must not look like an empty feed. A silently blank
   // section reads as "nothing happened" when the truth is "we could not look" (R5).
@@ -636,7 +637,7 @@ let UID=null;
 // undo a newer success; its abort is the re-check deadline.
 async function ping(signal){ if(!T) return false; const t0=T; let r; try{ r=await api('/api/ping',signal?{signal}:{}); }catch{ if(T===t0&&!signal) PAOffline.noteNet(false); return 'offline'; } if(T!==t0) return false;   // the session changed while this ping ran: its answer is not ours to apply
   if(signal){ let j0; try{ j0=await r.clone().json(); }catch{ return false; } if(T!==t0||!j0||!((r.ok&&typeof j0.ok==='boolean')||r.status===401)) return false; }   // a re-check needs the NODE: its ping reply or its 401 bad-token; a gateway error or HTML page does not count
-  PAOffline.noteNet(true); try{ const j=await r.json(); if(T!==t0) return false; if(j.ok){ UID=j.uid; PASW.remember(SW_UID_KEY,j.uid); if(j.name) document.querySelector('h1').textContent=j.name+'’s 管家'; } return j.ok; }catch{ return false; } }
+  PAOffline.noteNet(true); try{ const j=await r.json(); if(T!==t0) return false; if(j.ok){ UID=j.uid; PASW.remember(SW_UID_KEY,j.uid); const h1=document.querySelector('h1'); if(j.name) h1.textContent=j.name+'’s '+(h1.dataset.product||'管家'); else if(h1.dataset.product) h1.textContent=h1.dataset.product; } return j.ok; }catch{ return false; } }
 // Offline is set by one failed request, and only a later success clears it. On a screen that makes no
 // requests (the home grid) that never came, so the line stayed on with the network back (owner 2026-11-21).
 // While offline and visible, ask the node again on a short beat, on return to the app and on 'online'.
@@ -1191,7 +1192,11 @@ async function checkAndAutoUpdate(apps){
   loadApps();
 }
 
+// TODO(R4): index.html is far over budget; the drawer's app sections (loadApps/loadFamilyApps) are the seam to split out.
+const DEMO_FAMILY_NOTE='Family Apps are available on a privately hosted superelf · 家庭应用仅在私有部署的 superelf 上可用';
 async function loadFamilyApps(){
+  // The demo node (lib/demo-boot.mjs sets PADemoAuth) has no family: a muted note, no /api/family-apps request.
+  if(window.PADemoAuth){ const d=$('#dFamily'); d.textContent=''; const n=document.createElement('span'); n.id='dFamilyDemo'; n.style.cssText='color:var(--muted);font-size:13px'; n.textContent=DEMO_FAMILY_NOTE; d.appendChild(n); return; }
   let apps=[]; try{ apps=await (await api('/api/family-apps')).json(); }catch{}
   let myNames=new Set(); try{ (await (await api('/api/apps')).json()).forEach(a=>myNames.add(a.name)); }catch{}
   const el=$('#dFamily');
@@ -1208,6 +1213,7 @@ async function loadFamilyApps(){
     </div>`;
   }).join('');
 }
+if(window.PADemoAuth) loadFamilyApps();   // demo: the note at once, not after the boot's token and model fetches (no request is made)
 $('#dFamily').onclick=async(e)=>{
   const ob=e.target.closest('[data-fopen]');
   if(ob){ openApp(ob.dataset.fopen,ob.dataset.fslug,ob.dataset.ftitle); return; }
@@ -1287,6 +1293,7 @@ async function relayReminderRemove(m,deps){
      {ok:false, code:'bad-request',  error, status}                  other 4xx, or a path this shell refuses
      {ok:false, code:'relay-error',  error}                          a fault inside this shell — still NOT 'not-found'
      {ok:false, code:'cancelled',    error}                          the app withdrew it (chat-cancel) — NOT 'network' */
+const DEMO_SIGNIN_CODE='demo_signin', DEMO_SIGNIN_EVENT='pa-demo-signin';   // R3: = SIGNIN_CODE (lib/demo-auth.mjs) and SIGNIN_EVENT (lib/demo-boot.mjs), pinned by test/demo-signin-prompt.test.mjs
 const RELAY_NOT_FOUND='not found';                              // the legacy error string, pinned once (R3)
 const RELAY_CANCELLED='Cancelled · 已取消';                      // == PAC_CANCELLED in web/chat-ui.inline.html (test/chat-cancel.test.mjs)
 /* ── The noun table（名词表）— WHAT was refused ─────────────────────────────────────────
@@ -1357,6 +1364,12 @@ async function relayHttpFail(r){
   let j=null; try{ j=raw?JSON.parse(raw):null; }catch{ j=null; }   // text/plain body: the status alone decides
   const msg=(j&&typeof j.error==='string'&&j.error)||'';
   if(r.status===413) return {ok:false,code:'too-large',status:413,limit:(j&&Number.isFinite(j.limit))?j.limit:null,error:msg||'payload too large · 内容过大'};
+  // The demo node's AI gate (lib/demo-auth.mjs SIGNIN_CODE) answers a visitor who never signed in:
+  // still 'unauthorized' for apps, but flagged `signin` so the sentence is the server's own "sign in to
+  // use AI" and the demo boot (lib/demo-boot.mjs SIGNIN_EVENT) opens its sign-in. Owner nodes never send it.
+  // TODO(R4 seam): grows this over-budget shell by four lines; moves with the broker split (see appAgentInit).
+  if(r.status===401&&j&&j.code===DEMO_SIGNIN_CODE){ if(typeof dispatchEvent==='function'&&typeof Event==='function') dispatchEvent(new Event(DEMO_SIGNIN_EVENT));
+    return {ok:false,code:'unauthorized',signin:true,status:401,error:msg||'Sign in to use AI · 登录后使用 AI'}; }
   if(r.status===401||r.status===403) return {ok:false,code:'unauthorized',status:r.status,error:msg||'signed out · 登录已过期'};
   if(r.status===404) return {ok:false,code:'not-found',status:404,error:RELAY_NOT_FOUND};
   if(r.status>=500) return {ok:false,code:'server-error',status:r.status,error:msg||'server error · 服务器错误'};
@@ -1458,6 +1471,7 @@ function relayText(f,sentBytes,what){
   // already says which ("wrong username or PIN"); this branch used to drop that and print
   // "Signed out — sign in again" at someone who was, at that moment, signing in. It read as
   // a session bug and hid the real reason (R5: the specific reason always wins).
+  if(e.code==='unauthorized'&&e.signin) return String(e.error)+'。';   // demo: never signed in, not "expired"
   if(e.code==='unauthorized') return w===RELAY_NOUNS.credentials
     ? String(e.error||'Wrong username or PIN · 用户名或 PIN 错误')+'。'
     : 'Signed out · 登录已过期 — '+w.en+' '+w.did+'. Sign in again, then retry · 请重新登录后重试。';

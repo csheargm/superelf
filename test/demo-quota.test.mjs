@@ -78,7 +78,7 @@ test('the demo allow-list fails closed: only listed routes pass', () => {
   assert.equal(demoRouteAllowed('POST', '/api/chat'), true);
   assert.equal(demoRouteAllowed('GET', '/api/convos/abc123'), true);
   assert.equal(demoRouteAllowed('PATCH', '/api/convos/abc123'), true);
-  for (const [m, p] of [['POST', '/api/ask'], ['GET', '/api/admin/users'], ['POST', '/api/jobs'], ['GET', '/api/convos/../../config'],
+  for (const [m, p] of [['GET', '/api/admin/users'], ['POST', '/api/jobs'], ['GET', '/api/convos/../../config'],
     ['DELETE', '/api/apps/notes'], ['POST', '/api/new-route-added-later'], ['GET', '/api/websearch'], ['GET', '/api/family-apps'], ['GET', '/api/note-search'], ['GET', '/api/note-text']]) {
     assert.equal(demoRouteAllowed(m, p), false, `${m} ${p}`);
   }

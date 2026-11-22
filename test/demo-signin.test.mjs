@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { freePort, mkWebRoot, startWeb, stopWeb, waitReady } from './helpers-web.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
 import { DEMO_SIGNIN, DEMO_SIGNIN_BAD, DEMO_BLOCKED, AUTH_HEADER, sbUserId, makeSupabaseVerifier, makeSigninGate } from '../lib/demo-auth.mjs';
-import { DEMO_SIGNIN_TIP, SIGNIN_LABELS } from '../lib/demo-boot.mjs';
+import { SIGNIN_LABELS } from '../lib/demo-boot.mjs';
 import { DEMO_COOKIE, DEMO_DELETE_PATH } from '../lib/demo.mjs';
 const NOTICE = 'AI answers come from third-party cloud models · 第三方云端模型 <b>';
 
@@ -77,9 +77,9 @@ async function start(sbToken, { ip = `198.51.100.${++ipSeq}`, token } = {}) {
 }
 const chat = (v, message = 'hi') => req('/api/chat', { method: 'POST', token: v.j.token, ip: v.ip, body: JSON.stringify({ message }) });
 
-test('signed out: the shell shows the sign-in control and tip, and AI is refused with the bilingual prompt', async () => {
+test('signed out: the shell shows the sign-in control (no banner), and AI is refused with the bilingual prompt', async () => {
   const shell = await (await req('/')).text();
-  assert.ok(shell.includes(JSON.stringify(DEMO_SIGNIN_TIP)), 'one-time tip beside the sign-in control');
+  assert.ok(!shell.includes('demoSigninTip'), 'no sign-in banner under the header (owner 2026-11-22)');
   assert.ok(shell.includes(SIGNIN_LABELS.in.split(' · ')[0]) && shell.includes('/auth/v1/otp'));
   assert.ok(shell.includes('"anonKey":"public-anon"'), 'the client gets the public values from config');
   assert.ok(shell.includes("code_challenge_method:'s256'") && shell.includes("auth('pkce'"), 'the magic link is PKCE-bound to this browser');
@@ -206,7 +206,7 @@ test('concurrent verifications share one JWKS fetch, and a failed fetch backs of
 test('the notice under the chat box comes from config, as plain text', async () => {
   const shell = await (await req('/')).text();
   assert.ok(shell.includes(JSON.stringify(NOTICE).replace(/</g, '\\u003c')), 'config text, escaped');
-  assert.ok(shell.includes("n.id='demoNotice'") && shell.includes('n.textContent='));
+  assert.ok(shell.includes("n.id='demoNotice'") && shell.includes('f.appendChild(n)'));
 });
 
 test('blocked users (by Supabase id or email) get 403 on AI; others are not affected', async () => {
@@ -252,7 +252,7 @@ test("delete my account removes only that member's workspace and quota rows, the
   assert.equal((await req('/api/ping', { token: a.j.token })).status, 401, 'A is signed out');
   assert.equal((await chat(b)).status, 200, 'B still works');
   const shell = await (await req('/')).text();
-  assert.match(shell, /scripturetolife\.org sign-in stays.*scripturetolife\.org 登录账户保留/, 'the confirm says the shared account is kept');
+  assert.match(shell, /sign-in email stays registered.*登录邮箱账户保留/, 'the confirm says the sign-in account is kept');
 });
 
 test('the block list holds for signed-in members even when sign-in is optional', async () => {
@@ -262,4 +262,19 @@ test('the block list holds for signed-in members even when sign-in is optional',
   gate.bind('bearer-1', user.id, jwt({ sub: 'blocked-sub' }), Math.floor(Date.now() / 1000) + 3600);
   assert.equal((await gate.check(user, 'bearer-1')).status, 403);
   assert.equal(await gate.check({ id: 'anon-0000000000000000', signedIn: false }, 'x'), null, 'guests pass when sign-in is optional');
+});
+
+// An app's 'ask' (lib/demo-ask.mjs): the chat's sign-in gate, then an Ollama answer as {ok,text}; no agent.
+test("an app's ask needs a sign-in, then answers from the demo lane and saves no conversation", async () => {
+  const anon = await start();
+  const no = await req('/api/ask', { method: 'POST', token: anon.j.token, ip: anon.ip, body: JSON.stringify({ message: 'pollen?' }) });
+  assert.equal(no.status, 401);
+  assert.equal((await no.json()).error, DEMO_SIGNIN);
+  const v = await start(jwt({ sub: 'asker' }));
+  const before = (await (await req('/api/convos', { token: v.j.token, ip: v.ip })).json()).length;
+  assert.ok(Number.isInteger(before), 'the convo list is a list');
+  const r = await req('/api/ask', { method: 'POST', token: v.j.token, ip: v.ip, body: JSON.stringify({ message: 'pollen?' }) });
+  assert.equal(r.status, 200);
+  assert.deepEqual(await r.json(), { ok: true, text: 'FAST-ANSWER' });
+  assert.equal((await (await req('/api/convos', { token: v.j.token, ip: v.ip })).json()).length, before, 'nothing saved');
 });

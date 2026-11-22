@@ -14,6 +14,7 @@
 !ops/demo/entrypoint.sh
 !ops/demo/config.demo.json
 !ops/demo/ollama-models.json
+!ops/private/config.private.json
 **/.DS_Store
 **/*.log
 **/.env

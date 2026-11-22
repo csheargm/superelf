@@ -386,6 +386,8 @@ const DUMMY_HASH = hashPassword(crypto.randomBytes(8).toString('hex')); // for c
 
 // Everything is scoped to a user's own workspace — full data isolation.
 const wsDir = (u) => u.workspace;
+// The display name a member saved in Settings, or '' (the record's own name is a placeholder).
+const ownName = (u) => { const n = String((loadProfile(wsDir(u)) || {}).name || '').trim(); return n && n !== u.name ? n : ''; };
 const appsDir = (u) => path.join(u.workspace, 'apps');
 // An app folder as a WRITE target, never through a link at apps/<slug> or above it (R13, 2026-10-13):
 // a link there carried an update's files, a bump, a share toggle or a delete into another folder.
@@ -1718,7 +1720,9 @@ const server = http.createServer(async (req, res) => {
       catch (e) { return send(res, 400, 'application/json', JSON.stringify({ error: e.message })); }
     }
     if (req.method === 'GET' && p === OFFLINE_CONFIG_PATH) return send(res, 200, 'application/json', JSON.stringify({ ...cfg.offline, local_origin: cfg.local_origin, bible: bibleIndex(BIBLE_DATA) }));   // read at use time: a config reload changes the cap with no restart
-    if (req.method === 'GET' && p === '/api/ping') return send(res, 200, 'application/json', JSON.stringify({ ok: true, uid: user.id, name: user.name, role: user.role }));
+    // A demo visitor's record name is a placeholder ("Member · 会员"): the header shows only a name they set themselves.
+    // TODO(R4): web.mjs is over budget; split the small GET routes (ping, bible, family-apps) into lib/.
+    if (req.method === 'GET' && p === '/api/ping') return send(res, 200, 'application/json', JSON.stringify({ ok: true, uid: user.id, name: user.demo ? ownName(user) : user.name, role: user.role }));
     if (req.method === 'GET' && p === '/api/family-apps') return send(res, 200, 'application/json', JSON.stringify(listFamilyApps()));
     if (req.method === 'PATCH' && p.endsWith('/share') && p.startsWith('/api/apps/')) {
       const slug = p.slice('/api/apps/'.length, -'/share'.length);

@@ -552,3 +552,48 @@ Without it they now FAIL (R14), not pass as `# pass 0 / # fail 0`. To run them:
   may have switched accounts): over-sign-out, fails safe; rejected as not a bypass. (feat/demo-signin, gpt-review r5)
 - The sign-in boot/control script is checked for syntax and by server-side flows only; no fake-DOM
   run of the PKCE exchange and refresh yet. (feat/demo-signin)
+
+## Starter apps: GPT-review leftovers (2026-11-21, fix/demo-account-ui)
+- productivity-hub: debounced saves have no PALeave flush (leaving at once can drop the last edit);
+  clearing a note's body schedules no save; Export JSON needs `allow-downloads` in the app sandbox/CSP.
+- allergy: no stale-response guard (a late startup read or older check can overwrite a newer city).
+- bible-values: a reflection still in flight is written into whichever value sheet is open now.
+- Demo sign-out: after the 4 s deadline the shell reloads even if /api/logout never reached the node,
+  so the anonymous cookie can survive on a hung node. Option: on timeout, show "Sign-out not confirmed"
+  and retry instead of reloading (GPT review round 3).
+- productivity-hub: an idle tab's midnight stats reset can save a stale snapshot over another tab's edits.
+
+## Demo background app builds (lib/demo-build-job.mjs) — GPT review leftovers, 2026-11-21
+- A restart after the app is written but before the job record says 'done' reports the build as failed (the app is there).
+- If the first job-record write fails, the build cap already charged is not refunded (same as any other mid-turn failure today).
+- The chat's Open link uses the request Host header (syntax-checked only); the public node sits behind Cloudflare on one name.
+- (round 3) Restart recovery during a held turn: record says failed before its deferred note exists; the shell may refresh too early.
+- (round 3) If the terminal record write fails after the success note, a later read adds a contradictory "interrupted" note.
+- (round 3) The shell's completion refresh can reopen the chat during a new streaming turn (reply visible again on reopen).
+- (round 3) The relative Open-link fallback (odd Host, e.g. IPv6 literal) renders as plain text.
+
+## Private VM node (ops/private) — from GPT review 2026-11-21
+- The DOCKER-USER ingress rule is re-added by rebuild-private.sh but not persisted across a reboot
+  (until the next rebuild it is absent; 100.x is not routable to the VM's public NIC, so low risk).
+- backup.sh archives a live tree (same as the demo): quiesce or snapshot before tar.
+- The nightly root backup job reads the checkout's compose file; move a root-owned copy to /etc if
+  the checkout ever becomes writable by anyone but the sudo-capable owner.
+
+## Demo sign-in prompt leftovers (GPT review r3, 2026-11-22, capped)
+- lib/demo-boot.mjs: a failed sign-in callback leaves an error-only popover open; the pa-demo-signin
+  listener's `if(!pop)` guard then does not show the email form until the popover is dismissed.
+- lib/demo-boot.mjs: the listener exists only for a page loaded signed out. A signed-in tab whose
+  binding is lost or token fails verification shows the server's "sign in again" sentence but no form
+  (the minute sync then clears the session and the header Sign in returns).
+- test/demo-account-ui-e2e.test.mjs: the peek-bar step cannot tell the transitionend handler apart
+  (the shell header behind an app is as tall as the bar); an invariant pin only.
+
+## Flaky test · 不稳定测试
+- test/demo-account-ui-e2e.test.mjs "the demo drawer keeps Family Apps…" fails ~1 in 4 runs on main
+  too (seen 2026-11-22): the parse-time `#dFamilyDemo` count reads 0, likely the boot reload racing
+  the `domcontentloaded` check. Not caused by the drawer home link; fix the race separately.
+
+## Privacy scan (tools/privacy-scan.mjs) — GPT review r3 leftovers, 2026-11-22 (capped)
+- Annotated tags are not inspected (tagger, tag message); `rev-list` peels them. Push tags only after a manual look.
+- A new ref excludes commits on the destination's remote-tracking refs; stale refs could hide commits. Fetch before pushing.
+- bible-data/ is exempt wholesale; exempt only known Scripture blobs instead.

@@ -69,3 +69,11 @@ ops/demo/.rebuild.lock
 
 # First-run owner setup code (lib/setup-code.mjs) — a live credential
 setup-code
+
+# ── Private overlay (docs/repos.md): laid onto a checkout by the overlay's overlay.sh, never
+# committed here. Generic patterns only, so this file names nothing personal. An overlay APP
+# carries its own `.gitignore` of `*` (nested rules win over the `!workspace/apps/` above).
+/privacy-terms.txt
+/ops/private/
+/docs/private-*.md
+/test/private-*.test.mjs

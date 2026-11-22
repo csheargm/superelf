@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" media="(prefers-color-scheme:light)" content="#f0f5f0">
+<meta name="theme-color" media="(prefers-color-scheme:dark)" content="#0f1410">
+<title>Allergy & Pollen</title>
+<style>
+html { font-size: calc(17px * var(--fs,1)); }
+:root {
+  --bg:#f0f5f0; --card:#fff; --text:#1a1f1a; --muted:#6b7570; --line:#dde4dd;
+  --accent:#1a7a4a;
+  --low:#1a7a4a; --mod:#b07000; --high:#b04800; --vhigh:#9e2828;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0f1410; --card:#191e19; --text:#dfe8df; --muted:#8a9890; --line:#252e25;
+  --accent:#4db87a;
+  --low:#4db87a; --mod:#e0a020; --high:#e07040; --vhigh:#e05050;
+}}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--text);font:16px/1.5 -apple-system,system-ui,sans-serif;min-height:100vh;}
+
+.header{padding:18px 16px 6px;}
+.header h1{font-size:22px;font-weight:800;}
+.loc-sub{font-size:13px;color:var(--muted);margin-top:2px;}
+
+#status{padding:0 16px 10px;font-size:13px;color:#c33}
+#status:empty{display:none}
+.loc-bar{display:flex;gap:8px;padding:10px 16px 14px;}
+.loc-bar input{flex:1;font:inherit;font-size:15px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--text);outline:none;}
+.loc-bar input:focus{border-color:var(--accent);}
+.loc-bar button{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:0 18px;font:inherit;font-size:15px;cursor:pointer;white-space:nowrap;}
+
+.content{padding:0 16px 80px;}
+
+/* Level card */
+.level-card{border-radius:16px;padding:20px;margin-bottom:14px;border:1.5px solid;}
+.lc-low   {background:color-mix(in srgb,var(--low) 10%,transparent);border-color:var(--low);}
+.lc-moderate{background:color-mix(in srgb,var(--mod) 10%,transparent);border-color:var(--mod);}
+.lc-high  {background:color-mix(in srgb,var(--high) 10%,transparent);border-color:var(--high);}
+.lc-very-high{background:color-mix(in srgb,var(--vhigh) 10%,transparent);border-color:var(--vhigh);}
+
+.lv-label{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);}
+.lv-name{font-size:34px;font-weight:900;line-height:1.1;margin:4px 0 2px;}
+.lc-low    .lv-name{color:var(--low);}
+.lc-moderate .lv-name{color:var(--mod);}
+.lc-high   .lv-name{color:var(--high);}
+.lc-very-high .lv-name{color:var(--vhigh);}
+.lv-score{font-size:13px;color:var(--muted);}
+
+.gauge{height:8px;border-radius:4px;background:linear-gradient(to right,var(--low),var(--mod),var(--high),var(--vhigh));margin:14px 0 6px;position:relative;}
+.gauge-dot{width:18px;height:18px;border-radius:50%;background:var(--text);border:3px solid var(--card);position:absolute;top:50%;transform:translate(-50%,-50%);transition:left .5s ease;}
+
+.lv-desc{font-size:14px;margin-top:8px;line-height:1.4;}
+
+/* Section header */
+.sec{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:18px 0 8px;}
+
+/* Triggers grid */
+.triggers{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px;}
+.tcard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;}
+.tcard-name{font-size:12px;color:var(--muted);}
+.tcard-lv{font-size:17px;font-weight:700;margin-top:3px;}
+.tl-none{color:var(--muted);}
+.tl-low{color:var(--low);}
+.tl-moderate{color:var(--mod);}
+.tl-high{color:var(--high);}
+.tl-very-high{color:var(--vhigh);}
+
+/* Tips */
+.tips-box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:4px 14px;}
+.tip{font-size:14px;padding:9px 0;border-bottom:1px solid var(--line);line-height:1.4;display:flex;gap:8px;}
+.tip:last-child{border-bottom:none;}
+.tip::before{content:'•';color:var(--accent);flex-shrink:0;font-weight:700;}
+
+/* Footer */
+.footer{text-align:center;margin-top:16px;color:var(--muted);font-size:12px;}
+.source-link{color:var(--accent);font-size:12px;word-break:break-all;}
+.refresh-btn{margin-top:10px;background:none;border:1px solid var(--line);border-radius:8px;padding:7px 20px;font:inherit;font-size:13px;color:var(--muted);cursor:pointer;display:inline-block;}
+.refresh-btn:active{opacity:.7;}
+
+/* States */
+.state{text-align:center;padding:48px 16px;color:var(--muted);font-size:15px;}
+.spinner{display:inline-block;width:36px;height:36px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:14px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Allergy & Pollen</h1>
+  <div class="loc-sub" id="loc-sub">Enter your city to get started</div>
+</div>
+<div class="loc-bar">
+  <input id="loc-input" placeholder="e.g. Springfield, IL" autocomplete="off">
+  <button id="loc-btn">Check</button>
+</div>
+<div id="status" role="status"></div>
+<div class="content" id="content">
+  <div class="state">Enter a city above to check today's pollen levels.</div>
+</div>
+
+<script>
+let _id = 0;
+const _wait = {};
+window.addEventListener('message', e => {
+  const m = e.data;
+  if (m && m.pa === 'res' && _wait[m.id]) {
+    const keep = m.ev && !m.done;
+    _wait[m.id](m);
+    if (!keep) delete _wait[m.id];
+  }
+});
+function broker(kind, extra) {
+  return new Promise(res => {
+    const id = ++_id;
+    _wait[id] = res;
+    parent.postMessage({ pa: 'req', id, kind, ...extra }, '*');
+  });
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const POLLEN_PATH = 'pollen.json';
+function setStatus(t) { document.getElementById('status').textContent = t; }
+
+let currentLoc = '';
+
+function levelClass(lv) {
+  if (!lv) return 'none';
+  const c = String(lv).toLowerCase().replace(/\s+/g, '-').replace(/_/g, '-');
+  return ['low', 'moderate', 'high', 'very-high'].includes(c) ? c : 'none';   // model text: only known classes reach the markup
+}
+
+function gaugePos(score, level) {
+  if (score != null && !isNaN(score)) return Math.min(98, Math.max(2, (score / 12) * 100));
+  const map = { low: 12, moderate: 40, high: 65, 'very-high': 88 };
+  return map[levelClass(level)] ?? 50;
+}
+
+function renderResult(data, fetched) {
+  const lc = levelClass(data.overall_level);
+  const pos = gaugePos(data.score, data.overall_level);
+  const scoreStr = (data.score != null && !isNaN(data.score)) ? `Score: ${data.score}/12` : '';
+  const when = fetched ? new Date(fetched).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+  const triggersHtml = (data.triggers || []).map(t =>
+    `<div class="tcard">
+      <div class="tcard-name">${esc(t.name || '')}</div>
+      <div class="tcard-lv tl-${levelClass(t.level)}">${esc(t.level || 'Unknown')}</div>
+    </div>`
+  ).join('');
+
+  const tipsHtml = (data.tips || []).map(t =>
+    `<div class="tip"><span>${esc(t)}</span></div>`
+  ).join('');
+
+  const sourceHtml = data.source
+    ? `<div class="footer">Source: <span class="source-link">${esc(data.source)}</span></div>`
+    : '';
+
+  document.getElementById('content').innerHTML = `
+    <div class="level-card lc-${lc}">
+      <div class="lv-label">Overall Pollen Level</div>
+      <div class="lv-name">${esc(data.overall_level || 'Unknown')}</div>
+      ${scoreStr ? `<div class="lv-score">${esc(scoreStr)}</div>` : ''}
+      <div class="gauge"><div class="gauge-dot" style="left:${pos}%"></div></div>
+      <div class="lv-desc">${esc(data.description || '')}</div>
+    </div>
+
+    ${triggersHtml ? `<div class="sec">Allergen Breakdown</div><div class="triggers">${triggersHtml}</div>` : ''}
+
+    ${tipsHtml ? `<div class="sec">Tips for Today</div><div class="tips-box">${tipsHtml}</div>` : ''}
+
+    ${sourceHtml}
+    ${when ? `<div class="footer">Updated at ${esc(when)}</div>` : ''}
+    <div class="footer"><button class="refresh-btn" onclick="fetchPollen(currentLoc)">Refresh</button></div>
+  `;
+}
+
+async function fetchPollen(loc) {
+  currentLoc = loc;
+  document.getElementById('loc-sub').textContent = loc;
+  document.getElementById('content').innerHTML =
+    `<div class="state"><div class="spinner"></div><br>Searching pollen data for ${esc(loc)}…<br><small style="font-size:12px;margin-top:8px;display:block">This may take a moment</small></div>`;
+
+  const prompt = `Search the web right now for the current pollen and allergy forecast for "${loc}" today.
+
+Return ONLY a valid JSON object — no markdown, no extra text, just raw JSON:
+{
+  "overall_level": "Low" or "Moderate" or "High" or "Very High",
+  "score": <number 0–12, or null if unavailable>,
+  "description": "<one sentence about today's conditions>",
+  "triggers": [
+    { "name": "<allergen: Tree Pollen / Grass Pollen / Ragweed / Weed Pollen / Mold>", "level": "None" or "Low" or "Moderate" or "High" or "Very High" }
+  ],
+  "tips": ["<specific actionable tip for allergy sufferers today>", "<another tip>"],
+  "source": "<the URL you pulled data from>"
+}
+
+Use real live data from pollen.com, weather.com/forecast/health/allergy, IQAir, airnow.gov, or similar. If no data found, set overall_level to null and description to "Data unavailable for this location."`;
+
+  const r = await broker('ask', { message: prompt });
+  if (!r.ok) {
+    document.getElementById('content').innerHTML = `<div class="state">${esc(r.text || 'Could not retrieve data. Try again.')}</div>`;
+    return;
+  }
+
+  let result;
+  try {
+    const json = (r.text || '').match(/\{[\s\S]*\}/)?.[0];
+    result = JSON.parse(json);
+  } catch {
+    document.getElementById('content').innerHTML = `<div class="state">${esc(r.text || 'Could not parse pollen data.')}</div>`;
+    return;
+  }
+
+  const now = Date.now();
+  renderResult(result, now);
+  const s = await broker('save-data', { path: POLLEN_PATH, data: { location: loc, result, fetched: now } });
+  setStatus(s.ok ? '' : (s.text || s.error));   // the shell's bilingual sentence (superelf.md)
+}
+
+document.getElementById('loc-btn').onclick = () => {
+  const v = document.getElementById('loc-input').value.trim();
+  if (v) fetchPollen(v);
+};
+document.getElementById('loc-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('loc-btn').click();
+});
+
+// Load the saved city on start. The shell answers a read as {ok,text}, a missing file as code
+// 'not-found' (web/index.html relayCall): a first run. Any other failure is shown, not passed off as
+// "no city yet". Saves are not blocked: a check replaces this whole file with the city just typed.
+(async () => {
+  const r = await broker('data', { path: POLLEN_PATH });
+  if (!r.ok && r.code !== 'not-found') setStatus('Saved city not loaded · 未能读取已存城市 — ' + (r.text || r.error));
+  if (r.ok) {
+    let saved;
+    try { saved = JSON.parse(r.text); } catch (e) { setStatus('Saved city unreadable · 已存城市无法读取 (' + e.message + ')'); }
+    if (saved && saved.location) {
+      currentLoc = saved.location;
+      document.getElementById('loc-input').value = saved.location;
+      document.getElementById('loc-sub').textContent = saved.location;
+      const age = Date.now() - (saved.fetched || 0);
+      if (saved.result && age < 3 * 60 * 60 * 1000) {
+        renderResult(saved.result, saved.fetched);
+      } else {
+        await fetchPollen(saved.location);
+      }
+    }
+  }
+})();
+</script>
+</body>
+</html>

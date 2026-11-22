@@ -1,7 +1,8 @@
 # Weekly hosted-model watch of the superelf demo · 演示模型每周观察 (tools/ollama-model-watch.mjs).
 # REPORTS ONLY: writes /data/model-watch/model-watch-<date>.md inside the demo container; it never
 # edits config or switches a model. Runs in the demo container only (docker exec), so the
-# OLLAMA_API_KEY stays there and any other project is never touched. Install (root):
+# OLLAMA_API_KEY stays there and any other project is never touched. Installed and enabled on the
+# demo VM 2026-11-22 (timer: Mondays 04:30 VM local time, UTC). To install again (root):
 #   cp superelf-demo-model-watch.service superelf-demo-model-watch.timer /etc/systemd/system/
 #   systemctl daemon-reload && systemctl enable --now superelf-demo-model-watch.timer
 # Read a report: sudo docker exec superelf-demo-superelf-1 sh -c 'cat /data/model-watch/model-watch-*.md | tail -40'

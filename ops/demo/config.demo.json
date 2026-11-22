@@ -8,6 +8,7 @@
     "total_disk_gb": 5,
     "save_max_mb": 2,
     "app_model": "gpt-oss:120b",
+    "home_url": "https://superelf.app",
     "chat_timeout_s": 300,
     "app_builds_per_user_per_day": 5,
     "app_builds_per_ip_per_day": 15,
@@ -15,6 +16,7 @@
     "web_search_per_ip_per_day": 50,
     "ai_calls_node_per_day": 3000,
     "parallel_chats": 3,
+    "title": "superelf",
     "notice": "AI answers come from third-party cloud models (Ollama). Don't enter sensitive personal information. · AI 回答来自第三方云端模型（Ollama），请勿输入敏感个人信息。",
     "blocked_users": [],
     "auth": {
