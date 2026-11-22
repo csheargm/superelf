@@ -265,7 +265,7 @@ const JOBS = {
     run: async (user, opts = {}) => {
       const a = await checkClaudeAuth({ file: claudeAuth.file, chatModels: cfg.chat_models, claudeCmd: cfg.claude_cmd, cwd: wsDir(user), audit,
         run: (o) => enqueue(() => runClaude(o)) });
-      const check = () => runModelCheck({ file: modelHealth.file, chatModels: cfg.chat_models, url: cfg.ollama_url,
+      const check = () => runModelCheck({ file: modelHealth.file, chatModels: cfg.chat_models, url: cfg.ollama_url, auth: ollamaAuth(),
         catalogUrl: cfg.ollama_catalog_url, manual: !!opts.manual });
       try { return mergeBriefs(a, await check()); }
       catch (e) {

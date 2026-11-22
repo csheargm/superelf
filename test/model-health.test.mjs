@@ -176,3 +176,16 @@ test('a bare 404 is not "gone": a wrong ollama_url answering 404 to every path m
     assert.equal(ollamaHttpError(404, '{"error":"model \'b\' not found"}').gone, true, 'R14 control: Ollama\'s own 404 still counts');
   } finally { wrong.close(); }
 });
+
+test('the probe carries the chat lane\'s Ollama auth (ollama.com answers 401 without it)', async () => {
+  const seen = [];
+  const fetchImpl = async (u, o) => {
+    seen.push(o.headers && o.headers.authorization);
+    return o.headers && o.headers.authorization === 'Bearer k1' ? new Response('{}', { status: 200 }) : new Response('{"error":"unauthorized"}', { status: 401 });
+  };
+  const file = tmpFile();
+  await runModelCheck({ file, chatModels: [lane('g', 'glm-5.3')], url: 'https://ollama.example', auth: { authorization: 'Bearer k1' }, fetchImpl });   // resolves: the lane was checked
+  assert.deepEqual(seen.filter(Boolean), ['Bearer k1'], 'the key reached the probe');
+  // R14 control: without the key the same lane is unknown (never "gone"), and with no lane known the run fails.
+  await assert.rejects(runModelCheck({ file: tmpFile(), chatModels: [lane('g', 'glm-5.3')], url: 'https://ollama.example', fetchImpl }));
+});
