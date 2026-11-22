@@ -18,6 +18,9 @@ that found it in brackets. Pick from here; do not open a side session per item.
   its host; links are pairwise O(n^2) per redraw (fine for a chapter, slow for thousands of strokes);
   writing below a line's last row still sits at the line's top-left, so a line gaining rows pushes the
   word into the next line's text (anchor a word to the nearest edge of its host line).
+- rehost host flip (GPT review round 5): erasing the ONLY piece of a split word stored on the upper
+  line, on a width other than the one it was written at, sends the rest back to the lower line's
+  frame (a one-row jump). Fix: on erase, rewrite the survivors onto the host frame they were drawn on.
 - A burst's NEAR box grows with the writing in progress (union), so within 1.5 s a stroke near any part
   of a long written line joins it.
 
