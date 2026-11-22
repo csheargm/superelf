@@ -7,6 +7,7 @@ import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { demoOn, limitAudit, makeDiskMeter, makeQuotaStore, DEMO_QUOTA_FILE } from './lib/demo-quota.mjs';
 import { makeDemoUsers } from './lib/demo.mjs';
+import { appPageCookie, clearAppPageCookie, appPageToken, appPageCookieToken, appIsShared, canViewAppPage, APP_SIGNOUT_PATH } from './lib/app-page-access.mjs';
 import { injectDemoBoot } from './lib/demo-boot.mjs';
 import { makeSigninGate, authConfig } from './lib/demo-auth.mjs';
 import { makeDemoRoutes } from './lib/demo-routes.mjs';
@@ -526,8 +527,8 @@ const apiKeyReqs = new WeakSet();
 const apiKeyBlocked = (req, user) => apiKeyReqs.has(req) && !!user.passHash;
 const API_KEY_REFUSED = JSON.stringify({ error: 'Sign in with your password for this · 此操作需用密码登录' });
 const bearerOf = (req) => (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
-function userFor(req) {
-  const given = bearerOf(req);
+const userFor = (req) => userForToken(bearerOf(req), req);
+function userForToken(given, req) {
   if (!given) return null;
   const uid = cfg.sessions.resolve(given, Date.now());
   if (demoOn(cfg)) {   // demo: anonymous visitors only, never an account or API token (lib/demo.mjs)
@@ -1648,13 +1649,18 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'POST' && p === '/api/logout') {
       cfg.sessions.destroy(bearerOf(req));
-      return send(res, 200, 'application/json', '{"ok":true}');
+      return send(res, 200, 'application/json', '{"ok":true}', { 'set-cookie': clearAppPageCookie(req) });
     }
 
         // Sandboxed app hosting: /app/<userid>/<slug>/...  No token in the URL; the
     // user id is a public namespace, not a secret. Strict CSP + sandbox give the
     // app an opaque origin with NO network — it cannot read data or a token; it
     // only renders what its own shell brokers to it via postMessage.
+    if (req.method === 'POST' && p === APP_SIGNOUT_PATH) {   // ADR 0037: the signed-out shell ends the app cookie's session
+      const ck = appPageCookieToken(req);
+      if (ck) cfg.sessions.destroy(ck);
+      return send(res, 200, 'application/json', '{"ok":true}', { 'set-cookie': clearAppPageCookie(req) });
+    }
     if (req.method === 'GET' && p.startsWith('/app/')) {
       const parts = p.slice('/app/'.length).split('/');
       const uid = parts.shift();
@@ -1662,6 +1668,12 @@ const server = http.createServer(async (req, res) => {
       const base = uid === 'shared' ? (demoOn(cfg) ? null : SHARED) : (owner && appsDir(owner));
       if (!base || !slugOk(parts[0] || '')) return send(res, 400, 'text/plain', 'bad app');
       const slug = parts.shift();
+      // An unshared app's page is its author's (and the owner's) only; anyone else gets the same 404 as
+      // a missing file, so existence is not revealed (lib/app-page-access.mjs, ADR 0037). Demo visitors'
+      // apps stay public-by-link; the shared library is shared by definition.
+      // TODO(R4): web.mjs is over budget — split the /app/ route into lib/app-page-access.mjs.
+      if (owner && !noLinkOnTheWay(owner.workspace, path.join(base, slug))) return send(res, 404, 'text/plain', 'not found');   // a linked app folder could borrow another author's app
+      if (owner && !demoOn(cfg) && !canViewAppPage({ authorId: uid, shared: appIsShared(path.join(base, slug)), viewer: userForToken(appPageToken(req), req) })) return send(res, 404, 'text/plain', 'not found');
       if (!p.endsWith('/') && parts.length === 0) { res.writeHead(301, { location: `/app/${uid}/${slug}/` }); return res.end(); }
       const f = safeJoin(path.join(base, slug), parts.join('/') || 'index.html');
       if (!f) return send(res, 400, 'text/plain', 'bad path');
@@ -1725,7 +1737,8 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && p === OFFLINE_CONFIG_PATH) return send(res, 200, 'application/json', JSON.stringify({ ...cfg.offline, local_origin: cfg.local_origin, bible: bibleIndex(BIBLE_DATA) }));   // read at use time: a config reload changes the cap with no restart
     // A demo visitor's record name is a placeholder ("Member · 会员"): the header shows only a name they set themselves.
     // TODO(R4): web.mjs is over budget; split the small GET routes (ping, bible, family-apps) into lib/.
-    if (req.method === 'GET' && p === '/api/ping') return send(res, 200, 'application/json', JSON.stringify({ ok: true, uid: user.id, name: user.demo ? ownName(user) : user.name, role: user.role }));
+    if (req.method === 'GET' && p === '/api/ping') return send(res, 200, 'application/json', JSON.stringify({ ok: true, uid: user.id, name: user.demo ? ownName(user) : user.name, role: user.role }),
+      demoOn(cfg) ? undefined : { 'set-cookie': appPageCookie(req, bearerOf(req)) });   // carries the session to the app iframe's navigation (lib/app-page-access.mjs)
     if (req.method === 'GET' && p === '/api/family-apps') return send(res, 200, 'application/json', JSON.stringify(listFamilyApps()));
     if (req.method === 'PATCH' && p.endsWith('/share') && p.startsWith('/api/apps/')) {
       const slug = p.slice('/api/apps/'.length, -'/share'.length);

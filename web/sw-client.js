@@ -77,6 +77,25 @@ async function swPrefetch(d,ctx,uid){
   const w=ctx.worker(); if(w) w.postMessage({kind:SW_BIBLE_DONE_KIND,bytes});
   return status.bible='done';
 }
+// Sign-out: drop every stored app page from the offline bundle, so an unshared app (ADR 0037) cannot
+// be read from this device's cache by whoever signs in next. The shell's own pages stay. cachesApi =
+// window.caches or a fake; resolves with the number of entries removed.
+async function swForgetAppPages(cachesApi){
+  if(!cachesApi) return 0;
+  let n=0;
+  for(const name of (await cachesApi.keys()).filter((k)=>k.startsWith('pa-'))){
+    const c=await cachesApi.open(name);
+    for(const req of await c.keys()){ if(new URL(req.url).pathname.startsWith('/app/')){ await c.delete(req); n++; } }
+  }
+  return n;
+}
+// Entering the signed-out state (sign-out, or a boot whose session is gone): forget this device's
+// stored app pages and end the app cookie's session, so the next account on this browser can read
+// neither (ADR 0037). Both steps run; a failure of either reaches the caller.
+async function swSignedOut(cachesApi,post){
+  const [a,b]=await Promise.allSettled([swForgetAppPages(cachesApi),post('/app/-/signout')]);
+  const bad=[a,b].find((r)=>r.status==='rejected'); if(bad) throw bad.reason;
+}
 function makeSwClient(d){
   let route=SW_ROUTE_SRC, reg=null;
   const status={worker:'',bundle:'',probe:'',bible:'',error:''};
@@ -122,7 +141,8 @@ const PASW=makeSwClient({
   sw:('serviceWorker' in navigator)?navigator.serviceWorker:null,
   loaded:()=>{ const vl=$('#ver-lbl'); return vl?vl.textContent.trim():''; },   // the same footer line PAUpdate reads (web/update.js)
   frame:()=>$('#fr'),
-  fetchText:async(u)=>{ const r=await fetch(u,{credentials:'omit'}); if(!/^text\/html/.test(r.headers.get('content-type')||'')) throw new Error('HTTP '+r.status); return r.text(); },
+  fetchText:async(u)=>{ const r=await fetch(u,{credentials:'same-origin'});   // the Path=/app/ cookie: an unshared app page is its author's only (ADR 0037)
+  if(!/^text\/html/.test(r.headers.get('content-type')||'')) throw new Error('HTTP '+r.status); return r.text(); },
   fetchJson:async(u)=>{ const r=await api(u); if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); },
   fetchBytes:async(u)=>{ const r=await api(u); if(!r.ok) throw new Error('HTTP '+r.status); return (await r.arrayBuffer()).byteLength; },
   probeFrame:(u)=>{ const f=document.createElement('iframe'); f.setAttribute('sandbox','allow-scripts'); f.style.display='none'; f.src=u; document.body.appendChild(f); return f; },

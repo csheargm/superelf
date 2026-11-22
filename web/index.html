@@ -681,6 +681,9 @@ async function doSetup(){
 async function ensureToken(){
   // Offline-first: with no node at all, the last sign-in on this device stands (web/sw-client.js); a refused token still signs in again.
   if(T){ const p=await ping(); if(p===true||(p==='offline'&&(UID=PASW.recall(SW_UID_KEY)))){ $('#dot').classList.add('ok'); return; } }
+  // No live session here: whatever the last account left (cached app pages, the app cookie) goes first (ADR 0037).
+  // Offline it may not reach the node; the next signed-out boot tries again, so a failure is only noted on the line.
+  await swSignedOut(window.caches,(u)=>fetch(u,{method:'POST',credentials:'same-origin'})).catch(()=>PAOffline.noteNet(false));
   let first=false; try{ first=(await (await fetch('/api/setup-status')).json()).needsSetup; }catch{}
   if(first){
     for(;;){ const done=await new Promise((d)=>{ $('#setup').showModal(); $('#setupBtn').onclick=async(ev)=>{ ev.preventDefault(); if(await doSetup()){ $('#setup').close(); d(true); } }; }); if(done && await ping()) break; }
@@ -693,7 +696,7 @@ async function ensureToken(){
   }
   $('#dot').classList.add('ok');
 }
-async function logout(){ try{ await api('/api/logout',{method:'POST'}); }catch{} localStorage.removeItem('pa_session'); location.reload(); }
+async function logout(){ try{ await api('/api/logout',{method:'POST'}); }catch{} try{ await swSignedOut(window.caches,(u)=>fetch(u,{method:'POST',credentials:'same-origin'})); }catch(err){ alert('Could not clear saved app pages · 未能清除已保存的应用页面 — '+(err&&err.message||err)); } localStorage.removeItem('pa_session'); location.reload(); }
 
 /* ── New-feature key registry: maps feature-key → version added ── */
 // Update this when shipping new UI features; markNew() + PANewDot.mark() use these keys.
