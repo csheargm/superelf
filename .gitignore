@@ -1,0 +1,71 @@
+# ── Secrets & runtime state — NEVER commit ──
+config.json
+config.json.tmp
+sessions.json
+sessions.json.tmp
+# LEGACY: state.json was the removed Telegram bot's state (docs/adr/0006). Drop it once no node has one.
+state.json
+state-web.json
+model-health.json
+model-review.json
+# Claude sign-in: the long-lived token (lib/claude-token.mjs) and the watchdog's state (lib/claude-auth.mjs)
+claude-token
+claude-auth.json
+agentmail.json*
+*.log
+
+# ── Personal data — every user's private workspace ──
+# workspace/ is the owner's; workspace-<id>/ are family members'.
+# Only workspace.example/ (a sanitized template) is committed.
+workspace/
+workspace-*/
+*.deleted-*
+
+# ── EXCEPT the owner's apps, which are CODE ──────────────────────────────────
+# 21 apps, ~670KB of HTML + meta.json, existed on exactly one disk. The data they
+# hold does NOT live here — the broker namespaces it to workspace/data/<slug>/
+# (~64MB), which stays ignored along with conversations, journal, health and
+# uploads. So this tracks the dev work and none of the contents.
+#
+# ALLOWLIST, deliberately: re-including the directory wholesale would commit
+# whatever an app or a future feature decides to write beside its own code. Only
+# the two files an app is made of are un-ignored, and test/apps-tracked.test.mjs
+# fails if a tracked app ever carries anything else, or anything personal.
+#
+# MEMBERS' apps stay ignored. workspace-<id>/apps belongs to that person, and a
+# child's app is more likely to be personal than the owner's. Their call, not this
+# repo's.
+!workspace/
+workspace/*
+!workspace/apps/
+workspace/apps/*
+!workspace/apps/*/
+workspace/apps/*/*
+!workspace/apps/*/index.html
+!workspace/apps/*/meta.json
+
+node_modules/
+.DS_Store
+certs/
+*.crt
+*.key
+
+# The curated shelf IS source, not runtime state. It holds the apps that ship with superelf —
+# the ones every node gets, the way a note pad ships with an OS — and promote() is the publish
+# step, not a build artifact. Tracking it gives /changelog a real history to diff, makes each
+# promote a reviewable commit, and means a fresh clone comes with the apps instead of an empty
+# shelf. The one thing still ignored is the undo buffer: .versions/ is runtime, and git is
+# already the better history.
+shared-apps/.versions/
+
+# panote-ocr: the Vision CLI is compiled on the node from its .swift (lib/note-ocr.mjs ensureBuilt)
+tools/panote-ocr/build/
+
+# ── Public demo (ops/demo): secrets and the data disk, never committed ──
+ops/demo/.env
+ops/demo/data/
+ops/demo/data.img
+ops/demo/.rebuild.lock
+
+# First-run owner setup code (lib/setup-code.mjs) — a live credential
+setup-code

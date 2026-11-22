@@ -1,0 +1,199 @@
+<!-- PAVerseMarks — typed marks ON verse text（经文高亮 / 下划线）, option (d) of
+     docs/plans/annotation-anchoring.md §3. Inlined by web.mjs into any page carrying the
+     PA_VERSE_MARKS_UI marker (the Bible carries it). App-neutral: the host hands it the verse list
+     container, a store {get,set} over its own chapter file, textOf(n,lang) for the live text, and
+     onChange for its dots.
+     API: PAVerseMarks.attach({container, store:{get,set}, textOf, onChange}) returns
+       {render(), hasMarks(n), verses(), selection(), apply({verses,kind,color,range?}),
+        remove(verses,range?), sheetItems(verses,range?), openSheet(verses), closeSheet()}.
+     PAVerseMarks.armControl(el): the host's one Mark control must call this, or a tap on it
+     collapses the native selection on WebKit before the sheet reads it. openSheet snapshots
+     the selection ONCE and hands it to every entry, so the swatch tap needs no live selection.
+     Store shape (the host's ANN.marks[verseKey], verseKey 'v'+n), NEVER a pixel:
+       [{kind:'hl'|'ul', color?, lang?:'en'|'zh', quote?, start?, end?}] — a whole-verse mark has no
+       lang/quote/offsets; a range mark carries the quoted text plus character offsets into that
+       language's text line. Re-anchor on render: offsets first, then a quote search (BSB wording
+       change), and an unfindable quote shows as a whole-verse mark with a badge, never dropped.
+     Rendering is <mark> spans on the live text, so marks reflow at any width, orientation or font
+     scale (§3 d: R1/R2/R5 by construction). Driven for real by test/verse-marks.test.mjs. -->
+<style id="pvm-style">
+mark.pvm{background:none;color:inherit;border-radius:3px;padding:0 1px}
+mark.pvm.pvm-hl-yellow{background:rgba(255,214,0,.42)}
+mark.pvm.pvm-hl-green{background:rgba(72,199,116,.38)}
+mark.pvm.pvm-hl-pink{background:rgba(255,120,160,.36)}
+@media(prefers-color-scheme:dark){mark.pvm.pvm-hl-yellow{background:rgba(255,214,0,.30)}mark.pvm.pvm-hl-green{background:rgba(72,199,116,.30)}mark.pvm.pvm-hl-pink{background:rgba(255,120,160,.30)}}
+.pvm-ul{text-decoration:underline;text-decoration-color:var(--accent,#0f6355);text-decoration-thickness:2px;text-underline-offset:3px}
+.pvm-badge{font-size:10px;color:var(--muted,#6b7370);border:1px dashed var(--line,#e2e2de);border-radius:4px;padding:0 4px;margin-left:6px;white-space:nowrap;user-select:none;-webkit-user-select:none}
+.pvm-sheet{position:fixed;left:10px;right:10px;bottom:calc(66px + var(--sab,0px));z-index:11;display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--card,#fff);border:1px solid var(--line,#e2e2de);border-radius:14px;box-shadow:0 4px 20px rgba(0,0,0,.22)}
+.pvm-sheet button{font:inherit;font-size:13px;padding:7px 12px;border-radius:9px;cursor:pointer;border:1px solid var(--line,#e2e2de);background:var(--bg,#f4f4f2);color:var(--text,#1c1e1d);white-space:nowrap}
+.pvm-sheet button.pvm-sw{width:30px;height:30px;padding:0;border-radius:50%;border:2px solid rgba(0,0,0,.12)}
+.pvm-sheet .pvm-sw-yellow{background:rgb(255,214,0)}.pvm-sheet .pvm-sw-green{background:rgb(72,199,116)}.pvm-sheet .pvm-sw-pink{background:rgb(255,120,160)}
+.pvm-sheet .pvm-sp{flex:1}
+</style>
+<script id="pvm-script">
+(function(){
+  if(window.PAVerseMarks) return;
+  const COLORS=Object.freeze(['yellow','green','pink']);   // the three swatches; the store carries the NAME
+  const KINDS=Object.freeze({hl:'hl',ul:'ul'});
+  const LANGS=Object.freeze({en:'.ven',zh:'.vzh'});        // the host's text lines, by language
+  // User-facing text, English then 中文 (the repo's PANote.SEARCH_TXT style). `chip` is what the
+  // host's ☰ list row shows for a mark-only verse, so it is exported here and nowhere else (R3).
+  const TXT=Object.freeze({ mark:'Highlight · 高亮', underline:'Underline · 下划线', remove:'Remove · 移除',
+    chip:'Highlight 高亮', orphan:'text changed · 经文已更新', color:{yellow:'Yellow · 黄',green:'Green · 绿',pink:'Pink · 粉'} });
+  const keyOf=n=>'v'+n;
+  const isRange=m=>!!(m&&typeof m.quote==='string'&&m.quote.length&&Number.isInteger(m.start)&&Number.isInteger(m.end));
+  const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+  // ── DOM-free anchoring (the part that goes wrong, so it is pure and tested on strings) ──────
+  // A range mark against the CURRENT text: offsets when they still hold the quote, else the
+  // quote's first occurrence (a BSB wording change moved it), else orphan: the whole line, badged.
+  function resolve(text,m){
+    if(!isRange(m)) return {start:0,end:text.length,orphan:false,whole:true};
+    if(text.slice(m.start,m.end)===m.quote) return {start:m.start,end:m.end,orphan:false,whole:false};
+    const i=text.indexOf(m.quote);
+    if(i>=0) return {start:i,end:i+m.quote.length,orphan:false,whole:false};
+    return {start:0,end:text.length,orphan:true,whole:true};
+  }
+  // Marks → one style per character (so overlapping marks compose instead of nesting <mark>s) →
+  // HTML runs. A highlight after another replaces its colour; an underline adds to either.
+  function markupOf(text,marks){
+    const n=text.length; if(!n) return {html:'',orphan:false};
+    const hl=new Array(n).fill(''), ul=new Array(n).fill(false);
+    let orphan=false;
+    for(const m of marks){
+      const r=resolve(text,m); if(r.orphan) orphan=true;
+      const color=COLORS.includes(m.color)?m.color:COLORS[0];   // a store colour is a class name: clamp it
+      for(let i=r.start;i<r.end;i++){ if(m.kind===KINDS.ul) ul[i]=true; else hl[i]=color; }
+    }
+    let html='', i=0;
+    while(i<n){
+      let j=i; while(j<n&&hl[j]===hl[i]&&ul[j]===ul[i]) j++;
+      const run=esc(text.slice(i,j));
+      const cls=(hl[i]?' pvm-hl-'+hl[i]:'')+(ul[i]?' pvm-ul':'');
+      html+=cls?'<mark class="pvm'+cls+'">'+run+'</mark>':run;
+      i=j;
+    }
+    return {html,orphan};
+  }
+  const forLang=(list,lang)=>(list||[]).filter(m=>m&&(m.kind===KINDS.hl||m.kind===KINDS.ul)&&(!m.lang||m.lang===lang));
+
+  // Paint every verse line from the host's text (never from the DOM, which may already carry
+  // marks). A line with no marks gets its plain text back, so a removal shows at once.
+  function renderInto(c,listOf){
+    const els=c.container&&c.container.querySelectorAll?c.container.querySelectorAll('.verse'):[];
+    for(const el of els){
+      const n=Number(el.dataset&&el.dataset.n); if(!Number.isFinite(n)) continue;
+      for(const lang of Object.keys(LANGS)){
+        const line=el.querySelector&&el.querySelector(LANGS[lang]); if(!line) continue;
+        const text=String(c.textOf(n,lang)||'');
+        const ms=forLang(listOf(n),lang);
+        if(!ms.length){ line.textContent=text; continue; }
+        const {html,orphan}=markupOf(text,ms);
+        line.innerHTML=html+(orphan?'<span class="pvm-badge">'+TXT.orphan+'</span>':'');
+      }
+    }
+  }
+  // The native text selection, if it lies inside ONE verse line of the container: the verse,
+  // the language and the character range (offsets into that line's text), with the quote.
+  // Anything else (collapsed, outside, spanning lines) is null: the mark is then whole-verse.
+  function readSelection(c){
+    const sel=window.getSelection&&window.getSelection();
+    if(!sel||sel.isCollapsed||!sel.rangeCount) return null;
+    const r=sel.getRangeAt(0);
+    const node=r.commonAncestorContainer;
+    const host=node&&(node.nodeType===1?node:node.parentNode);
+    const line=host&&host.closest?host.closest(LANGS.en+','+LANGS.zh):null;
+    const verse=line&&line.closest?line.closest('.verse'):null;
+    if(!line||!verse||!c.container.contains(verse)) return null;
+    const lang=line.matches(LANGS.en)?'en':'zh';
+    const n=Number(verse.dataset.n);
+    const pre=document.createRange(); pre.selectNodeContents(line); pre.setEnd(r.startContainer,r.startOffset);
+    let start=pre.toString().length, quote=r.toString();
+    const lead=quote.length-quote.replace(/^\s+/,'').length; start+=lead; quote=quote.trim();
+    const text=String(c.textOf(n,lang)||'');
+    if(!quote||text.slice(start,start+quote.length)!==quote) return null;   // the badge or a stale DOM: not a range we can anchor
+    return {n,lang,start,end:start+quote.length,quote};
+  }
+  // A control that must not collapse the native selection when tapped (WebKit collapses it on
+  // pointerdown): the sheet's buttons and the host's Mark control, through this ONE helper.
+  const armControl=el=>{ el.addEventListener('pointerdown',e=>e.preventDefault()); return el; };
+  // The sheet, opened from the host's one `Mark · 标记` control; any entry applies and closes it.
+  // The selection is read ONCE at open and handed to every entry, so a tap that collapses it
+  // still marks the range the user had.
+  function makeSheet(sheetItems,selection){
+    let sheet=null;
+    function closeSheet(){ if(sheet){ sheet.remove(); sheet=null; document.removeEventListener('pointerdown',onOutside,true); } }
+    function onOutside(e){ if(sheet&&!(e.target&&sheet.contains&&sheet.contains(e.target))) closeSheet(); }
+    function openSheet(vs){
+      closeSheet();
+      if(!vs||!vs.length) return null;
+      sheet=document.createElement('div'); sheet.className='pvm-sheet';
+      sheet.style.userSelect='none'; sheet.style.webkitUserSelect='none';
+      const range=selection();
+      for(const it of sheetItems(vs,range)){
+        const b=document.createElement('button');
+        if(COLORS.includes(it.id)){ b.className='pvm-sw pvm-sw-'+it.id; b.title=it.label; b.setAttribute('aria-label',it.label); }
+        else b.textContent=it.label;
+        if(it.id==='remove'){ const sp=document.createElement('span'); sp.className='pvm-sp'; sheet.appendChild(sp); }
+        armControl(b);
+        b.onclick=()=>{ const p=it.act(); closeSheet(); return p; };
+        sheet.appendChild(b);
+      }
+      document.body.appendChild(sheet);
+      setTimeout(()=>document.addEventListener('pointerdown',onOutside,true),0);
+      return sheet;
+    }
+    return {openSheet,closeSheet,isSheetOpen:()=>!!sheet};
+  }
+
+  function attach(c){
+    const all=()=>c.store.get()||{};
+    const listOf=n=>all()[keyOf(n)]||[];
+    const hasMarks=n=>listOf(n).length>0;
+    const verses=()=>Object.keys(all()).filter(k=>all()[k]&&all()[k].length).map(k=>Number(k.slice(1))).filter(Number.isFinite);
+    const render=()=>renderInto(c,listOf);
+    const selection=()=>readSelection(c);
+    // Write-through: the host's own save path (store.set) persists the chapter file; onChange
+    // lets it refresh its dots. Returns the save outcome, as every write in these apps does.
+    async function commit(next){
+      const r=await c.store.set(next);
+      render(); if(c.onChange) c.onChange();
+      return r;
+    }
+    // `range`: a selection snapshot (openSheet's); undefined reads the live selection now.
+    async function apply({verses:vs,kind,color,range}){
+      const next=Object.assign({},all());
+      if(range===undefined) range=selection();
+      for(const n of vs){
+        const m={kind:kind===KINDS.ul?KINDS.ul:KINDS.hl};
+        if(m.kind===KINDS.hl) m.color=COLORS.includes(color)?color:COLORS[0];
+        if(range&&range.n===n) Object.assign(m,{lang:range.lang,quote:range.quote,start:range.start,end:range.end});
+        // The same span marked again replaces its predecessor (a new colour on the same words).
+        const same=x=>x.kind===m.kind&&(x.lang||'')===(m.lang||'')&&(x.start||0)===(m.start||0)&&(x.end||0)===(m.end||0)&&(x.quote||'')===(m.quote||'');
+        next[keyOf(n)]=(next[keyOf(n)]||[]).filter(x=>!same(x)).concat([m]);
+      }
+      return commit(next);
+    }
+    // Remove: the marks under a text selection when there is one, else every mark of the verse.
+    async function remove(vs,range){
+      const next=Object.assign({},all());
+      if(range===undefined) range=selection();
+      for(const n of vs){
+        const keep=range&&range.n===n?(next[keyOf(n)]||[]).filter(m=>{ const r=resolve(String(c.textOf(n,range.lang)||''),m); return (m.lang&&m.lang!==range.lang)||r.end<=range.start||r.start>=range.end; }):[];
+        if(keep.length) next[keyOf(n)]=keep; else delete next[keyOf(n)];
+      }
+      return commit(next);
+    }
+    // The sheet's entries as data, so the host and the tests see ONE list: three colours, underline,
+    // and Remove only while something is marked (the control is context-aware, not a parallel button).
+    function sheetItems(vs,range){
+      const items=COLORS.map(color=>({id:color,label:TXT.color[color],act:()=>apply({verses:vs,kind:KINDS.hl,color,range})}));
+      items.push({id:'ul',label:TXT.underline,act:()=>apply({verses:vs,kind:KINDS.ul,range})});
+      if(vs.some(hasMarks)) items.push({id:'remove',label:TXT.remove,act:()=>remove(vs,range)});
+      return items;
+    }
+    return Object.assign({render,hasMarks,verses,selection,apply,remove,sheetItems},makeSheet(sheetItems,selection));
+  }
+  window.PAVerseMarks={attach,armControl,resolve,markupOf,TXT,COLORS,KINDS};
+})();
+</script>

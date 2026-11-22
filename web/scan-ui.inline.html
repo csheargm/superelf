@@ -1,0 +1,208 @@
+<!-- PAScan — document perspective-correction UI.
+     Inlined by web.mjs into any page carrying the PA_SCAN_UI marker (note-ui carries it).
+     API: PAScan.correct(file) returns Promise resolving {ok,file} or {ok:false,cancelled} -->
+<!--PA_SCAN_DETECT-->
+<script id="psc-script">
+(function(){
+  if(window.PAScan) return;
+
+  // Gaussian elimination — 8×8 augmented matrix → solution vector
+  function gauss(A,b){
+    const n=8, M=A.map((r,i)=>[...r,b[i]]);
+    for(let c=0;c<n;c++){
+      let mx=c; for(let r=c+1;r<n;r++) if(Math.abs(M[r][c])>Math.abs(M[mx][c])) mx=r;
+      [M[c],M[mx]]=[M[mx],M[c]];
+      for(let r=c+1;r<n;r++){ const f=M[r][c]/M[c][c]; for(let j=c;j<=n;j++) M[r][j]-=f*M[c][j]; }
+    }
+    const x=new Array(n).fill(0);
+    for(let i=n-1;i>=0;i--){ x[i]=M[i][n]; for(let j=i+1;j<n;j++) x[i]-=M[i][j]*x[j]; x[i]/=M[i][i]; }
+    return x;
+  }
+
+  // 3×3 homography matrix from 4 src→dst point pairs
+  function homography(src,dst){
+    const A=[],b=[];
+    for(let i=0;i<4;i++){
+      const[sx,sy]=src[i],[dx,dy]=dst[i];
+      A.push([sx,sy,1,0,0,0,-sx*dx,-sy*dx]); b.push(dx);
+      A.push([0,0,0,sx,sy,1,-sx*dy,-sy*dy]); b.push(dy);
+    }
+    const h=gauss(A,b);
+    return[[h[0],h[1],h[2]],[h[3],h[4],h[5]],[h[6],h[7],1]];
+  }
+
+  function applyH(H,x,y){
+    const w=H[2][0]*x+H[2][1]*y+H[2][2];
+    return[(H[0][0]*x+H[0][1]*y+H[0][2])/w,(H[1][0]*x+H[1][1]*y+H[1][2])/w];
+  }
+
+  // Inverse-warp: corners (TL,TR,BR,BL) in src image coords → ImageData (outW×outH)
+  function warp(srcCtx,sw,sh,corners,outW,outH){
+    const dst=[[0,0],[outW,0],[outW,outH],[0,outH]];
+    const H=homography(dst,corners);        // inverse: output px → src px
+    const srcD=srcCtx.getImageData(0,0,sw,sh).data;
+    const out=new ImageData(outW,outH); const d=out.data;
+    for(let oy=0;oy<outH;oy++){
+      for(let ox=0;ox<outW;ox++){
+        const[sx,sy]=applyH(H,ox,oy);
+        const x0=sx|0, y0=sy|0, x1=x0+1, y1=y0+1;
+        const oi=(oy*outW+ox)*4;
+        if(x0<0||y0<0||x1>=sw||y1>=sh){d[oi]=d[oi+1]=d[oi+2]=255;d[oi+3]=255;continue;}
+        const fx=sx-x0, fy=sy-y0, fx1=1-fx, fy1=1-fy;
+        for(let c=0;c<3;c++){
+          const v00=srcD[(y0*sw+x0)*4+c],v10=srcD[(y0*sw+x1)*4+c];
+          const v01=srcD[(y1*sw+x0)*4+c],v11=srcD[(y1*sw+x1)*4+c];
+          d[oi+c]=v00*fx1*fy1+v10*fx*fy1+v01*fx1*fy+v11*fx*fy;
+        }
+        d[oi+3]=255;
+      }
+    }
+    return out;
+  }
+
+  // Contrast stretch so text is crisp against a white background
+  function enhance(d){
+    let mn=255,mx=0;
+    for(let i=0;i<d.length;i+=4){const v=(d[i]+d[i+1]+d[i+2])/3;if(v<mn)mn=v;if(v>mx)mx=v;}
+    if(mx-mn<30) return;
+    const sc=255/(mx-mn);
+    for(let i=0;i<d.length;i+=4){for(let c=0;c<3;c++)d[i+c]=Math.min(255,Math.max(0,(d[i+c]-mn)*sc|0));}
+  }
+
+  // Load File → canvas, shrunk to maxEdge px on longest side
+  // Decoding goes through PAPhoto, which already owns this and owns the failure messages with
+  // it. A private copy here is what photo-component's enumeration test refuses (R3) — and the
+  // copy had drifted already: it clamped scale at 1 while papScale does not, so a small photo
+  // behaved differently in the editor than everywhere else in the app.
+  // Decoding goes through PAPhoto, which already owns it and owns the failure messages with it.
+  // There is no local fallback ON PURPOSE: PAScan is only ever reached AFTER PAPhoto.pick() has
+  // handed over a File, so a page that can open this editor always has PAPhoto. A private copy
+  // is what photo-component's enumeration test refuses (R3), and the copy it replaced had already
+  // drifted — it clamped scale at 1 where papScale does not, so a small photo behaved differently
+  // in the editor than everywhere else. A missing component is REPORTED, never silently patched.
+  function loadImg(file,maxEdge){
+    if(!(window.PAPhoto&&window.PAPhoto.toCanvas))
+      return Promise.reject(new Error('PAPhoto is required to read the photo · 需要 PAPhoto 读取图片'));
+    return window.PAPhoto.toCanvas(file,maxEdge);
+  }
+
+  // Displayed image rect within container (object-fit:contain logic)
+  function iRect(natW,natH,cw,ch){
+    const sc=Math.min(cw/natW,ch/natH), dw=natW*sc, dh=natH*sc;
+    return{x:(cw-dw)/2,y:(ch-dh)/2,w:dw,h:dh,sc};
+  }
+
+  // Output dimensions: average of opposite quad edges, capped at maxEdge
+  function outSize(corners,maxEdge){
+    const[tl,tr,br,bl]=corners;
+    const W=Math.round((Math.hypot(tr[0]-tl[0],tr[1]-tl[1])+Math.hypot(br[0]-bl[0],br[1]-bl[1]))/2);
+    const H=Math.round((Math.hypot(bl[0]-tl[0],bl[1]-tl[1])+Math.hypot(br[0]-tr[0],br[1]-tr[1]))/2);
+    const sc=Math.min(1,maxEdge/Math.max(W||1,H||1));
+    return[Math.max(1,Math.round(W*sc)),Math.max(1,Math.round(H*sc))];
+  }
+
+  // Run the detector on a small copy (DETECT_PX on the long edge: fast, and noise averages out),
+  // then scale its corners back to source pixels. null when the component is missing or finds nothing.
+  const DETECT_PX=320;
+  function autoQuad(canvas,w,h){
+    if(!window.PAScanDetect) return null;
+    try{
+      const k=Math.min(1,DETECT_PX/Math.max(w,h)), dw=Math.max(1,Math.round(w*k)), dh=Math.max(1,Math.round(h*k));
+      const c=document.createElement('canvas'); c.width=dw; c.height=dh;
+      const ctx=c.getContext('2d'); ctx.drawImage(canvas,0,0,dw,dh);
+      const q=window.PAScanDetect.quad(ctx.getImageData(0,0,dw,dh));
+      return q&&q.map(([x,y])=>[Math.min(w,x/k),Math.min(h,y/k)]);
+    }catch(_){ return null; }   // a detector failure must never block the editor: the inset fallback takes over
+  }
+  function correct(file){
+    return new Promise(res=>{
+      let srcCanvas=null,srcW=0,srcH=0,corners=null,dragging=-1;
+
+      const ov=document.createElement('div');
+      ov.style.cssText='position:fixed;inset:0;z-index:9998;background:#000;display:flex;flex-direction:column;font-family:system-ui,-apple-system,sans-serif';
+      ov.innerHTML=
+        '<div id="psc-wrap" style="flex:1;position:relative;overflow:hidden;touch-action:none">'+
+          '<img id="psc-img" style="position:absolute;width:100%;height:100%;object-fit:contain">'+
+          '<canvas id="psc-qc" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none"></canvas>'+
+          [0,1,2,3].map(i=>'<div data-h="'+i+'" style="position:absolute;width:44px;height:44px;border-radius:50%;background:rgba(0,210,130,.85);border:3px solid #fff;transform:translate(-50%,-50%);cursor:grab;touch-action:none;box-shadow:0 2px 8px rgba(0,0,0,.4)"></div>').join('')+
+        '</div>'+
+        '<div style="display:flex;gap:8px;padding:12px 16px 28px;background:#111">'+
+          '<button id="psc-cancel" style="padding:10px 14px;border-radius:10px;border:none;background:#444;color:#fff;font-size:15px">Cancel</button>'+
+          '<button id="psc-skip" style="flex:1;padding:10px;border-radius:10px;border:none;background:#444;color:#fff;font-size:15px">Skip · 原图</button>'+
+          '<button id="psc-crop" style="flex:1;padding:10px;border-radius:10px;border:none;background:#0a7a5a;color:#fff;font-size:15px;font-weight:600">Crop &amp; Enhance</button>'+
+        '</div>';
+      document.body.appendChild(ov);
+
+      const wrap=ov.querySelector('#psc-wrap');
+      const imgEl=ov.querySelector('#psc-img');
+      const qc=ov.querySelector('#psc-qc');
+      const handles=[...ov.querySelectorAll('[data-h]')].sort((a,b)=>+a.dataset.h-+b.dataset.h);
+
+      function drawAll(){
+        if(!corners||!srcCanvas) return;
+        const cw=wrap.clientWidth, ch=wrap.clientHeight;
+        qc.width=cw*devicePixelRatio; qc.height=ch*devicePixelRatio;
+        const ctx=qc.getContext('2d'); ctx.scale(devicePixelRatio,devicePixelRatio);
+        ctx.clearRect(0,0,cw,ch);
+        const r=iRect(srcW,srcH,cw,ch);
+        const pts=corners.map(([ix,iy])=>[r.x+ix*r.sc,r.y+iy*r.sc]);
+        ctx.beginPath(); ctx.moveTo(pts[0][0],pts[0][1]);
+        for(let i=1;i<4;i++) ctx.lineTo(pts[i][0],pts[i][1]);
+        ctx.closePath();
+        ctx.fillStyle='rgba(0,210,130,.1)'; ctx.fill();
+        ctx.strokeStyle='#00d282'; ctx.lineWidth=2; ctx.stroke();
+        corners.forEach(([ix,iy],i)=>{
+          handles[i].style.left=(r.x+ix*r.sc)+'px';
+          handles[i].style.top=(r.y+iy*r.sc)+'px';
+        });
+      }
+
+      wrap.addEventListener('pointerdown',e=>{
+        const h=e.target.closest('[data-h]'); if(!h) return;
+        dragging=+h.dataset.h; h.setPointerCapture(e.pointerId); e.preventDefault();
+      });
+      wrap.addEventListener('pointermove',e=>{
+        if(dragging<0) return;
+        const r=iRect(srcW,srcH,wrap.clientWidth,wrap.clientHeight);
+        const bnd=wrap.getBoundingClientRect();
+        const ix=Math.max(0,Math.min(srcW,(e.clientX-bnd.left-r.x)/r.sc));
+        const iy=Math.max(0,Math.min(srcH,(e.clientY-bnd.top-r.y)/r.sc));
+        corners[dragging]=[ix,iy]; drawAll(); e.preventDefault();
+      });
+      wrap.addEventListener('pointerup',()=>{ dragging=-1; });
+
+      function done(result){ ov.remove(); res(result); }
+
+      ov.querySelector('#psc-cancel').onclick=()=>done({ok:false,cancelled:true});
+      ov.querySelector('#psc-skip').onclick=()=>done({ok:true,file});
+      ov.querySelector('#psc-crop').onclick=async()=>{
+        const btn=ov.querySelector('#psc-crop');
+        btn.textContent='Processing… · 处理中'; btn.disabled=true;
+        await new Promise(r=>setTimeout(r,60));   // flush repaint before blocking loop
+        try{
+          const[ow,oh]=outSize(corners,1600);
+          const imgData=warp(srcCanvas.getContext('2d'),srcW,srcH,corners,ow,oh);
+          enhance(imgData.data);
+          const outC=document.createElement('canvas'); outC.width=ow; outC.height=oh;
+          outC.getContext('2d').putImageData(imgData,0,0);
+          outC.toBlob(blob=>done({ok:true,file:blob?new File([blob],'scan.jpg',{type:'image/jpeg'}):file}),'image/jpeg',0.92);
+        }catch(_){ done({ok:true,file}); }   // on any error, fall through to original
+      };
+
+      loadImg(file,1600).then(({canvas,w,h})=>{
+        srcCanvas=canvas; srcW=w; srcH=h;
+        imgEl.src=canvas.toDataURL('image/jpeg',0.85);
+        imgEl.onload=()=>{
+          // Auto-frame first: the detector (PAScanDetect) finds the bright slide and the handles
+          // start ON it; the four handles stay draggable for the misses. A 10% inset is the fallback.
+          corners=autoQuad(canvas,w,h);
+          if(!corners){ const p=0.1; corners=[[srcW*p,srcH*p],[srcW*(1-p),srcH*p],[srcW*(1-p),srcH*(1-p)],[srcW*p,srcH*(1-p)]]; }
+          drawAll();
+        };
+      }).catch(()=>done({ok:true,file}));   // load error: pass original through
+    });
+  }
+
+  window.PAScan={correct};
+})();
+</script>

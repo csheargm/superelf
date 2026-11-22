@@ -1,0 +1,55 @@
+<script>
+// PATwoTap — the two-tap destructive button（两次点击确认）.
+// No app carries its marker: web.mjs (sendAppHtml) puts PA_TWO_TAP_UI ahead of the first script
+// of EVERY served app page, so every app and every component inlined into one has it, at top
+// level too. Apps run sandboxed without allow-modals, where confirm() returns false at once, so a
+// destructive action asks in place: the first tap arms, a second within MS acts (superelf.md).
+// Five hand-written copies of this existed; this is the one.
+//   PATwoTap.press(btn, {label, ms}) → true when THIS tap should act (the button was asking; it is
+//     disarmed first). Otherwise the button asks — class `arm`, text `label` — and forgets after ms.
+//   PATwoTap.disarm(btn) — forget an ask now: a button reused for another row must never act on one tap.
+//   PATwoTap.rows(ms) → {press(key, redraw), asking(key)} for a list that re-renders: one row asks at
+//     a time, and the renderers read asking(key) rather than a button holding the state.
+// `var`, and kept if already present, so the page has one instance even if the marker appears twice.
+// Unit-tested by test/two-tap.test.mjs; each app's flow by test/sandbox-modal-flows.test.mjs.
+var PATwoTap = PATwoTap || (function () {
+  'use strict';
+  const MS = 3000;
+  const LABEL = 'Delete? · 删除?';
+  const ARMED = 'arm';                    // the class each app's CSS styles as "asking"
+  const asking = new WeakMap();           // button → { label to restore, expiry timer }
+
+  function disarm(btn) {
+    const a = asking.get(btn);
+    if (!a) return;
+    asking.delete(btn);
+    clearTimeout(a.timer);
+    btn.classList.remove(ARMED);
+    btn.textContent = a.label;
+  }
+
+  function press(btn, { label = LABEL, ms = MS } = {}) {
+    if (asking.has(btn)) { disarm(btn); return true; }
+    asking.set(btn, { label: btn.textContent, timer: setTimeout(() => disarm(btn), ms) });
+    btn.classList.add(ARMED);
+    btn.textContent = label;
+    return false;
+  }
+
+  function rows(ms = MS) {
+    let armed = null, timer = 0;
+    return {
+      press(key, redraw) {
+        clearTimeout(timer);
+        if (armed === key) { armed = null; return true; }
+        armed = key; redraw();
+        timer = setTimeout(() => { armed = null; redraw(); }, ms);
+        return false;
+      },
+      asking: (key) => armed === key,
+    };
+  }
+
+  return { press, disarm, rows, MS, LABEL };
+})();
+</script>

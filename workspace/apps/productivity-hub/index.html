@@ -1,0 +1,1286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#0f0f1a" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f0f0f5" media="(prefers-color-scheme: light)">
+<title>Productivity Hub</title>
+<style>
+html{font-size:calc(17px * var(--fs,1))}   /* A-/A+ scale, broadcast by the shell (pa:'prefs' fontScale) */
+/* ── Base ── */
+:root {
+  --bg: #f0f0f5;
+  --surface: #fff;
+  --surface2: #e8e8ef;
+  --text: #111;
+  --sub: #666;
+  --border: #d0d0da;
+  --accent: #5b5ef4;
+  --accent2: #7c7ff5;
+  --danger: #e05252;
+  --ok: #3cb97a;
+  --warn: #e09050;
+  --radius: 12px;
+  --shadow: 0 2px 12px rgba(0,0,0,.08);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f0f1a;
+    --surface: #1a1a2e;
+    --surface2: #23233a;
+    --text: #eee;
+    --sub: #888;
+    --border: #2e2e48;
+    --accent: #7c7ff5;
+    --accent2: #9a9cf8;
+    --shadow: 0 2px 12px rgba(0,0,0,.4);
+  }
+}
+[data-theme="dark"] {
+  --bg: #0f0f1a; --surface: #1a1a2e; --surface2: #23233a;
+  --text: #eee; --sub: #888; --border: #2e2e48;
+  --accent: #7c7ff5; --accent2: #9a9cf8;
+  --shadow: 0 2px 12px rgba(0,0,0,.4);
+}
+[data-theme="light"] {
+  --bg: #f0f0f5; --surface: #fff; --surface2: #e8e8ef;
+  --text: #111; --sub: #666; --border: #d0d0da;
+  --accent: #5b5ef4; --accent2: #7c7ff5;
+  --shadow: 0 2px 12px rgba(0,0,0,.08);
+}
+[data-theme="midnight"] {
+  --bg: #020817; --surface: #0d1b2a; --surface2: #132032;
+  --text: #e2e8f0; --sub: #64748b; --border: #1e3a5f;
+  --accent: #38bdf8; --accent2: #7dd3fc;
+  --shadow: 0 2px 16px rgba(0,0,0,.6);
+}
+[data-theme="forest"] {
+  --bg: #0d1f0d; --surface: #162016; --surface2: #1e2e1e;
+  --text: #d4e8d0; --sub: #6b9b6b; --border: #2d4a2d;
+  --accent: #4ade80; --accent2: #86efac;
+  --shadow: 0 2px 12px rgba(0,0,0,.5);
+}
+[data-theme="sunset"] {
+  --bg: #1a0a0a; --surface: #2a1010; --surface2: #361515;
+  --text: #f5ddd0; --sub: #a06060; --border: #4a2020;
+  --accent: #f97316; --accent2: #fb923c;
+  --shadow: 0 2px 12px rgba(0,0,0,.5);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* ── Nav ── */
+nav {
+  display: flex;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex-shrink: 0;
+}
+nav::-webkit-scrollbar { display: none; }
+nav button {
+  flex: 1;
+  min-width: 60px;
+  padding: .6rem .5rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--sub);
+  font-size: .75rem;
+  cursor: pointer;
+  transition: color .2s, border-color .2s;
+  white-space: nowrap;
+}
+nav button.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* ── Panels ── */
+.panel {
+  display: none;
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+}
+.panel.active { display: flex; flex-direction: column; gap: 1rem; }
+
+/* ── Clock ── */
+.clock-digital {
+  text-align: center;
+  font-size: clamp(2.8rem, 12vw, 5rem);
+  font-weight: 200;
+  letter-spacing: .05em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.clock-date {
+  text-align: center;
+  color: var(--sub);
+  font-size: .9rem;
+  margin-top: .3rem;
+}
+.clock-analog-wrap {
+  display: flex;
+  justify-content: center;
+}
+.clock-analog-wrap svg { width: min(220px, 70vw); height: min(220px, 70vw); }
+
+/* ── Pomodoro ── */
+.pomo-modes {
+  display: flex;
+  gap: .5rem;
+  justify-content: center;
+}
+.pomo-modes button {
+  flex: 1;
+  padding: .45rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--sub);
+  font-size: .8rem;
+  cursor: pointer;
+  transition: background .2s, color .2s;
+}
+.pomo-modes button.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.pomo-ring-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+.pomo-ring-wrap svg { width: min(200px, 65vw); height: min(200px, 65vw); }
+.pomo-time {
+  position: absolute;
+  font-size: clamp(1.6rem, 8vw, 2.4rem);
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.pomo-controls {
+  display: flex;
+  gap: .75rem;
+  justify-content: center;
+}
+.pomo-controls button {
+  padding: .6rem 1.6rem;
+  border: none;
+  border-radius: 8px;
+  font-size: .95rem;
+  cursor: pointer;
+  background: var(--accent);
+  color: #fff;
+  transition: opacity .2s;
+}
+.pomo-controls button:active { opacity: .75; }
+.pomo-controls button.secondary {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.pomo-durations {
+  display: flex;
+  gap: .5rem;
+  justify-content: center;
+}
+.pomo-dur {
+  flex: 1;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: .5rem;
+  text-align: center;
+}
+.pomo-dur label { display: block; font-size: .7rem; color: var(--sub); margin-bottom: .25rem; }
+.pomo-dur-row { display: flex; align-items: center; justify-content: center; gap: .25rem; }
+.pomo-dur-row button {
+  width: 22px; height: 22px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 4px;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.pomo-dur-val {
+  width: 36px;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: .9rem;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+.pomo-dur-val::-webkit-outer-spin-button,
+.pomo-dur-val::-webkit-inner-spin-button { -webkit-appearance: none; }
+.pomo-sessions { text-align: center; color: var(--sub); font-size: .85rem; }
+
+/* ── Tasks ── */
+.tasks-add { display: flex; gap: .5rem; }
+.tasks-add input {
+  flex: 1;
+  padding: .6rem .8rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: .95rem;
+}
+.tasks-add input::placeholder { color: var(--sub); }
+.tasks-add button {
+  padding: .6rem 1rem;
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+.tasks-filters {
+  display: flex;
+  gap: .4rem;
+}
+.tasks-filters button {
+  padding: .3rem .8rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--sub);
+  font-size: .8rem;
+  cursor: pointer;
+}
+.tasks-filters button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.task-list { display: flex; flex-direction: column; gap: .4rem; }
+.task-item {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: .6rem .8rem;
+  border-left: 3px solid var(--border);
+}
+.task-item.done { opacity: .55; border-left-color: var(--ok); }
+.task-check {
+  width: 18px; height: 18px;
+  border: 2px solid var(--border);
+  border-radius: 4px;
+  flex-shrink: 0;
+  cursor: pointer;
+  appearance: none;
+  background: none;
+  position: relative;
+}
+.task-check:checked {
+  background: var(--ok);
+  border-color: var(--ok);
+}
+.task-check:checked::after {
+  content: '';
+  position: absolute;
+  left: 3px; top: 0px;
+  width: 5px; height: 9px;
+  border: 2px solid #fff;
+  border-top: none;
+  border-left: none;
+  transform: rotate(45deg);
+}
+.task-label { flex: 1; font-size: .9rem; }
+.task-item.done .task-label { text-decoration: line-through; }
+.task-del {
+  background: none;
+  border: none;
+  color: var(--sub);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0 .2rem;
+}
+.task-del:hover { color: var(--danger); }
+.tasks-clear {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: var(--sub);
+  font-size: .8rem;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* ── Notes ── */
+.notes-wrap {
+  flex: 1;
+  display: flex;
+  gap: .75rem;
+  min-height: 0;
+}
+.notes-sidebar {
+  width: 130px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+}
+.notes-search {
+  width: 100%;
+  padding: .4rem .6rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: .8rem;
+}
+.notes-search::placeholder { color: var(--sub); }
+.notes-new {
+  width: 100%;
+  padding: .4rem;
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: .8rem;
+  cursor: pointer;
+}
+.notes-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: .3rem; }
+.note-item {
+  padding: .4rem .5rem;
+  background: var(--surface2);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: .78rem;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+.note-item.active {
+  background: var(--accent);
+  color: #fff;
+}
+.note-item-title { font-weight: 500; }
+.note-item-sub { font-size: .7rem; opacity: .7; }
+.notes-editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  min-width: 0;
+}
+.notes-editor-body {
+  flex: 1;
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: .88rem;
+  padding: .75rem;
+  resize: none;
+  font-family: inherit;
+  line-height: 1.6;
+}
+.notes-editor-body:focus { outline: none; border-color: var(--accent); }
+.notes-del {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: var(--sub);
+  font-size: .8rem;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.notes-del:hover { color: var(--danger); }
+
+/* ── Settings ── */
+.settings-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; }
+.settings-section h3 { font-size: .85rem; color: var(--sub); text-transform: uppercase; letter-spacing: .05em; margin-bottom: .75rem; }
+.theme-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; }
+.theme-btn {
+  padding: .5rem;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  font-size: .78rem;
+  font-weight: 500;
+  transition: border-color .2s;
+}
+.theme-btn.active { border-color: var(--accent); }
+.stats-row { display: flex; justify-content: space-between; align-items: center; padding: .3rem 0; border-bottom: 1px solid var(--border); }
+.stats-row:last-child { border-bottom: none; }
+.stats-label { font-size: .85rem; color: var(--sub); }
+.stats-val { font-size: .9rem; font-weight: 600; }
+.settings-btn {
+  width: 100%;
+  padding: .6rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface2);
+  color: var(--text);
+  font-size: .85rem;
+  cursor: pointer;
+  margin-top: .4rem;
+}
+.settings-btn.danger { color: var(--danger); border-color: var(--danger); }
+.settings-btn.danger.arm { background: var(--danger); color: #fff; }
+.data-msg { font-size: .8rem; color: var(--sub); margin-top: .5rem; }
+.data-msg:empty { display: none; }
+.settings-btn:active { opacity: .75; }
+
+/* ── Util ── */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; box-shadow: var(--shadow); }
+.saving-indicator {
+  position: fixed;
+  top: .5rem;
+  right: .75rem;
+  font-size: .7rem;
+  color: var(--sub);
+  opacity: 0;
+  transition: opacity .3s;
+  pointer-events: none;
+}
+.saving-indicator.show { opacity: 1; }
+/* A failed read or save, above every tab. Empty (hidden) when all is well. */
+.status-line { margin: .5rem 1rem 0; padding: .5rem .75rem; border: 1px solid var(--danger); border-radius: 8px; color: var(--danger); font-size: .85rem; }
+.status-line:empty { display: none; }
+</style>
+</head>
+<body>
+
+<div class="saving-indicator" id="saving">saving…</div>
+
+<nav>
+  <button class="active" onclick="showTab('clock',this)">🕐 Clock</button>
+  <button onclick="showTab('pomo',this)">🍅 Pomodoro</button>
+  <button onclick="showTab('tasks',this)">✅ Tasks</button>
+  <button onclick="showTab('notes',this)">📝 Notes</button>
+  <button onclick="showTab('settings',this)">⚙️ Settings</button>
+</nav>
+<div class="status-line" id="status" role="status"></div>
+
+<!-- ── Clock ── -->
+<div class="panel active" id="tab-clock">
+  <div class="card" style="align-items:center;gap:.5rem">
+    <div class="clock-digital" id="clock-time">--:--:--</div>
+    <div class="clock-date" id="clock-date"></div>
+  </div>
+  <div class="card" style="align-items:center">
+    <div class="clock-analog-wrap">
+      <svg id="analog-clock" viewBox="0 0 200 200">
+        <circle cx="100" cy="100" r="96" fill="none" stroke="var(--border)" stroke-width="2"/>
+        <!-- tick marks -->
+        <g id="ticks"></g>
+        <line id="hour-hand"   x1="100" y1="100" x2="100" y2="45"  stroke="var(--text)"   stroke-width="5"  stroke-linecap="round"/>
+        <line id="minute-hand" x1="100" y1="100" x2="100" y2="22"  stroke="var(--text)"   stroke-width="3"  stroke-linecap="round"/>
+        <line id="second-hand" x1="100" y1="110" x2="100" y2="18"  stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="100" cy="100" r="4" fill="var(--accent)"/>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<!-- ── Pomodoro ── -->
+<div class="panel" id="tab-pomo">
+  <div class="card">
+    <div class="pomo-modes">
+      <button class="active" id="pomo-btn-focus"  onclick="setPomoMode('focus')">Focus</button>
+      <button              id="pomo-btn-short"  onclick="setPomoMode('short')">Short Break</button>
+      <button              id="pomo-btn-long"   onclick="setPomoMode('long')">Long Break</button>
+    </div>
+  </div>
+  <div class="card" style="align-items:center">
+    <div class="pomo-ring-wrap">
+      <svg viewBox="0 0 200 200">
+        <circle cx="100" cy="100" r="85" fill="none" stroke="var(--border)" stroke-width="8"/>
+        <circle id="pomo-progress" cx="100" cy="100" r="85" fill="none"
+          stroke="var(--accent)" stroke-width="8" stroke-linecap="round"
+          stroke-dasharray="534" stroke-dashoffset="0"
+          transform="rotate(-90 100 100)"/>
+      </svg>
+      <div class="pomo-time" id="pomo-display">25:00</div>
+    </div>
+    <div class="pomo-controls">
+      <button id="pomo-start-btn" onclick="togglePomo()">Start</button>
+      <button class="secondary" onclick="resetPomo()">Reset</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="pomo-durations">
+      <div class="pomo-dur">
+        <label>Focus</label>
+        <div class="pomo-dur-row">
+          <button onclick="adjustDur('focus',-1)">−</button>
+          <input class="pomo-dur-val" id="dur-focus" type="number" min="1" max="120" value="25" oninput="durTyped('focus',this.value)">
+          <button onclick="adjustDur('focus',1)">+</button>
+        </div>
+      </div>
+      <div class="pomo-dur">
+        <label>Short</label>
+        <div class="pomo-dur-row">
+          <button onclick="adjustDur('short',-1)">−</button>
+          <input class="pomo-dur-val" id="dur-short" type="number" min="1" max="120" value="5" oninput="durTyped('short',this.value)">
+          <button onclick="adjustDur('short',1)">+</button>
+        </div>
+      </div>
+      <div class="pomo-dur">
+        <label>Long</label>
+        <div class="pomo-dur-row">
+          <button onclick="adjustDur('long',-1)">−</button>
+          <input class="pomo-dur-val" id="dur-long" type="number" min="1" max="120" value="15" oninput="durTyped('long',this.value)">
+          <button onclick="adjustDur('long',1)">+</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="pomo-sessions" id="pomo-sessions">Sessions today: 0</div>
+  <!-- Only ever non-empty when the shell REFUSED to arm the alarm (R14: a schedule that
+       did not happen must not look like one that did). -->
+  <div class="pomo-sessions" id="pomo-note" style="color:var(--danger,#c33)"></div>
+</div>
+
+<!-- ── Tasks ── -->
+<div class="panel" id="tab-tasks">
+  <div class="tasks-add">
+    <input id="task-input" placeholder="Add a task…" onkeydown="if(event.key==='Enter')addTask()">
+    <button onclick="addTask()">+</button>
+  </div>
+  <div class="tasks-filters">
+    <button class="active" onclick="setFilter('all',this)">All</button>
+    <button onclick="setFilter('active',this)">Active</button>
+    <button onclick="setFilter('done',this)">Done</button>
+  </div>
+  <div class="task-list" id="task-list"></div>
+  <button class="tasks-clear" onclick="clearDone()">Clear completed</button>
+</div>
+
+<!-- ── Notes ── -->
+<div class="panel" id="tab-notes">
+  <div class="notes-wrap">
+    <div class="notes-sidebar">
+      <input class="notes-search" id="notes-search" placeholder="Search…" oninput="renderNotesList()">
+      <button class="notes-new" onclick="newNote()">+ New</button>
+      <div class="notes-list" id="notes-list"></div>
+    </div>
+    <div class="notes-editor">
+      <textarea class="notes-editor-body" id="note-body" placeholder="First line becomes the title…" oninput="noteEdited()"></textarea>
+      <button class="notes-del" onclick="deleteNote()">Delete note</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Settings ── -->
+<div class="panel" id="tab-settings">
+  <div class="settings-section">
+    <h3>Theme</h3>
+    <div class="theme-grid">
+      <button class="theme-btn" style="background:#0f0f1a;color:#eee" onclick="setTheme('dark')" id="theme-dark">Dark</button>
+      <button class="theme-btn" style="background:#f0f0f5;color:#111" onclick="setTheme('light')" id="theme-light">Light</button>
+      <button class="theme-btn" style="background:#020817;color:#e2e8f0" onclick="setTheme('midnight')" id="theme-midnight">Midnight</button>
+      <button class="theme-btn" style="background:#0d1f0d;color:#d4e8d0" onclick="setTheme('forest')" id="theme-forest">Forest</button>
+      <button class="theme-btn" style="background:#1a0a0a;color:#f5ddd0" onclick="setTheme('sunset')" id="theme-sunset">Sunset</button>
+      <button class="theme-btn" style="background:none;color:var(--text);border:1px solid var(--border)" onclick="setTheme('auto')" id="theme-auto">Auto</button>
+    </div>
+  </div>
+  <div class="settings-section">
+    <h3>Alarm Sound</h3>
+    <div class="stats-row">
+      <select id="alarm-sound" onchange="setAlarmSound(this.value)" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text)">
+        <option value="morning-bird">Morning Bird</option>
+        <option value="gentle-chime">Gentle Chime</option>
+        <option value="soft-bells">Soft Bells</option>
+        <option value="ocean-wave">Ocean Wave</option>
+        <option value="classic-ring">Classic Ring</option>
+      </select>
+      <button onclick="previewAlarm()" title="Preview" style="margin-left:8px;padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer">&#9654;</button>
+    </div>
+    <div class="stats-row" style="color:var(--muted)"><span>It rings 3 times, so a single chime is harder to miss.</span></div>
+  </div>
+  <div class="settings-section">
+    <h3>Pomodoro Stats</h3>
+    <div class="stats-row"><span class="stats-label">Sessions today</span><span class="stats-val" id="stat-today">0</span></div>
+    <div class="stats-row"><span class="stats-label">Sessions total</span><span class="stats-val" id="stat-total">0</span></div>
+    <div class="stats-row"><span class="stats-label">Focus time today</span><span class="stats-val" id="stat-mins">0 min</span></div>
+  </div>
+  <div class="settings-section">
+    <h3>Data</h3>
+    <button class="settings-btn" onclick="exportData()">Export JSON</button>
+    <button class="settings-btn" onclick="importData()">Import JSON</button>
+    <button class="settings-btn danger" onclick="resetAll(this)">Reset all data</button>
+    <div class="data-msg" id="data-msg" role="status"></div>
+  </div>
+</div>
+
+<audio id="bell" preload="auto"></audio>
+
+<script>
+/* ── Broker ── */
+let _id = 0;
+const _wait = {};
+window.addEventListener('message', e => {
+  const m = e.data;
+  if (m && m.pa === 'res' && _wait[m.id]) {
+    _wait[m.id](m);
+    delete _wait[m.id];
+  }
+});
+// Schedule an OS notification IN THE SHELL. The shell survives leaving this app (which
+// blanks the iframe and destroys everything in here), so it is the only place a future
+// alarm can live. {tag,inMs,title,body} → {ok:true,tag,at,replaced} | {ok:false,code,text}.
+// Same tag replaces a pending alarm, so a restarted timer never stacks two bells.
+function paNotifyAt(o) {
+  return new Promise(res => { const id=++_id; _wait[id]=res; parent.postMessage({pa:'req',id,kind:'notify-at',...o},'*'); });
+}
+// Idempotent — {ok:true,cancelled:false} just means nothing was pending.
+function paNotifyCancel(tag) {
+  return new Promise(res => { const id=++_id; _wait[id]=res; parent.postMessage({pa:'req',id,kind:'notify-cancel',tag},'*'); });
+}
+
+/* ── State ── */
+let state = {
+  tasks: [],
+  notes: [],
+  // `timer` persists the RUNNING countdown. It used to be a bare pomoEndTime variable that
+  // died with the app, so reopening reset a running pomodoro to a fresh 25:00.
+  pomo: { durations: { focus:25, short:5, long:15 }, sessions: 0, sessionsToday: 0, focusMinsToday: 0, lastDate: '',
+          alarm: 'morning-bird',
+          timer: { mode:'focus', running:false, endTime:0, secsLeft:0 } },
+  theme: 'auto'
+};
+
+// PAStore (web/store.inline.html, ADR 0010) refuses every save until the file has been read: after a
+// failed or unreadable read `state` is still the defaults, and the first save (opening the app on a
+// new day schedules one) would replace the real file with them.
+const hubFile = PAStore.file('productivity-hub.json', {
+  shape: d => (d && typeof d === 'object' && !Array.isArray(d)) ? '' : 'not a saved state',
+  unreadable: why => 'Data file unreadable · 数据文件无法读取 (' + why + ')',
+});
+function setStatus(text) { document.getElementById('status').textContent = text; }
+
+async function loadState() {
+  const r = await hubFile.load();
+  if (r.state === 'ok') Object.assign(state, r.value);
+  setStatus(r.text || '');
+}
+
+let saveTimer = null;
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveState, 1200);
+}
+// Answers whether the save landed, so an import can say so.
+async function saveState() {
+  // hubFile.save refuses until the file is read; only a save it will send shows "saving" and builds a payload.
+  const sending = hubFile.loaded;
+  if (sending) showSaving();
+  const payload = sending ? { ...state, notes: state.notes.filter(n => n.body.trim()) } : null;
+  const why = await hubFile.save(payload && JSON.stringify(payload, null, 2));
+  if (sending) hideSaving();
+  setStatus(why);
+  return !why;
+}
+
+let savingTimer = null;
+function showSaving() {
+  document.getElementById('saving').classList.add('show');
+}
+function hideSaving() {
+  clearTimeout(savingTimer);
+  savingTimer = setTimeout(() => document.getElementById('saving').classList.remove('show'), 800);
+}
+
+/* ── Tabs ── */
+function showTab(id, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  btn.classList.add('active');
+  if (id === 'notes') renderNotesList();
+  if (id === 'settings') renderStats();
+}
+
+/* ── Clock ── */
+const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function pad(n) { return String(n).padStart(2,'0'); }
+
+function initTicks() {
+  const g = document.getElementById('ticks');
+  for (let i = 0; i < 60; i++) {
+    const angle = i * 6;
+    const r1 = i % 5 === 0 ? 80 : 88;
+    const r2 = 94;
+    const a = angle * Math.PI / 180;
+    const x1 = 100 + r1 * Math.sin(a), y1 = 100 - r1 * Math.cos(a);
+    const x2 = 100 + r2 * Math.sin(a), y2 = 100 - r2 * Math.cos(a);
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+    line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+    line.setAttribute('stroke', 'var(--border)');
+    line.setAttribute('stroke-width', i % 5 === 0 ? 2 : 1);
+    g.appendChild(line);
+  }
+}
+
+function tickClock() {
+  const now = new Date();
+  const h = pad(now.getHours()), m = pad(now.getMinutes()), s = pad(now.getSeconds());
+  document.getElementById('clock-time').textContent = `${h}:${m}:${s}`;
+  document.getElementById('clock-date').textContent =
+    `${DAYS[now.getDay()]}, ${MONTHS[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}`;
+  // analog
+  const sec = now.getSeconds() + now.getMilliseconds()/1000;
+  const min = now.getMinutes() + sec/60;
+  const hr  = (now.getHours() % 12) + min/60;
+  rotateHand('hour-hand',   hr  * 30);
+  rotateHand('minute-hand', min * 6);
+  rotateHand('second-hand', sec * 6);
+  // daily reset
+  checkDailyReset();
+}
+function rotateHand(id, deg) {
+  const el = document.getElementById(id);
+  const cx = 100, cy = 100;
+  el.setAttribute('transform', `rotate(${deg} ${cx} ${cy})`);
+}
+
+function checkDailyReset() {
+  const today = new Date().toDateString();
+  if (state.pomo.lastDate !== today) {
+    state.pomo.sessionsToday = 0;
+    state.pomo.focusMinsToday = 0;
+    state.pomo.lastDate = today;
+    scheduleSave();
+  }
+}
+
+/* ── Pomodoro ── */
+let pomoMode = 'focus';
+let pomoRunning = false;
+let pomoEndTime = 0;
+let pomoTotal = 0;
+let pomoSecsLeft = 0;
+let pomoFinished = false;
+let _pomoInterval = null;
+
+function setPomoMode(mode) {
+  if (pomoRunning) return;
+  pomoMode = mode;
+  ['focus','short','long'].forEach(m => {
+    document.getElementById('pomo-btn-' + m).classList.toggle('active', m === mode);
+  });
+  resetPomo();
+}
+
+function getModeSecs(mode) {
+  return state.pomo.durations[mode] * 60;
+}
+
+function togglePomo() {
+  if (pomoRunning) { pausePomo(); } else { startPomo(); }
+}
+
+const POMO_TAG = 'pomodoro';
+function pomoModeLabel(mode) {
+  return mode === 'focus' ? 'Focus session' : mode === 'short' ? 'Short break' : 'Long break';
+}
+function setPomoNote(msg) { document.getElementById('pomo-note').textContent = msg || ''; }
+
+// THE alarm. It lives in the shell, not here: going Home or opening another app sets this
+// iframe to about:blank, which kills the interval below and any AudioContext in this page.
+// Anything that must happen after the user leaves has to be armed outside this document.
+async function armPomoAlarm() {
+  const r = await paNotifyAt({
+    tag: POMO_TAG,
+    inMs: Math.max(0, pomoEndTime - Date.now()),
+    title: pomoModeLabel(pomoMode) + ' complete',
+    body: 'Time to switch - ' + state.pomo.durations[pomoMode] + ' min done.',
+    sound: state.pomo.alarm || 'morning-bird',   // the SHELL rings it: it is still alive when this app is not
+  });
+  // R14: a refused schedule must never pass for an armed one. The shell renders the reason
+  // (permission off, bad delay); it is shown here, on the panel the user is looking at.
+  // Three outcomes, not two: armed with a banner, armed but SILENT-banner (notifications
+  // blocked, yet sound:true still rings), or not armed at all. Saying "alarm set" for the
+  // middle case would overstate it; saying nothing for it would hide a blocked permission.
+  setPomoNote(r && r.ok === false ? (r.text || r.error || 'Alarm not set.')
+    : (r && r.banner === false ? 'Alarm will ring, but notifications are blocked · 会响铃，但通知被阻止' : ''));
+}
+function cancelPomoAlarm() { setPomoNote(''); return paNotifyCancel(POMO_TAG); }
+// Preview plays through the SHELL too — the same code path that will ring for real, so what
+// you hear here is exactly what you get. It arms nothing and needs no permission.
+function previewAlarm() {
+  parent.postMessage({ pa:'req', id:++_id, kind:'notify-preview', sound: state.pomo.alarm || 'morning-bird', repeat: 1 }, '*');
+}
+function setAlarmSound(v) {
+  state.pomo.alarm = v; scheduleSave();
+  // Re-arm a RUNNING pomodoro so the change takes effect now rather than next session.
+  if (pomoRunning) armPomoAlarm();
+  previewAlarm();
+}
+
+// Everything that starts or resumes a countdown goes through here, so arming the shell
+// alarm and persisting the end time can never be forgotten by one of the call sites.
+function runPomoUntil(endTime) {
+  pomoEndTime = endTime;
+  pomoRunning = true;
+  pomoFinished = false;
+  document.getElementById('pomo-start-btn').textContent = 'Pause';
+  ['focus','short','long'].forEach(m => { document.getElementById('dur-' + m).disabled = true; });
+  clearInterval(_pomoInterval);
+  _pomoInterval = setInterval(pomoTick, 500);
+  armPomoAlarm();
+  persistPomoTimer();
+}
+
+// The saved half of the countdown. Written on every state change, so a reopen resumes
+// instead of resetting, and read back by restorePomo().
+function persistPomoTimer() {
+  state.pomo.timer = {
+    mode: pomoMode,
+    running: pomoRunning,
+    endTime: pomoRunning ? pomoEndTime : 0,
+    secsLeft: pomoSecsLeft,
+  };
+  scheduleSave();
+}
+
+function startPomo() {
+  const resumeSecs = pomoSecsLeft > 0 ? pomoSecsLeft : getModeSecs(pomoMode);
+  pomoTotal = getModeSecs(pomoMode);
+  runPomoUntil(Date.now() + resumeSecs * 1000);
+}
+
+function pausePomo() {
+  pomoSecsLeft = Math.max(0, Math.round((pomoEndTime - Date.now()) / 1000));
+  pomoRunning = false;
+  clearInterval(_pomoInterval);
+  document.getElementById('pomo-start-btn').textContent = 'Resume';
+  ['focus','short','long'].forEach(m => { document.getElementById('dur-' + m).disabled = false; });
+  cancelPomoAlarm();   // paused means paused — the shell must not ring at the original time
+  persistPomoTimer();
+  updatePomoDisplay();
+}
+
+function resetPomo() {
+  pomoRunning = false;
+  pomoFinished = false;
+  clearInterval(_pomoInterval);
+  document.getElementById('pomo-start-btn').textContent = 'Start';
+  ['focus','short','long'].forEach(m => { document.getElementById('dur-' + m).disabled = false; });
+  pomoSecsLeft = getModeSecs(pomoMode);
+  pomoTotal = pomoSecsLeft;
+  pomoEndTime = 0;
+  cancelPomoAlarm();
+  persistPomoTimer();
+  updatePomoDisplay();
+}
+
+// Reopening the app: pick the countdown back up where it actually is.
+function restorePomo() {
+  const t = (state.pomo && state.pomo.timer) || {};
+  if (['focus','short','long'].includes(t.mode)) {
+    pomoMode = t.mode;
+    ['focus','short','long'].forEach(m => {
+      document.getElementById('pomo-btn-' + m).classList.toggle('active', m === pomoMode);
+    });
+  }
+  pomoTotal = getModeSecs(pomoMode);
+  const endTime = Number(t.endTime);
+  if (t.running && Number.isFinite(endTime) && endTime > Date.now()) {
+    pomoSecsLeft = Math.round((endTime - Date.now()) / 1000);
+    runPomoUntil(endTime);        // re-arms in the shell too: same tag, so it replaces, never stacks
+  } else if (t.running) {
+    // It came due while the app was gone. The SHELL already rang (or dropped it as stale),
+    // so do not ring again — but the session did happen, and used to be lost entirely.
+    pomoSecsLeft = 0;
+    finishPomo({ alreadyRang: true });
+  } else {
+    const full = getModeSecs(pomoMode);
+    const left = Number(t.secsLeft);
+    pomoSecsLeft = Number.isFinite(left) && left > 0 && left < full ? left : full;
+    if (pomoSecsLeft < full) document.getElementById('pomo-start-btn').textContent = 'Resume';
+  }
+  updatePomoDisplay();
+}
+
+function pomoTick() {
+  if (!pomoRunning) return;
+  const secsLeft = Math.max(0, Math.round((pomoEndTime - Date.now()) / 1000));
+  pomoSecsLeft = secsLeft;
+  updatePomoDisplay();
+  if (secsLeft <= 0 && !pomoFinished) { pomoFinished = true; finishPomo(); }
+}
+
+function updatePomoDisplay() {
+  const secsLeft = pomoRunning
+    ? Math.max(0, Math.round((pomoEndTime - Date.now()) / 1000))
+    : pomoSecsLeft;
+  const m = Math.floor(secsLeft / 60);
+  const s = secsLeft % 60;
+  document.getElementById('pomo-display').textContent = `${pad(m)}:${pad(s)}`;
+  const total = pomoTotal || getModeSecs(pomoMode);
+  const frac = total > 0 ? 1 - (secsLeft / total) : 0;
+  const circumference = 2 * Math.PI * 85;
+  document.getElementById('pomo-progress').setAttribute('stroke-dashoffset', circumference * (1 - frac));
+  document.getElementById('pomo-sessions').textContent = `Sessions today: ${state.pomo.sessionsToday}`;
+}
+
+// Catch up immediately when user returns to this app
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && pomoRunning) pomoTick();
+});
+
+function finishPomo(opts) {
+  const alreadyRang = !!(opts && opts.alreadyRang);
+  pomoRunning = false;
+  clearInterval(_pomoInterval);
+  document.getElementById('pomo-start-btn').textContent = 'Start';
+  ['focus','short','long'].forEach(m => { document.getElementById('dur-' + m).disabled = false; });
+  // The SHELL rings the tone now (sound:true on the schedule), because it is still alive
+  // when this app is not. Ringing here too would double-ring whenever the app is open, so
+  // the app's own copy is gone (R1/R3 — one bell, one place). NOT cancelling either: this
+  // tick can round up to half a second EARLY, and cancelling would kill the real alarm.
+  if (pomoMode === 'focus') {
+    state.pomo.sessions++;
+    state.pomo.sessionsToday++;
+    state.pomo.focusMinsToday += state.pomo.durations.focus;
+    renderStats();
+    document.getElementById('pomo-sessions').textContent = `Sessions today: ${state.pomo.sessionsToday}`;
+  }
+  pomoSecsLeft = 0;
+  pomoEndTime = 0;
+  persistPomoTimer();
+  updatePomoDisplay();
+}
+
+function adjustDur(mode, delta) {
+  if (pomoRunning) return;
+  let val = state.pomo.durations[mode] + delta;
+  val = Math.max(1, Math.min(120, val));
+  state.pomo.durations[mode] = val;
+  document.getElementById('dur-' + mode).value = val;
+  if (mode === pomoMode) resetPomo();
+  scheduleSave();
+}
+
+function durTyped(mode, val) {
+  const n = parseInt(val);
+  if (!isNaN(n) && n >= 1 && n <= 120) {
+    state.pomo.durations[mode] = n;
+    if (mode === pomoMode) { pomoSecsLeft = n * 60; pomoTotal = pomoSecsLeft; persistPomoTimer(); updatePomoDisplay(); }
+    scheduleSave();
+  }
+}
+
+
+/* ── Tasks ── */
+let taskFilter = 'all';
+let taskIdCounter = 1;
+
+function addTask() {
+  const inp = document.getElementById('task-input');
+  const text = inp.value.trim();
+  if (!text) return;
+  state.tasks.push({ id: taskIdCounter++, text, done: false, createdAt: Date.now() });
+  inp.value = '';
+  renderTasks();
+  scheduleSave();
+}
+
+function toggleTask(id) {
+  const t = state.tasks.find(t => t.id === id);
+  if (t) { t.done = !t.done; renderTasks(); scheduleSave(); }
+}
+
+function deleteTask(id) {
+  state.tasks = state.tasks.filter(t => t.id !== id);
+  renderTasks();
+  scheduleSave();
+}
+
+function setFilter(f, btn) {
+  taskFilter = f;
+  document.querySelectorAll('.tasks-filters button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTasks();
+}
+
+function clearDone() {
+  state.tasks = state.tasks.filter(t => !t.done);
+  renderTasks();
+  scheduleSave();
+}
+
+function renderTasks() {
+  const list = document.getElementById('task-list');
+  let tasks = state.tasks;
+  if (taskFilter === 'active') tasks = tasks.filter(t => !t.done);
+  if (taskFilter === 'done')   tasks = tasks.filter(t =>  t.done);
+  list.innerHTML = '';
+  if (!tasks.length) {
+    list.innerHTML = '<div style="color:var(--sub);font-size:.85rem;text-align:center;padding:1rem">No tasks here</div>';
+    return;
+  }
+  tasks.forEach(t => {
+    const div = document.createElement('div');
+    div.className = 'task-item' + (t.done ? ' done' : '');
+    div.innerHTML = `
+      <input type="checkbox" class="task-check" ${t.done?'checked':''} onchange="toggleTask(${t.id})">
+      <span class="task-label">${escHtml(t.text)}</span>
+      <button class="task-del" onclick="deleteTask(${t.id})">✕</button>`;
+    list.appendChild(div);
+  });
+}
+
+/* ── Notes ── */
+let activeNoteId = null;
+let noteIdCounter = 1;
+let noteAutoSave = null;
+
+function noteTimestamp(ts) {
+  const d = new Date(ts);
+  return `Note · ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function noteTitle(note) {
+  const first = note.body.split('\n')[0].trim();
+  return first || noteTimestamp(note.createdAt);
+}
+
+function notePreview(note) {
+  const lines = note.body.split('\n');
+  return lines.slice(1).join(' ').trim().slice(0, 50);
+}
+
+function discardEmptyNote() {
+  if (!activeNoteId) return;
+  const cur = state.notes.find(n => n.id === activeNoteId);
+  if (cur && !cur.body.trim()) {
+    state.notes = state.notes.filter(n => n.id !== activeNoteId);
+    activeNoteId = null;
+  }
+}
+
+function newNote() {
+  // if current note is empty, just focus it
+  if (activeNoteId) {
+    const cur = state.notes.find(n => n.id === activeNoteId);
+    if (cur && !cur.body.trim()) {
+      document.getElementById('note-body').focus();
+      return;
+    }
+  }
+  const note = { id: noteIdCounter++, body: '', createdAt: Date.now(), updatedAt: Date.now() };
+  state.notes.unshift(note);
+  activeNoteId = note.id;
+  renderNotesList();
+  document.getElementById('note-body').value = '';
+  document.getElementById('note-body').focus();
+  // don't save yet — wait for content
+}
+
+function loadNote(id) {
+  discardEmptyNote();
+  activeNoteId = id;
+  const note = state.notes.find(n => n.id === id);
+  if (!note) { renderNotesList(); return; }
+  document.getElementById('note-body').value = note.body;
+  renderNotesList();
+  document.getElementById('note-body').focus();
+}
+
+function noteEdited() {
+  if (!activeNoteId) return;
+  const note = state.notes.find(n => n.id === activeNoteId);
+  if (!note) return;
+  note.body = document.getElementById('note-body').value;
+  note.updatedAt = Date.now();
+  clearTimeout(noteAutoSave);
+  noteAutoSave = setTimeout(() => {
+    renderNotesList();
+    if (note.body.trim()) scheduleSave();
+  }, 600);
+}
+
+function deleteNote() {
+  if (!activeNoteId) return;
+  state.notes = state.notes.filter(n => n.id !== activeNoteId);
+  activeNoteId = null;
+  document.getElementById('note-body').value = '';
+  renderNotesList();
+  scheduleSave();
+}
+
+function renderNotesList() {
+  const q = document.getElementById('notes-search').value.toLowerCase();
+  const list = document.getElementById('notes-list');
+  // exclude empty notes that aren't the one being edited right now
+  let notes = state.notes.filter(n => n.body.trim() || n.id === activeNoteId);
+  if (q) notes = notes.filter(n => n.body.toLowerCase().includes(q));
+  notes = [...notes].sort((a,b) => b.updatedAt - a.updatedAt);
+  list.innerHTML = '';
+  notes.forEach(n => {
+    const div = document.createElement('div');
+    div.className = 'note-item' + (n.id === activeNoteId ? ' active' : '');
+    div.onclick = () => loadNote(n.id);
+    const title = escHtml(noteTitle(n).slice(0, 22));
+    const d = new Date(n.updatedAt);
+    const dateStr = d.toLocaleDateString([], {month:'short', day:'numeric'}) +
+      ' ' + d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    div.innerHTML = `<div class="note-item-title">${title}</div>
+      <div class="note-item-sub">${escHtml(dateStr)}</div>`;
+    list.appendChild(div);
+  });
+}
+
+/* ── Settings ── */
+function setTheme(t) {
+  state.theme = t;
+  applyTheme(t);
+  document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('theme-' + t);
+  if (btn) btn.classList.add('active');
+  scheduleSave();
+}
+
+function applyTheme(t) {
+  if (t === 'auto') {
+    document.documentElement.removeAttribute('data-theme');
+  } else {
+    document.documentElement.setAttribute('data-theme', t);
+  }
+}
+
+function renderStats() {
+  // The Settings tab renders from state, so a saved tone shows as the SELECTED one. Without
+  // this the menu always read 'Morning Bird' while the alarm rang whatever was saved.
+  const sel = document.getElementById('alarm-sound');
+  if (sel) sel.value = state.pomo.alarm || 'morning-bird';
+  document.getElementById('stat-today').textContent = state.pomo.sessionsToday;
+  document.getElementById('stat-total').textContent = state.pomo.sessions;
+  document.getElementById('stat-mins').textContent = state.pomo.focusMinsToday + ' min';
+}
+
+function exportData() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'productivity-hub-export.json'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// The Data section's own status line. alert() does nothing in the app sandbox (no allow-modals),
+// so an import used to succeed or fail without a word.
+function setDataMsg(text) { document.getElementById('data-msg').textContent = text; }
+
+function importData() {
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = '.json';
+  inp.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        Object.assign(state, data);
+        applyAll();
+        // "Imported" only once it is saved; the status line says why when it is not.
+        saveState().then(ok => setDataMsg(ok ? 'Imported · 已导入' : 'Import not saved · 导入未保存'));
+      } catch(e) { setDataMsg('Invalid JSON file · JSON 文件无效'); }
+    };
+    reader.readAsText(file);
+  };
+  inp.click();
+}
+
+// TODO(R4): this file is ~1,300 lines, 4x budget. Split seams: the Pomodoro timer (Clock + Pomodoro
+// sections, the largest part, with its alarm and notify-at handling), Tasks and Notes share only
+// `state` and saveState() — each can stand as its own app, or Notes can move onto PANote.
+// Two taps to reset, through the shared PATwoTap (superelf.md "Reusable components"):
+// window.confirm() returns false at once in the app sandbox, so "Reset all data?" silently
+// cancelled every reset.
+const DELETE_ARM_MS = PATwoTap.MS;
+const RESET_ARMED_LABEL = 'Reset all data? · 清空所有数据?';
+function resetAll(btn) {
+  if (!PATwoTap.press(btn, { label: RESET_ARMED_LABEL, ms: DELETE_ARM_MS })) return;
+  setDataMsg('');                 // an earlier "Imported" no longer describes the data
+  clearInterval(_pomoInterval);
+  cancelPomoAlarm();   // wiping the data must also disarm the shell alarm it armed
+  pomoRunning = false;
+  state = {
+    tasks: [], notes: [],
+    pomo: { durations:{focus:25,short:5,long:15}, sessions:0, sessionsToday:0, focusMinsToday:0, lastDate:'',
+            alarm:'morning-bird',
+            timer: { mode:'focus', running:false, endTime:0, secsLeft:0 } },
+    theme: 'auto'
+  };
+  applyAll();
+  saveState();
+}
+
+/* ── Init ── */
+function applyAll() {
+  applyTheme(state.theme);
+  // mark active theme btn
+  document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+  const tb = document.getElementById('theme-' + state.theme);
+  if (tb) tb.classList.add('active');
+  // sync dur inputs
+  ['focus','short','long'].forEach(m => {
+    document.getElementById('dur-' + m).value = state.pomo.durations[m];
+  });
+  // sync task ids
+  if (state.tasks.length) taskIdCounter = Math.max(...state.tasks.map(t=>t.id)) + 1;
+  // ensure notes have createdAt (migrate old data that had title instead)
+  state.notes.forEach(n => { if (!n.createdAt) n.createdAt = n.updatedAt || Date.now(); });
+  if (state.notes.length) noteIdCounter = Math.max(...state.notes.map(n=>n.id)) + 1;
+  restorePomo();
+  renderTasks();
+  renderNotesList();
+  renderStats();
+  const firstNote = state.notes.find(n => n.body.trim());
+  if (firstNote) loadNote(firstNote.id);
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function init() {
+  initTicks();
+  await loadState();
+  applyAll();
+  tickClock();
+  setInterval(tickClock, 1000);
+}
+
+init();
+</script>
+</body>
+</html>

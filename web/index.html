@@ -1,0 +1,2602 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<!-- DO NOT change the status-bar/theme-color metas: "default"+theme-color works around an iOS standalone viewport bug (62pt bottom band). Changing requires users to re-add the home-screen icon. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#111514">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f4f2">
+<title>管家</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ctext y=%2213%22 font-size=%2213%22%3E🏠%3C/text%3E%3C/svg%3E">
+<style>
+/* PA_BAR_HANDLE_CSS */
+:root { --sab-probe: env(safe-area-inset-bottom, 0px); --bg:#f4f4f2; --card:#fff; --text:#1c1e1d; --muted:#6b7370; --line:#e2e2de; --accent:#0f6355; --danger:#983d24; }
+@media (prefers-color-scheme: dark){ :root{ --bg:#111514; --card:#1b201f; --text:#e5e8e6; --muted:#8f9894; --line:#2a302e; --accent:#57c2ac; --danger:#e08163; } }
+*{ box-sizing:border-box; margin:0; }
+html{ height:100dvh; overflow:hidden; background:var(--bg); }
+/* iOS home-screen apps: dvh can compute short, leaving a bottom band. 100% is reliable there. */
+@media (display-mode: standalone){ html,body{ height:100% !important; } }
+html.standalone, html.standalone body{ height:100% !important; }
+/* The A-/A+ scale applies to the SHELL as well as the apps it broadcasts to. It used to
+   change only the Bible app: the value was posted to every app (sendAppPrefs fontScale) and
+   almost nothing read it — main chat included. 17px base matches iOS body text; the device
+   difference is handled by each device being allowed its own override, not by the base. */
+body{ background:var(--bg); color:var(--text); font:calc(17px * var(--fs,1))/1.5 -apple-system,system-ui,sans-serif; padding:env(safe-area-inset-top) 0 0; height:100dvh; display:flex; flex-direction:column; overflow:hidden; }
+header{ display:flex; align-items:center; gap:10px; padding:14px 18px; border-bottom:1px solid var(--line); flex-shrink:0; }
+header h1{ font-size:18px; white-space:nowrap; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.dot{ width:8px; height:8px; border-radius:50%; background:var(--danger); flex-shrink:0; }
+.dot.ok{ background:var(--accent); }
+header .spacer{ flex:1; }
+main{ max-width:720px; width:100%; margin:0 auto; padding:0 16px; flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; }
+#log{ flex:1; min-height:0; overflow-y:auto; padding:8px 0 var(--pill-clear, calc(104px + env(safe-area-inset-bottom,0px))); scroll-padding-bottom:var(--pill-clear, calc(104px + env(safe-area-inset-bottom,0px))); }
+#log{ display:flex; flex-direction:column; gap:10px; }
+h2{ font-size:13px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:18px 0 10px; }
+.grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; }
+.family-card{ background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 14px; display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.family-card .fc-info{ flex:1; min-width:0; }
+.family-card b{ display:block; font-size:15px; }
+.family-card small{ color:var(--muted); font-size:12px; }
+.family-card .fc-author{ font-size:11px; color:var(--accent); margin-top:2px; }
+.family-card .fc-btns{ display:flex; flex-direction:column; gap:5px; flex-shrink:0; }
+.update-dot{ display:inline-block; width:8px; height:8px; border-radius:50%; background:#2196f3; margin-left:5px; vertical-align:middle; flex-shrink:0; cursor:pointer; }
+.msg{ background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 14px; word-break:break-word; }
+.msg.me{ background:var(--accent); color:#fff; border:none; align-self:flex-end; max-width:85%; white-space:pre-wrap; }
+.msg.status{ color:var(--muted); font-size:13px; background:none; border:none; padding:2px 4px; white-space:pre-wrap; }
+/* The in-flight indicator. It used to be a single '…' at 13px, which read as a typo rather
+   than as work happening. Three pulsing dots plus a live elapsed time: the dots say "still
+   going", the number says how long — which is the honest answer to "is this stuck?". */
+.pa-think{ display:inline-flex; align-items:center; gap:5px; vertical-align:middle; }
+.pa-think i{ width:7px; height:7px; border-radius:50%; background:var(--accent); display:inline-block;
+  animation:pa-think 1.25s infinite ease-in-out; }
+.pa-think i:nth-child(2){ animation-delay:.16s } .pa-think i:nth-child(3){ animation-delay:.32s }
+@keyframes pa-think{ 0%,75%,100%{ transform:scale(.55); opacity:.35 } 35%{ transform:scale(1); opacity:1 } }
+@media (prefers-reduced-motion:reduce){ .pa-think i{ animation:none; opacity:.8 } }
+.pa-lbl{ margin-left:7px }
+.fs-toast{ position:fixed; left:50%; transform:translateX(-50%); top:calc(env(safe-area-inset-top,0px) + 52px);
+  background:var(--card); color:var(--text); border:1px solid var(--line); border-radius:16px;
+  padding:6px 14px; font-size:13px; box-shadow:0 4px 14px rgba(0,0,0,.18); z-index:60;
+  opacity:0; pointer-events:none; transition:opacity .18s ease; }
+.fs-toast.on{ opacity:1 }
+.pa-el{ margin-left:8px; font-weight:500; font-variant-numeric:tabular-nums; opacity:.75 }
+.msg .pa-took{ display:block; margin-top:6px; font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums }
+.msg.err{ color:var(--danger); background:none; border:none; }
+.msg.stream{ white-space:pre-wrap; }
+.msg p{ margin:.4em 0; } .msg p:first-child{ margin-top:0; } .msg p:last-child{ margin-bottom:0; }
+.msg h1,.msg h2,.msg h3{ margin:.6em 0 .2em; font-size:1em; font-weight:700; }
+.msg h2{ font-size:.95em; } .msg h3{ font-size:.9em; }
+.msg ul,.msg ol{ padding-left:1.4em; margin:.3em 0; }
+.msg li{ margin:.1em 0; }
+.msg table{ border-collapse:collapse; font-size:13px; margin:.5em 0; display:block; overflow-x:auto; max-width:100%; }
+.msg th,.msg td{ border:1px solid var(--line); padding:4px 8px; text-align:left; vertical-align:top; }
+.msg th{ background:rgba(128,128,128,.1); font-weight:600; white-space:nowrap; }
+.msg code{ font-family:ui-monospace,monospace; font-size:.85em; background:rgba(128,128,128,.15); padding:.1em .3em; border-radius:3px; }
+.msg pre{ background:rgba(128,128,128,.12); border-radius:6px; padding:10px 12px; overflow-x:auto; margin:.4em 0; }
+.pac-pills{display:flex;gap:6px;padding:4px 12px 0}
+.pac-model,.pac-vfy{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:3px 10px;font:inherit;font-size:12px;color:var(--muted);cursor:pointer;box-shadow:0 1px 6px rgba(0,0,0,.12)}
+.pac-model:active,.pac-vfy:active{filter:brightness(.96)}
+.pac-vfy.on{color:var(--accent);border-color:var(--accent);font-weight:600}
+.pac-mmenu{position:fixed;left:12px;bottom:calc(var(--pill-clear,104px) + 8px);background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 6px 22px rgba(0,0,0,.28);padding:5px;z-index:50;min-width:180px}
+.pac-mg{font-size:10px;color:var(--muted);padding:6px 10px 2px;text-transform:uppercase;letter-spacing:.05em}
+.pac-mi{display:block;width:100%;text-align:left;font:inherit;font-size:14px;padding:8px 10px;border:none;background:none;color:var(--text);cursor:pointer;border-radius:7px}
+.pac-mi.on{background:color-mix(in srgb,var(--accent) 15%,transparent);font-weight:600}
+.msg pre code{ background:none; padding:0; font-size:.82em; }
+.msg a{ color:var(--accent); text-decoration:underline; word-break:break-all; }
+/* Input bar */
+form#f{ position:fixed; left:0; right:0; bottom:0; display:flex; flex-direction:column; gap:6px;
+  padding:8px 12px calc(10px + env(safe-area-inset-bottom,0px));
+  background:transparent; pointer-events:none;
+  border:none; z-index:2; }
+#chips{ display:flex; flex-wrap:wrap; gap:6px; }
+#chips:empty{ display:none; }
+.chip{ display:flex; align-items:center; gap:4px; background:var(--card); border:1px solid var(--line); border-radius:16px; padding:3px 8px 3px 10px; font-size:13px; max-width:180px; }
+.chip span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.chip button{ background:none; border:none; cursor:pointer; color:var(--muted); font-size:15px; padding:0 2px; line-height:1; flex-shrink:0; }
+form#f > *{ pointer-events:auto; }
+#frow{ display:flex; gap:4px; align-items:center; background:var(--card); border:1px solid var(--line); border-radius:999px; padding:4px 4px 4px 6px; box-shadow:0 2px 12px rgba(0,0,0,.25); }
+#box{ flex:1; font:inherit; padding:8px 8px; border:none; border-radius:999px; background:transparent; color:var(--text); outline:none; }
+.ibtn{ background:none; border:none; border-radius:999px; padding:7px 10px; font-size:18px; cursor:pointer; color:var(--muted); line-height:1; flex-shrink:0; }
+@keyframes pa-spin{ to{ transform:rotate(-360deg); } }
+#reload.spin{ animation:pa-spin .8s linear infinite; color:var(--accent); pointer-events:none; }
+#reload.upd{ color:var(--accent); }   /* a new build is ready (web/update.js) */
+#updBar{ pointer-events:auto; cursor:pointer; }
+#offLine.mini{ left:calc(env(safe-area-inset-left,0px) + 8px); top:auto; bottom:calc(env(safe-area-inset-bottom,0px) + 8px); transform:none;
+  font-size:0; padding:2px 8px; opacity:0; box-shadow:none; cursor:pointer; }   /* shrunk: a small corner pill */
+#offLine.mini.on, #updBar.on + #offLine.mini.on{ opacity:.7; pointer-events:auto; transform:none; }
+#offLine.mini::after{ content:attr(data-mini); font-size:11px; }
+#updBar.on + #offLine.on{ transform:translate(-50%,calc(100% + .4em)); }   /* both lit: the state line sits under the update line */
+button.primary{ background:var(--accent); color:#fff; border:none; border-radius:10px; padding:0 16px; font:inherit; cursor:pointer; }
+#send{ border-radius:999px; width:36px; height:36px; padding:0; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+button.plain{ background:none; border:1px solid var(--line); border-radius:8px; padding:4px 10px; color:var(--muted); font:inherit; cursor:pointer; }
+#frame{ position:fixed; inset:0; background:var(--bg); display:none; flex-direction:column; z-index:9; }
+#frame iframe{ flex:1; border:0; width:100%; }
+/* The app frame's header. It carries three controls and a title, and it used to spend 57px of
+   every screen doing it — measured at 1280x800: 87px of "← Home", 32+38px of A-/A+, and 1123px
+   of empty title. On a handwriting app that row is 7.1% of the page you are trying to write on,
+   and it is charged to all 19 apps. Trimmed to the controls' own height. The safe-area inset is
+   kept in full: it is the notch, not padding, and removing it puts the title under the camera. */
+#frame .bar{ display:flex; gap:8px; align-items:center; padding:calc(3px + env(safe-area-inset-top)) 10px 3px; border-bottom:1px solid var(--line); }
+#frame .bar>#ftitle{ font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* PEEK · 隐藏顶栏. Trimming the bar to 43px still left a whole ROW charged to every app, and a
+   row is the thing that is actually wasted: the app under it already has its own header. In peek
+   mode the bar stops occupying layout and OVERLAYS instead, so the iframe gets the frame's full
+   height, and it slides away the moment the user touches the app.
+   It cannot be moved INTO the app. The app is a cross-origin sandboxed iframe, so the shell can
+   neither draw into it nor see a touch inside it; every affordance that brings the bar back has
+   to be a shell element sitting ON TOP of the iframe.
+   That is what #barpeek is, and its size is the whole design: top-CENTRE, sized in web/bar-handle.css. Measured
+   across all 19 apps, 11 anchor chrome to the top or bottom edge, always full-width rows whose
+   CONTROLS sit at the left and right ends — the centre of that row is title text. A grabber there
+   shadows letters, never a button. Anything wider, or in a corner, lands on one. */
+#frame.peek{ padding-top:env(safe-area-inset-top,0px); }
+/* The notch inset moves to the FRAME here, so the iframe still clears the camera once the bar is
+   no longer the thing holding that space. The bar drops its own copy or it would count twice. */
+#frame.peek .bar{ position:absolute; top:0; left:0; right:0; z-index:6; background:var(--bg);
+  padding:3px 10px; transform:translateY(-101%); transition:transform .18s ease; }
+#frame.peek.barin .bar{ transform:translateY(0); }
+/* -101%, not -100%: the bar's own bottom border is outside its box and a 1px line parked at the
+   top of every app reads as a rendering fault. */
+#barpeek{ display:none; position:absolute; top:0; left:50%; transform:translateX(-50%); z-index:7;
+  width:var(--pa-handle-w); height:var(--pa-handle-h); align-items:center; justify-content:center; cursor:pointer;
+  background:none; border:0; padding:0; -webkit-tap-highlight-color:transparent;
+  transition:opacity .18s ease; }
+#frame.peek #barpeek{ display:flex; }
+#barpeek::before{ content:''; width:var(--pa-grab-w); height:var(--pa-grab-h); border-radius:3px; background:var(--line); }
+#barpeek:hover::before{ background:var(--muted); }
+/* While the bar is out it would sit on top of "← Home"; it also has nothing left to do. */
+#frame.peek.barin #barpeek{ opacity:0; pointer-events:none; }
+/* An app that draws its OWN bar (meta.json ownBar, web/app-bar.inline.html, ADR 0032) carries Home and
+   A-/A+ itself; set only once that app says {pa:'shell',type:'ready'}, so a broken app keeps this bar. */
+#frame.ownbar .bar,#frame.ownbar #barpeek{ display:none; }
+/* The BUTTONS keep their size. The saving comes from the bar's own padding, not from the tap
+   targets: shrinking "← Home" to 32px tall bought 4 more pixels and put it under the 44px touch
+   guideline, on the device this is mostly used from with a finger. */
+/* Sign-in, first-run setup and the profile sheet are the FIRST thing a phone sees, so the mobile
+   rules live here once rather than being patched into each dialog. `width:min()` uses the space a
+   phone actually has instead of a fixed 320px column; max-height + overflow keeps the button
+   reachable when the on-screen keyboard covers half the screen (a modal <dialog> does not scroll
+   on its own, so the Sign in button was simply unreachable behind the keyboard). */
+dialog{ border:1px solid var(--line); border-radius:12px; background:var(--card); color:var(--text); padding:20px;
+  width:min(360px, calc(100vw - 32px)); max-height:calc(100dvh - 32px); overflow-y:auto; overscroll-behavior:contain;
+  /* A modal <dialog> centres itself with margin:auto — which the global `*{margin:0}` above
+     silently cancels, pinning every dialog to the top-left corner. */
+  margin:auto; }
+/* Settings is a PAGE, not a pop-up. The rule above is width:min(360px,…) and it is SHARED by
+   three dialogs — right for #login and #setup, which are four fields each, and wrong for this
+   one, which carries the whole profile, the family list, the shelf, node settings and the audit
+   log. Reported as "so much content in a narrow pop up window", and that is exactly what 360px
+   of a multi-section form looks like.
+   It stays a <dialog>: that is what gives Escape-to-close, focus containment and an inert
+   background for free, and re-implementing those as a routed view would be a lot of new surface
+   to get wrong. Only the BOX changes.
+   The horizontal padding centres a readable column instead of stretching form rows across a
+   27-inch monitor — max() keeps it at 16px once the viewport is narrower than the column, so a
+   phone still gets edge-to-edge. */
+#cfg{ width:100vw; max-width:100vw; height:100dvh; max-height:100dvh; border:0; border-radius:0;
+  padding:max(20px, env(safe-area-inset-top,0px)) max(16px, calc((100vw - 760px) / 2))
+          max(24px, calc(20px + env(safe-area-inset-bottom,0px))); }
+#cfg::backdrop{ background:var(--bg); }
+
+/* Form controls do NOT inherit a font — the login inputs were rendering at the UA default (~13px),
+   unreadable on a phone and immune to A-/A+. The 16px floor is the threshold below which iOS
+   zooms the page on focus. */
+dialog input, dialog textarea, dialog select, dialog button{ font:inherit; font-size:max(16px, calc(17px * var(--fs,1))); }
+dialog .primary{ min-height:44px; }                       /* Apple's minimum touch target */
+dialog a{ display:inline-block; padding:6px 4px; }        /* the small links were ~12px tall to hit */
+/* New-feature blue dot — add class .pa-new to any element; dot clears on first tap */
+.pa-new{position:relative}
+.pa-new::after{content:'';position:absolute;top:1px;right:1px;width:8px;height:8px;background:#007AFF;border-radius:50%;pointer-events:none;box-shadow:0 0 0 2px var(--card,#fff);z-index:5}
+
+#backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; z-index:20; }
+#backdrop.open{ display:block; }
+#drawer{ position:fixed; top:0; left:0; bottom:0; width:82%; max-width:320px; background:var(--card); border-right:1px solid var(--line);
+  transform:translateX(-100%); transition:transform .2s; z-index:21; display:flex; flex-direction:column;
+  padding-top:env(safe-area-inset-top); }
+#drawer.open{ transform:none; }
+@media (prefers-reduced-motion:reduce){ #drawer{ transition:none; } }
+.dhead{ display:flex; align-items:center; padding:14px 16px; border-bottom:1px solid var(--line); }
+.dhead b, .dhead #goHome{ flex:1; text-align:left; font-weight:700; font-size:inherit; color:var(--text); padding:0; }
+#goHome{ cursor:pointer; }
+#convos{ overflow-y:auto; flex:1; }
+.dsec{ flex-shrink:0; display:flex; flex-direction:column; min-height:0; }
+.dsec-head{ font-size:14px; font-weight:600; letter-spacing:.02em; color:var(--text); padding:14px 16px 6px; flex-shrink:0; cursor:pointer; user-select:none; display:flex; align-items:center; }
+.dsec-head::after{ content:'›'; margin-left:auto; font-size:20px; line-height:1; color:var(--muted); display:inline-block; transition:transform .15s ease; }
+.dsec.open > .dsec-head::after{ transform:rotate(90deg); }
+.dsec-body{ display:none; }
+.dsec.open > .dsec-body{ display:block; }
+#secChats.open{ flex:1; min-height:0; }
+#secChats.open > .dsec-body{ display:flex; flex-direction:column; flex:1; min-height:0; }
+#chatSearch{ position:absolute; inset:0; background:var(--card); display:none; flex-direction:column; z-index:5; }
+#chatSearch.on{ display:flex; }
+.cs-bar{ display:flex; gap:6px; padding:14px 12px; border-bottom:1px solid var(--line); }
+.cs-bar input{ flex:1; min-width:0; font:inherit; font-size:15px; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); outline:none; }
+#csResults{ flex:1; overflow-y:auto; }
+.d-apps-list{ overflow-y:auto; max-height:180px; }
+#briefs{ overflow-y:auto; max-height:220px; }
+.dapp{ display:flex; align-items:center; gap:8px; padding:10px 16px; border-bottom:1px solid var(--line); cursor:pointer; }
+.dapp:last-child{ border-bottom:none; }
+.dapp-name{ flex:1; font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* App-row actions moved into the shared ⋯ menu (.cmenu / .cmenu-pop below) — keeps each row to just a name + ⋯. */
+#emptyState{ flex:0 1 auto; min-height:0; overflow-y:auto; padding:20px 0 var(--pill-clear, calc(104px + env(safe-area-inset-bottom,0px))); }
+/* The app shelf is a SIBLING of #log inside main{overflow:hidden}. flex-shrink:0 with no overflow
+   meant a shelf taller than the viewport was clipped with nothing to scroll — the last apps were
+   simply unreachable. `flex:0 1 auto` keeps a short shelf at its natural height at the top; a tall
+   one shrinks to the space available and scrolls. Bottom padding clears the composer, same token
+   #log uses. */
+#emptyState .grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:8px; }
+.ecard{ background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px; cursor:pointer; }
+.ecard b{ display:block; margin-bottom:3px; font-size:14px; }
+.ecard small{ color:var(--muted); font-size:12px; }
+/* App face（应用面孔）— the live line, replacing the one-line description on a tile that has
+   one. Two lines of description + face would push the grid taller on every phone; the desc is
+   the thing you only need once, the face is the thing you came to read. */
+.ecard .face{ display:block; margin-top:4px; font-size:12px; color:var(--muted); }
+.ecard .face b{ display:inline; margin:0; font-size:17px; color:var(--text); }
+.ecard .face i{ font-style:normal; opacity:.75; }   /* the age — never let a stale face look live */
+.convo{ display:flex; align-items:center; gap:8px; padding:12px 16px; border-bottom:1px solid var(--line); cursor:pointer; }
+.convo.active{ background:color-mix(in srgb,var(--accent) 12%,transparent); }
+.convo .t{ flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:15px; }
+.convo .t input{ width:100%; font:inherit; background:none; border:none; border-bottom:1px solid var(--accent); outline:none; color:var(--text); padding:0; }
+.convo .cmenu,.dapp .cmenu{ background:none; border:none; color:var(--muted); font-size:18px; cursor:pointer; flex-shrink:0; padding:0 4px; line-height:1; }
+.cmenu-pop{ position:fixed; background:var(--card); border:1px solid var(--line); border-radius:10px; box-shadow:0 4px 16px rgba(0,0,0,.25); z-index:30; overflow:hidden; min-width:130px; }
+.cmenu-pop button{ display:block; width:100%; text-align:left; background:none; border:none; padding:10px 14px; font:inherit; font-size:14px; color:var(--text); cursor:pointer; }
+.cmenu-pop button:hover,.cmenu-pop button:active{ background:var(--bg); }
+.cmenu-pop button.del:hover,.cmenu-pop button.del:active{ background:color-mix(in srgb,var(--danger) 12%,transparent); }
+.cmenu-pop button.del{ color:var(--danger); }
+.msg-actions{display:flex;gap:5px;margin-top:8px;padding-top:6px;border-top:1px solid var(--line);}
+.msg.me .msg-actions{border-top-color:rgba(255,255,255,.25);}
+.mab{background:none;border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:13px;cursor:pointer;color:var(--muted);line-height:1.4;transition:color .15s,border-color .15s;}
+.mab:hover{color:var(--text);border-color:var(--muted);}
+.mab.active{color:var(--accent);border-color:var(--accent);}
+.msg.me .mab{border-color:rgba(255,255,255,.3);color:rgba(255,255,255,.75);}
+.msg.me .mab:hover{color:#fff;border-color:#fff;}
+#scrollBtn{position:fixed;bottom:68px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--line);border-radius:50%;width:36px;height:36px;font-size:16px;cursor:pointer;display:none;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.18);color:var(--text);z-index:5;transition:opacity .15s;}
+#scrollBtn.show{display:flex;}
+.atts{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.att-img{max-width:min(220px,60%);max-height:220px;border-radius:8px;border:1px solid var(--line);cursor:zoom-in;}.att-chip{font-size:12px;color:var(--muted);background:var(--card);border:1px solid var(--line);border-radius:6px;padding:3px 8px}
+#lightbox{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:100;display:none;align-items:center;justify-content:center;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);}
+#lightbox.open{display:flex;}
+#lightbox img{max-width:100%;max-height:100%;object-fit:contain;border-radius:6px;}
+#lightbox-close{position:absolute;top:calc(env(safe-area-inset-top)+16px);right:20px;background:rgba(255,255,255,.9);border:none;color:#111;font-size:20px;font-weight:700;line-height:1;width:44px;height:44px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.4);}
+.shelf-head{padding:10px 16px 4px;font-size:11px;letter-spacing:.06em;color:var(--muted);text-transform:uppercase}.grid-sep{grid-column:1/-1;font-size:11px;letter-spacing:.06em;color:var(--muted);text-transform:uppercase;margin:6px 0 2px}.ecard .star{color:var(--accent);font-size:.85em}
+/* ── Print surface · 打印 ──────────────────────────────────────────────────────────────
+   The app iframe cannot print itself (sandbox has no allow-modals), so PAPrint hands the shell
+   rendered PNG pages and they are laid out here. Off-screen until a print is actually running.
+   The ruled lines, paper colour and highlighter are INSIDE each PNG — drawPaper paints them onto
+   a canvas, not as CSS — so they are foreground image content and the print dialog's "background
+   graphics" setting cannot drop them. */
+#printRoot{display:none}
+@media print{
+  /* Everything the shell normally shows is chrome around the note; none of it belongs on paper. */
+  html.pa-printing body>*:not(#printRoot){display:none!important}
+  html.pa-printing #printRoot{display:block!important;height:auto!important;overflow:visible!important}
+  /* One note page per sheet, sized to the PAGE WIDTH.
+     SCAR 2026-09-12 (iPad): this used to be a 100vh flex box with object-fit:contain. In print
+     iOS resolves vh against the SCREEN viewport, not the page box, so every sheet became a box
+     far taller than the paper: the image centred inside it (a wide white band above it), the
+     overflow was clipped, and a FOUR-page note printed as one cut-off page. Viewport units have
+     no meaning in paginated media — nothing here may use them again.
+     Width-fitting needs no viewport and no page size, which is the point: the pad has no paper
+     size to compare against. Measured note pages run 1.1-1.23 tall per width against a printable
+     box nearer 1.45, so a page fits with room to spare; a page taller than the sheet flows on
+     rather than being cropped, which is the right way round for handwriting. */
+  /* NEUTRALISE THE APP SHELL. This is the fix that made pagination work at all.
+     The shell is a viewport-pinned app layout: html and body carry height:100dvh (height:100%
+     !important in standalone) plus overflow:hidden, and body is a column flex container. Printed,
+     that is a fixed-height clipping box — content cannot flow onto a second sheet, so a FOUR-page
+     note came out as one cut-off page on desktop AND on iPad. Every declaration here needs
+     !important because the standalone rule that sets the height has it too. */
+  html.pa-printing, html.pa-printing body{
+    display:block!important;height:auto!important;min-height:0!important;max-height:none!important;
+    overflow:visible!important;margin:0!important;padding:0!important;background:#fff!important}
+  html.pa-printing .pr-sheet{page-break-after:always;break-after:page}
+  html.pa-printing .pr-sheet:last-child{page-break-after:auto;break-after:auto}
+  html.pa-printing .pr-sheet img{display:block;width:100%;height:auto;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  @page{margin:10mm}
+}
+</style>
+</head>
+<body>
+<div id="backdrop"></div>
+<aside id="drawer">
+  <div class="dhead"><button class="plain" id="goHome" title="Home · 主页">Home</button><button class="plain" id="drawerSearch" title="Search chats" style="margin-right:2px">🔍</button><button class="plain" id="newChat">+ New</button></div>
+  <div class="dsec open" id="secApps"><div class="dsec-head">My Apps</div><div class="dsec-body"><div class="d-apps-list" id="dApps"></div></div></div>
+  <div class="dsec open" id="secFamily"><div class="dsec-head">Family Apps</div><div class="dsec-body"><div id="dFamily" class="d-apps-list" style="padding:0 12px 8px"><span style="color:var(--muted);font-size:13px">None shared yet.</span></div></div></div>
+  <!-- 简报 · Briefings — a JOB's output. System-level, like the jobs that produce it, so it
+       belongs beside My Apps rather than inside any one app. It was previously readable only
+       inside the longevity app: an accident of history, since briefings began as a health
+       feature and the reading surface never moved when they became general. -->
+  <div class="dsec open" id="secBriefs"><div class="dsec-head">简报 · Briefings</div><div class="dsec-body"><div id="briefs"></div></div></div>
+  <div class="dsec open" id="secChats"><div class="dsec-head">Chats · 对话记录</div><div class="dsec-body"><div id="convos"></div></div></div>
+  <div id="chatSearch"><div class="cs-bar"><input id="csInp" placeholder="Search chats · 搜索对话" autocomplete="off"><button class="plain" id="csClose">✕</button></div><div id="csResults"></div></div>
+</aside>
+<header>
+  <button class="ibtn" id="menu" title="Conversations">☰</button>
+  <span class="dot" id="dot"></span>
+  <h1>管家</h1>
+  <span class="spacer"></span>
+  <button class="ibtn fs-dn" style="font-size:12px;font-weight:700">A-</button>
+  <button class="ibtn fs-up" style="font-size:15px;font-weight:700">A+</button>
+  <button class="ibtn" id="reload" title="Refresh">↺</button>
+
+  <button class="ibtn" id="settings" title="Settings">⚙️</button>
+  <button class="plain" id="newSession">Main</button>
+</header>
+<!-- Outside <header>: the toast also answers the app bar's A-/A+, and the header is inert while an app is open. -->
+<span id="updBar" class="fs-toast"></span>   <!-- "Update ready" line, PAUpdate (web/update.js); same place as the toast, outside the inert header -->
+<span id="offLine" class="fs-toast"></span>   <!-- the offline state line, PAOffline (web/offline-client.js): "Offline · 离线 — saving on this iPad", the queued count -->
+<span id="fsToast" class="fs-toast"></span>
+<main>
+  <div id="emptyState" style="display:none"><div class="grid" id="eApps"></div></div>
+  <div id="log"></div>
+</main>
+<form id="f">
+  <div id="chips"></div>
+  <div class="pac-pills"><button class="pac-model" id="shellModel" type="button" style="display:none"></button><button class="pac-vfy" id="shellVfy" type="button" style="display:none">☐ Verify · 校验</button></div>
+  <div id="frow">
+    <button class="ibtn" id="plus" type="button" title="Attach">+</button>
+    <input id="box" placeholder="Ask, or: create an app that…" autocomplete="off">
+    <button class="primary" id="send">↑</button>
+  </div>
+</form>
+<input type="file" id="filein-photo" multiple hidden accept="image/*">
+<div id="lightbox"><button id="lightbox-close">✕</button><img id="lightbox-img" src="" alt=""><div style="position:absolute;bottom:calc(env(safe-area-inset-bottom)+16px);left:0;right:0;text-align:center;color:rgba(255,255,255,.55);font-size:13px;pointer-events:none;">Tap outside image to close</div></div>
+<div id="frame"><div class="bar"><button class="plain" id="back">← Home</button><b id="ftitle" style="flex:1"></b><button class="plain fs-dn" id="fs-dn" style="font-size:12px;font-weight:700;padding:4px 8px">A-</button><button class="plain fs-up" id="fs-up" style="font-size:15px;font-weight:700;padding:4px 8px">A+</button></div><button id="barpeek" class="plain" title="Show the app bar · 显示应用栏" aria-label="Show the app bar"></button><iframe id="fr" sandbox="allow-scripts" allow="clipboard-write;microphone"></iframe></div>
+<!--PA_SETTINGS_DIALOG-->
+<dialog id="actConfirm" style="max-width:340px">
+  <div id="acText" style="margin-bottom:14px;overflow-wrap:anywhere"></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end">
+    <button class="plain" id="acCancel">Cancel · 取消</button>
+    <button class="primary" id="acOk" style="padding:8px 14px"></button>
+  </div>
+</dialog>
+<dialog id="updateSheet" style="max-width:340px">
+  <b id="usTitle" style="display:block;margin-bottom:6px"></b>
+  <div id="usChangelog" style="font-size:13px;color:var(--muted);margin-bottom:14px;white-space:pre-wrap"></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+    <button class="plain" id="usCancel">Cancel · 取消</button>
+    <button class="primary" id="usInstall" style="padding:8px 14px">Install update · 安装更新</button>
+  </div>
+</dialog>
+<dialog id="setup"><form method="dialog">
+  <h3 style="margin-bottom:6px">Welcome to superelf</h3>
+  <p style="color:var(--muted);font-size:14px;margin-bottom:12px">Create your master account. You'll manage the family from here.</p>
+  <input id="sUser" placeholder="username" autocapitalize="none" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
+  <input id="sName" placeholder="Your name" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
+  <input id="sPin" type="password" placeholder="password (8+ characters) · 密码（至少 8 位）" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
+  <input id="sCode" placeholder="setup code (server log / setup-code file) · 初始化码" autocapitalize="characters" autocomplete="off" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
+  <div id="setupErr" style="color:var(--danger);font-size:13px;min-height:18px"></div>
+  <button class="primary" id="setupBtn" style="width:100%;padding:10px;margin-top:6px">Create master account</button>
+</form></dialog>
+<dialog id="login"><form method="dialog">
+  <h3 id="loginTitle" style="margin-bottom:12px">Sign in</h3>
+  <input id="luser" placeholder="username" autocapitalize="none" autocomplete="username" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
+  <input id="lpin" type="password" placeholder="PIN" autocomplete="current-password" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
+  <input id="lname" placeholder="Your name" style="display:none;width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
+  <div id="loginErr" style="color:var(--danger);font-size:13px;min-height:18px"></div>
+  <button class="primary" id="loginBtn" style="width:100%;padding:10px;margin-top:6px">Sign in</button>
+  <div style="text-align:center;margin-top:10px;font-size:14px"><a href="#" id="toReg" style="color:var(--accent)">Create an account</a></div>
+  <div style="text-align:center;margin-top:6px;font-size:12px"><a href="#" id="toTok" style="color:var(--muted)">No PIN yet: sign in with access token · 尚无 PIN：用访问令牌登录</a></div>
+  <input id="ltok" placeholder="access token (config.json web_token)" style="display:none;width:100%;padding:9px;margin-top:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
+</form></dialog>
+<script>
+const $=(s)=>document.querySelector(s);
+let T=localStorage.getItem('pa_session')||'';
+let API_BASE='';   // '' = this page's origin; the home node's name while the public one is away (web/offline-origin.js PAOrigin). TODO(R4 seam): with api() into web/api.js
+const api=(p,opt={})=>fetch(API_BASE+p,{...opt,headers:{...(opt.headers||{}),authorization:'Bearer '+T}});
+const esc=(s)=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ── Conversations (server-backed, cross-device) ── */
+let convoId=localStorage.getItem('pa_convo')||null;
+function setConvo(id){ convoId=id; if(id) localStorage.setItem('pa_convo',id); else localStorage.removeItem('pa_convo'); }
+let briefId=null;
+// Render uploaded-file attachments onto a message element. Images are fetched
+// with the auth header and shown via a blob URL (never a token in an <img src>).
+async function renderAtts(el, atts){
+  if(!atts||!atts.length) return;
+  const wrap=document.createElement('div'); wrap.className='atts'; el.appendChild(wrap);
+  for(const a of atts){
+    const isImg=/\.(png|jpe?g|gif|webp|svg)$/i.test(a.name||a.path||'');
+    if(isImg){
+      try{ const r=await api('/api/data/'+String(a.path).split('/').map(encodeURIComponent).join('/')); if(r.ok){ const u=URL.createObjectURL(await r.blob()); const im=document.createElement('img'); im.src=u; im.className='att-img'; im.onclick=()=>openLightbox(u);
+        // Re-pin ONLY when already near-bottom (the ↓-button threshold): on boot,
+        // history images finish loading in arbitrary order, and an unconditional
+        // scrollIntoView let the LAST one yank the viewport mid-chat on iPhone.
+        im.onload=()=>{ if(logNearBottom()) logEl.scrollTop=logEl.scrollHeight; };
+        wrap.appendChild(im); continue; } }catch{}
+    }
+    const chip=document.createElement('div'); chip.className='att-chip'; chip.textContent='📎 '+(a.name||a.path); wrap.appendChild(chip);
+  }
+}
+// How long the answer took. ONE formatter and ONE builder for the shell (R3): it was written
+// three times, and the copies had drifted — the reconnect path printed a 3-minute reply as
+// "180.0s" because it used a bare toFixed instead of this. PAChat carries the same format for
+// its own document; test/took-timing.test.mjs holds the two byte-identical.
+function took(ms){ return ms<60000?(ms/1000).toFixed(1)+'s':Math.floor(ms/60000)+'m '+String(Math.round(ms%60000/1000)).padStart(2,'0')+'s'; }
+// Appends the took line to a reply bubble. `ms` may be absent (a message stored before this
+// shipped, or a lane that never reported) — then nothing is added, rather than "took NaNs".
+function addTook(el,ms,by){ if(!(Number.isFinite(ms)&&ms>=0)) return null;   // by: the model that actually answered
+  const t=document.createElement('small'); t.className='pa-took'; t.textContent=(by?by+' · ':'')+'took '+took(ms); el.appendChild(t); return t; }
+// Offer a resolved job for review. The card is deliberately plain: what it will do, when,
+// and two buttons. A draft that needs more information says which field, rather than failing.
+function renderJobDraft(d){
+  const el=add('','');
+  el.className='msg';
+  const j=d.job;
+  const box=document.createElement('div');
+  box.style.cssText='border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--card)';
+  if(j){
+    box.innerHTML='<div style="font-weight:600;margin-bottom:4px">'+esc(j.title)+'</div>'
+      +'<div style="color:var(--muted);font-size:13px">'+esc(j.plan.tool)+' · '+esc(schedText(j.schedule))+'</div>'
+      +(Object.keys(j.plan.args||{}).length?'<div style="color:var(--muted);font-size:12px;margin-top:4px;overflow-wrap:anywhere">'+esc(JSON.stringify(j.plan.args))+'</div>':'')
+      +'<div style="display:flex;gap:8px;margin-top:10px"><button class="primary" data-mkjob="1" style="font-size:13px;padding:6px 12px">Create · 创建</button>'
+      +'<button class="plain" data-nojob="1" style="font-size:13px;padding:6px 12px">Not now · 暂不</button></div>'
+      +'<div data-jobmsg style="color:var(--muted);font-size:12px;margin-top:6px"></div>';
+    box.querySelector('[data-mkjob]').onclick=async()=>{
+      const m=box.querySelector('[data-jobmsg]'); m.textContent='creating · 创建中…';
+      let r=null;
+      try{ r=await (await api('/api/jobs',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(j)})).json(); }
+      catch{ /* !r below reports it (R5) */ }
+      // Created PAUSED on purpose — Settings is where you arm it, having seen it.
+      m.textContent=(r&&r.ok)?'Created, paused · 已创建（暂停中）— enable it in Settings › Jobs':((r&&r.error)||'Could not create · 创建失败');
+      if(r&&r.ok) box.querySelector('[data-mkjob]').disabled=true;
+    };
+    box.querySelector('[data-nojob]').onclick=()=>{ box.remove(); };
+  } else {
+    box.innerHTML='<div style="font-size:13px">I can set that up, but I need: <b>'
+      +esc((d.ask||[]).map(a=>a.input).join(', '))+'</b></div>'
+      +'<div style="color:var(--muted);font-size:12px;margin-top:6px">Add it in Settings › Jobs › New job · 在设置里补充</div>';
+  }
+  el.appendChild(box);
+  const l=$('#log'); l.scrollTop=l.scrollHeight;
+}
+const schedText=(s)=> !s||!s.time ? '—' : (s.day===undefined ? 'daily · 每日 '+s.time
+  : ['Sun 周日','Mon 周一','Tue 周二','Wed 周三','Thu 周四','Fri 周五','Sat 周六'][s.day]+' '+s.time);
+function renderMsgs(msgs){ $('#log').innerHTML=''; let lastU=''; for(const m of (msgs||[])){ if(m.role==='md'){ const el=add('','',renderMd(m.text)); addActions(el,'response',m.text,lastU); addTook(el,m.ms,m.by); /* the stored duration — reopening a chat keeps it */ } else { const el=add(m.role,m.text); if(m.role==='me'){ lastU=m.text; addActions(el,'prompt',m.text); renderAtts(el,m.attachments); } } } }
+let allConvos=[];
+async function loadConvos(){
+  let list=[]; try{ list=await (await api('/api/convos')).json(); }catch{}
+  allConvos=list;
+  $('#convos').innerHTML=list.map((c)=>
+    `<div class="convo${c.id===convoId?' active':''}" data-id="${esc(c.id)}"><div class="t">${esc(c.title||'New chat')}</div><button class="cmenu" data-menu="${esc(c.id)}" title="More" aria-label="More">⋯</button></div>`
+  ).join('')||'<div style="padding:16px;color:var(--muted)">No chats yet.</div>';
+}
+// A job's output. Rows are SUMMARIES (id/title/job/created/preview); the body is fetched on
+// open, so the drawer stays cheap with months of history behind it.
+const BRIEFS_MAX=15;
+function briefWhen(ms){ const d=new Date(ms),now=new Date(),p=(n)=>String(n).padStart(2,'0');
+  return d.toDateString()===now.toDateString()?`${p(d.getHours())}:${p(d.getMinutes())}`:`${d.getMonth()+1}/${d.getDate()}`; }
+async function loadBriefs(){
+  const box=$('#briefs'); let list=null;
+  // Three-state on purpose: a FAILURE must not look like an empty feed. A silently blank
+  // section reads as "nothing happened" when the truth is "we could not look" (R5).
+  try{ const r=await api('/api/briefings'); if(r.ok) list=await r.json(); }catch{ /* list stays null */ }
+  if(!Array.isArray(list)){ box.innerHTML='<div style="padding:16px;color:var(--danger);font-size:14px">Could not load briefings · 无法加载简报</div>'; return; }
+  if(!list.length){ box.innerHTML='<div style="padding:16px;color:var(--muted)">No briefings yet · 暂无简报</div>'; return; }
+  box.innerHTML=list.slice(0,BRIEFS_MAX).map((b)=>
+    `<div class="convo${b.id===briefId?' active':''}" data-brief="${esc(b.id)}"><div class="t">
+       <div style="display:flex;gap:8px;align-items:baseline"><span style="color:var(--muted);font-size:12px;flex-shrink:0">${esc(briefWhen(b.created))}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(b.title||b.job||'Briefing')}</span></div>
+       <div style="color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(b.preview||'')}</div>
+     </div></div>`).join('');
+  // The EXISTING blue-dot mechanism (markNew + _SEEN), not a second one.
+  box.querySelectorAll('[data-brief]').forEach((el)=>markNew(el,'briefing:'+el.dataset.brief));
+}
+// Opened into the main log, the way a conversation is — no bespoke modal for one surface.
+async function openBrief(id){
+  let b=null;
+  try{ const r=await api('/api/briefings/'+encodeURIComponent(id)); if(r.ok) b=await r.json(); }catch{ /* b stays null */ }
+  briefId=id; closeDrawer(); loadBriefs();
+  if(!b||!b.body){ add('err','⚠ Could not open that briefing · 无法打开该简报'); return; }
+  setConvo(null); $('#log').innerHTML=''; hideEmptyState();
+  const el=add('','',renderMd(b.body)); addActions(el,'response',b.body,'');
+  const l=$('#log'); l.scrollTop=l.scrollHeight;
+}
+$('#briefs').onclick=(e)=>{ const r=e.target.closest('[data-brief]'); if(r) openBrief(r.dataset.brief); };
+
+async function openConvo(id){
+  setConvo(id);
+  try{ const c=await (await api('/api/convos/'+encodeURIComponent(id))).json(); renderMsgs(c.messages); }catch{ $('#log').innerHTML=''; }
+  closeDrawer(); loadConvos();
+}
+// The ONE destination called Home: no open app, no open conversation, the app shelf showing.
+// Every control that says Home comes here — the drawer's Home, the app bar's ← Home, and
+// + New, which lands in the same place because a new chat STARTS at the shelf. They used to
+// disagree: the drawer's Home was a plain <b> that did nothing at all, and ← Home closed the
+// app and opened the DRAWER instead of going home.
+function goHome(){
+  $('#frame').style.display='none'; $('#frame').classList.remove('peek','barin','ownbar'); barHide(); shellBehindApp(false);
+  appFrameLeave();   // the app is held while it makes its last save, then removed (web/app-frame.js)
+  setConvo(null); $('#log').innerHTML='';
+  closeDrawer(); loadApps(); loadConvos(); showEmptyState();
+}
+const newConvo=goHome;   // a new chat begins at Home; kept as a name so call sites still read right
+$('#convos').onclick=(e)=>{
+  const menuId=e.target.dataset.menu;
+  if(menuId){ e.stopPropagation(); convoMenu(menuId, e.target.closest('.convo'), e.target); return; }
+  const id=e.target.closest('.convo')?.dataset.id; if(id) openConvo(id);
+};
+// Shared ⋯-popover close (chats + apps, R3). Closes ONLY on an OUTSIDE pointerdown — a
+// pointerdown ON a menu item must NOT remove the menu before that item's click fires, or
+// the action never runs (this was breaking app move/share/delete AND chat rename/delete).
+let _menuOutside=null;
+function closeMenuPop(){ document.querySelectorAll('.cmenu-pop').forEach((m)=>m.remove()); if(_menuOutside){ document.removeEventListener('click',_menuOutside,true); _menuOutside=null; } }
+function armMenuPop(){
+  // Dismiss on a click OUTSIDE the popup, handled in the CAPTURE phase and stopped there so
+  // it never reaches what's underneath (e.g. the drawer backdrop's close-on-click). So the
+  // FIRST outside click JUST closes the popup and the drawer stays open. A click INSIDE the
+  // popup is let through to run its own item handler.
+  _menuOutside=(ev)=>{ if(ev.target.closest('.cmenu-pop')) return; ev.stopPropagation(); ev.preventDefault(); closeMenuPop(); };
+  setTimeout(()=>{ if(_menuOutside) document.addEventListener('click',_menuOutside,true); },0);
+}
+function closeConvoMenu(){ closeMenuPop(); }
+function convoMenu(id, convoEl, anchor){
+  closeConvoMenu();
+  const m=document.createElement('div'); m.id='convoMenu'; m.className='cmenu-pop';
+  m.innerHTML='<button data-a="rename">Rename</button><button data-a="delete" class="del">Delete</button>';
+  document.body.appendChild(m);
+  const r=anchor.getBoundingClientRect(); m.style.top=(r.bottom+4)+'px'; m.style.right=Math.max(6,innerWidth-r.right)+'px';
+  m.onclick=async(ev)=>{ const b=ev.target.closest('button'); if(!b) return; const a=b.dataset.a; closeConvoMenu();
+    if(a==='rename') startRename(convoEl, id);
+    else if(a==='delete'){ if(confirm('Delete this chat?')){ await api('/api/convos/'+encodeURIComponent(id),{method:'DELETE'}); if(id===convoId) newConvo(); else loadConvos(); } }
+  };
+  armMenuPop();
+}
+function startRename(convoEl, id){
+  const tEl=convoEl.querySelector('.t'); const cur=tEl.textContent;
+  tEl.innerHTML=`<input value="${esc(cur)}" maxlength="80">`;
+  const inp=tEl.querySelector('input'); inp.focus(); inp.select();
+  const finish=async()=>{ const val=inp.value.trim()||cur; tEl.textContent=val; if(val!==cur) await api('/api/convos/'+encodeURIComponent(id),{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({title:val})}); };
+  inp.onblur=finish; inp.onkeydown=(ev)=>{ if(ev.key==='Enter'){ ev.preventDefault(); inp.blur(); } if(ev.key==='Escape'){ tEl.textContent=cur; } };
+}
+// Collapsible drawer sections (state persisted per section)
+document.querySelectorAll('#drawer .dsec').forEach(s=>{
+  try{ if(localStorage.getItem('pa_sec_'+s.id)==='0') s.classList.remove('open'); }catch{}
+  s.querySelector('.dsec-head').onclick=()=>{ s.classList.toggle('open'); try{ localStorage.setItem('pa_sec_'+s.id, s.classList.contains('open')?'1':'0'); }catch{} };
+});
+// Chat search (popup within the drawer)
+function csRender(qv){ const f=(qv||'').toLowerCase().trim();
+  const items=allConvos.filter(c=>!f || (c.title||'').toLowerCase().includes(f));
+  $('#csResults').innerHTML=items.map(c=>`<div class="convo" data-id="${esc(c.id)}"><div class="t">${esc(c.title||'New chat')}</div></div>`).join('')||`<div style="padding:16px;color:var(--muted)">${f?'No matches.':'No chats.'}</div>`;
+}
+$('#drawerSearch').onclick=()=>{ $('#chatSearch').classList.add('on'); $('#csInp').value=''; csRender(''); setTimeout(()=>$('#csInp').focus(),80); };
+$('#csClose').onclick=()=>$('#chatSearch').classList.remove('on');
+$('#csInp').addEventListener('input',()=>csRender($('#csInp').value));
+$('#csResults').onclick=e=>{ const c=e.target.closest('.convo'); if(!c) return; $('#chatSearch').classList.remove('on'); openConvo(c.dataset.id); };
+function openDrawer(){ $('#drawer').classList.add('open'); $('#backdrop').classList.add('open'); loadConvos(); loadBriefs(); }
+function closeDrawer(){ $('#drawer').classList.remove('open'); $('#backdrop').classList.remove('open'); }
+$('#menu').onclick=openDrawer; $('#backdrop').onclick=closeDrawer;
+$('#newChat').onclick=newConvo; $('#goHome').onclick=goHome;
+
+/* ── Markdown renderer ── */
+function renderMd(raw){
+  const he=(s)=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const blocks=[]; let s=raw.replace(/```(\w*)\n?([\s\S]*?)```/g,(_,lang,code)=>{
+    blocks.push(`<pre><code>${he(code.replace(/\n$/,''))}</code></pre>`);
+    return `\x02B${blocks.length-1}\x03`;
+  });
+  const spans=[]; s=s.replace(/`([^`\n]+)`/g,(_,c)=>{ spans.push(`<code>${he(c)}</code>`); return `\x02S${spans.length-1}\x03`; });
+  const links=[]; s=s.replace(/\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g,(_,txt,href)=>{
+    links.push(`<a href="${he(href)}" target="_blank" rel="noopener noreferrer">${he(txt)}</a>`);
+    return `\x02L${links.length-1}\x03`;
+  });
+  s=s.replace(/(https?:\/\/[^\s<>")\]]+)/g,(url)=>{
+    links.push(`<a href="${he(url)}" target="_blank" rel="noopener noreferrer">${he(url)}</a>`);
+    return `\x02L${links.length-1}\x03`;
+  });
+  s=he(s);
+  s=s.replace(/\*\*\*(.+?)\*\*\*/g,'<strong><em>$1</em></strong>');
+  s=s.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+  s=s.replace(/\*([^*\n]+?)\*/g,'<em>$1</em>');
+  s=s.replace(/^### (.+)$/gm,'<h3>$1</h3>');
+  s=s.replace(/^## (.+)$/gm,'<h2>$1</h2>');
+  s=s.replace(/^# (.+)$/gm,'<h1>$1</h1>');
+  // GFM tables: a header row, a |---| separator, then body rows. Cells keep the
+  // inline formatting already applied above.
+  s=s.replace(/^\|(.+)\|[ \t]*\n\|[ \t:|-]+\|[ \t]*\n((?:^\|.*\|[ \t]*\n?)*)/gm,(_,head,body)=>{
+    const cells=(r)=>r.split('|').slice(1,-1).map(c=>c.trim());
+    const h=cells('|'+head+'|');
+    const rows=(body||'').split('\n').filter(l=>l.trim().startsWith('|')).map(cells);
+    let out='<table><thead><tr>'+h.map(c=>'<th>'+c+'</th>').join('')+'</tr></thead>';
+    if(rows.length) out+='<tbody>'+rows.map(r=>'<tr>'+h.map((_,i)=>'<td>'+(r[i]||'')+'</td>').join('')+'</tr>').join('')+'</tbody>';
+    return out+'</table>';
+  });
+  s=s.replace(/^(\d+)\. (.+)$/gm,'<oli>$2</oli>');
+  s=s.replace(/^[-*] (.+)$/gm,'<uli>$1</uli>');
+  s=s.replace(/(?:<uli>[\s\S]*?<\/uli>\s*)+/g,m=>'<ul>'+m.replace(/<uli>/g,'<li>').replace(/<\/uli>/g,'</li>')+'</ul>');
+  s=s.replace(/(?:<oli>[\s\S]*?<\/oli>\s*)+/g,m=>'<ol>'+m.replace(/<oli>/g,'<li>').replace(/<\/oli>/g,'</li>')+'</ol>');
+  const BLOCK=/^<(h[1-3]|ul|ol|pre|li|table)/;
+  s=s.split(/\n{2,}/).map(para=>{
+    const lines=para.split('\n').filter(l=>l.trim());
+    if(!lines.length) return '';
+    if(BLOCK.test(lines[0].trim())) return lines.join('\n');
+    return '<p>'+lines.join('<br>')+'</p>';
+  }).join('\n');
+  s=s.replace(/\x02B(\d+)\x03/g,(_,i)=>blocks[+i]);
+  s=s.replace(/\x02S(\d+)\x03/g,(_,i)=>spans[+i]);
+  s=s.replace(/\x02L(\d+)\x03/g,(_,i)=>links[+i]);
+  return s;
+}
+
+function stripMd(text){
+  return text
+    .replace(/```[\s\S]*?```/g,'(code block)')
+    .replace(/`[^`]+`/g,'')
+    .replace(/\*{1,3}(.+?)\*{1,3}/g,'$1')
+    .replace(/^#+\s+/gm,'')
+    .replace(/^[-*]\s+/gm,'')
+    .replace(/^\d+\.\s+/gm,'');
+}
+
+/* ── Auth ── */
+let UID=null;
+// → true | false | 'offline' (the node could not be reached at all: a fetch that threw, never a refused token).
+// signal: the offline re-check. Its failure changes nothing (the shell is already offline) and so can never
+// undo a newer success; its abort is the re-check deadline.
+async function ping(signal){ if(!T) return false; const t0=T; let r; try{ r=await api('/api/ping',signal?{signal}:{}); }catch{ if(T===t0&&!signal) PAOffline.noteNet(false); return 'offline'; } if(T!==t0) return false;   // the session changed while this ping ran: its answer is not ours to apply
+  if(signal){ let j0; try{ j0=await r.clone().json(); }catch{ return false; } if(T!==t0||!j0||!((r.ok&&typeof j0.ok==='boolean')||r.status===401)) return false; }   // a re-check needs the NODE: its ping reply or its 401 bad-token; a gateway error or HTML page does not count
+  PAOffline.noteNet(true); try{ const j=await r.json(); if(T!==t0) return false; if(j.ok){ UID=j.uid; PASW.remember(SW_UID_KEY,j.uid); if(j.name) document.querySelector('h1').textContent=j.name+'’s 管家'; } return j.ok; }catch{ return false; } }
+// Offline is set by one failed request, and only a later success clears it. On a screen that makes no
+// requests (the home grid) that never came, so the line stayed on with the network back (owner 2026-11-21).
+// While offline and visible, ask the node again on a short beat, on return to the app and on 'online'.
+const OFF_RECHECK_MS=10*1000, OFF_RECHECK_DEADLINE_MS=8*1000;   // a ping that never answers is aborted before the next beat
+let _offChecking=false;   // one re-check at a time: a stalled ping never stacks another every beat
+async function recheckWhileOffline(){ if(_offChecking||!PAOffline.offline()||document.visibilityState!=='visible') return;
+  _offChecking=true; const t0=T, ac=new AbortController(), stop=setTimeout(()=>ac.abort(),OFF_RECHECK_DEADLINE_MS);   // the deadline CANCELS the request: no stray ping left to flip the line later
+  try{ await ping(ac.signal); if(T===t0&&!PAOffline.offline()) PASync.drain(); } finally{ clearTimeout(stop); _offChecking=false; } }   // online again = drain (its own reachability check), even if the body was cut off
+setInterval(recheckWhileOffline,OFF_RECHECK_MS);
+document.addEventListener('visibilitychange',recheckWhileOffline);
+window.addEventListener('online',recheckWhileOffline);
+let regMode=false;
+function setLoginMode(reg){ regMode=reg; $('#loginTitle').textContent=reg?'Create account':'Sign in'; $('#lname').style.display=reg?'block':'none'; $('#loginBtn').textContent=reg?'Create account':'Sign in'; $('#toReg').textContent=reg?'Have an account? Sign in':'Create an account'; $('#loginErr').textContent=''; }
+$('#toReg').onclick=(e)=>{ e.preventDefault(); setLoginMode(!regMode); };
+$('#toTok').onclick=(e)=>{ e.preventDefault(); $('#ltok').style.display=$('#ltok').style.display==='none'?'block':'none'; };
+async function doAuth(){
+  const username=$('#luser').value.trim().toLowerCase(), password=$('#lpin').value, name=$('#lname').value.trim();
+  const tok=$('#ltok').value.trim();
+  if(!tok && (!username||!password)){ $('#loginErr').textContent='Enter a username and PIN.'; return false; } // token-only sign-in is allowed
+  const path=regMode?'/api/register':'/api/login';
+  // relayJson, not `await r.json()`: the auth gate can answer a non-JSON body, and parsing
+  // it threw — leaving the sign-in form frozen with no message at all.
+  const g=await relayJson(fetch(path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username,password,name,token:tok||undefined})}),'credentials');
+  if(!g.ok){ $('#loginErr').style.color='var(--danger)'; $('#loginErr').textContent=g.text; return false; }
+  const j=g.data;
+  if(j.pending){ $('#loginErr').style.color='var(--muted)'; $('#loginErr').textContent='Account created — waiting for approval · 账号已创建，等待批准。'; return false; }
+  if(!j.ok){ $('#loginErr').style.color='var(--danger)'; $('#loginErr').textContent=j.error||'Sign-in refused · 登录被拒绝。'; return false; }
+  T=j.token; localStorage.setItem('pa_session',T); UID=j.uid;
+  return true;
+}
+async function doSetup(){
+  const username=$('#sUser').value.trim().toLowerCase(), name=$('#sName').value.trim(), password=$('#sPin').value, setupCode=$('#sCode').value.trim();
+  if(!username||!password||!setupCode){ $('#setupErr').textContent='Fill in username, password and setup code · 请填写用户名、密码和初始化码'; return false; }   // length rule: the server's (lib/owner.mjs MIN_PASSWORD)
+  const g=await relayJson(fetch('/api/setup',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username,name,password,setupCode})}),'request');
+  if(!g.ok){ $('#setupErr').textContent=g.text; return false; }
+  const j=g.data;
+  if(!j.ok){ $('#setupErr').textContent=j.error||'Setup refused · 初始化被拒绝。'; return false; }
+  T=j.token; localStorage.setItem('pa_session',T); UID=j.uid;
+  return true;
+}
+async function ensureToken(){
+  // Offline-first: with no node at all, the last sign-in on this device stands (web/sw-client.js); a refused token still signs in again.
+  if(T){ const p=await ping(); if(p===true||(p==='offline'&&(UID=PASW.recall(SW_UID_KEY)))){ $('#dot').classList.add('ok'); return; } }
+  let first=false; try{ first=(await (await fetch('/api/setup-status')).json()).needsSetup; }catch{}
+  if(first){
+    for(;;){ const done=await new Promise((d)=>{ $('#setup').showModal(); $('#setupBtn').onclick=async(ev)=>{ ev.preventDefault(); if(await doSetup()){ $('#setup').close(); d(true); } }; }); if(done && await ping()) break; }
+    $('#dot').classList.add('ok'); return;
+  }
+  setLoginMode(false);
+  for(;;){
+    const done=await new Promise((d)=>{ $('#login').showModal(); $('#loginBtn').onclick=async(ev)=>{ ev.preventDefault(); if(await doAuth()){ $('#login').close(); d(true); } }; });
+    if(done && await ping()) break;
+  }
+  $('#dot').classList.add('ok');
+}
+async function logout(){ try{ await api('/api/logout',{method:'POST'}); }catch{} localStorage.removeItem('pa_session'); location.reload(); }
+
+/* ── New-feature key registry: maps feature-key → version added ── */
+// Update this when shipping new UI features; markNew() + PANewDot.mark() use these keys.
+// RELEASE CHECKLIST: if a release adds UI, add its key here + a mark call
+// (shell: markNew/markNewSel; apps: PANewDot.mark). version.sh echoes this reminder.
+window._PA_NEW_KEYS={
+  'note-print':'v2.82.0',            // ⎙ Print · 打印 in the note pad's top bar
+  'bible-notes-filter':'v2.1.0',     // Notes & Chats filter tabs in Bible history
+  'bible-note-menu':'v2.1.0',        // ⋯ rename/delete on note items
+  'finger-draw':'v2.1.0',            // finger drawing checkbox in ink settings
+  'double-tap-text':'v2.1.0',        // double-tap to enter text mode
+  'ver-changelog':'v2.1.1',
+  'research-lane':'v2.6.0',           // Research · 联网研究 entry in the model chooser          // long-press version number for changelog
+  'verify-toggle':'v2.2.0',          // Verify · 校验 multi-model toggle in the composer
+  'health-setup':'v2.3.0',           // Health setup · 健康接入 QR section in the profile
+  'briefings-section':'v2.4.0',      // 简报 · Briefings section in the longevity app
+  'approvals-section':'v2.5.0',      // 待批准 · Pending Approvals section in the longevity app
+  'reminders-section':'v2.5.0',      // 提醒 · Reminders section in the longevity app
+  'briefing-email':'v2.7.0',         // 简报邮箱 · Briefing email field in the profile
+  'agent-address':'v2.7.0',          // Agent email · 管家邮箱 read-only address in the owner profile
+  'jobs-section':'v2.9.0',           // Jobs · 任务 status + Run now · 立即运行 in the profile
+  'node-settings':'v2.9.0',          // Node settings · 节点设置 owner config surface in the profile
+};
+
+/* ── Global font scale for apps ── */
+const FS_STEPS=[0.75,0.875,1,1.125,1.25,1.5,1.75];
+let fsIdx=FS_STEPS.indexOf(parseFloat(localStorage.getItem('pa_fs')||'1'));
+if(fsIdx<0) fsIdx=2;
+let CHAT_MODELS=[];   // composer model-chooser options, from /api/models
+// READ AT BOOT AND AGAIN ON EVERY APP OPEN (ADR 0007). It was read once, at boot, so a shell left
+// open for days (the iOS home-screen app) kept handing every app a lane the server had since
+// stopped serving: the app's chooser showed its label while another lane answered. One small GET
+// per open, sent while the frame loads, so it costs no wait. Only a 200 carrying a list replaces
+// the old one; an empty list from a 200 is the server's real answer and replaces it too.
+// TODO(R4): this file is far over the 300-line budget. Split seam: the model list (CHAT_MODELS, this
+// refresh, the per-app model memory below, the main chat's chooser and syncShellModel) becomes its
+// own inlined shell part, as settings.js is.
+let chatModelsFresh=Promise.resolve();
+// How long a loading app waits for that GET before it gets the last good list. Normally the GET
+// is back before the app's own page is; this bound only matters when the node stops answering.
+const MODELS_WAIT_MS=3000;
+function refreshChatModels(){
+  chatModelsFresh=(async()=>{
+    let list=null;
+    try{ const r=await api('/api/models'); list=r.ok?await r.json():null; }
+    catch(e){ /* Silent on purpose: the last good list stays, and the server re-checks every turn and
+      falls back with a status line (ADR 0007). Emptying it would hide the chooser instead. */ }
+    if(Array.isArray(list)){ CHAT_MODELS=list; syncShellModel(); }   // outside the try: a fault here is not a failed read
+  })();
+  return chatModelsFresh;
+}
+// uploadMaxBytes/chatMaxBytes: the caps the SERVER actually enforces, published to every
+// app. A component that hardcodes its own number (the notebook's photo insert defaulted to
+// 6MB against a 20MB route) tells the user "too large" about a photo the server would have
+// accepted — a size message that is simply false. One number, from one place (R3).
+function applyShellFontScale(){ document.documentElement.style.setProperty('--fs',FS_STEPS[fsIdx]); }
+// ── per-app model memory ────────────────────────────────────────────────────────────────────
+// The chooser reset to the first lane on every app load, so a deliberate choice had to be made
+// again on every visit. Kept per app slug, IN THE SHELL: an app is sandboxed at an opaque origin
+// where localStorage/sessionStorage/IndexedDB/cookie all throw, so it cannot remember anything
+// itself. Per-app, not global — a study app and a coding app want different lanes.
+//
+// ON THE ACCOUNT, NOT THE DEVICE. This was localStorage ('pa_model:'+slug), which made it a
+// per-DEVICE memory: a lane chosen on the Mac had to be chosen again on the iPhone, and clearing
+// site data erased it. It now lives in the user's profile (profile.appModels, PUT /api/profile),
+// the same store appOrder and systemPrompts already use, so it follows the account.
+//
+// NOT profile.prefs.appModels as first sketched: profile.prefs is an existing free-text STRING
+// (the member's "how to answer me" note, PUT /api/profile prefs). Nesting under it would have
+// overwritten that text with an object.
+// The URL of the page #fr holds: data-app when PASW loaded it by srcdoc (web/sw-client.js), else its src — the ONE read for frameSlug/frameUid/frameApp.
+// TODO(R4 seam): frameRef/frameSlug/frameUid and the offline sign-in hooks (ping, ensureToken, loadApps) belong in web/boot.js with the boot block.
+const frameRef=()=>{ const fr=$('#fr'); return fr.getAttribute('data-app')||fr.src||''; };
+const frameSlug=()=>(frameRef().match(/\/app\/[^/]+\/([^/]+)(?:\/|$)/)||[])[1]||'';
+const frameUid=()=>decodeURIComponent((frameRef().match(/\/app\/([^/]+)\//)||[])[1]||'');
+// The own apps that may ask the broker for 'open-url', as /api/apps marks them (`links`, web.mjs
+// openUrlApps): the Journal and the Bible notes. Empty until the list loads: refused closed till then.
+let LINK_APPS=new Set();
+let OWNBAR_APPS=new Set();   // own apps whose page draws its own Home + A-/A+ (meta.json ownBar, ADR 0032)
+const NO_APP_TEXT='no app in view · 未打开应用';   // every refusal of a request that names no app (R3)
+// ME is the profile fetched at boot (settings.js loadProfile, which sets ME={} if the fetch
+// fails). ONE accessor, so a profile that failed to load reads as "nothing remembered" in every
+// caller rather than each of them repeating the guard.
+function appModels(){ return (ME&&ME.appModels&&typeof ME.appModels==='object')?ME.appModels:{}; }
+function appModel(slug){ return slug?(appModels()[slug]||null):null; }
+async function setAppModel(slug,id){
+  if(!slug) return {ok:false,error:NO_APP_TEXT};
+  if(typeof id!=='string'||!id) return {ok:false,error:'no model id · 缺少模型标识'};
+  // Only a lane the server actually offers. An unknown id would be stored for ever and then
+  // silently ignored on every load, which reads as "it did not remember" rather than as an error.
+  // Checked here so an obvious mistake costs no round trip; the route re-checks, because a client
+  // is not a trust boundary and this list can be stale.
+  if(!CHAT_MODELS.some(x=>x.id===id)) return {ok:false,error:'unknown model · 未知模型: '+id};
+  const next=Object.assign({},appModels()); next[slug]=id;
+  try{
+    const r=await api('/api/profile',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({appModels:next})});
+    if(!r.ok){ let why=''; try{ why=(await r.json()).error||''; }catch(e){}
+      return {ok:false,error:'could not save · 无法保存: '+(why||('HTTP '+r.status))}; }
+  }catch(e){ return {ok:false,error:'could not save · 无法保存: '+((e&&e.message)||'network unavailable')}; }
+  // Only AFTER the server confirmed. appOrder updates optimistically because it is re-derived
+  // from the server on the next boot either way; this must not, or a write the server REFUSED
+  // would still read back as remembered — the app would show a lane no reload can reproduce.
+  ME.appModels=next;
+  return {ok:true};
+}
+// ── per-app settings, for the app's own ⚙ panel (PASettings) ────────────────────────────────
+// The app is sandboxed and cannot call /api/profile itself — and MUST NOT, because the profile
+// carries the member's name, notes, briefing email and every other app's settings. So the shell
+// reads the profile and hands back ONE APP'S SLICE. That scoping is the whole reason these two
+// kinds exist rather than the app fetching the route.
+function appPrefsMap(){ return (ME&&ME.appPrefs&&typeof ME.appPrefs==='object')?ME.appPrefs:{}; }
+function sysPrompts(){ return (ME&&ME.systemPrompts&&typeof ME.systemPrompts==='object')?ME.systemPrompts:{}; }
+// PRECEDENCE, mirrored from web.mjs resolveSystemPrompts, which returns
+//   app: appOver || appDefault || appSent || null
+// The order is the same three operands in the same order, and test/app-settings.test.mjs reads
+// BOTH and fails if they drift (R3 — the chat route and this panel must never disagree about
+// which prompt is in force). `appSent` is the app's own, which only the app knows, so it hands it
+// over with the request.
+function appPromptOf(slug,appSent){
+  const over=(sysPrompts().apps||{})[slug];
+  const dflt=((ME&&ME.systemPromptDefaults&&ME.systemPromptDefaults.apps)||{})[slug];
+  const pick=(v)=>(typeof v==='string'&&v.trim())?v.trim():null;
+  const sent=pick(appSent);
+  const eff=pick(over)||pick(dflt)||sent||null;
+  return { effective:eff||'', override:pick(over)||'',
+           source:pick(over)?'profile':(pick(dflt)?'config':(sent?'app':'none')) };
+}
+function appSettingsOf(slug,appSent){ return { prefs:appPrefsMap()[slug]||{}, systemPrompt:appPromptOf(slug,appSent) }; }
+async function saveAppSettings(slug,prefs,systemPrompt,appSent){
+  if(!slug) return {ok:false,error:NO_APP_TEXT};
+  if(!prefs||typeof prefs!=='object'||Array.isArray(prefs)) return {ok:false,error:'preferences must be a JSON object · 偏好必须是 JSON 对象'};
+  // FULL-OBJECT replace on both fields, because that is what the route does: sending only this
+  // app's entry would drop every other app's preferences and every other app's prompt override.
+  const nextPrefs=Object.assign({},appPrefsMap()); nextPrefs[slug]=prefs;
+  const sp=sysPrompts();
+  const nextApps=Object.assign({},sp.apps||{});
+  // A blank override CLEARS it — the route keeps only non-blank strings, so sending '' is how the
+  // built-in default starts flowing again. Deleting here too keeps ME in step without a re-fetch.
+  // NOT a string (undefined: a prefs-only write) KEEPS the override — only the settings dialog's string, '' included, changes it.
+  // TODO(R4 seam): grows this over-budget file by two lines; the seam is the per-app settings block → its own inlined part.
+  if(typeof systemPrompt==='string'){ if(systemPrompt.trim()) nextApps[slug]=systemPrompt.trim(); else delete nextApps[slug]; }
+  const nextSp={apps:nextApps}; if(sp.global) nextSp.global=sp.global;
+  try{
+    const r=await api('/api/profile',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({appPrefs:nextPrefs,systemPrompts:nextSp})});
+    if(!r.ok){ let why=''; try{ why=(await r.json()).error||''; }catch(e){}
+      return {ok:false,error:why||('HTTP '+r.status)}; }
+  }catch(e){ return {ok:false,error:((e&&e.message)||'network unavailable')}; }
+  // Only after the server confirmed, for the same reason setAppModel waits: a refused write that
+  // still updated ME would reopen the panel on settings the server never accepted.
+  ME.appPrefs=nextPrefs; ME.systemPrompts=nextSp;
+  return {ok:true,settings:appSettingsOf(slug,appSent)};
+}
+// The pad prefs (printInk, …; openAi comes from the account's appPrefs[slug]) are read by a host THE MOMENT a note opens — the journal boots
+// on its last note — so they must be in the frame before the app's own boot runs, not after the
+// models GET. Hence two pushes per load: the stored prefs at once (withModels=false: no models, so
+// PAChat does not take its lane from a stale list), then everything once the list settles. The
+// app-side handlers are idempotent; newFeatureKeys ride the second push only, so the blue dots are
+// announced once.
+function sendAppPrefs(withModels=true){ const fw=$('#fr').contentWindow; if(!(fw&&$('#fr').src!=='about:blank')) return;
+  const m={pa:'prefs',fontScale:FS_STEPS[fsIdx],fingerDraw:localStorage.getItem('pa_fingerdraw')==='1',seamless:localStorage.getItem('pa_seamless')==='1',printInk:localStorage.getItem('pa_printink')!=='0',noFlip:localStorage.getItem('pa_noflip')==='1',openAi:(appPrefsMap()[frameSlug()]||{}).openAi===true,uploadMaxBytes:RELAY_LIMITS.upload,chatMaxBytes:RELAY_LIMITS.chat,ownBar:frameOwnBar(),fsTitles:[fsTitle(-1),fsTitle(1)]};
+  if(withModels) Object.assign(m,{models:CHAT_MODELS,wantModel:appModel(frameSlug()),newFeatureKeys:Object.keys(window._PA_NEW_KEYS||{}).filter(k=>!_SEEN.has(k))});
+  fw.postMessage(m,'*'); }
+// Bound by CLASS: the buttons now exist twice — in the app frame bar and in the main header —
+// and both must drive the same one setting.
+const FS_DEFAULT=2;   // index of 1.0 in FS_STEPS — the size everything is designed at
+function fsApply(){ localStorage.setItem('pa_fs',FS_STEPS[fsIdx]); applyShellFontScale(); sendAppPrefs(); }
+function fsStep(d){ const n=fsIdx+d; if(n<0||n>=FS_STEPS.length) return; fsIdx=n; fsApply(); }
+// LONG-PRESS either button to return to 1.0. Seven steps with no indicator meant counting
+// clicks back to normal and overshooting; long-press is already this app's idiom (the version
+// number opens the changelog the same way), so it costs no new button.
+function fsReset(){ if(fsIdx===FS_DEFAULT) return; fsIdx=FS_DEFAULT; fsApply();
+  const t=$('#fsToast'); if(t){ t.textContent='Text size reset · 字号已重置'; t.classList.add('on'); setTimeout(()=>t.classList.remove('on'),1400); } }
+// One source for the tooltips: the same two buttons exist twice (main header + app frame
+// bar), and the reset hint has to be discoverable — a long-press nobody knows about is not
+// a feature. Set here rather than repeated in four title attributes that would drift.
+const FS_RESET_HINT=' — long-press to reset · 长按恢复默认';
+// Also sent to an app that draws its own A-/A+ (prefs fsTitles), so the help text has one source (R3).
+function fsTitle(d){ return (d<0?'Smaller text · 缩小字号':'Larger text · 放大字号')+FS_RESET_HINT; }
+function fsBind(sel,d){
+  document.querySelectorAll(sel).forEach(b=>{
+    b.title=fsTitle(d);
+    let held=0, timer=0;
+    const start=()=>{ held=0; clearTimeout(timer); timer=setTimeout(()=>{ held=1; fsReset(); },550); };
+    const stop=()=>{ clearTimeout(timer); };
+    b.addEventListener('pointerdown',start);
+    b.addEventListener('pointerup',stop); b.addEventListener('pointercancel',stop); b.addEventListener('pointerleave',stop);
+    b.onclick=()=>{ if(held){ held=0; return; } fsStep(d); };   // the press that reset must not also step
+  });
+}
+fsBind('.fs-dn',-1); fsBind('.fs-up',1);
+// Pad prefs at once; the models wait for the refresh openApp started, because PAChat takes its
+// lane from the FIRST prefs that carry a list.
+$('#fr').onload=()=>{ sendAppPrefs(false); return Promise.race([chatModelsFresh,new Promise(r=>setTimeout(r,MODELS_WAIT_MS))]).then(()=>sendAppPrefs()); };
+
+/* ── Apps ── */
+// THE BAR STARTS HIDDEN. It was shown on open at first, on the theory that the grabber needed
+// teaching; in use that was the wrong trade — it put the row back on screen for every launch of
+// every app, which is the cost the whole change exists to remove.
+//
+// HOW LONG IT STAYS. Short, and this is a discoverability argument rather than a tidiness one: a
+// bar that lingers reads as permanent, so the user goes looking for the way to dismiss it. One
+// that leaves promptly teaches that it leaves. 2.5s is about two reads of "← Home".
+const BAR_IDLE_MS=2500;
+// WHAT PUTS IT AWAY EARLY. The shell cannot observe events INSIDE a cross-origin iframe, but
+// focus crossing into one is visible from outside, and two independent things report it:
+//   · the iframe ELEMENT fires focus — the parent's own node, so this is directly testable;
+//   · the parent window fires blur — the classic iframe-click tell, but it cannot be exercised by
+//     automation (a click into an opaque-origin frame is refused), so it is a fallback only.
+// Neither fires for a tap on the note itself: the pad calls preventDefault on touchstart (the
+// iOS handwriting fix — without it Pencil writing pops the Copy/Look-Up menu and drops strokes),
+// and a default-prevented touch moves no focus. Tapping the chat box does retract the bar,
+// because a text field takes focus. So the timer, not the tap, is what the writing hand relies
+// on — which is the other reason it is short.
+// Switching browser tabs blurs the window too and also hides the bar; that is harmless.
+// _barIdle is NULLED, not just cleared: it doubles as the "is the bar on a timer" flag below, and
+// a cleared timer id is still a truthy number. Left unnulled, one use of the grabber made every
+// later press inside the bar start a 5s countdown — including on a bar that was meant to stay.
+let _barIdle=null;
+function barShow(){ clearTimeout(_barIdle); _barIdle=null; $('#frame').classList.add('barin'); }
+function barHide(){ clearTimeout(_barIdle); _barIdle=null; $('#frame').classList.remove('barin'); }
+// Shown ON REQUEST, rather than on open, it has to leave by itself as well: on touch there is no
+// pointerleave, and a bar that needed a second tap to dismiss would cost more than it saves.
+// The app's OWN bar (PAAppBar) dropped this timer (ADR 0034); this one keeps it: the shell sees no tap inside the
+// app frame, so the timer is what takes an overlaying bar back off the app's own header.
+function barShowTemporarily(){ barShow(); _barIdle=setTimeout(barHide,BAR_IDLE_MS); }
+function frameOpen(){ return $('#frame').classList.contains('peek'); }
+$('#barpeek').onclick=barShowTemporarily;
+// A- / A+ are used in runs. Any press inside the bar restarts the clock instead of letting it
+// vanish mid-adjustment; #back needs no such care, since it leaves the app entirely.
+$('#frame').querySelector('.bar').addEventListener('pointerdown',()=>{ if(_barIdle) barShowTemporarily(); });
+$('#fr').onfocus=()=>{ if(frameOpen()) barHide(); };   // a property: a fresh #fr carries it (APP_FRAME_HANDLERS)
+addEventListener('blur',()=>{ if(frameOpen()) barHide(); });
+// THE APP'S OWN BAR (ADR 0032). An ownBar app sends {pa:'shell',type:'home'|'font'|'ready',d}.
+// Accepted ONLY from the page open in #fr right now (never one still leaving, ADR 0018), from a
+// sandboxed (origin 'null') frame, for an app flagged ownBar; font steps capped per second.
+// TODO(R4): this file is far over budget; this block moves with the app-frame seam (see SHELL_BEHIND_APP).
+const SHELL_MSG_FONT_PER_S=20; let _shellFont={t:0,n:0};
+function frameOwnBar(){ return frameUid()===UID&&OWNBAR_APPS.has(frameSlug()); }
+window.addEventListener('message',(e)=>{
+  const m=e.data; if(!m||m.pa!=='shell') return;
+  if(!e.source||e.source!==$('#fr').contentWindow||e.origin!=='null'||!frameOpen()||!frameOwnBar()) return;
+  if(m.type==='ready'){ barHide(); $('#frame').classList.add('ownbar'); return; }
+  if(m.type==='home') return goHome();
+  if(m.type!=='font'||![-1,0,1].includes(m.d)) return;
+  const now=Date.now(); if(now-_shellFont.t>1000) _shellFont={t:now,n:0};
+  if(++_shellFont.n>SHELL_MSG_FONT_PER_S) return;
+  if(m.d===0) fsReset(); else fsStep(m.d);
+});
+
+/* PA_APP_FRAME_JS */
+function openApp(uid,slug,title){ if(uid===UID) promoteApp(slug); appFrameLeave(); $('#ftitle').textContent=title||slug; refreshChatModels(); PASW.frameLoad(uid,slug); $('#frame').classList.remove('ownbar'); $('#frame').classList.add('peek'); $('#frame').style.display='flex'; closeDrawer(); shellBehindApp(true); }
+/* ══ SHELL_BEHIND_APP_BEGIN — cut out and run by runShell() in test/helpers-shell-dom.mjs, for every suite that calls it ══ */
+// TODO(R4): this file is far over the 300-line budget. Split seam: the app-frame section (bar peek,
+// openApp, this block) moves into web/app-frame.js, the inlined shell part that already holds
+// leaving an app (ADR 0018), the way settings.js holds the settings.
+// THE SHELL UNDER AN OPEN APP · 应用下层的外壳. #frame is fixed over the whole shell, but the home
+// view stays laid out underneath it: the header, the transcript, the composer (#box). On the
+// owner's iPad (Journal, swipe-to-flip off) the Pencil stopped inking for 2-5 s while the app's
+// own recorder saw NO event of any kind — the strokes were taken by something outside the app's
+// document. Leading suspect: iPadOS Scribble, which asks the page for editable elements in a rect
+// and need not account for the iframe covering them. `inert` takes the covered elements out of
+// hit-testing, focus, and Scribble / assistive discovery while an app is open.
+// ONLY these body-level containers. Everything still usable over an app is a SEPARATE body child
+// and must stay one: #frame (its bar, the grabber, the app), the drawer, every <dialog> (sign-in,
+// settings, confirms), menus, the A-/A+ toast, #printRoot and the lightbox.
+const SHELL_BEHIND_APP='header,main,form#f,#scrollBtn';
+const SHELL_EVENTS=['pointerdown','touchstart','focusin'];
+let _shellEventsOff=null;
+// The ONE switch, called by every path that opens or closes an app (openApp, goHome).
+function shellBehindApp(open){
+  const behind=[...document.body.children].filter((el)=>el.matches(SHELL_BEHIND_APP));
+  const a=document.activeElement;
+  if(open&&a&&behind.some((el)=>el.contains(a))) a.blur();   // a focused #box would keep the keyboard and Scribble on it
+  for(const el of behind) el.toggleAttribute('inert',open);
+  if(_shellEventsOff){ _shellEventsOff(); _shellEventsOff=null; }
+  if(open) _shellEventsOff=shellEventsToApp();
+}
+// While an app is open, any touch or focus that lands on a SHELL element is reported to the app,
+// whose Pencil recorder logs it (tg 'shell'): if a stroke goes missing, the log says where it went.
+// Kind and #id/.class only — never a value or text.
+function shellEventsToApp(){
+  const fr=$('#fr');
+  const tell=(e)=>{ const t=e.target; if(!t||t===fr||(t.nodeType===1&&fr.contains(t))) return;
+    const w=fr.contentWindow; if(w) w.postMessage({pa:'shell-event',type:e.type,tag:shellTag(t),t:Date.now()},'*'); };
+  const opt={capture:true,passive:true};
+  for(const ty of SHELL_EVENTS) document.addEventListener(ty,tell,opt);
+  return ()=>{ for(const ty of SHELL_EVENTS) document.removeEventListener(ty,tell,opt); };
+}
+function shellTag(t){
+  if(t.id) return '#'+String(t.id).slice(0,24);
+  const c=typeof t.className==='string'?t.className.trim().split(/\s+/)[0]:'';
+  return c?'.'+c.slice(0,24):String(t.nodeName||'').toLowerCase().slice(0,25);
+}
+/* ══ SHELL_BEHIND_APP_END ══ */
+
+function showEmptyState(){ if(!$('#log').children.length){ $('#emptyState').style.display='block'; } }
+function hideEmptyState(){ $('#emptyState').style.display='none'; }
+
+// My-Apps ordering — persisted SERVER-SIDE in the user's profile (ME.appOrder), so the
+// order follows the account across devices (iPhone + Mac). Value is an array of app slugs
+// (a.name) in display order; apps missing from it (newly created) render after the saved
+// ones, keeping the server order among themselves. ME is fetched at boot (see loadProfile).
+function savedAppOrder(){ return Array.isArray(ME.appOrder) ? ME.appOrder : []; }
+function sortBySavedOrder(list,fresh){
+  const pos=new Map(savedAppOrder().map((n,i)=>[n,i]));
+  // A freshly created app ranks above everything until it is opened — otherwise it lands at
+  // the BOTTOM of a long shelf, which is where every new app used to appear. Absence from
+  // appOrder is NOT the test for "new": appOrder is the most-recently-opened list, so an old
+  // app you simply never opened is absent too, and floating those would push the app you
+  // just used below apps you have never touched.
+  const rank=a=>(fresh&&fresh.has(a.name))?-1:(pos.has(a.name)?pos.get(a.name):Infinity);
+  // Decorate with original index so unsaved/tied apps keep their server order (stable sort).
+  return list.map((a,i)=>[a,i]).sort((x,y)=>(rank(x[0])-rank(y[0]))||(x[1]-y[1])).map(p=>p[0]);
+}
+// Which apps are NEW TO THIS DEVICE. Kept per-device in localStorage beside _SEEN, because
+// "new to me" is a per-device notion while appOrder is shared across them.
+const _KNOWN_APPS=new Set(JSON.parse(localStorage.getItem('pa_known_apps')||'[]'));
+const _NEW_APPS=new Set(JSON.parse(localStorage.getItem('pa_new_apps')||'[]'));
+function _saveAppSets(){ try{ localStorage.setItem('pa_known_apps',JSON.stringify([..._KNOWN_APPS])); localStorage.setItem('pa_new_apps',JSON.stringify([..._NEW_APPS])); }catch{ /* private mode: the dot degrades to not showing, never to a wrong claim */ } }
+function noteNewApps(names){
+  // First run has no baseline, so nothing can be called new — seed silently rather than dot
+  // every app and claim something we do not know (R14).
+  const hadBaseline=_KNOWN_APPS.size>0;
+  for(const n of names){ if(hadBaseline&&!_KNOWN_APPS.has(n)) _NEW_APPS.add(n); _KNOWN_APPS.add(n); }
+  const live=new Set(names);
+  for(const n of [..._NEW_APPS]) if(!live.has(n)||_SEEN.has('app:'+n)) _NEW_APPS.delete(n);  // deleted, or already opened
+  _saveAppSets();
+  return new Set(_NEW_APPS);
+}
+// Persist the order to the profile endpoint, debounced so rapid ▲/▼ taps coalesce into one PUT.
+let appOrderTimer=null;
+function saveAppOrder(names){
+  clearTimeout(appOrderTimer);
+  appOrderTimer=setTimeout(()=>{
+    // Best-effort: ME.appOrder is already applied locally, and the next boot re-reads the
+    // server copy — so a transient failure degrades to "not yet synced", not a broken UI.
+    api('/api/profile',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({appOrder:names})}).catch(()=>{});
+  },400);
+}
+// Most-recently-opened first. Opening one of your OWN apps moves it to the head of the
+// same saved order the ▲/▼ menu writes — one ordering, not two (R3) — so the apps you
+// actually use stay reachable as the list grows past a phone screen. Family-shelf apps
+// are excluded at the call site: appOrder describes own apps only.
+// Pure list transform, unit-tested in test/app-mru.test.mjs.
+function mruOrder(name,current){
+  return [name,...(Array.isArray(current)?current:[]).filter(n=>n!==name)];
+}
+function promoteApp(name){
+  const cur=savedAppOrder();
+  if(cur[0]===name) return;   // already on top: no re-render, no PUT
+  const names=mruOrder(name,cur);
+  ME.appOrder=names;          // optimistic local update, same contract as moveApp
+  saveAppOrder(names);        // debounced server PUT — follows the account across devices
+  loadApps();                 // re-render now, so Home is already sorted when the app closes
+}
+// Swap an own-app with its neighbour (dir -1 up / +1 down), persist, re-render.
+function moveApp(name,dir){
+  const names=[...$('#dApps').querySelectorAll('.dapp')].filter(d=>d.querySelector('[data-appmenu]')).map(d=>d.dataset.n);
+  const i=names.indexOf(name), j=i+dir;
+  if(i<0||j<0||j>=names.length) return;
+  [names[i],names[j]]=[names[j],names[i]];
+  ME.appOrder=names;   // optimistic local update so the re-render reflects the swap immediately
+  saveAppOrder(names); // server-side persistence (debounced)
+  loadApps();
+}
+
+// ── App faces（应用面孔）on the home tile ────────────────────────────────────────────────
+// The value arrives with /api/apps (web.mjs listApps → readFace), which reads the face.json the
+// app itself declared and wrote. The shell only renders it: no extra request per tile, no app
+// code running, nothing scraped out of an iframe that is not open.
+//
+// THE AGE IS NOT DECORATION. A face is written when the app last ran, so it can be hours or days
+// old, and a stale number that looks live is worse than no number — the shelf would be
+// confidently wrong about today. Under an hour reads as now and stays unlabelled; past that the
+// tile says how old it is, every time.
+const FACE_FRESH_MS=3600000;
+function faceAge(ts,now){
+  const ms=now-ts;
+  if(!(ms>=0)) return '';                 // missing ts, or a clock skew: say nothing, never "-3h"
+  if(ms<FACE_FRESH_MS) return '';
+  const h=Math.floor(ms/FACE_FRESH_MS);
+  return h<24?h+'h':Math.floor(h/24)+'d';
+}
+function faceHtml(a){
+  const f=a&&a.face;
+  if(!f||!f.value) return '';             // no face → the caller falls back to the plain tile
+  const age=faceAge(f.ts,Date.now());
+  return `<span class="face"><b>${esc(f.value)}</b> ${esc(f.label)}${age?` <i>· ${esc(age)}</i>`:''}</span>`;
+}
+
+async function loadApps(){
+  let apps=[]; try{ apps=await (await api('/api/apps')).json(); if(Array.isArray(apps)) PASW.remember(SW_APPS_KEY,apps); }catch{ apps=PASW.recall(SW_APPS_KEY)||[]; /* no node: the list from the last online load (offline-first) */ }
+  const ownApps=apps.filter(a=>a.uid===UID);
+  LINK_APPS=new Set(ownApps.filter(a=>a.links===true).map(a=>a.name));
+  OWNBAR_APPS=new Set(ownApps.filter(a=>a.ownBar===true).map(a=>a.name));
+  const fresh=noteNewApps(ownApps.map(a=>a.name));
+  const own=sortBySavedOrder(ownApps,fresh);
+  const shelf=apps.filter(a=>a.uid!==UID); // promoted (uid='shared') + family-shared (uid=owner id)
+  const ownNames=new Set(own.map(a=>a.name));
+  // Drawer: own apps (share/delete) + a labelled Family shelf (open/fork, read-only)
+  const promotedInShelf=shelf.filter(a=>a.uid==='shared');
+  $('#dApps').innerHTML=(own.map((a,i,arr)=>
+    `<div class="dapp" data-u="${esc(UID)}" data-n="${esc(a.name)}">
+      <span class="dapp-name">${esc(a.title)}</span>
+      <button class="cmenu" data-appmenu="${esc(a.name)}" data-shared="${a.shared?'1':'0'}" data-forked="${a.forkedFrom?'1':'0'}" data-version="${esc(a.version||'')}" data-first="${i===0?'1':'0'}" data-last="${i===arr.length-1?'1':'0'}" title="More" aria-label="More">⋯</button>
+    </div>`).join('')||'<div style="padding:10px 16px;color:var(--muted);font-size:14px">No apps yet.</div>')
+    +(promotedInShelf.length?'<div class="shelf-head">⭐ Family shelf</div>'+promotedInShelf.map(a=>
+    `<div class="dapp" data-u="shared" data-n="${esc(a.name)}">
+      <span class="dapp-name">${esc(a.title)}${a.sharedBy?` <small style="color:var(--muted)">· ${esc(a.sharedBy)}</small>`:''}</span>
+      ${ownNames.has(a.name)?'<small style="color:var(--accent);font-size:11px">✓ copied</small>':`<button class="plain" style="font-size:12px;padding:3px 8px" data-fork="${esc(a.name)}">Fork</button>`}
+    </div>`).join(''):'');
+  // Empty state grid: own then shelf (promoted + family-shared)
+  const card=(uid,a,badge)=>`<div class="ecard" data-eu="${esc(uid)}" data-es="${esc(a.name)}" data-et="${esc(a.title)}"><b>${esc(a.title)}${badge||''}${a.hasUpdate?`<span class="update-dot" data-update="${esc(a.name)}" data-title="${esc(a.title)}" title="Update available · 有新版本"></span>`:''}</b>${faceHtml(a)||`<small>${esc(a.desc||a.name)}</small>`}</div>`;
+  const familyShelf=shelf.filter(a=>a.fromFamily);
+  const shelfBadge=(a)=>a.fromFamily?`<button class="plain" style="font-size:11px;padding:2px 7px;margin-left:4px" data-fget="${esc(a.uid)}" data-fslug="${esc(a.name)}">Get</button>`:'<span class="star">★</span>';
+  $('#eApps').innerHTML=own.map(a=>card(UID,a,'')).join('')
+    +(shelf.length?`<div class="grid-sep">⭐ Family shelf</div>`+shelf.map(a=>card(a.uid,a,shelfBadge(a))).join(''):'');
+  // Blue dot on each new app — the existing markNew system (key + _SEEN), so it clears on
+  // first tap and stays cleared across reloads. The shelf is usually off-screen when an app
+  // is created, so the ☰ that opens it is dotted too, or there is no cue to look.
+  if(fresh.size){
+    $('#dApps').querySelectorAll('.dapp').forEach(el=>{ if(el.dataset.u===UID&&fresh.has(el.dataset.n)) markNew(el,'app:'+el.dataset.n); });
+    $('#eApps').querySelectorAll('.ecard').forEach(el=>{ if(el.dataset.eu===UID&&fresh.has(el.dataset.es)) markNew(el,'app:'+el.dataset.es); });
+    markNewSel('#menu','apps:'+[...fresh].sort().join(','));
+  }
+  checkAndAutoUpdate(ownApps);
+}
+
+function closeAppMenu(){ closeMenuPop(); }
+// Reuses the shared .cmenu-pop popover (same as the chat list, R3) so an app row is just a
+// name + ⋯; the rarely-used actions (reorder / share / delete) live inside the menu.
+function appMenu(name, anchor){
+  closeAppMenu();
+  const shared=anchor.dataset.shared==='1', first=anchor.dataset.first==='1', last=anchor.dataset.last==='1';
+  const forked=anchor.dataset.forked==='1', ver=anchor.dataset.version||'';
+  const nextVer=ver?ver.replace(/(\d+)$/,n=>+n+1):'1.0.0';
+  const m=document.createElement('div'); m.id='appMenu'; m.className='cmenu-pop';
+  m.innerHTML=(first?'':'<button data-a="up">Move up</button>')
+    +(last?'':'<button data-a="dn">Move down</button>')
+    +`<button data-a="share">${shared?'Unshare from family':'Share to family'}</button>`
+    +(shared&&!forked?`<button data-a="bump">Publish update ${nextVer} · 发布更新</button>`:'')
+    +'<button data-a="delete" class="del">Delete</button>';
+  document.body.appendChild(m);
+  const r=anchor.getBoundingClientRect(); m.style.top=(r.bottom+4)+'px'; m.style.right=Math.max(6,innerWidth-r.right)+'px';
+  m.onclick=async(ev)=>{ const b=ev.target.closest('button'); if(!b) return; const a=b.dataset.a; closeAppMenu();
+    if(a==='up') moveApp(name,-1);
+    else if(a==='dn') moveApp(name,1);
+    else if(a==='share'){ await api('/api/apps/'+encodeURIComponent(name)+'/share',{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({shared:!shared})}); loadApps(); loadFamilyApps(); }
+    else if(a==='bump'){
+      const g=await relayJson(api('/api/apps/'+encodeURIComponent(name)+'/bump',{method:'POST'}),'request');
+      if(g.ok) loadApps(); else alert(g.text);
+    }
+    else if(a==='delete'){ if(confirm(`Delete "${name}"?`)){ await api('/api/apps/'+encodeURIComponent(name),{method:'DELETE'}); loadApps(); } }
+  };
+  armMenuPop();
+}
+$('#dApps').onclick=async(e)=>{
+  const menu=e.target.closest('[data-appmenu]');
+  if(menu){ e.stopPropagation(); appMenu(menu.dataset.appmenu, menu); return; }
+  const fk=e.target.dataset.fork;
+  if(fk){ e.stopPropagation(); const g=await relayJson(api('/api/apps/fork',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({slug:fk})}),'request');
+    if(g.ok&&g.data&&g.data.ok) loadApps(); else alert(g.ok?(g.data.error||'Fork refused · 复制被拒绝。'):g.text); return; }
+  const c=e.target.closest('.dapp'); if(!c) return;
+  openApp(c.dataset.u||UID,c.dataset.n,c.querySelector('.dapp-name')?.textContent);
+};
+$('#eApps').onclick=async e=>{
+  const dot=e.target.closest('.update-dot');
+  if(dot){ e.stopPropagation(); showUpdateSheet(dot.dataset.update,dot.dataset.title); return; }
+  const gb=e.target.closest('[data-fget]');
+  if(gb){ e.stopPropagation();
+    const g=await relayJson(api('/api/apps/fork',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({fromUid:gb.dataset.fget,slug:gb.dataset.fslug})}),'request');
+    if(g.ok&&g.data&&g.data.ok) loadApps(); else alert(g.ok?(g.data.error||'Could not get app · 获取失败'):g.text); return; }
+  const c=e.target.closest('.ecard'); if(c) openApp(c.dataset.eu,c.dataset.es,c.dataset.et);
+};
+async function showUpdateSheet(slug,title){
+  $('#usTitle').textContent=`Update available: ${esc(title)}`;
+  $('#usChangelog').innerHTML='<span style="color:var(--muted);font-size:13px">Loading · 加载中…</span>';
+  $('#usInstall').onclick=async()=>{ $('#updateSheet').close(); await doAppUpdate(slug); };
+  $('#usCancel').onclick=()=>$('#updateSheet').close();
+  $('#updateSheet').showModal();
+  let data={features:[],fixes:[]};
+  try{ data=await (await api(`/api/apps/${encodeURIComponent(slug)}/changelog`)).json(); }catch{}
+  const sec=(t,items)=>items&&items.length?`<div style="font-size:12px;font-weight:600;color:var(--muted);margin:8px 0 4px">${t}</div><ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.7">${items.map(f=>'<li>'+esc(f)+'</li>').join('')}</ul>`:'';
+  const body=sec('New · 新功能',data.features)+sec('Fixed · 修复',data.fixes);
+  $('#usChangelog').innerHTML=body||'<div style="color:var(--muted);font-size:13px">App updated by the owner. · 应用已由所有者更新。</div>';
+}
+async function doAppUpdate(slug){
+  const g=await relayJson(api(`/api/apps/${encodeURIComponent(slug)}/update`,{method:'POST'}),'request');
+  if(g.ok) loadApps(); else alert(g.text);
+}
+async function checkAndAutoUpdate(apps){
+  if(!ME.autoUpdateApps) return;
+  const pending=apps.filter(a=>a.hasUpdate&&a.uid===UID);
+  if(!pending.length) return;
+  await Promise.allSettled(pending.map(a=>api(`/api/apps/${encodeURIComponent(a.name)}/update`,{method:'POST'})));
+  loadApps();
+}
+
+async function loadFamilyApps(){
+  let apps=[]; try{ apps=await (await api('/api/family-apps')).json(); }catch{}
+  let myNames=new Set(); try{ (await (await api('/api/apps')).json()).forEach(a=>myNames.add(a.name)); }catch{}
+  const el=$('#dFamily');
+  if(!apps.length){ el.innerHTML='<span style="color:var(--muted);font-size:13px">None shared yet.</span>'; return; }
+  el.innerHTML=apps.map(a=>{
+    const isOwn=a.uid===UID, have=myNames.has(a.slug);
+    return`<div class="family-card" style="margin-bottom:6px">
+      <div class="fc-info"><b>${esc(a.title)}</b><small>${esc(a.desc)}</small><div class="fc-author">by ${esc(a.author)}${isOwn?' (you)':''}</div></div>
+      <div class="fc-btns">
+        <button class="plain" style="font-size:12px;padding:3px 8px" data-fopen="${esc(a.uid)}" data-fslug="${esc(a.slug)}" data-ftitle="${esc(a.title)}">Open</button>
+        ${!isOwn&&!have?`<button class="plain" style="font-size:12px;padding:3px 8px" data-ffork="${esc(a.uid)}" data-fslug="${esc(a.slug)}">Fork</button>`:''}
+        ${have&&!isOwn?`<small style="color:var(--accent);font-size:11px">✓</small>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+$('#dFamily').onclick=async(e)=>{
+  const ob=e.target.closest('[data-fopen]');
+  if(ob){ openApp(ob.dataset.fopen,ob.dataset.fslug,ob.dataset.ftitle); return; }
+  const fb=e.target.closest('[data-ffork]');
+  if(fb){ if(!confirm(`Fork "${fb.dataset.fslug}"?`)) return; const g=await relayJson(api('/api/apps/fork',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({fromUid:fb.dataset.ffork,slug:fb.dataset.fslug})}),'request');
+    if(g.ok&&g.data&&g.data.ok){loadApps();loadFamilyApps();} else alert(g.ok?(g.data.error||'Fork refused · 复制被拒绝。'):g.text); }
+};
+$('#back').onclick=goHome;   // the button says Home, so it goes Home (it used to open the drawer)
+$('#newSession').onclick=newConvo;
+
+/* ── Trusted-chrome confirmation（外壳确认）for app-initiated decisions ──
+   An app iframe can ASK for a decision; only a HUMAN tap in this SHELL-owned
+   dialog (app code cannot reach or script it — it lives outside the sandbox)
+   lets it proceed. Deny/remove confirm too: lower stakes, one mechanism. */
+const SHELL_CONFIRM_LABELS={ approve:['Approve','批准'], deny:['Deny','拒绝'], 'remove-reminder':['Remove reminder','移除提醒'] };
+// The ONE confirm surface (R3): app-relayed confirms (shellConfirm) and
+// shell-initiated ones (Jobs run-now, reminder remove, node restart) share it.
+function askConfirm(text,okLabel){
+  return new Promise((res)=>{
+    const d=$('#actConfirm'); let settled=false;
+    const done=(v)=>{ if(settled) return; settled=true; if(d.open) d.close(); res(v); };
+    $('#acText').textContent=text;
+    $('#acOk').textContent=okLabel;
+    $('#acOk').onclick=()=>done(true);
+    $('#acCancel').onclick=()=>done(false);
+    d.oncancel=()=>done(false);  // Esc
+    d.onclose=()=>done(false);   // any other close path counts as refusal
+    d.showModal();
+  });
+}
+function shellConfirm(kind,title){
+  const [en,zh]=SHELL_CONFIRM_LABELS[kind]||[kind,kind];
+  return askConfirm(`App requests: ${en} "${title}"? · 应用请求${zh}，确认？`,`${en} · ${zh}`);
+}
+// The action-decide relay, deps injected so the test harness can run it with
+// no DOM (test/actions-ui.test.mjs): WITHOUT deps.confirm resolving true —
+// the human tap in shell chrome — deps.decide (the server POST) is never
+// called. The title shown is looked up from the SERVER's pending queue, never
+// taken from the app's message (an app must not caption its own confirm).
+async function relayActionDecide(m,deps){
+  if(typeof m.actionId!=='string'||(m.verb!=='approve'&&m.verb!=='deny')) return {ok:false,error:'bad params'};
+  let title=m.actionId;
+  try{ const pend=await deps.listPending(); const a=(pend||[]).find(x=>x.id===m.actionId); if(a&&a.title) title=a.title; }
+  catch{ /* lookup is label-only; the human gate below still applies (R5: nothing decided here) */ }
+  if(!await deps.confirm(m.verb,title)) return {ok:false,error:'cancelled in shell · 已在外壳取消'};
+  return deps.decide(m.actionId,m.verb);
+}
+// Same trusted-chrome rule for revoking a reminder from an app.
+async function relayReminderRemove(m,deps){
+  if(typeof m.reminderId!=='string') return {ok:false,error:'bad params'};
+  let title=m.reminderId;
+  try{ const list=await deps.list(); const r=(list||[]).find(x=>x.id===m.reminderId); if(r&&r.text) title=r.text; }
+  catch{ /* label-only lookup — the human gate below still applies */ }
+  if(!await deps.confirm('remove-reminder',title)) return {ok:false,error:'cancelled in shell · 已在外壳取消'};
+  return deps.remove(m.reminderId);
+}
+
+/* RELAY-CORE-START ── Request-failure mapping（失败映射）: the ONE place a failed request
+   becomes an app-visible reply. DOM-free on purpose — test/helpers-shell-broker.mjs extracts
+   everything between the two markers and runs it (broker-relay: against a real node:http server).
+
+   DATA-LOSS SCAR 2026-09-02 (round 2). Every read failure used to answer the app the SAME
+   thing: {ok:false,error:'not found'}. A 401 after a restarted server, a 500, a dropped
+   Wi-Fi handoff and a file that genuinely does not exist were indistinguishable. An app
+   reads "absent" as "new empty note", and its next save writes that empty note over the
+   user's good data. Hence the rule this block exists to enforce:
+     ONLY code:'not-found' means "there is nothing there".
+     Every other failure means "I could not read it — do NOT treat it as empty."
+
+   Reply contract (additive — the legacy `error` string stays for already-forked apps):
+     {ok:true, …payload}
+     {ok:false, code:'not-found',    error:'not found', status:404}  the target really is absent
+     {ok:false, code:'unauthorized', error, status}                  401/403 — session expired
+     {ok:false, code:'server-error', error, status}                  5xx, or a 2xx body that will not parse
+     {ok:false, code:'network',      error}                          fetch/stream rejection — never reached the server
+     {ok:false, code:'too-large',    error, status:413, limit}       over the route's cap (lib/webutil.mjs BODY_LIMITS)
+     {ok:false, code:'bad-request',  error, status}                  other 4xx, or a path this shell refuses
+     {ok:false, code:'relay-error',  error}                          a fault inside this shell — still NOT 'not-found'
+     {ok:false, code:'cancelled',    error}                          the app withdrew it (chat-cancel) — NOT 'network' */
+const RELAY_NOT_FOUND='not found';                              // the legacy error string, pinned once (R3)
+const RELAY_CANCELLED='Cancelled · 已取消';                      // == PAC_CANCELLED in web/chat-ui.inline.html (test/chat-cancel.test.mjs)
+/* ── The noun table（名词表）— WHAT was refused ─────────────────────────────────────────
+   LEFTOVER (e) of the 2026-09-02 data loss: an oversized photo insert in the notebook read
+   "Upload failed" — byte-identical to a 401 and to a dropped connection. A user shown that
+   sentence cannot tell "crop the photo" from "sign in again", so they retry the thing that
+   can never work. Every failure sentence below therefore names (1) WHAT was refused,
+   (2) WHY, and for a size rejection (3) the cap — bilingually, in ONE table (R3).
+   `did` is what happened to that thing, so a 401 on a photo does not read like a 401 on a
+   note: the user must be able to tell whether their work still exists. */
+const RELAY_NOUNS={
+  message:{en:'Message',head:'Message too large · 消息过长',did:'not sent · 未发送',act:'Shorten it or remove an attachment, then send again · 请缩短内容或删除附件后重发'},
+  file:   {en:'File',   head:'File too large · 文件过大',   did:'not uploaded · 未上传',act:'Pick a smaller file · 请选择更小的文件'},
+  photo:  {en:'Photo',  head:'Photo too large · 照片过大',  did:'not uploaded · 未上传',act:'Pick a smaller photo, or crop it · 请选择更小的照片或裁剪后重试'},
+  note:   {en:'Note',   head:'Note too large · 笔记过大',   did:'not saved · 未保存',  act:'Split it across pages, then save again · 请分页后重新保存'},
+  data:   {en:'Data',   head:'Too large · 内容过大',        did:'not saved · 未保存',  act:'Make it smaller, then try again · 请缩小后重试'},
+  // A READ that failed. `did` must never say "not saved" here: telling a user their note
+  // was not saved when the app merely could not LOAD it is the same category of lie the
+  // whole incident was made of — it describes the wrong side of the exchange.
+  content:{en:'Content',head:'Too large · 内容过大',        did:'not loaded · 未加载',  act:'Try again · 请重试'},
+  // A shell action that is neither a payload nor a read: signing in, forking an app.
+  request:{en:'Request',head:'Too large · 内容过大',        did:'not completed · 未完成',act:'Try again · 请重试'},
+  // Signing in. Its 401 is a REJECTED CREDENTIAL, not a lost session — see relayText.
+  credentials:{en:'Sign-in',head:'Too large · 内容过大',   did:'not completed · 未完成',act:'Try again · 请重试'},
+};
+const RELAY_TOO_LARGE_MSG=RELAY_NOUNS.message.head;             // chat composer heading
+const RELAY_TOO_LARGE_FILE=RELAY_NOUNS.file.head;               // upload heading
+const RELAY_TOO_LARGE_PHOTO=RELAY_NOUNS.photo.head;             // image upload heading (notebook insert, camera roll)
+// `what` may be a noun key ('photo') or — for the callers that predate the table — one of
+// the heading strings above. Anything unrecognised falls back to 'message', which is what
+// relayText answered before the table existed: a wrong noun is a wording bug, never a
+// silent success (R14 — no failure may become unreadable because a key was misspelt).
+function relayWhat(what){
+  const k=String(what||'').toLowerCase();
+  if(RELAY_NOUNS[k]) return RELAY_NOUNS[k];
+  for(const n in RELAY_NOUNS) if(RELAY_NOUNS[n].head===what) return RELAY_NOUNS[n];
+  return RELAY_NOUNS.message;
+}
+// Filename → noun. The notebook's photo insert and the composer's camera-roll pick both
+// travel through the SAME broker kind ('upload'), so the noun is inferred once, here,
+// rather than at each call site (R3).
+const RELAY_IMAGE_RE=/\.(jpe?g|png|heic|heif|gif|webp|bmp|tiff?|avif)$/i;
+function relayWhatForFile(name){ return RELAY_IMAGE_RE.test(String(name||''))?'photo':'file'; }
+// The caps this shell can check BEFORE spending the upload. Browser code here cannot
+// import lib/webutil.mjs, so these are a COPY of BODY_LIMITS — pinned against it by
+// test/fail-legibility.test.mjs, the same way PAC_LIMITS is pinned in the chat component.
+// Base64 inflates 4/3, so a 16MB photo is a 21.3MB body: refusing here is the difference
+// between an instant, specific "Photo too large" and 20MB pushed over cellular to earn a
+// 413 nobody wanted.
+const RELAY_LIMITS={chat:1024*1024,upload:20*1024*1024};   // == lib/webutil.mjs BODY_LIMITS.chat / .upload
+const RELAY_ENVELOPE_BYTES=512;                            // the JSON wrapper this shell adds around a payload
+function relayB64Bytes(fileSize){ return Math.ceil(Number(fileSize||0)/3)*4+RELAY_ENVELOPE_BYTES; }
+// A fetch/stream rejection: the request never completed, so NOTHING is known about the
+// target. `where` names the half that failed, so a dead socket is distinguishable from a
+// truncated body in a bug report (R5 — the reason travels with the reply, never dropped).
+// `signal` (optional) is the request's own AbortSignal. An aborted fetch rejects exactly like a
+// dead socket, so the cause is read off the signal, never off the error: calling a Cancel the
+// user pressed "Connection failed" would send them hunting for a network fault (R14).
+function relayNetFail(err,where,signal){
+  if(signal&&signal.aborted) return {ok:false,code:'cancelled',error:RELAY_CANCELLED};
+  return {ok:false,code:'network',error:'network unreachable · 网络不可达 ('+where+': '+((err&&err.message)||'unknown')+')'};
+}
+// A non-2xx answer → its own code. The body is read ONCE here: a 413 from lib/webutil.mjs
+// carries {error,code:'payload_too_large',limit}, while web.mjs's sendFile answers 404/500
+// as text/plain — so a non-JSON body must never throw and must never change the code.
+async function relayHttpFail(r){
+  let raw=''; try{ raw=await r.text(); }catch{ raw=''; }           // an unreadable body must not mask the status
+  let j=null; try{ j=raw?JSON.parse(raw):null; }catch{ j=null; }   // text/plain body: the status alone decides
+  const msg=(j&&typeof j.error==='string'&&j.error)||'';
+  if(r.status===413) return {ok:false,code:'too-large',status:413,limit:(j&&Number.isFinite(j.limit))?j.limit:null,error:msg||'payload too large · 内容过大'};
+  if(r.status===401||r.status===403) return {ok:false,code:'unauthorized',status:r.status,error:msg||'signed out · 登录已过期'};
+  if(r.status===404) return {ok:false,code:'not-found',status:404,error:RELAY_NOT_FOUND};
+  if(r.status>=500) return {ok:false,code:'server-error',status:r.status,error:msg||'server error · 服务器错误'};
+  return {ok:false,code:'bad-request',status:r.status,error:msg||'request rejected · 请求被拒绝'};
+}
+// A path this shell refuses before any request — a client fault, never "absent".
+function relayBadPath(){ return {ok:false,code:'bad-request',error:'bad path · 路径无效'}; }
+// One request → one reply object. `as` says how a 2xx body is read:
+//   'none' → {ok:true} · 'text' → {ok:true,[key||'text']} · 'json' → {ok:true,[key||'data']}
+//   'blob' → {ok:true,blob} (never postMessage'd — the caller converts it first)
+//   'raw'  → the server's own JSON verbatim (save-data telemetry, /api/ask)
+async function relayCall(url,opt,as,key){
+  let r;
+  try{ r=await api(url,opt); }catch(err){ return relayNetFail(err,'request'); }
+  if(!r.ok) return await relayHttpFail(r);
+  try{
+    if(as==='none') return {ok:true};
+    if(as==='text') return {ok:true,[key||'text']:await r.text()};
+    if(as==='blob') return {ok:true,blob:await r.blob()};
+    const j=await r.json();
+    if(as!=='raw') return {ok:true,[key||'data']:j};
+    // A verbatim passthrough still owes the app a code when the SERVER says ok:false
+    // (/api/ask answers 200 {ok:false,text}) — no app may be handed a code-less failure.
+    return (j&&typeof j==='object'&&!Array.isArray(j)&&j.ok===false&&!j.code)?{...j,code:'server-error'}:j;
+  }catch(err){
+    // A 2xx whose body will not parse is a broken SERVER answer — not an absent file and
+    // not a network drop. Say that, rather than borrowing a neighbouring code (R14).
+    return (err&&err.name==='SyntaxError')?{ok:false,code:'server-error',status:r.status,error:'malformed reply · 回复格式错误'}:relayNetFail(err,'reply');
+  }
+}
+// ── App-originated agent requests（应用发起的 AI 请求）────────────────────────────────────────
+// Every broker kind that reaches an agent lane sends its POST through appAgentInit, which adds
+// the app-origin header. The server runs any request carrying it CONFINED — even in the owner's
+// session — because the app that caused it may be anyone's (a shelf app is member-authored). The
+// app cannot add or remove it: the header is built HERE, and an app has no network of its own.
+// The shell's own composer (submitSend) never uses this. R3: the name must equal
+// APP_ORIGIN_HEADER in lib/agent-origin.mjs — pinned by test/app-agent-confinement.test.mjs.
+// `signal` is the chat relay's AbortController signal, so chat-cancel can close that request;
+// kind 'ask' passes none (undefined is what fetch reads as "not cancellable").
+// TODO(R4): this shell is over budget — the broker (relay helpers + the kind switch) is the seam to split out.
+const APP_ORIGIN_HEADER='x-superelf-origin', APP_ORIGIN_VALUE='app';
+function appAgentInit(body,signal){
+  return {method:'POST',headers:{'content-type':'application/json',[APP_ORIGIN_HEADER]:APP_ORIGIN_VALUE},body,signal};
+}
+// Bytes on the wire for a JSON body — what the caps in lib/webutil.mjs actually count, so
+// a "too large" message can state the real size instead of a character count.
+// The fallback is for an engine with no TextEncoder: a character count under-reports CJK
+// (3 bytes each), but this number only ever feeds a human-readable size inside a message —
+// it never gates a request — so an approximate figure beats no message at all (R5).
+function relayBodyBytes(s){ try{ return new TextEncoder().encode(String(s||'')).length; }catch{ return String(s||'').length; } }
+// ── Compressed writes（压缩写入）────────────────────────────────────────────────────────────
+// An app-data write is long, repetitive JSON — a notebook is mostly coordinate arrays — and a
+// sandboxed app has no network of its own, so compression belongs HERE, at the one place the
+// request is actually made. The server inflates it with the size cap applied to the INFLATED
+// bytes and enforced during inflation (lib/gzipbody.mjs), so this can only ever buy time on the
+// wire: it can never smuggle a payload past a limit.
+// Below this size the gzip header + trailer cost more than they save and the round-trip is
+// already instant, so a small write goes exactly as it always did.
+const RELAY_GZIP_MIN_BYTES=1024;
+// R3: the encoding token names the CompressionStream format AND the header value, and it must
+// equal GZIP_ENCODING in lib/gzipbody.mjs — one literal here, pinned against the server by
+// test/save-gzip.test.mjs.
+const RELAY_GZIP='gzip';
+// Returns the fetch headers + body to use. This is a CAPABILITY check, not a browser-version
+// check: CompressionStream is absent on older iPadOS Safari and inside some WebViews. Both that
+// and any throw fall back to the byte-identical uncompressed request — the save still happens, in
+// full, with an unchanged outcome, which is why the failure is silent here (R5).
+async function relayGzipBody(text){
+  const plain={'content-type':'application/json'};
+  if(typeof CompressionStream==='undefined'||relayBodyBytes(text)<RELAY_GZIP_MIN_BYTES) return {headers:plain,body:text};
+  try{
+    const packed=await new Response(new Response(text).body.pipeThrough(new CompressionStream(RELAY_GZIP))).arrayBuffer();
+    return {headers:{...plain,'content-encoding':RELAY_GZIP},body:packed};
+  }catch(_){ return {headers:plain,body:text}; }
+}
+// Bytes → words. R3 DRIFT FIXED (round 3): this used to print "1.0 MB" while the server's
+// own 413 body (humanBytes, lib/webutil.mjs) printed "1 MB" for the SAME cap and the chat
+// component (pacHuman) printed a third thing. Three renderings of one number is how a user
+// ends up unsure which limit is real. Identical to humanBytes / pacHuman, pinned by test.
+function relaySize(n){ const b=Number(n);
+  if(!isFinite(b)||b<=0) return '0 B';
+  if(b>=1048576){ const m=b/1048576; return (m>=10?Math.round(m):Math.round(m*10)/10)+' MB'; }
+  return b>=1024?Math.round(b/1024)+' KB':b+' B'; }
+// THE ONE bilingual sentence for a failed request — server code → user-visible prose, in
+// one function, for every surface. The shell's own chrome calls it; the broker attaches its
+// output to EVERY {ok:false} reply (relayFail below) so a sandboxed app can print the right
+// sentence without owning a mapping of its own.
+// V4 SCAR: an oversize /api/chat answered 413 and the shell rendered NOTHING — a non-2xx
+// answer is not a stream, so the NDJSON loop never parsed it, nothing threw, and the '…'
+// pill sat there forever with the typed message already cleared.
+// LEFTOVER (e) SCAR: every non-size failure of an upload said "Upload failed". Each branch
+// below is now a DIFFERENT sentence, and each one states what happened to the payload —
+// a size rejection can never be mistaken for a 401 or for a dropped connection.
+function relayText(f,sentBytes,what){
+  const e=f||{}, w=relayWhat(what);
+  const sent=sentBytes?' — '+relaySize(sentBytes)+' sent · 已发送':'';
+  if(e.code==='too-large') return w.head+(e.limit?' (max '+relaySize(e.limit)+')':'')+sent+'. '+w.act+'。';
+  // A 401 answering a SIGN-IN is a rejected credential, not an expired session. The server
+  // already says which ("wrong username or PIN"); this branch used to drop that and print
+  // "Signed out — sign in again" at someone who was, at that moment, signing in. It read as
+  // a session bug and hid the real reason (R5: the specific reason always wins).
+  if(e.code==='unauthorized') return w===RELAY_NOUNS.credentials
+    ? String(e.error||'Wrong username or PIN · 用户名或 PIN 错误')+'。'
+    : 'Signed out · 登录已过期 — '+w.en+' '+w.did+'. Sign in again, then retry · 请重新登录后重试。';
+  // NOT the `sent` clause: nothing was sent, so naming a "sent" size here would contradict
+  // the sentence it sits in. The size is stated as what is still waiting on the device.
+  if(e.code==='network') return 'Connection failed · 连接失败 — it never left this device · 未发出'+(sentBytes?' ('+relaySize(sentBytes)+' waiting · 待发送)':'')+'. Retry when you are back online · 恢复网络后重试。';
+  if(e.code==='server-error') return 'Server error · 服务器错误'+(e.status?' ('+e.status+')':'')+' — '+w.en+' '+w.did+'. Nothing on this device was changed · 本机内容未受影响。';
+  if(e.code==='not-found') return 'Not found · 未找到 — '+w.en+' '+w.did+'。';
+  if(e.code==='relay-error') return 'App shell error · 外壳出错 — '+w.en+' '+w.did+'. Reload and retry · 请重新加载后重试'+(e.error?' ('+e.error+')':'')+'。';
+  // bad-request (incl. the 408 an unfinished body earns) and anything without a code: the
+  // server's own reason is the most specific thing available, so it is shown verbatim
+  // rather than replaced by a house sentence that would say less (R5). 'cancelled' lands here
+  // too: its error, RELAY_CANCELLED, already is the whole sentence.
+  return (e.code==='bad-request'?'Rejected · 请求被拒绝'+(e.status?' ('+e.status+')':'')+' — ':'')
+    +String(e.error||'Request rejected · 请求被拒绝')+'。';
+}
+// Attach that sentence to a failure reply. EVERY broker kind answers through this, so an
+// app that only knows how to print a string still shows the specific reason — the fix for
+// the "Upload failed" class of surface (R3: apps map nothing; this is the only mapping).
+// An `ok:true` reply and a failure that already carries prose from the server are untouched.
+function relayFail(f,sentBytes,what){
+  if(!f||typeof f!=='object'||f.ok!==false||typeof f.text==='string') return f;
+  return {...f,text:relayText(f,sentBytes,what)};
+}
+// The shell's OWN chrome (sign in, fork an app, save settings) through that same mapper.
+// `p` is a fetch promise rather than a URL because sign-in has no session header yet and
+// so cannot go through relayCall — the PLUMBING differs, the MAPPING does not (R3).
+// SCAR these call sites carried: they did `await r.json()` on a text/plain 4xx, which
+// THROWS — the user saw nothing at all — or printed a house 'Save failed · 保存失败' that
+// read identically for a 413, an expired session and a dead socket.
+// Returns {ok:true,data} or a coded failure carrying its own rendered `text`.
+async function relayJson(p,what){
+  let r; try{ r=await p; }catch(err){ return relayFail(relayNetFail(err,'request'),0,what); }
+  if(!r.ok) return relayFail(await relayHttpFail(r),0,what);
+  try{ return {ok:true,data:await r.json()}; }
+  catch{ return relayFail({ok:false,code:'server-error',status:r.status,error:'malformed reply · 回复格式错误'},0,what); }
+}
+/* RELAY-CORE-END */
+
+// SpeechRecognition reports failures as bare tokens ('no-speech', 'not-allowed'). The shell
+// authors the reason here — the same job the server does for an HTTP failure — so relayText
+// has a real bilingual sentence to render instead of printing a raw token at the user.
+// `secure` is window.isSecureContext, passed in so this stays pure and testable. It
+// separates the two causes that BOTH surface as 'not-allowed': a permission the user
+// denied (the browser will not re-prompt — it must be changed in site settings), and an
+// insecure origin, where the API is blocked outright and no prompt ever appears. Over
+// http://<lan-ip>:8787 the second is what happens, and telling the user to "allow the
+// microphone" there is advice they cannot act on — the fix is the https:// address.
+function speechReason(code,secure){
+  if(code==='not-allowed'||code==='service-not-allowed') return secure
+    ? 'Microphone blocked · 麦克风被阻止 — turn it on for this site in browser settings, then retry · 请在浏览器设置中为本站开启麦克风后重试'
+    : 'Microphone needs a secure connection · 麦克风需要安全连接 — open this page over its https:// address · 请改用 https:// 地址打开';
+  if(code==='no-speech') return 'No speech heard · 未听到语音 — try again · 请再试一次';
+  if(code==='audio-capture') return 'No microphone found · 未找到麦克风';
+  if(code==='network') return 'Speech service unreachable · 语音服务连接失败';
+  if(code==='aborted') return 'Listening stopped · 已停止聆听';
+  return 'Speech failed · 语音识别失败'+(code?' ('+code+')':'');
+}
+
+// ── Notifications（通知）───────────────────────────────────────────────────────────────
+// The ONE Notification-permission path (R3). A sandboxed iframe cannot ask for the grant,
+// so the SHELL owns it and one grant covers every app — and both the fire-now kind
+// ('notify') and the scheduled kind ('notify-at') come through here, so there is exactly
+// one place that decides whether a notification is allowed to happen.
+async function shellNotifyPermission(){
+  if(!('Notification' in window)) return {ok:false,code:'unsupported',error:'Notifications not supported · 不支持通知'};
+  let perm=Notification.permission;
+  // requestPermission() REJECTS in some browsers when there is no user gesture (a timer that
+  // fires while the user is elsewhere has none). A rejection is not "granted", so it is read
+  // back as the current state and reported as a coded refusal — never swallowed (R5).
+  if(perm==='default'){ try{ perm=await Notification.requestPermission(); }catch(_){ perm=Notification.permission; } }
+  // 'denied' has TWO causes needing different remedies, and the raw state told the user
+  // neither. An INSECURE ORIGIN (http://<lan-ip>:8787) cannot even ask — the browser
+  // auto-denies and never prompts — so "allow it in settings" is advice that cannot be
+  // acted on; the fix is the https:// address. A real denial IS a settings change, and the
+  // browser will not re-prompt. Same split as speechReason() for the microphone (R3).
+  if(perm!=='granted') return {ok:false,code:'denied',permission:perm,error: window.isSecureContext
+    ? 'Notifications are blocked · 通知被阻止 — turn them on for this site in browser settings, then retry · 请在浏览器设置中为本站开启通知后重试'
+    : 'Notifications need a secure connection · 通知需要安全连接 — open this page over its https:// address · 请改用 https:// 地址打开'};
+  return {ok:true,permission:perm};
+}
+// The alarm TONE. A notification's own sound is an OS setting the page cannot control, and the
+// Notification API has no working custom-sound option — so an app that wants to be HEARD needs
+// this. It lives in the shell for the same reason the timer does: by fire time the app is
+// usually gone (its iframe removed, ADR 0018) and its own AudioContext went with it. Audio needs
+// no PERMISSION, only a prior interaction with the page — opening an app is one — so it still
+// rings when the notification grant was refused.
+// Synthesized, not shipped as audio files: no binary assets, nothing to license, and it works
+// under the app CSP. Each returns the seconds it occupies, so repeats can be spaced.
+const PA_TONES={
+  // Three rising-then-falling chirps. The default on purpose: pleasant enough to hear several
+  // times an hour, and its pitch sits above most room noise.
+  'morning-bird':(x,t)=>{ for(let i=0;i<3;i++){ const s=t+i*0.22, o=x.createOscillator(), g=x.createGain();
+      o.type='sine';
+      o.frequency.setValueAtTime(2100,s); o.frequency.exponentialRampToValueAtTime(3400,s+0.06); o.frequency.exponentialRampToValueAtTime(2300,s+0.14);
+      g.gain.setValueAtTime(0.0001,s); g.gain.exponentialRampToValueAtTime(0.5,s+0.02); g.gain.exponentialRampToValueAtTime(0.0001,s+0.17);
+      o.connect(g); g.connect(x.destination); o.start(s); o.stop(s+0.18); } return 0.72; },
+  'gentle-chime':(x,t)=>{ [1046.5,1568].forEach((f,i)=>{ const o=x.createOscillator(), g=x.createGain();
+      o.type='sine'; o.frequency.value=f;
+      g.gain.setValueAtTime(i?0.16:0.34,t); g.gain.exponentialRampToValueAtTime(0.0001,t+1.7);
+      o.connect(g); g.connect(x.destination); o.start(t); o.stop(t+1.8); }); return 1.6; },
+  'soft-bells':(x,t)=>{ [0,0.42].forEach(d=>{ [660,990,1320].forEach((f,i)=>{ const o=x.createOscillator(), g=x.createGain();
+      o.type='sine'; o.frequency.value=f;
+      g.gain.setValueAtTime(0.28/(i+1),t+d); g.gain.exponentialRampToValueAtTime(0.0001,t+d+1.1);
+      o.connect(g); g.connect(x.destination); o.start(t+d); o.stop(t+d+1.2); }); }); return 1.6; },
+  'ocean-wave':(x,t)=>{ const n=Math.floor(x.sampleRate*1.5), b=x.createBuffer(1,n,x.sampleRate), d=b.getChannelData(0);
+      for(let i=0;i<n;i++) d[i]=Math.random()*2-1;
+      const src=x.createBufferSource(); src.buffer=b;
+      const f=x.createBiquadFilter(); f.type='lowpass';
+      f.frequency.setValueAtTime(280,t); f.frequency.linearRampToValueAtTime(1100,t+0.65); f.frequency.linearRampToValueAtTime(240,t+1.5);
+      const g=x.createGain();
+      g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(0.38,t+0.65); g.gain.linearRampToValueAtTime(0.0001,t+1.5);
+      src.connect(f); f.connect(g); g.connect(x.destination); src.start(t); src.stop(t+1.5); return 1.5; },
+  'classic-ring':(x,t)=>{ for(let i=0;i<9;i++){ const s=t+i*0.09, o=x.createOscillator(), g=x.createGain();
+      o.type='square'; o.frequency.value=i%2?480:440;
+      g.gain.setValueAtTime(0.18,s); g.gain.setValueAtTime(0.0001,s+0.08);
+      o.connect(g); g.connect(x.destination); o.start(s); o.stop(s+0.09); } return 0.85; },
+};
+// Play `name`, `repeat` times. ONE AudioContext for the whole burst, closed after the last note:
+// a context per note leaks them on devices with a low limit.
+function shellBell(name,repeat){
+  try{
+    const C=window.AudioContext||window.webkitAudioContext; if(!C) return false;
+    const tone=PA_TONES[name]; if(!tone) return false;   // unknown name = silent, never a surprise substitute
+    const ctx=new C(); let t=ctx.currentTime+0.03, end=t;
+    const n=Math.max(1,Math.min(PA_TONE_MAX_REPEAT,repeat||PA_TONE_REPEAT));
+    for(let i=0;i<n;i++){ const d=tone(ctx,t); end=t+d; t=end+PA_TONE_GAP; }
+    setTimeout(()=>{ try{ ctx.close(); }catch(_){ /* already closed by the browser */ } },(end-ctx.currentTime+0.6)*1000);
+    return true;
+  }catch(_){ return false; }   // a suspended or blocked AudioContext is nothing the caller can act on; the banner is the fallback
+}
+// Show one now. Returns a broker-shaped reply; the caller is the only thing that differs
+// between "an app asked" and "a schedule came due".
+async function shellNotify(o){
+  const g=await shellNotifyPermission();
+  if(!g.ok) return g;
+  try{
+      // requireInteraction: a banner that fades after a few seconds is as missable as a
+      // single beep. Honoured on desktop Chrome/Edge; Safari ignores it harmlessly.
+    new Notification(String((o&&o.title)||'Notification'),{body:String((o&&o.body)||''),tag:(o&&o.tag)||undefined,icon:(o&&o.icon)||undefined,requireInteraction:true});
+    return {ok:true,permission:g.permission};
+  }catch(err){ return {ok:false,code:'relay-error',error:String((err&&err.message)||err)}; }
+}
+
+/* NOTIFY-SCHED-START ── Scheduled notifications（定时通知）: the pure half ────────────────
+   WHY THE SHELL OWNS THIS. Leaving an app DESTROYS it: $('#back') removes its iframe once
+   its last save is in (ADR 0018), so the app's countdown (setInterval), its bell (an AudioContext oscillator)
+   and its end-time variable all die with it. A pomodoro that only rings from inside the
+   app therefore never rings — the user left, which is exactly when they needed telling.
+   The shell is the same page across every app switch, so the shell holds the timer.
+   OUT OF SCOPE, deliberately: the browser TAB being closed, and iOS freezing a background
+   tab. No page-side timer can survive either; that needs a push channel (Web Push)
+   and is a separate decision.
+   DOM-free on purpose — test/notify-at.test.mjs extracts everything between the two markers
+   and RUNS it, so the rules below are the shipped ones, not a retyped copy. */
+// setTimeout keeps its delay in a signed 32-bit int: a delay over 2147483647 ms wraps and
+// fires IMMEDIATELY. Capping at 24h keeps every armed timer far inside that, and turns an
+// absurd delay into a coded refusal instead of an alarm that goes off at once (R14).
+  const PA_TONE_REPEAT=3, PA_TONE_MAX_REPEAT=10, PA_TONE_GAP=0.55;
+const NOTIFY_AT_MAX_MS=24*60*60*1000;
+// How late an alarm may be and still be worth ringing: longer than a page reload, far
+// shorter than "the tab was closed over lunch".
+const NOTIFY_AT_GRACE_MS=60*1000;
+const NOTIFY_AT_MAX_TAG=64, NOTIFY_AT_MAX_TEXT=200;
+  // Tone NAMES live here (pure); their SYNTHESIS lives in PA_TONES above, which needs an
+  // AudioContext. A test pins the two lists identical, so a tone can never be offered but
+  // unplayable. A single ring is the easiest thing to miss — you look up one second late and
+  // it is simply gone — so an alarm repeats by default; louder only startles.
+  const PA_TONE_NAMES=['morning-bird','gentle-chime','soft-bells','ocean-wave','classic-ring'];
+  const PA_TONE_DEFAULT='morning-bird';
+  // sound: true -> the default tone · a known name -> that tone · anything else -> silent.
+  // An UNKNOWN name is SILENT rather than falling back, so a typo shows up as no sound instead
+  // of quietly playing something the app never asked for (R14).
+  function toneOf(v){ return v===true?PA_TONE_DEFAULT:(typeof v==='string'&&PA_TONE_NAMES.indexOf(v)>=0?v:''); }
+  function repeatOf(v){ const n=Math.round(Number(v)); return Number.isFinite(n)&&n>0?Math.min(n,PA_TONE_MAX_REPEAT):PA_TONE_REPEAT; }
+// A notify-at request → the record to store, or a coded failure. `now` is a parameter so the
+// rule is testable, and so ONE clock (the shell's) decides both the deadline and the checks.
+function notifyAtPlan(m,now){
+  const tag=(m&&typeof m.tag==='string')?m.tag.trim().slice(0,NOTIFY_AT_MAX_TAG):'';
+  // The tag IS the schedule's identity: it is what a later schedule replaces and what a
+  // cancel names. Without one, restarting a pomodoro would stack a second bell on the first.
+  if(!tag) return {ok:false,code:'bad-request',error:'a scheduled notification needs a tag · 定时通知需要 tag'};
+  // inMs wins when both are given — a delay cannot disagree with the shell's clock, while an
+  // absolute `at` the app computed can (the app may have been loaded before a clock change).
+  const at=Number.isFinite(m.inMs)?now+Number(m.inMs):(Number.isFinite(m.at)?Number(m.at):NaN);
+  if(!Number.isFinite(at)) return {ok:false,code:'bad-request',error:'when? give inMs (ms from now) or at (epoch ms) · 需要 inMs（毫秒后）或 at（毫秒时间戳）'};
+  const delay=at-now;
+  if(delay>NOTIFY_AT_MAX_MS) return {ok:false,code:'bad-request',error:'too far ahead · 时间过远 (max 24h)'};
+  if(delay< -NOTIFY_AT_GRACE_MS) return {ok:false,code:'bad-request',error:'that time has already passed · 时间已过'};
+  return {ok:true,rec:{tag,at,
+    title:String((m.title==null?'':m.title)).slice(0,NOTIFY_AT_MAX_TEXT),
+    body:String((m.body==null?'':m.body)).slice(0,NOTIFY_AT_MAX_TEXT),
+    icon:(typeof m.icon==='string')?m.icon:'',
+    sound:toneOf(m.sound),                 // '' = silent: a reminder from another app must not beep unasked
+    repeat:repeatOf(m.repeat)}};
+}
+// Same tag REPLACES. One pomodoro, one bell — a Start after a Start must not leave two.
+function notifyAtPut(list,rec){ return [...(list||[]).filter(r=>r&&r.tag!==rec.tag),rec]; }
+function notifyAtDrop(list,tag){ return (list||[]).filter(r=>r&&r.tag!==tag); }
+// Boot triage — what a reload interrupted. `pending` is re-armed; `due` came due while the
+// page was rebuilding and is still worth ringing; `stale` is DROPPED and never fired: a bell
+// an hour late is noise, not information, and a record that fails the rules above is corrupt.
+function notifyAtTriage(list,now){
+  const due=[],pending=[],stale=[];
+  for(const r of (list||[])){
+    const bad=!r||typeof r.tag!=='string'||!r.tag||!Number.isFinite(r.at);
+    const d=bad?NaN:r.at-now;
+    if(bad||d>NOTIFY_AT_MAX_MS||d< -NOTIFY_AT_GRACE_MS) stale.push(r);
+    else if(d>0) pending.push(r);
+    else due.push(r);
+  }
+  return {due,pending,stale};
+}
+/* NOTIFY-SCHED-END */
+
+// ── Scheduled notifications: the half that touches the device ────────────────────────────
+const NOTIFY_AT_KEY='pa_notify_at';   // localStorage: pending schedules, re-armed on boot
+const _notifyAtTimers=new Map();      // tag → setTimeout handle, for THIS page load only
+function notifyAtLoad(){
+  // A corrupt or unavailable store degrades to "nothing pending" — never to a wrong alarm.
+  // Silence is correct (R5): no app is waiting on this read, nothing the user did failed, and
+  // throwing here would break the shell's boot over a stale localStorage value.
+  try{ const v=JSON.parse(localStorage.getItem(NOTIFY_AT_KEY)||'[]'); return Array.isArray(v)?v:[]; }
+  catch(_){ return []; }
+}
+function notifyAtStore(list){
+  // Private mode / quota: the alarm still fires from the live timer in THIS page; only
+  // surviving a reload is lost. Nothing the app asked for failed, so there is nothing to
+  // report to it (R5) — the same degradation _saveSeen already accepts for the blue dot.
+  try{ localStorage.setItem(NOTIFY_AT_KEY,JSON.stringify(list)); }catch(_){ }
+}
+function notifyAtDisarm(tag){
+  const h=_notifyAtTimers.get(tag);
+  if(h===undefined) return false;
+  clearTimeout(h); _notifyAtTimers.delete(tag); return true;
+}
+function notifyAtArm(rec){
+  notifyAtDisarm(rec.tag);
+  _notifyAtTimers.set(rec.tag,setTimeout(()=>{
+    _notifyAtTimers.delete(rec.tag);
+    notifyAtStore(notifyAtDrop(notifyAtLoad(),rec.tag));   // spent — it must not be re-armed by a later reload
+    notifyAtFire(rec);
+  },Math.max(0,rec.at-Date.now())));
+}
+// Fire. R5: the app that asked is usually GONE by now (that is the whole point of this kind),
+// so a refusal here cannot be relayed to it. It is shown in shell chrome instead, so a
+// blocked notification still reaches the user as the alarm they asked for, not as silence.
+async function notifyAtFire(rec){
+  // Ring BEFORE notifying, and independently of it: audio needs no grant, so a blocked
+  // notification must not also cost the user the alarm they asked to hear.
+  const rang=(rec&&rec.sound)?shellBell(rec.sound,rec.repeat):false;
+  const g=await shellNotify(rec);
+  // Fall back to shell chrome only when NOTHING else reached the user. If it rang they have
+  // been alerted, and a dialog every pomodoro would be noise rather than news.
+  if(!g.ok&&!rang){
+    const d=$('#actConfirm');
+    // Never steal a confirm the user is in the middle of answering.
+    if(d&&!d.open) askConfirm(String(rec.title||'')+(rec.body?' — '+rec.body:'')+' ('+relayText(g,0,'request')+')','OK · 知道了');
+  }
+  return {...g,rang};
+}
+function notifyAtCancel(tag){
+  const armed=notifyAtDisarm(tag);
+  const before=notifyAtLoad(), after=notifyAtDrop(before,tag);
+  const stored=after.length!==before.length;
+  if(stored) notifyAtStore(after);
+  return armed||stored;   // false = nothing was pending, which is not a failure — cancel is idempotent
+}
+async function notifyAtSchedule(m){
+  const plan=notifyAtPlan(m,Date.now());
+  if(!plan.ok) return plan;
+  // Ask for the grant NOW, while the tap that started the timer is still the live user
+  // gesture — Safari shows the prompt only then, and at fire time there is none. A refused
+  // grant refuses the SCHEDULE: an alarm that can never ring must not report success (R14).
+  const g=await shellNotifyPermission();
+  // A refused grant refuses the schedule ONLY when nothing would reach the user (R14). With
+  // sound:true the alarm can still be HEARD, so arming it is honest — but report banner:false
+  // so the caller can tell the user there will be no banner.
+  if(!g.ok&&!plan.rec.sound) return g;
+  const before=notifyAtLoad();
+  const replaced=notifyAtDisarm(plan.rec.tag)||before.some(r=>r&&r.tag===plan.rec.tag);
+  notifyAtStore(notifyAtPut(before,plan.rec));
+  notifyAtArm(plan.rec);
+  return {ok:true,tag:plan.rec.tag,at:plan.rec.at,replaced,sound:plan.rec.sound,banner:g.ok,permission:g.permission||'denied'};
+}
+// A reload is not a cancel: the pomodoro that was running when the page refreshed must still
+// ring. Stale schedules are dropped here rather than fired (see notifyAtTriage).
+function notifyAtBoot(){
+  const t=notifyAtTriage(notifyAtLoad(),Date.now());
+  notifyAtStore(t.pending);
+  for(const r of t.pending) notifyAtArm(r);
+  for(const r of t.due) notifyAtFire(r);
+}
+notifyAtBoot();
+
+/* ── Broker (for sandboxed apps) ── */
+// In-flight 'chat' relays: broker id → that relay's AbortController. It is what chat-cancel looks
+// a chat up by, and an entry lives exactly as long as its relay runs.
+const relayChats=new Map();
+// The schemes kind 'open-url' opens: a way OUT to a page or a mail app, never javascript:/data:/
+// file:. The same set as PANote's LINK_SCHEMES (web/note-ui.inline.html; test/note-link.test.mjs).
+const OPEN_URL_OK=/^(https?|mailto):$/;
+window.addEventListener('message',async(e)=>{
+  // Only an app's own page: the one in #fr, or one held while it leaves (web/app-frame.js, ADR 0018).
+  const fr=appFrameOf(e.source); if(!fr) return;
+  // id may be a number (an app's own broker) or a string (the shared PAChat broker,
+  // which prefixes ids 'pac…' to avoid colliding with the app's numeric ids). Echoed back as-is.
+  const m=e.data; if(!m||m.pa!=='req'||(typeof m.id!=='number'&&typeof m.id!=='string')) return;
+  // What this request carries, so a failure can name it. An app may say so itself
+  // (m.what); otherwise the kind decides, and an upload is a photo or a file by its
+  // filename — the notebook's photo insert and the composer's camera-roll pick both use
+  // kind 'upload', so inferring here fixes BOTH without either call site knowing (R3).
+  // Writes name their payload; everything else is a read, and a read that failed was
+  // "not loaded", never "not saved".
+  // 'meal-photo' is a photo WRITE: without it the noun defaulted to 'content', so an
+  // oversized meal photo read "Content not loaded" — the wrong side of the exchange, and
+  // the exact wording class the noun table exists to kill. It is a photo, not uploaded.
+  const relayKindWhat=m.kind==='upload'?relayWhatForFile(m.name):m.kind==='meal-photo'?'photo':m.kind==='chat'||m.kind==='ask'?'message':m.kind==='save-data'?'note':'content';
+  const what=(typeof m.what==='string'&&m.what)?m.what:relayKindWhat;
+  // EVERY reply goes through relayFail: a failure without a rendered sentence is exactly
+  // the "Upload failed" surface this round removes (R5 — the reason reaches the user, not
+  // just the log). relayFail leaves ok:true replies and server-authored prose untouched.
+  // To the page that asked, never to whatever #fr holds by then: a reply that outlives a leave must
+  // not reach the next app, whose ids start again from 1.
+  const reply=(o,bytes)=>e.source.postMessage({pa:'res',id:m.id,...relayFail(o,bytes||0,what)},'*');
+  // Per-app data isolation: the app's private data channel (kind data/save-data) is
+  // auto-namespaced to data/<slug>/, so apps use BARE paths and physically cannot scatter
+  // to the workspace root or read another app's data. Shared data uses dedicated kinds.
+  // The slug of the page that asked: #fr's, or the one a held page had when it was held.
+  const appSlug=fr.slug;
+  // FAILS CLOSED with no slug, for EVERY kind (R13, 2026-10-13; ADR 0018). A page with no app slug
+  // has no data folder, no chat tag and no settings of its own: a bare path landed at the workspace
+  // root, and a chat or an ask ran an agent for no app. None of this is reachable from a page the
+  // shell serves; it is the backstop if that ever changes.
+  if(!appSlug) return reply({ok:false,code:'bad-request',error:NO_APP_TEXT});
+  const appData=(pp)=>'data/'+appSlug+'/'+pp;
+  // In flight until answered, so a leaving page is not removed while it waits on a reply (web/app-frame.js).
+  appFrameBusy(fr,1);
+  try{
+    // Offline-first: a kind that needs the node is answered at once while there is none (web/offline-client.js §5).
+    const needsNode=PAOffline.refuse(m.kind); if(needsNode) return reply(needsNode);
+    if(m.kind==='pref'){
+      // Device-level UI preference from an app component (e.g. PANote's "Allow finger drawing"):
+      // stored like the font scale (localStorage), pushed back to apps via sendAppPrefs on load.
+      if(typeof m.fingerDraw==='boolean') localStorage.setItem('pa_fingerdraw', m.fingerDraw?'1':'0');
+      // Print on white rather than the note's paper tint. Read back with !=='0' below, NOT
+      // ==='1': this one DEFAULTS ON, so an unset value must mean ink-only.
+      if(typeof m.printInk==='boolean') localStorage.setItem('pa_printink', m.printInk?'1':'0');
+      // Seamless vs single-page writing surface. Defaults OFF, so !=='1' is the right read here —
+      // the opposite of printInk above, and getting the polarity wrong silently inverts a default.
+      if(typeof m.seamless==='boolean') localStorage.setItem('pa_seamless', m.seamless?'1':'0');
+      if(typeof m.noFlip==='boolean') localStorage.setItem('pa_noflip', m.noFlip?'1':'0');
+      // TODO(R4 seam): the pref store + sendAppPrefs push is one block to lift out of the broker.
+      // (openAi used to live here, per device. It is the app pref appPrefs[slug].openAi now, set in
+      // the app's Settings dialog — one place, on the account — and pushed by sendAppPrefs.)
+      // (noteSort used to live here, per device. It is a per-APP setting on the server now —
+      // app-settings / set-app-settings — because a journal read on a laptop and on an iPad is
+      // one journal, and two devices disagreeing about its order is two different journals.)
+      return reply({ok:true});
+    } else if(m.kind==='open-url'){
+      // A link an app's user tapped (PANote's note links). The app page is sandboxed without
+      // allow-popups (this iframe AND its served CSP), so its own target=_blank is a silent no-op:
+      // the shell owns this Web API, as with print. The shell checks the address ITSELF — never on
+      // the app's word — and opens it at once, while the tap's activation still holds (no await
+      // above this line in the handler). noopener+noreferrer: the page learns nothing of the shell.
+      // TODO(R4): grows this over-budget file; the seam is the broker (this listener) to its own file.
+      // Which app asks is the shell's own reading too: the page in #fr (a held page is hidden, so no
+      // tap reaches it), the signed-in user's own app, on the list. Every other app stays sealed.
+      if(fr.held||frameUid()!==UID||!LINK_APPS.has(appSlug)) return reply({ok:false,code:'bad-request',error:'links off for this app',text:'This app cannot open links · 此应用不能打开链接'});
+      let u=null; try{ u=new URL(String(m.url==null?'':m.url)); }catch(_){ /* not a URL: refused just below */ }
+      if(!u||!OPEN_URL_OK.test(u.protocol)) return reply({ok:false,code:'bad-request',error:'link refused',text:'Only web or email links open · 只能打开网页或邮件链接'});
+      window.open(u.href,'_blank','noopener,noreferrer');
+      return reply({ok:true});
+    } else if(m.kind==='data'){
+      // THE read path. Its outcome decides whether an app treats a notebook as empty, so
+      // it answers a code, never a bare "not found" (see RELAY-CORE above).
+      if(typeof m.path!=='string'||m.path.includes('..')) return reply(relayBadPath());
+      // Offline-first: the node first, the on-device mirror when the network fails (web/offline-client.js). TODO(R4 seam): the broker to its own file.
+      reply(await PAOffline.read(appSlug,m.path,()=>relayCall('/api/data/'+appData(m.path).split('/').map(encodeURIComponent).join('/'),undefined,'text','text')));
+    } else if(m.kind==='attach-url'){
+      // Return an uploaded attachment as a data URL so a sandboxed app can re-display it on
+      // reload (apps can't fetch; blob URLs don't cross origins). Same source as renderAtts.
+      if(typeof m.path!=='string'||m.path.includes('..')) return reply(relayBadPath());
+      const g=await relayCall('/api/data/'+m.path.split('/').map(encodeURIComponent).join('/'),undefined,'blob');
+      if(!g.ok) return reply(g);
+      try{
+        const u=await new Promise((rr,rj)=>{ const fr=new FileReader(); fr.onload=()=>rr(fr.result); fr.onerror=()=>rj(new Error('FileReader failed')); fr.readAsDataURL(g.blob); });
+        reply({ok:true,dataUrl:u});
+      }catch(err){ reply({ok:false,code:'relay-error',error:'could not decode the attachment · 附件解码失败: '+((err&&err.message)||'')}); }
+    } else if(m.kind==='websearch'){
+      // Web search performed BY THE SERVER（联网搜索）. An app is sandboxed with connect-src
+      // 'none' and a member's agent cannot run Bash, so this relay is the only way either of
+      // them reaches the live web — and the Tavily key stays on the server throughout.
+      // 'raw', NOT 'json'. The route answers an ENVELOPE — {ok,results} — and 'json' would nest
+      // the whole body under a second `results` key, handing the app results:{ok,results:[…]}.
+      // An app then sees a non-array and reports "no results found", blaming the user's spelling
+      // for a wiring fault. raw also carries the server's own failure code straight through.
+      reply(await relayCall('/api/websearch?q='+encodeURIComponent(m.q||m.query||'')
+        +(m.max?'&max='+encodeURIComponent(m.max):''),undefined,'raw'));
+    } else if(m.kind==='bible-search'){
+      reply(await relayCall('/api/bible-search?q='+encodeURIComponent(m.q||''),undefined,'json','results'));
+    } else if(m.kind==='bible'){
+      reply(await relayCall('/api/bible?book='+encodeURIComponent(m.book)+'&chapter='+encodeURIComponent(m.chapter),undefined,'json','data'));
+    } else if(m.kind==='chat'){
+      // Relay the real chat pipeline (persistence, sessions, streaming) to the app.
+      const send=(o)=>e.source.postMessage({pa:'res',id:m.id,...o},'*');   // to the page that asked, as reply() is
+      // oneShot: ONE answer for a component (PAChat.complete), not a conversation turn — the server
+      // then answers without extended thinking and kills the job when this request closes. Only the
+      // literal true is forwarded, so no other value an app sends can switch either behaviour on.
+      const body=JSON.stringify({message:String(m.message||''),convoId:m.convoId||null,attachments:m.attachments,app:appSlug,label:m.label,model:m.model||undefined,system:m.system||undefined,assess:m.assess||undefined,oneShot:m.oneShot===true||undefined});
+      // A failed chat must SAY so inside the app's chat UI. PAChat renders only
+      // convo/status/delta/done/assess events (web/chat-ui.inline.html:575-588), and a
+      // delta APPENDS to what has streamed so far — so the failure is delivered as a delta
+      // (a partial answer is kept, the warning is appended) plus {ok:false,code,…} on the
+      // done message for programmatic callers. Previously a 413 was forwarded as an opaque
+      // {ev:{ok:false}} with no `type`, which PAChat rendered as "No response".
+      // The done message carries the SAME rendered sentence as the delta (relayFail), so a
+      // programmatic caller that never paints deltas still has the specific reason (R3).
+      const fail=(f)=>{ const n=relayBodyBytes(body); send({ev:{type:'delta',text:'\n\n⚠ '+relayText(f,n,'message')}}); send({done:true,...relayFail(f,n,'message')}); loadConvos(); };
+      // Cancellable by chat-cancel for as long as this relay runs. Aborting closes the fetch — the
+      // signal the server acts on — and the chat then ends code:'cancelled', never 'network'. The
+      // entry is removed only if it is still OURS: a newer app frame may reuse this broker id.
+      const ac=new AbortController(); relayChats.set(m.id,ac);
+      try{
+        let res;
+        try{ res=await api('/api/chat',appAgentInit(body,ac.signal)); }
+        catch(err){ return fail(relayNetFail(err,'request',ac.signal)); }
+        if(!res.ok) return fail(await relayHttpFail(res));
+        try{
+          const rd=res.body.getReader(); const dec=new TextDecoder(); let buf='';
+          for(;;){ const {done,value}=await rd.read(); if(done) break; buf+=dec.decode(value,{stream:true});
+            // R5: a line that will not parse is skipped on purpose — NDJSON framing is the
+            // stream's contract, and the transport failures that used to hide here (a 413 or
+            // a 401 answered instead of a stream) are now caught by the res.ok check above.
+            let i; while((i=buf.indexOf('\n'))>=0){ const t=buf.slice(0,i); buf=buf.slice(i+1); if(!t.trim()) continue; let jj; try{jj=JSON.parse(t)}catch{continue} send({ev:jj}); } }
+          send({done:true});
+        }catch(err){ return fail(relayNetFail(err,'stream',ac.signal)); }
+      }finally{ if(relayChats.get(m.id)===ac) relayChats.delete(m.id); }
+      loadConvos();
+      return;
+    } else if(m.kind==='chat-cancel'){
+      //   {kind:'chat-cancel',chatId} → {ok:true,chatId,cancelled}
+      // chatId is the broker id of the in-flight 'chat' to stop; it cannot travel as `id`, which is
+      // this request's own. cancelled:false means nothing by that id is in flight (it ended, or was
+      // cancelled already) — idempotent by design, like notify-cancel, and not a failure.
+      if(typeof m.chatId!=='number'&&typeof m.chatId!=='string') return reply({ok:false,code:'bad-request',error:'cancel needs a chatId · 取消需要 chatId'});
+      const ac=relayChats.get(m.chatId);
+      if(ac){ relayChats.delete(m.chatId); ac.abort(); }
+      reply({ok:true,chatId:m.chatId,cancelled:!!ac});
+    } else if(m.kind==='convo'){
+      reply(await relayCall('/api/convos/'+encodeURIComponent(m.convoId||''),undefined,'json','data'));
+    } else if(m.kind==='app-convos'){
+      reply(await relayCall('/api/app-convos?app='+encodeURIComponent(appSlug),undefined,'raw'));
+    } else if(m.kind==='health'){
+      reply(await relayCall('/api/health?days='+encodeURIComponent(m.days||7),undefined,'json','days'));
+    } else if(m.kind==='briefings'){
+      // Autonomy briefings (read-only digests) — the server lists newest-first.
+      reply(await relayCall('/api/briefings',undefined,'json','briefings'));
+    } else if(m.kind==='briefing'){
+      // NB: the briefing id travels as m.briefingId (m.id is the broker's own
+      // correlation id — an app payload named `id` would clobber it, like convoId).
+      if(typeof m.briefingId!=='string') return reply({ok:false,code:'bad-request',error:'bad id'});
+      reply(await relayCall('/api/briefings/'+encodeURIComponent(m.briefingId),undefined,'json','briefing'));
+    } else if(m.kind==='actions'){
+      // Approval loop（审批闭环）: the pending proposal queue (expiry swept server-side).
+      reply(await relayCall('/api/actions',undefined,'json','actions'));
+    } else if(m.kind==='action-decide'){
+      // The action id travels as m.actionId (m.id is the broker's correlation
+      // id); verb whitelisted in the relay. Gate: a shell-owned confirm dialog
+      // — an app postMessage alone NEVER reaches the server (see relayActionDecide).
+      reply(await relayActionDecide(m,{
+        // The label lookup may legitimately come back empty (relayActionDecide falls back
+        // to the id); the human gate below is what decides, so [] here is not a failure.
+        listPending:async()=>{ const g=await relayCall('/api/actions',undefined,'json','data'); return g.ok?g.data:[]; },
+        confirm:shellConfirm,
+        decide:async(id,verb)=>{ const g=await relayCall('/api/actions/'+encodeURIComponent(id)+'/'+verb,{method:'POST'},'json','action'); return g.ok?{ok:true,action:g.action}:g; },
+      }));
+    } else if(m.kind==='reminders'){
+      // Registered reminders（提醒）— read-only list for the app's Reminders section.
+      reply(await relayCall('/api/reminders',undefined,'json','reminders'));
+    } else if(m.kind==='reminder-remove'){
+      // Revocation goes through the SAME shell-confirm gate as action-decide.
+      reply(await relayReminderRemove(m,{
+        list:async()=>{ const g=await relayCall('/api/reminders',undefined,'json','data'); return g.ok?g.data:[]; },
+        confirm:shellConfirm,
+        remove:async(id)=>{ const g=await relayCall('/api/reminders/'+encodeURIComponent(id),{method:'DELETE'},'none'); return g.ok?g:{...g,error:'remove failed · 移除失败 ('+g.error+')'}; },
+      }));
+    } else if(m.kind==='convo-rename'){
+      if(typeof m.convoId!=='string') return reply({ok:false,code:'bad-request',error:'bad id'});
+      reply(await relayCall('/api/convos/'+encodeURIComponent(m.convoId),{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({title:String(m.title||'').slice(0,80)})},'none'));
+    } else if(m.kind==='convo-delete'){
+      if(typeof m.convoId!=='string') return reply({ok:false,code:'bad-request',error:'bad id'});
+      reply(await relayCall('/api/convos/'+encodeURIComponent(m.convoId),{method:'DELETE'},'none'));
+    } else if(m.kind==='ask'){
+      // /api/ask answers 200 {ok,text} for both outcomes; relayCall adds a code when the
+      // server itself says ok:false, and maps a transport failure the same as every kind.
+      // No slug: the server has no use for one since an app's agent writes nothing (ADR 0019).
+      reply(await relayCall('/api/ask',appAgentInit(JSON.stringify({message:String(m.message||'')})),'raw'));
+    } else if(m.kind==='meal-photo'){
+      // Log a meal photo（拍照记录饮食）. The whole pipeline already existed — vision extraction,
+      // storage, retention, and the 健康简报 Meals section — but was reachable ONLY by an iOS
+      // Shortcut posting with a token. A sandboxed app had no path to it, so there was no way
+      // to photograph a meal from inside superelf.
+      //   {kind:'meal-photo', data:'<bare base64, no data: prefix>', name?, takenAt?}
+      //   -> {ok:true, record:{items,analyzed,...}} | {ok:false, code, error}
+      // The SERVER owns every guard (size, month cap, in-flight, retention). This only
+      // relays, so an app cannot get past one by asking differently.
+      // 'raw', NOT 'json': /api/meals/ingest authors its own {ok,record,pruned} envelope,
+      // exactly like /api/ask. Reading it as 'json' wrapped that envelope under a key
+      // ({ok:true,'meal photo':{ok:true,record}}), so an app's `r.ok` was true while
+      // `r.record` was undefined — the card rendered blank and the `analyzed:false`
+      // warning could never fire, printing a clean "logged" over a dropped analysis.
+      reply(await relayCall('/api/meals/ingest',{method:'POST',headers:{'content-type':'application/json'},
+        body:JSON.stringify({ data:String(m.data||''), name:m.name, takenAt:m.takenAt })},'raw'),
+        Math.ceil(String(m.data||'').length*3/4));
+    } else if(m.kind==='meals'){
+      // The READ half of 拍照记录饮食 — recent records, oldest→newest, as the server stored
+      // them. Keyed like kind 'health' over /api/health (R3: same bare-array route shape,
+      // same relayCall spelling), so a 401/500/dropped socket reaches the app as its own
+      // code and can never be mistaken for "no meals logged yet".
+      reply(await relayCall('/api/meals?days='+encodeURIComponent(m.days||3),undefined,'json','meals'));
+    } else if(m.kind==='notify'){
+      // Generic OS notification — fires even when the user is in a different app.
+      // The shell owns the Notification permission (sandbox cannot ask), so one
+      // grant covers every app. Any app calls: paNotify({title,body,tag}).
+      reply(await shellNotify(m));
+    } else if(m.kind==='notify-at'){
+      // The SAME notification, scheduled by the SHELL so it outlives the app that asked.
+      // Leaving an app removes its iframe (ADR 0018) — the app's own timer, bell and
+      // end-time all die there, so a pomodoro that only rings in-app never rings.
+      //   {kind:'notify-at',tag,inMs|at,title,body,icon} → {ok:true,tag,at,replaced}
+      // The tag is the schedule's identity: scheduling the same tag REPLACES the pending
+      // alarm (a restarted pomodoro rings once, not twice), and notify-cancel removes it.
+      reply(await notifyAtSchedule(m));
+      } else if(m.kind==='notify-preview'){
+        //   {kind:'notify-preview',sound,repeat} → {ok:true,played}
+        // Plays a tone NOW so a settings screen can offer a ▶ before committing to it. No
+        // notification and no schedule: choosing a sound must not require permission, and
+        // must not leave anything armed. played:false = the name is unknown or audio is
+        // blocked — reported, not silently ignored (R14).
+        reply({ok:true,played:shellBell(toneOf(m.sound),repeatOf(m.repeat))});
+    } else if(m.kind==='notify-cancel'){
+      //   {kind:'notify-cancel',tag} → {ok:true,tag,cancelled}
+      // cancelled:false means nothing was pending — idempotent by design, not a failure.
+      const tag=(typeof m.tag==='string')?m.tag.trim().slice(0,NOTIFY_AT_MAX_TAG):'';
+      if(!tag) return reply({ok:false,code:'bad-request',error:'cancel needs a tag · 取消需要 tag'});
+      reply({ok:true,tag,cancelled:notifyAtCancel(tag)});
+    } else if(m.kind==='render-md'){
+      reply({ok:true,html:renderMd(String(m.text||''))});
+    } else if(m.kind==='save-data'){
+      // THE write path. A 413 carries the cap that rejected it, so an app can tell "too
+      // large" (retrying will never help — split the notebook) from "server down"
+      // (retrying will). The 200 body is relayed verbatim: it carries the server's size
+      // telemetry (bytes/prevBytes/shrank), which the app must be able to read.
+      if(typeof m.path!=='string'||m.path.includes('..')||!/\.(json|md)$/.test(m.path)) return reply(relayBadPath());   // .md: ADR 0014; the server's rule decides the rest
+      const body=JSON.stringify({path:appData(m.path),data:m.data});
+      // Sent gzipped when the browser can (relayGzipBody). The size reported alongside the reply
+      // stays the UNCOMPRESSED one: that is what the server's cap counts and what a "too large"
+      // sentence has to name — telling the user the compressed size would name a number no limit
+      // is measured against.
+      const packed=await relayGzipBody(body);
+      // Offline-first: a network failure queues the write on this device, {ok:true,offline:true} (web/offline-client.js §2).
+      reply(await PAOffline.write(appSlug,m.path,m.data,()=>relayCall('/api/save-data',{method:'POST',headers:packed.headers,body:packed.body},'raw')),relayBodyBytes(body));
+    } else if(m.kind==='upload'){
+      // THE attachment path — the notebook's photo insert, PAChat's paperclip and any
+      // app's file picker all land here. LEFTOVER (e): an oversized photo used to reach the
+      // user as the generic "Upload failed", byte-identical to a 401 or a dropped socket.
+      // The reply now always carries the rendered sentence (relayFail, via reply()) WITH
+      // the real bytes sent and the noun inferred from the filename, so "Photo too large ·
+      // 照片过大 (max 20.0 MB)" and "Signed out · 登录已过期" can never read the same.
+      if(typeof m.name!=='string'||typeof m.data!=='string') return reply({ok:false,code:'bad-request',error:'missing fields · 缺少字段 (name/data)'});
+      const body=JSON.stringify({name:m.name,data:m.data});
+      const g=await relayCall('/api/upload',{method:'POST',headers:{'content-type':'application/json'},body},'raw');
+      reply(g&&g.ok?{ok:true,path:g.path}:g,relayBodyBytes(body));
+    } else if(m.kind==='get-new-features'){
+      reply({ok:true,unseen:[...Object.keys(window._PA_NEW_KEYS||{})].filter(k=>!_SEEN.has(k))});
+    } else if(m.kind==='seen-feature'){
+      if(typeof m.key==='string'&&m.key){ _SEEN.add(m.key); _saveSeen(); } reply({ok:true});
+    } else if(m.kind==='set-model'){
+      // Remember which model this APP was last asked with. The app cannot keep it itself — it
+      // runs sandboxed at an opaque origin where every storage API throws — and the shell no
+      // longer keeps it either: it goes to the user's PROFILE, so the lane follows the account
+      // rather than the device. Per-app rather than global: a study app and a coding app want
+      // different lanes. AWAITED, so a refused or failed write is what the app is told (R5).
+      reply(await setAppModel(appSlug, m.model));
+    } else if(m.kind==='app-settings'){
+      // Read, SCOPED: only this app's preferences and its system prompt leave the shell. The app
+      // must never see the rest of the profile, and the slug is the one the SHELL derives from
+      // the frame, never one the app supplies.
+      reply({ok:true, ...appSettingsOf(appSlug, m.appPrompt)});
+    } else if(m.kind==='set-app-settings'){
+      const saved=await saveAppSettings(appSlug, m.prefs, m.systemPrompt, m.appPrompt); reply(saved);
+      if(saved.ok) sendAppPrefs(false);   // the app prefs a host reads (openAi) reach the frame now, not on the next load
+    } else if(m.kind==='notes-list'){
+      reply(await relayCall('/api/notes',undefined,'json','notes'));
+    } else if(m.kind==='note-search'){   // TODO(R4 seam): broker kinds → their own file (the listener is the seam named above)
+      // Typed text + #tags across THIS app's notebooks (lib/note-search.mjs; ADR 0023). The slug is
+      // the one the shell derives from the frame, never one the app supplies. 'raw': the server
+      // already answers the house shape {ok,hits} / {ok:false,code,error}, so it passes verbatim.
+      reply(await relayCall('/api/note-search?app='+encodeURIComponent(appSlug)+'&q='+encodeURIComponent(String(m.q||'')),undefined,'raw'));
+    } else if(m.kind==='note-text'){   // TODO(R4 seam): broker kinds → their own file
+      // The index records of THIS app's notebooks — transcript, labels, #tags — one per page (web.mjs
+      // GET /api/note-text, lib/note-text.mjs). `paths` repeat as path=; `scope` is sent only when
+      // given (null = any); `fields` is a comma list. 'raw', like note-search: the house shape passes verbatim.
+      const tq=new URLSearchParams({app:appSlug});
+      for(const pth of (Array.isArray(m.paths)?m.paths:[])) if(typeof pth==='string'&&pth) tq.append('path',pth);
+      if(typeof m.scope==='string') tq.set('scope',m.scope);
+      if(Array.isArray(m.fields)&&m.fields.length) tq.set('fields',m.fields.map(String).join(','));
+      reply(await relayCall('/api/note-text?'+tq.toString(),undefined,'raw'));
+    } else if(m.kind==='note-page-image'){   // TODO(R4 seam): broker kinds → their own file
+      // ONE page of THIS app's notebook as a PNG the node renders and keeps under uploads/pages/ (web.mjs
+      // GET /api/note-page-image, lib/note-page-image.mjs); the answer names the file for a chat attachment.
+      if(typeof m.path!=='string'||m.path.includes('..')) return reply(relayBadPath());
+      const iq=new URLSearchParams({app:appSlug,path:m.path,page:String(Math.max(0,Number(m.page)||0))}); if(typeof m.scope==='string') iq.set('scope',m.scope);
+      reply(await relayCall('/api/note-page-image?'+iq.toString(),undefined,'raw'));
+    } else if(m.kind==='summary-followup'){   // TODO(R4 seam): broker kinds → their own file
+      // The automatic research after a summary (web.mjs POST /api/summary-followup, lib/summary-followup.mjs):
+      // the summary's text goes to the node, which sends ONLY its to-do lines to the research lane (ADR 0027).
+      reply(await relayCall('/api/summary-followup',appAgentInit(JSON.stringify({text:String(m.text||'')})),'raw'));   // reaches the Claude writer now: marked like every agent call
+    } else if(m.kind==='speech-start'){
+      // Shell-side speech recognition — iOS Safari blocks webkitSpeechRecognition in iframes,
+      // so the shell owns the SpeechRecognition instance and streams results to the app.
+      // This is the ONE kind that answers more than once for a single id: interim results
+      // carry ev:'result', and exactly one terminal reply carries done:true. Every one of
+      // them goes through reply(), the same single mapper as every other kind (R3) — a
+      // second postMessage helper here would be a second mapping, and its failures reached
+      // the app as bare tokens with no rendered sentence.
+      const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+      // done:true so the app's waiter settles NOW. Without it a browser without the API
+      // left the mic spinning until the app's own 15s timeout, reporting "timeout" instead
+      // of the real reason.
+      if(!SR) return reply({ok:false,code:'unsupported',done:true,error:'Speech not supported · 不支持语音识别'});
+      // abort() throws if nothing is listening; either way a fresh recognizer is what the
+      // next line creates, so there is nothing to report and nothing to recover (R5).
+      if(window._paRec){ try{window._paRec.abort();}catch(_){/* not listening — nothing to abort */} window._paRec=null; }
+      const rec=new SR();
+      window._paRec=rec;
+      rec.lang=m.lang||'en-US';
+      rec.continuous=false;
+      rec.interimResults=true;
+      rec.onresult=(e)=>{
+        let interim='',final='';
+        for(let i=e.resultIndex;i<e.results.length;i++){
+          if(e.results[i].isFinal) final+=e.results[i][0].transcript;
+          else interim+=e.results[i][0].transcript;
+        }
+        reply({ok:true,ev:'result',text:final||interim,isFinal:!!final});
+      };
+      rec.onerror=(e)=>{ reply({ok:false,code:'speech-error',done:true,error:speechReason(e&&e.error,window.isSecureContext)}); window._paRec=null; };
+      rec.onend=()=>{ reply({ok:true,done:true,ev:'done'}); window._paRec=null; };
+      rec.start();
+      return; // already answered by the streaming replies above
+    } else if(m.kind==='speech-stop'){
+      // stop() throws on a recognizer that is not listening — which is the state the caller
+      // asked for, so there is nothing to surface (R5).
+      if(window._paRec){ try{window._paRec.stop();}catch(_){/* not listening — already stopped */} }
+      return reply({ok:true});
+    } else if(m.kind==='print'){
+      // Shell-side printing. An app page is sandbox="allow-scripts" with no allow-modals, so its
+      // own window.print() is a SILENT no-op — returns undefined, throws nothing, fires no event.
+      // Same shape as speech-start above: the shell owns a Web API the sandbox denies the app.
+      // The app sends rendered PNG pages; this only lays them out on sheets and prints them.
+      const pages=Array.isArray(m.pages)?m.pages:[];
+      // Leads with a CODE, like every other failure the broker answers. A reply that carries only
+      // prose cannot be told apart from any other refusal by the caller, which is the whole point
+      // of the one-mapper rule — and this branch had been quietly breaking it since print landed.
+      if(!pages.length) return reply({ok:false,code:'no-content',error:'nothing to print · 没有可打印的内容'});
+      let root=$('#printRoot');
+      if(!root){ root=document.createElement('div'); root.id='printRoot'; document.body.appendChild(root); }
+      root.innerHTML=pages.map(()=>'<div class="pr-sheet"><img alt=""></div>').join('');
+      const imgs=[...root.querySelectorAll('img')];
+      // src via property, not innerHTML: a data: URL of a 300dpi page is ~1MB, and building that
+      // into an attribute string costs a second copy of every page for no reason.
+      imgs.forEach((im,i)=>{ im.src=(pages[i]&&pages[i].png)||''; });
+      // Print only once the pixels are decodable. Printing early yields blank sheets, which look
+      // exactly like a note that failed to render.
+      await Promise.all(imgs.map(im=>im.complete?Promise.resolve():new Promise(r=>{ im.onload=im.onerror=r; })));
+      document.documentElement.classList.add('pa-printing');
+      // THE PRINT SURFACE OUTLIVES THE PRINT CALL, AND OUTLIVES afterprint.
+      //
+      // Two scars, both iPad, both the same mistake at a different distance:
+      //  1. Teardown ran on the line after window.print(). Desktop print() BLOCKS until the dialog
+      //     closes; iOS returns immediately, so the surface was gone before the preview rendered
+      //     and iOS printed the ordinary page — shell header, app toolbar and all.
+      //  2. Teardown then ran on `afterprint`. With NO printer selected the preview was right, and
+      //     the moment a real printer was chosen the app chrome came back, zoomed. Selecting a
+      //     printer makes iOS RE-RENDER the document for that printer's paper, and iOS fires
+      //     afterprint when the first PREVIEW is generated — not when the user is finished. By the
+      //     re-render the surface had been torn down again.
+      // So nothing event-driven may reclaim it. A timer does, long after any dialog is done, and
+      // the next print clears that timer first — otherwise print #1's timer fires in the middle of
+      // print #2. The surface is display:none on screen, so holding it costs nothing visible.
+      const HOLD_MS=600000;
+      if(root._paHold) clearTimeout(root._paHold);          // a previous print's timer must not fire into this one
+      const teardown=()=>{ root._paHold=0;
+        document.documentElement.classList.remove('pa-printing');
+        root.innerHTML=''; };                               // release ~1MB per page
+      root._paHold=setTimeout(teardown,HOLD_MS);
+      const t0=Date.now();
+      try{ window.print(); }
+      catch(err){ clearTimeout(root._paHold); teardown();
+        return reply({ok:false,code:'print-error',error:'could not open the print dialog · 无法打开打印对话框: '+((err&&err.message)||'')}); }
+      // Answered once the dialog has been HANDED OFF, which is all a platform that returns
+      // immediately can truthfully tell us. Waiting for afterprint here would leave the app's
+      // "Preparing to print…" hanging for the whole hold on exactly the device this bug came from.
+      reply({ok:true,pages:pages.length});
+      // Whether print() BLOCKED is the one honest signal for which platform this is, and it is
+      // MEASURED rather than sniffed. A blocking call only returns once the dialog is closed, so
+      // the surface has already done its job and can go now — that is desktop, and reclaiming it
+      // keeps a later Ctrl+P from printing this note instead of the app. A call that returned
+      // instantly left the dialog open behind it (iOS), and there the timer is the only safe
+      // reclaimer: every event-driven attempt fired while the dialog was still open.
+      if(Date.now()-t0>150){ clearTimeout(root._paHold); teardown(); }
+    } else reply({ok:false,code:'bad-request',error:'unknown'});
+  }catch(err){
+    // Reaching here is a fault in THIS shell (a bug in the branch above), not a statement
+    // about the app's data. It must never look like 'not-found' — an app that read this as
+    // "the file is absent" would save an empty document over a good one (R5).
+    reply({ok:false,code:'relay-error',error:'shell relay error · 外壳中转出错: '+((err&&err.message)||'unknown')});
+  }finally{ appFrameBusy(fr,-1); }
+});
+
+/* ── Chat log helpers ── */
+function add(cls,text,html){
+  hideEmptyState();
+  const d=document.createElement('div'); d.className='msg '+cls;
+  if(html) d.innerHTML=html; else d.textContent=text||'';
+  const log=$('#log'); log.appendChild(d); log.scrollTop=log.scrollHeight; updateScrollBtn(); return d;
+}
+
+let lastPromptText='';
+
+function mkab(icon,title){ const b=document.createElement('button'); b.className='mab'; b.type='button'; b.title=title; b.textContent=icon; return b; }
+function flashBtn(b,icon){ const old=b.textContent; b.textContent=icon; setTimeout(()=>{ b.textContent=old; },1200); }
+// Copy that works on plain HTTP too: navigator.clipboard is undefined outside secure
+// contexts (LAN http://), so fall back to a hidden-textarea execCommand('copy').
+function fallbackCopy(t){ try{ const ta=document.createElement('textarea'); ta.value=t; ta.style.cssText='position:fixed;top:0;left:0;opacity:0'; document.body.appendChild(ta); ta.focus(); ta.select(); const ok=document.execCommand('copy'); ta.remove(); return ok; }catch{ return false; } }
+function doCopy(t,btn){ if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(t).then(()=>flashBtn(btn,'✓')).catch(()=>{ if(fallbackCopy(t)) flashBtn(btn,'✓'); }); } else if(fallbackCopy(t)) flashBtn(btn,'✓'); }
+
+function addActions(el,kind,rawText,prompt){
+  const bar=document.createElement('div'); bar.className='msg-actions';
+  const copyBtn=mkab('⎘','Copy');
+  copyBtn.onclick=()=>doCopy(rawText,copyBtn);
+  if(kind==='response'){
+    const voiceBtn=mkab('🔊','Read aloud');
+    voiceBtn.onclick=()=>{
+      if(window.speechSynthesis?.speaking){ window.speechSynthesis.cancel(); voiceBtn.classList.remove('active'); return; }
+      voiceBtn.classList.add('active');
+      speak(stripMd(rawText),()=>voiceBtn.classList.remove('active'));
+    };
+    const retryBtn=mkab('↺','Ask again');
+    // re-ask the question that produced THIS reply (passed in), not a global that's empty on loaded chats
+    retryBtn.onclick=()=>{ const p=prompt||lastPromptText; if(!p) return; $('#box').value=p; submitSend(); };
+    bar.append(copyBtn,voiceBtn,retryBtn);
+  } else {
+    const editBtn=mkab('✎','Edit');
+    editBtn.onclick=()=>{ $('#box').value=rawText; $('#box').focus(); };
+    bar.append(copyBtn,editBtn);
+  }
+  el.appendChild(bar);
+}
+
+/* ── File attachments ── */
+let attachments=[]; // [{name, text?} | {name, path}]
+
+function renderChips(){
+  $('#chips').innerHTML=attachments.map((a,i)=>
+    `<div class="chip"><span>📎 ${esc(a.name)}</span><button onclick="removeChip(${i})">×</button></div>`
+  ).join('');
+}
+window.removeChip=(i)=>{ attachments.splice(i,1); renderChips(); };
+
+/* ── Lightbox ── */
+const lb=$('#lightbox'), lbImg=$('#lightbox-img');
+function openLightbox(src){ lbImg.src=src; lb.classList.add('open'); }
+function closeLightbox(){ lb.classList.remove('open'); lbImg.src=''; }
+$('#lightbox-close').onclick=closeLightbox;
+lb.addEventListener('click',(e)=>{ if(e.target===lb) closeLightbox(); });
+document.addEventListener('keydown',(e)=>{ if(e.key==='Escape') closeLightbox(); });
+
+$('#plus').onclick=()=>$('#filein-photo').click();
+
+async function handleFiles(e){
+  const files=[...e.target.files]; e.target.value='';
+  for(const file of files){
+    const isText=file.type.startsWith('text/')||/\.(md|json|csv|js|ts|mjs|py|sh|txt|html|css|xml|yaml|yml)$/i.test(file.name);
+    if(isText){
+      const text=await file.text();
+      attachments.push({name:file.name,text});
+    } else {
+      // Upload binary (images, PDFs, etc.) to workspace. Same mapper as the broker: an
+      // oversize photo says "Photo too large · 照片过大 (max 20.0 MB)" — never "unknown",
+      // and never the same sentence a 401 or a dropped socket produces (leftover (e)).
+      const what=relayWhatForFile(file.name);
+      // PRE-FLIGHT: the size is known before the read, so refuse here rather than spend the
+      // whole upload to be told the same thing by a 413 (the V4 lesson, applied to files).
+      const willBe=relayB64Bytes(file.size);
+      if(willBe>RELAY_LIMITS.upload){
+        add('err','⚠ '+file.name+' — '+relayText({ok:false,code:'too-large',limit:RELAY_LIMITS.upload},willBe,what));
+        continue;
+      }
+      const data=await toBase64(file);
+      const body=JSON.stringify({name:file.name,data});
+      const g=await relayCall('/api/upload',{method:'POST',headers:{'content-type':'application/json'},body},'raw');
+      // add() writes textContent here (no html argument) — the name must NOT be escaped.
+      if(g&&g.ok) attachments.push({name:file.name,path:g.path});
+      else add('err','⚠ '+file.name+' — '+relayText(g,relayBodyBytes(body),what));
+    }
+  }
+  renderChips();
+}
+$('#filein-photo').addEventListener('change',handleFiles);
+
+function toBase64(file){ return new Promise((res,rej)=>{
+  const r=new FileReader(); r.onload=()=>res(r.result.split(',')[1]); r.onerror=rej; r.readAsDataURL(file);
+}); }
+
+function buildMessage(userText){
+  let msg=userText;
+  for(const a of attachments){
+    if(a.text!==undefined){
+      msg+=`\n\n<attachment name="${a.name}">\n${a.text}\n</attachment>`;
+    } else {
+      msg+=`\n\n[Attached file: ${a.name} — saved to workspace/${a.path}. Use the Read tool to view it.]`;
+    }
+  }
+  attachments=[]; renderChips();
+  return msg;
+}
+// A send the server REFUSED (413/401/4xx) must not eat the user's work: buildMessage()
+// clears the box and the attachment chips up front, so a rejection puts both back exactly
+// as they were, ready to be shortened and re-sent.
+function restoreComposer(text,atts){ $('#box').value=text||''; attachments=(atts||[]).slice(); renderChips(); }
+
+// Mixed EN/中文 read-aloud: ONE utterance per script run, each with its own lang/voice —
+// a single-language utterance silently skips (or mangles) the other script on iOS/macOS.
+// (Duplicated in web/chat-ui.inline.html for the in-app chats — separate documents.)
+const SPEAK_CJK=/[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]/;
+const SPEAK_SCRIPTED=/[A-Za-z\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]/;
+function speechSegments(text){
+  const out=[]; let cur='', curZh=null;
+  for(const ch of String(text||'')){
+    const zh=SPEAK_CJK.test(ch), neutral=!SPEAK_SCRIPTED.test(ch);
+    if(curZh===null){ cur+=ch; if(!neutral) curZh=zh; continue; }
+    if(neutral||zh===curZh){ cur+=ch; continue; }
+    out.push({text:cur,zh:curZh}); cur=ch; curZh=zh;
+  }
+  if(cur.trim()) out.push({text:cur,zh:curZh===null?false:curZh});
+  return out.filter(s=>s.text.trim());
+}
+function speak(text,onEnd){
+  if(!window.speechSynthesis) return onEnd?.();
+  window.speechSynthesis.cancel();
+  const segs=speechSegments(text);
+  if(!segs.length) return onEnd?.();
+  const voices=(window.speechSynthesis.getVoices&&window.speechSynthesis.getVoices())||[];
+  const pick=zh=>voices.find(v=>v.lang&&v.lang.toLowerCase().startsWith(zh?'zh':'en'))||null;
+  let done=0; const finish=()=>{ if(++done===segs.length) onEnd?.(); };
+  for(const s of segs){ const u=new SpeechSynthesisUtterance(s.text);
+    u.lang=s.zh?'zh-CN':((navigator.language&&!/^zh/i.test(navigator.language))?navigator.language:'en-US');
+    const v=pick(s.zh); if(v) u.voice=v;
+    u.onend=finish; u.onerror=finish;
+    window.speechSynthesis.speak(u); }
+}
+
+/* ── Reconnect polling (when iOS drops the SSE stream mid-run) ── */
+// THE UNIFIED ROOT CAUSE, applied to the shell's own chat path: evidence of unfinished
+// work may only be retired by a signal that actually covers that work.
+// TWO defects this rewrite closes, both the same shape as the notebook's draft wipe:
+//  1. It used to stop on `c.updated>afterMs` ALONE. Any other touch of the conversation —
+//     a rename, another device, a background job appending — ended the watch while the
+//     "waiting for result…" pill stayed on screen forever, never resolved, never escalated.
+//     The conversation moving is not this send's reply arriving.
+//  2. `catch{}` swallowed every poll failure (R5), so an expired session polled silently 45
+//     times and then reported the same "no result" a still-running job reports.
+// `onSettled` fires ONLY when this send's reply is on screen — that, and nothing earlier,
+// is what makes it safe for the caller to drop the draft it kept.
+function pollForResult(id, afterMs, statusEl, outEl, onSettled){
+  let attempts=0;
+  statusEl.className='msg status'; statusEl.textContent='⚡ Connection lost — waiting for result… · 连接中断，正在等待结果…';
+  const stop=(cls,text)=>{ clearInterval(timer); statusEl.className='msg '+cls; statusEl.textContent=text; };
+  const timer=setInterval(async()=>{
+    attempts++;
+    if(attempts>45){ stop('err','⚠ No result after several minutes · 数分钟后仍无结果 — your message is still in the composer; reopen the chat to check before resending · 消息仍在输入框，请重开对话确认后再重发。'); return; }
+    const g=await relayCall('/api/convos/'+encodeURIComponent(id),undefined,'json','data');
+    if(!g.ok){
+      // Classified, never swallowed. Only a signed-out / vanished conversation is terminal —
+      // no number of retries fixes either, and silently waiting on them is the lie that
+      // made a lost session look like a slow model.
+      if(g.code==='unauthorized'||g.code==='not-found') stop('err','⚠ '+relayText(g,0,'message'));
+      return;   // network / 5xx: the laptop may still be finishing the run — keep waiting
+    }
+    const c=g.data, last=c&&c.messages&&c.messages[c.messages.length-1];
+    // BOTH halves, together: the conversation moved AND what moved is an assistant reply.
+    // Either one alone is the unrelated success that used to end the watch.
+    if(!(c&&c.updated>afterMs&&last&&last.role==='md')) return;
+    clearInterval(timer);
+    statusEl.remove();
+    const el=outEl||add('','');
+    el.className='msg'; el.innerHTML=renderMd(last.text); addActions(el,'response',last.text,lastPromptText);
+    addTook(el,Date.now()-afterMs,last.by);
+    const l=$('#log');l.scrollTop=l.scrollHeight; loadConvos(); loadApps();
+    if(onSettled) onSettled();
+  },4000);
+}
+
+/* ── Send ── */
+// A send made before the running one has learned its conversation id would go out with
+// convoId=null and start a NEW conversation, losing all context. It waits for the {type:'convo'}
+// line instead (or for that send to end), then goes to the same conversation; the server queues it.
+// TODO(R4 seam): this hold leaves with submitSend for a composer module.
+let convoIdWait=null;
+async function submitSend(){
+  const q=$('#box').value.trim();
+  if(!q&&!attachments.length) return;
+  lastPromptText=q;
+  const fileAtts=attachments.filter(a=>a.path).map(a=>({name:a.name,path:a.path}));
+  const attsBefore=attachments.slice();          // buildMessage() clears the composer; a rejected send puts it back
+  const msg=buildMessage(q||'(see attached files)');
+  $('#box').value='';
+  const shown=q||(attachments.length?`[${attachments.length} file(s)]`:'');
+  const userEl=add('me',shown); if(q) addActions(userEl,'prompt',q); renderAtts(userEl,fileAtts);
+  const status=add('status',''); let out=null, acc='', rlast=0;
+  status.innerHTML='<span class="pa-think"><i></i><i></i><i></i></span><span class="pa-lbl"></span><b class="pa-el"></b>';
+  const setLbl=(t)=>{ const e=status.querySelector('.pa-lbl'); if(e) e.textContent=t||''; };
+  const sendTime=Date.now();
+  // Live elapsed time. "Is it stuck or just slow?" is the question a spinner cannot answer.
+  const elTimer=setInterval(()=>{ const e=status.querySelector('.pa-el'); if(e) e.textContent=took(Date.now()-sendTime); },200);
+  const stopEl=()=>clearInterval(elTimer);
+  while(convoIdWait) await convoIdWait;
+  let releaseConvoWait=null;
+  if(!convoId){ const w=new Promise(r=>{ releaseConvoWait=()=>{ if(convoIdWait===w) convoIdWait=null; r(); }; }); convoIdWait=w; }
+  // Bytes, not characters: BODY_LIMITS.chat counts what goes on the wire, and a text
+  // attachment is spliced into `message` here (handleFiles reads .md/.json/.csv/… inline),
+  // so a rejection must be able to name the real size.
+  const body=JSON.stringify({message:msg,convoId,attachments:fileAtts,model:SHELL_CURMODEL||undefined,assess:shellVerifyOn||undefined});
+  const sentBytes=relayBodyBytes(body);
+  try{
+    const res=await api('/api/chat',{method:'POST',headers:{'content-type':'application/json'},body});
+    // V4 SCAR: this went straight to res.body.getReader(). A non-2xx answer is not a
+    // stream, so the NDJSON loop below simply never parsed it, nothing threw, the catch
+    // never ran, and the '…' pill stayed forever — with the composer already cleared.
+    // lib/webutil.mjs now terminates ITS body-error answers with '\n' so the loop can read
+    // them, but that covers only the errors that go through it: web.mjs's auth gate answers
+    // 401 {"error":"bad token"} with no newline and no `type`, and a proxy in front of the
+    // server can answer anything at all. res.ok is the ONE signal always present.
+    // A non-2xx now lands in the SAME place a stream 'error' event lands (status pill
+    // removed, a .msg.err line), and the message goes back into the composer.
+    if(!res.ok){
+      const f=await relayHttpFail(res);
+      stopEl(); status.remove(); userEl.remove();
+      add('err','⚠ '+relayText(f,sentBytes));
+      restoreComposer(q,attsBefore);
+      return;
+    }
+    const rd=res.body.getReader(); const dec=new TextDecoder(); let buf='';
+    for(;;){
+      const {done,value}=await rd.read(); if(done) break;
+      buf+=dec.decode(value,{stream:true});
+      let i; while((i=buf.indexOf('\n'))>=0){
+        const t=buf.slice(0,i); buf=buf.slice(i+1); if(!t.trim()) continue;
+        let j; try{ j=JSON.parse(t); }catch{ continue; }
+        if(j.type==='convo'){ if(j.id!==convoId){ setConvo(j.id); loadConvos(); } if(releaseConvoWait) releaseConvoWait(); }
+        if(j.type==='status') setLbl('🔧 '+j.text);
+        if(j.type==='delta'){ if(!out){out=add('stream','');} acc+=j.text;
+          const tn=Date.now(); if(tn-rlast>=120){ rlast=tn; out.className='msg'; out.innerHTML=renderMd(acc); }   // live markdown, throttled
+          $('#log').scrollTop=$('#log').scrollHeight; }
+        // A job the assistant worked out from what you said. NOTHING is created until you
+        // press Create — the same review-before-it-can-message-you rule the editor follows.
+        if(j.type==='app-made') openApp(j.uid,j.slug,j.title);   // demo: the app the server just built (lib/demo-app.mjs)
+        if(j.type==='job-draft'){ stopEl(); status.remove(); renderJobDraft(j); }
+        if(j.type==='error'){ stopEl(); status.remove(); add('err','⚠ '+j.text); }
+        if(j.type==='done'){
+          stopEl(); status.remove(); if(!out) out=add('','');
+          const txt=j.text||acc; out.className='msg';
+          out.innerHTML=renderMd(txt); addActions(out,'response',txt,lastPromptText);
+          addTook(out,Date.now()-sendTime,j.by);   // kept with the answer, not just while waiting
+          $('#log').scrollTop=$('#log').scrollHeight; loadApps();
+        }
+      }
+    }
+  }catch(err){
+    stopEl();   // the pill's timer must not outlive the request that started it
+    // The request died mid-flight, so whether the server received it is UNKNOWN. The
+    // composer therefore comes BACK: an unknown outcome is not a confirmed send, and the
+    // typed text plus its attachment chips are the only copy of what the user composed
+    // (the echoed bubble carries neither the spliced text attachments nor the chips).
+    // It is dropped again only from pollForResult's onSettled — i.e. only once THIS send's
+    // reply is actually on screen — and only if the user has not since edited it.
+    restoreComposer(q,attsBefore);
+    const untouched=()=>$('#box').value===q&&attachments.length===attsBefore.length&&attachments.every((a,i)=>a===attsBefore[i]);
+    if(convoId) pollForResult(convoId, sendTime, status, out, ()=>{ if(untouched()) restoreComposer('',[]); });
+    else{ status.className='msg err'; status.textContent='⚠ '+relayText(relayNetFail(err,'stream'),sentBytes,'message')+' Your message is back in the composer; the task may still be running on the laptop · 消息已放回输入框，任务可能仍在电脑上运行。'; }
+  }finally{ if(releaseConvoWait) releaseConvoWait(); }
+}
+
+$('#f').onsubmit=(e)=>{ e.preventDefault(); submitSend(); };
+
+/* ── Shell composer: model pill + Verify toggle ── */
+let SHELL_CURMODEL=null, shellVerifyOn=false;
+function renderShellModelBtn(){ const btn=$('#shellModel'); if(!CHAT_MODELS.length){ btn.style.display='none'; return; } btn.style.display=''; const cur=CHAT_MODELS.find(x=>x.id===SHELL_CURMODEL)||CHAT_MODELS[0]; btn.textContent=cur.label+' ▾'; }
+// The main chat's lane after every list read (boot and each app open), put where a fresh load would
+// put it. A pick still served is kept. A gone one gives way to the boot default (Claude when offered),
+// so the label never names a lane the turn does not send. No models: no lane, no chooser, and Verify
+// off and hidden — left on behind a hidden pill, every turn would still ask for a panel.
+function syncShellModel(){
+  if(CHAT_MODELS.length){ if(!CHAT_MODELS.some(x=>x.id===SHELL_CURMODEL)){ const def=CHAT_MODELS.find(x=>x.id&&x.id.startsWith('claude'))||CHAT_MODELS[0]; SHELL_CURMODEL=def.id; } $('#shellVfy').style.display=''; }
+  else{ SHELL_CURMODEL=null; shellVerifyOn=false; renderShellVfy(); $('#shellVfy').style.display='none'; }
+  renderShellModelBtn();
+}
+$('#shellModel').onclick=()=>{
+  let menu=document.querySelector('.pac-mmenu'); if(menu){ menu.remove(); return; }
+  menu=document.createElement('div'); menu.className='pac-mmenu';
+  const groups={}; CHAT_MODELS.forEach(x=>{ (groups[x.group||'']=groups[x.group||'']||[]).push(x); });
+  let html=''; for(const g of Object.keys(groups)){ if(g) html+='<div class="pac-mg">'+g+'</div>'; for(const x of groups[g]) html+='<button class="pac-mi'+(x.id===(SHELL_CURMODEL||(CHAT_MODELS[0]&&CHAT_MODELS[0].id))?' on':'')+'" data-m="'+x.id+'">'+x.label+'</button>'; }
+  menu.innerHTML=html;
+  menu.onclick=(ev)=>{ const b=ev.target.closest('[data-m]'); if(!b) return; SHELL_CURMODEL=b.dataset.m; renderShellModelBtn(); menu.remove(); };
+  document.body.appendChild(menu);
+  setTimeout(()=>{ const off=(ev)=>{ if(!menu.contains(ev.target)&&ev.target!==$('#shellModel')){ menu.remove(); document.removeEventListener('click',off); } }; document.addEventListener('click',off); },0);
+};
+function renderShellVfy(){ const btn=$('#shellVfy'); btn.textContent=(shellVerifyOn?'☑':'☐')+' Verify · 校验'; btn.classList.toggle('on',shellVerifyOn); }
+$('#shellVfy').onclick=()=>{ shellVerifyOn=!shellVerifyOn; renderShellVfy(); };
+
+/* PA_SETTINGS_JS */
+
+/* ── Scroll-to-bottom button ── */
+const scrollBtn=document.createElement('button'); scrollBtn.id='scrollBtn'; scrollBtn.title='Scroll to bottom'; scrollBtn.textContent='↓'; document.body.appendChild(scrollBtn);
+const logEl=$('#log');
+const NEAR_BOTTOM_PX=120; // ONE threshold: the ↓-button visibility AND the image-load re-pin gate (renderAtts)
+function logNearBottom(){ return logEl.scrollHeight-logEl.scrollTop-logEl.clientHeight<=NEAR_BOTTOM_PX; }
+function updateScrollBtn(){ scrollBtn.classList.toggle('show', !logNearBottom()); }
+logEl.addEventListener('scroll',updateScrollBtn,{passive:true});
+window.addEventListener('resize',updateScrollBtn,{passive:true});
+scrollBtn.onclick=()=>{ logEl.scrollTo({top:logEl.scrollHeight,behavior:'smooth'}); setTimeout(updateScrollBtn,300); };
+
+// Boot: once the session is valid, fire the independent GETs concurrently instead
+// of serializing ping → apps → convo. On a returning launch the app grid and the
+// restored conversation now load in parallel (faster first content, esp. iOS Safari
+// waking a cold tab). Each loader owns its errors; nothing here depends on their order.
+// Refresh: spin the icon and carry it across the reload so there's feedback the whole time
+// (full reload → new page boot → data loaded). Cleared once the boot loaders settle.
+$('#reload').onclick=()=>{ try{ sessionStorage.setItem('pa_refreshing','1'); }catch{} $('#reload').classList.add('spin'); location.reload(); };
+/* PA_UPDATE_JS */   /* TODO(R4 seam): the boot block below (reload, loaders, new-feature dots) belongs in web/boot.js like app-frame.js */
+/* PA_SW_CLIENT_JS */
+/* PA_OFFLINE_JS */
+/* PA_MERGE_JS */
+/* PA_ORIGIN_JS */
+/* PA_SYNC_JS */
+(async()=>{
+  PASW.start();   // the offline bundle: registration + the build hand-off run beside the loaders (web/sw-client.js)
+  let refreshing=false; try{ refreshing=sessionStorage.getItem('pa_refreshing')==='1'; }catch{}
+  if(refreshing) $('#reload').classList.add('spin');
+  await ensureToken();
+  PAOffline.boot();   // the queued count on the state line, the warm cap from the node's config (web/offline-client.js)
+  PASync.drain();     // what was queued while away goes to the node now (web/offline-sync.js); then on online/visible/poll/tap
+  applyShellFontScale();   // the saved A-/A+ scale must apply to the shell on boot, not only when tapped
+  await refreshChatModels();   // also sets the main chat's lane and chooser (syncShellModel)
+  // Fetch the profile (ME, incl. appOrder) in parallel; gate only the app grid on it so the
+  // saved My-Apps order applies on first paint, while convos/family load concurrently.
+  const profileReady=loadProfile();
+  await Promise.allSettled([profileReady.finally(loadApps), loadFamilyApps(), loadConvos(), convoId?openConvo(convoId):Promise.resolve()]);
+  if(!convoId) showEmptyState();
+  if(refreshing){ try{ sessionStorage.removeItem('pa_refreshing'); }catch{} $('#reload').classList.remove('spin'); }
+  reopenAfterUpdate();   // the app that was open when PAUpdate reloaded the page (web/update.js)
+  PASW.prefetch(UID);    // background: the app pages and the Bible corpus into the bundle (web/sw-client.js)
+  // Apply new-feature dots on shell elements after login
+  markNewSel('#settings','ver-changelog');
+  markNewSel('#ver-lbl','ver-changelog-item');   // cascade: the dot inside Settings sits on the actual new thing (the tappable version line)
+  markNewSel('#healthWrap>summary','health-setup');   // Health setup · 健康接入 in the profile dialog
+  markNewSel('#pBriefWrap','briefing-email');         // 简报邮箱 · Briefing email field in the profile dialog
+  markNewSel('#agentMailWrap>summary','agent-address'); // Agent email · 管家邮箱 in the owner's profile dialog
+  markNewSel('#jobsWrap>summary','jobs-section');       // Jobs · 任务 in the profile dialog
+  markNewSel('#nodeCfgWrap>summary','node-settings');   // Node settings · 节点设置 in the owner's profile dialog
+})();
+
+if (navigator.standalone) document.documentElement.classList.add('standalone');
+
+// Bottom clearance = actual pill height, measured — no hardcoded px. Adapts to
+// any device and to the pill growing (multi-line input, attachment chips).
+(function(){
+  const f=document.querySelector('form#f'); if(!f||!window.ResizeObserver) return;
+  const set=()=>document.documentElement.style.setProperty('--pill-clear', (f.offsetHeight+12)+'px');
+  new ResizeObserver(set).observe(f); set();
+})();
+
+// Debug: triple-tap the 管家 title to overlay viewport geometry (for layout bugs).
+(function(){
+  let taps=0, timer=null;
+  document.querySelector('header h1')?.addEventListener('click', ()=>{
+    taps++; clearTimeout(timer); timer=setTimeout(()=>{ taps=0; }, 600);
+    if (taps < 3) return;
+    taps=0;
+    let d=document.getElementById('dbg');
+    if (d) { d.remove(); return; }
+    d=document.createElement('pre'); d.id='dbg';
+    d.style.cssText='position:fixed;top:70px;left:8px;right:8px;z-index:99;background:var(--card);border:1px solid var(--accent);border-radius:8px;padding:10px;font-size:11px;line-height:1.5;white-space:pre-wrap;';
+    const f=document.querySelector('form#f')?.getBoundingClientRect();
+    const b=document.body.getBoundingClientRect();
+    d.textContent=[
+      'standalone: '+(navigator.standalone===true),
+      'screen: '+screen.width+'x'+screen.height,
+      'innerH: '+innerHeight+'  outerH: '+outerHeight,
+      'vv.height: '+(visualViewport?.height)+'  vv.offsetTop: '+(visualViewport?.offsetTop),
+      'html h: '+document.documentElement.getBoundingClientRect().height,
+      'body h: '+b.height+'  body bottom: '+b.bottom,
+      'form bottom: '+f?.bottom+'  (screen bottom should ≈ innerH)',
+      'safe-bottom: '+getComputedStyle(document.documentElement).getPropertyValue('--sab-probe'),
+      'scrollY: '+scrollY,
+      'viewTop offset ≈ (overlay top − 70): below status bar = fixed container',
+    ].join('\n');
+    document.body.appendChild(d);
+  });
+})();
+
+// iOS home-screen apps: after the software keyboard closes, WebKit can leave the
+// viewport panned up, showing a black band at the bottom. Snap back to origin
+// whenever focus leaves an input / the visual viewport resizes.
+//
+// ONLY ONCE THE KEYBOARD HAS CLOSED. visualViewport fires `resize` when the keyboard OPENS too,
+// and with focus inside an app the shell's activeElement is the IFRAME (verified in a real
+// browser), which passed the old tag guard — so this used to scroll to 0,0 the moment a keyboard
+// opened for a box inside an app. That was wrong, and this gate removes it.
+// It was NOT the cause of "the keyboard covers the composer until I type" (iPhone + iPad, PAChat +
+// PANote): the report was unchanged on device after v3.6.2. Kept because scrolling while the
+// keyboard is up is never wanted and the gate can only remove scrolls, never add one.
+(function(){
+  // The visual viewport shrinks by the keyboard's height when it is up: 250px+ on an iPhone,
+  // 300px+ on an iPad. Safari's collapsing toolbar and an iPad hardware keyboard's shortcut bar
+  // move it by well under 100px, so they do not count as "open".
+  const KB_OPEN_PX=150;
+  const keyboardOpen=()=>{ const vv=window.visualViewport; return !!vv&&(window.innerHeight-vv.height)>KB_OPEN_PX; };
+  const snap=()=>{ if(keyboardOpen()) return;
+    const t=document.activeElement?.tagName; if(t!=='INPUT'&&t!=='TEXTAREA') window.scrollTo(0,0); };
+  window.visualViewport?.addEventListener('resize', ()=>setTimeout(snap,60));
+  document.addEventListener('focusout', ()=>setTimeout(snap,60));
+})();
+// Server injects release-notes JSON at the marker (template-literal-escaped).
+// Must be a window property — a top-level const is NOT reachable as window._VER_NOTES.
+try{ window._VER_NOTES=JSON.parse(`<!--APP_NOTES-->`); }catch{ /* R5: raw file or bad embed → sheet shows its in-page empty message */ }
+</script>
+</body>
+</html>

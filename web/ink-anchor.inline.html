@@ -1,0 +1,295 @@
+<!-- PAInkAnchor — Apple-Pencil ink ON the verse text（经文上的手写）, option (b) of
+     docs/plans/annotation-anchoring.md §3. Inlined by web.mjs into any page carrying the
+     PA_INK_ANCHOR_UI marker (the Bible carries it, after PANote: the stroke renderer and the Pencil
+     guard come from window.PANote.ink, never a second copy — R3).
+     One transparent canvas INSIDE the scrolling verse list, at its content origin, so it scrolls with
+     the text. It takes PEN input only (pointerType 'pen'); a finger or a mouse passes straight through
+     to the list (scroll, select, long-press explain) as before. A stroke is grouped into an ANCHOR
+     RECORD by the verse + character range under its bounding box, measured with a Range over the
+     line's text nodes (W3C TextPositionSelector + TextQuoteSelector, never a page fraction):
+       {verse:n, lang:'en'|'zh', charStart, charEnd, quote, dx, dy, w, strokes:[{p:[[x,y,p]…],c,w,t,a?}]}  (no t = pen; a = a highlighter's alpha)
+     dx/dy = the group's origin from the anchor's top-left and w = the anchor's width, all CSS px at
+     write time; points are px from the group origin. On every layout change (ResizeObserver on the
+     list, window resize/orientation, the shell's fontScale message, the host's render()) each anchor
+     is re-measured — offsets first, then the quote's new place — and the group is translated and
+     scaled by anchorWidthNow / w, so an underline or a circled word follows the word across iPad
+     sizes, orientation, the split rail and A-/A+. Honest limit (§3 b): ink does not re-wrap; a shape
+     spanning two lines keeps its shape and follows ONE end.
+     Phase 2 — store, erase, orphans: pack(groups) → {vN:[group…], unanchored:[…]} is the chapter-file
+     shape the host keeps beside its marks (ANN.ink); load() takes that object or a flat list. A SCRUB
+     stroke (SCRUB: back-and-forth over one spot) is the eraser: every group it crosses (ERASE_HIT px)
+     is removed and the scrub itself is not kept; a scrub over nothing is ordinary ink. A group whose
+     verse line is gone, whose quote is no longer in the line, or that never had a line (verse:null)
+     goes to the ORPHAN BUCKET: one labelled row appended under the last verse, the ink stacked inside
+     at scale 1 — shown, never dropped (BSB wording changes, renumbering).
+     API: PAInkAnchor.attach({container, ink?, pen?, enabled?, onChange?}) returns
+       {render(), reflow(), groups(), placements(), load(packedOrList), clear(), destroy(), canvas, isDrawing(), readout(),
+      undo(), redo(), canUndo(), canRedo(), onHistory(fn)}; undo/redo step back through this chapter's stroke/erase/clear
+     actions (HISTORY_MAX deep, reset by load(), redo cleared by a new action) and save like any action (onChange).
+     readout() is the device line for a host's settings sheet (READOUT, label READOUT_LABEL), phase 3.
+     onChange(packed, groups) after every stroke, erase or clear — never after a load (no write without
+     the user's hand). Driven by test/ink-anchor.test.mjs. -->
+<style id="pia-style">
+.pia-ink{position:absolute;left:0;top:0;pointer-events:none;z-index:3;touch-action:none;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.pia-bucket{position:relative;margin:14px 0 8px;padding:0 8px;border:1px dashed var(--line,#bbb);border-radius:10px;box-sizing:border-box}
+.pia-bucket-l{height:22px;line-height:22px;font-size:12px;color:var(--muted,#777);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+</style>
+<script id="pia-script">
+(function(){
+  if(window.PAInkAnchor) return;
+  const CLS='pia-ink';
+  const TIP='Write on the verses with Apple Pencil; scrub back and forth over ink to erase it · 用 Apple Pencil 直接在经文上书写；来回涂抹即可擦除';
+  const LINES=Object.freeze([['en','.ven'],['zh','.vzh']]);   // the host's text lines, by language (PAVerseMarks' LANGS)
+  const DEFAULT_PEN=Object.freeze({c:'#0f6355',w:2.2,t:'pen'});   // the accent; a host may pass its own `pen`
+  // The ⚙ sheet's device line (the Journal's DEV_READOUT idea): what to screenshot on each iPad instead of
+  // describing it. Viewport, dpr, the shell's A-/A+ scale, the live text column and the ink count.
+  const READOUT_LABEL='Device readout · 设备读数';
+  const READOUT=m=>'Device 设备: '+m.w+'×'+m.h+' px · dpr '+m.dpr+' · A '+(Math.round(m.fs*100)/100)+' · text '+Math.round(m.textW)+'px · ink 笔迹 '+m.n+' · orphan 孤立 '+m.orphans;
+  const PAD=4, MIN_COVER=0.3;                                     // px above/below a stroke box, and how much of a character it must cover, to count the character
+  const round2=n=>Math.round(n*100)/100;
+
+  // ── DOM-free geometry (the part that goes wrong, so it is pure and tested on numbers) ─────────
+  function bboxOf(pts){
+    let l=Infinity,t=Infinity,r=-Infinity,b=-Infinity;
+    for(const p of pts){ if(p.x<l)l=p.x; if(p.x>r)r=p.x; if(p.y<t)t=p.y; if(p.y>b)b=p.y; }
+    return {l,t,r,b};
+  }
+  // The line a stroke box belongs to: the most vertical overlap, else the nearest line. `lines` are
+  // {n,lang,rect,text} in the SAME coordinate space as the box (the list's content space).
+  function pickLine(box,lines){
+    let best=null,bestOv=0,near=null,nearD=Infinity;
+    for(const L of lines){
+      const r=L.rect; if(!r||!(r.height>0)) continue;
+      const ov=Math.min(box.b,r.top+r.height)-Math.max(box.t,r.top);
+      if(ov>bestOv){ bestOv=ov; best=L; }
+      const d=box.b<r.top?r.top-box.b:box.t>r.top+r.height?box.t-(r.top+r.height):0;
+      if(d<nearD){ nearD=d; near=L; }
+    }
+    return best||near;
+  }
+  // The character range under the box: a character counts when the box covers at least MIN_COVER of
+  // its width (a stroke that merely grazes the neighbour's edge does not take it) on a row the box
+  // touches (PAD: an underline sits just under the glyphs). None (a margin scribble) → the whole
+  // line, so a verse-level anchor still follows its verse. Surrounding whitespace is then trimmed
+  // off, as PAVerseMarks trims a selection, so the quote is the words themselves.
+  function pickChars(box,count,charRect){
+    let s=-1,e=-1;
+    for(let i=0;i<count;i++){ const c=charRect(i); if(!c||!(c.width>0)) continue;
+      const ox=Math.min(box.r,c.left+c.width)-Math.max(box.l,c.left), oy=Math.min(box.b+PAD,c.top+c.height)-Math.max(box.t-PAD,c.top);
+      if(oy<=0||ox<Math.min(c.width*MIN_COVER,box.r-box.l)) continue;
+      if(s<0)s=i; e=i+1; }
+    return s<0?{start:0,end:count}:{start:s,end:e};
+  }
+  function trimRange(text,r){
+    let {start,end}=r; while(start<end&&/\s/.test(text[start])) start++; while(end>start&&/\s/.test(text[end-1])) end--;
+    return start<end?{start,end}:r;
+  }
+  // A group against the CURRENT line text: offsets when they still hold the quote, else the quote's
+  // occurrence NEAREST the stored offset (a BSB wording change moved it), else the whole line, flagged
+  // (phase 2 buckets it). Nearest, not first: a quote that repeats in the verse ("God" twice) used to
+  // re-anchor to the first copy, moving the ink to another part of the verse. Two copies equally near
+  // is a guess either way, so the group goes to the bucket instead.
+  function resolveRange(text,g){
+    if(text.slice(g.charStart,g.charEnd)===g.quote) return {start:g.charStart,end:g.charEnd,orphan:false};
+    const hits=[]; if(g.quote) for(let i=text.indexOf(g.quote);i>=0;i=text.indexOf(g.quote,i+1)) hits.push(i);
+    const dist=i=>Math.abs(i-g.charStart); hits.sort((a,b)=>dist(a)-dist(b));
+    if(hits.length&&(hits.length<2||dist(hits[0])!==dist(hits[1]))) return {start:hits[0],end:hits[0]+g.quote.length,orphan:false};
+    return {start:0,end:text.length,orphan:true};
+  }
+  // Where a group draws now: translated to the anchor's new origin, scaled by its new width.
+  function place(g,rect){
+    const s=g.w>0&&rect.width>0?rect.width/g.w:1;
+    return {ox:rect.left+g.dx*s,oy:rect.top+g.dy*s,s};
+  }
+
+  // ── Text measurement: a Range over the line's text nodes, global offset → (node, offset) ─────
+  function textNodes(el,out){ for(const c of el.childNodes||[]){ if(c.nodeType===3) out.push(c); else if(c.nodeType===1) textNodes(c,out); } return out; }
+  function measurer(line){
+    const nodes=textNodes(line,[]), text=nodes.map(n=>n.data||n.nodeValue||'').join('');
+    const at=i=>{ let k=i; for(const n of nodes){ const len=(n.data||n.nodeValue||'').length; if(k<=len&&(k<len||n===nodes[nodes.length-1])) return [n,k]; k-=len; } return [nodes[nodes.length-1],0]; };
+    const rangeRect=(s,e)=>{ if(!nodes.length) return null; const r=document.createRange(), a=at(s), b=at(Math.max(s,e)); r.setStart(a[0],a[1]); r.setEnd(b[0],b[1]); return r.getBoundingClientRect(); };
+    return {text,rangeRect,charRect:i=>rangeRect(i,i+1)};
+  }
+
+  // ── Store shape (the chapter file, beside the host's marks): one key per verse, as the host's
+  //    dots and ☰ list read keys ('v16'), the unanchored groups under UNANCHORED. pack/unpack is the
+  //    ONE conversion between that object and the flat list the overlay works on (R3).
+  const UNANCHORED='unanchored';
+  const keyOf=g=>g.verse==null?UNANCHORED:'v'+g.verse;
+  function pack(groups){ const o={}; for(const g of groups){ const k=keyOf(g); (o[k]||(o[k]=[])).push(g); } return o; }
+  function unpack(o){ const out=[]; if(Array.isArray(o)) return o.filter(valid); for(const k of Object.keys(o||{})) if(Array.isArray(o[k])) for(const g of o[k]) if(valid(g)) out.push(g); return out; }
+  const valid=g=>!!(g&&typeof g==='object'&&Array.isArray(g.strokes));
+
+  // ── Scrub-out eraser: a stroke that goes back and forth over one spot (SCRUB.turns reversals in x
+  //    and a path SCRUB.density times longer than its box's diagonal). An underline turns 0 times, a
+  //    circle once, a "w" three; a scrub many. ERASE_HIT px: how near a scrub point must pass a
+  //    group's placed point to take that group.
+  const SCRUB=Object.freeze({turns:4,density:3,minPts:8}), ERASE_HIT=12, HISTORY_MAX=100;   // HISTORY_MAX: undo steps kept per chapter
+  function isScrub(pts,opt){
+    const t=Object.assign({},SCRUB,opt||{}); if(pts.length<t.minPts) return false;
+    const b=bboxOf(pts), diag=Math.hypot(b.r-b.l,b.b-b.t)||1; let len=0,turns=0,dir=0;
+    for(let i=1;i<pts.length;i++){ const dx=pts[i].x-pts[i-1].x; len+=Math.hypot(dx,pts[i].y-pts[i-1].y); const d=dx>0?1:dx<0?-1:0; if(d&&dir&&d!==dir) turns++; if(d) dir=d; }
+    return turns>=t.turns&&len/diag>=t.density;
+  }
+  // The groups a scrub crosses, given where each group draws now ({g,at}); a group with no place is never hit.
+  function hitGroups(pts,placed,hit){
+    const h2=(hit||ERASE_HIT)**2, out=[];
+    for(const {g,at} of placed){ if(!at) continue;
+      const touched=g.strokes.some(s=>s.p.some(p=>{ const x=at.ox+p[0]*at.s, y=at.oy+p[1]*at.s; return pts.some(q=>(q.x-x)**2+(q.y-y)**2<h2); }));
+      if(touched) out.push(g); }
+    return out;
+  }
+  // A group's own extent (px at scale 1): the stroke points plus the pen width, for stacking in the bucket.
+  function extentOf(g){ let w=0,h=0; for(const s of g.strokes) for(const p of s.p){ if(p[0]+s.w>w) w=p[0]+s.w; if(p[1]+s.w>h) h=p[1]+s.w; } return {w:Math.max(1,w),h:Math.max(1,h)}; }
+
+  // ── The orphan bucket: a labelled row under the last verse holding every group that has no place
+  //    on the text. English then 中文; one string, read by the host's tests.
+  const BUCKET_TXT='Ink whose text changed · 经文已改动的笔迹', BUCKET_CLS='pia-bucket', LABEL_H=22, ROW_GAP=8, BUCKET_PADX=8;
+  function makeBucket(){ const b=document.createElement('div'); b.className=BUCKET_CLS; const l=document.createElement('div'); l.className=BUCKET_CLS+'-l'; l.textContent=BUCKET_TXT; b.appendChild(l); return b; }
+  // Sizes the bucket for `orphans` ([{g,at:null}]) and fills their `at`: stacked rows at scale 1. Empty → the bucket leaves the DOM.
+  function layoutBucket(container,bucket,orphans,local){
+    if(!orphans.length){ if(bucket.parentNode) bucket.parentNode.removeChild(bucket); return; }
+    if(bucket.parentNode!==container) container.appendChild(bucket);
+    const ext=orphans.map(o=>extentOf(o.g)); bucket.style.height=(LABEL_H+ext.reduce((a,e)=>a+e.h+ROW_GAP,0)+ROW_GAP)+'px';
+    const r=local(bucket.getBoundingClientRect()); let y=r.top+LABEL_H+ROW_GAP;
+    orphans.forEach((o,i)=>{ o.at={ox:r.left+BUCKET_PADX,oy:y,s:1}; y+=ext[i].h+ROW_GAP; });
+  }
+
+  // TODO(R4 seam): capture handlers → capture(ctl); bucket layout → its own block.
+  function attach(o){
+    const container=o.container, ink=o.ink||(window.PANote&&window.PANote.ink);
+    if(!container) throw new Error('PAInkAnchor.attach: container required');
+    if(!ink) throw new Error('PAInkAnchor.attach: no stroke renderer (PANote.ink) — PANote must be inlined first');
+    let pen=Object.assign({},DEFAULT_PEN,o.pen||{}), onPen=null; const enabled=typeof o.enabled==='function'?o.enabled:()=>true;
+    const onChange=typeof o.onChange==='function'?o.onChange:()=>{}, changed=()=>onChange(pack(groups),groups.slice());
+    const canvas=document.createElement('canvas'); canvas.className=CLS; const bucket=makeBucket();
+    let undoS=[], redoS=[], onHist=null; const hist=()=>{ if(onHist) onHist(); };   // whole-list snapshots (groups are never mutated in place)
+    // ONE path for every user action: snapshot, apply, repaint, save (onChange), tell the pen cluster.
+    const commit=next=>{ undoS.push(groups); if(undoS.length>HISTORY_MAX) undoS.shift(); redoS=[]; groups=next; reflow(); changed(); hist(); };
+    const step=(from,to)=>{ if(!from.length||cur||!enabled()) return false; to.push(groups); groups=from.pop(); reflow(); changed(); hist(); return true; };
+    let ctx=null, cur=null, swallowClick=false, groups=[], scheduled=false, dead=false, fs=1;   // fs: the shell's last fontScale, for the readout
+    // First-use tip (ADR 0030), beside the first VERSE (not the list, taller than the screen; not the ink
+    // canvas or the orphan bucket, which are also children of the container).
+    if(window.PATips) window.PATips.register({id:'bible-pencil-verses',anchor:()=>container.querySelector('.verse'),text:TIP});
+    const cs=container.style; if(!cs.position) cs.position='relative';   // the canvas is placed at the list's content origin
+
+    // The list's content space: a client rect → px from the list's scrolled content origin.
+    const local=r=>{ const c=container.getBoundingClientRect(); return {left:r.left-c.left-(container.clientLeft||0)+(container.scrollLeft||0),top:r.top-c.top-(container.clientTop||0)+(container.scrollTop||0),width:r.width,height:r.height}; };
+    const point=e=>{ const c=container.getBoundingClientRect(); return {x:e.clientX-c.left-(container.clientLeft||0)+(container.scrollLeft||0),y:e.clientY-c.top-(container.clientTop||0)+(container.scrollTop||0),p:e.pressure>0?e.pressure:0.5}; };
+    function size(){
+      // The canvas sits INSIDE the scroller, so its own height counts in scrollHeight: zero it first or a
+      // tall chapter's canvas ratchets scrollHeight up forever (phantom blank space under short chapters).
+      canvas.style.width='0px'; canvas.style.height='0px';
+      const w=Math.max(1,Math.round(container.scrollWidth||container.clientWidth||1)), h=Math.max(1,Math.round(container.scrollHeight||container.clientHeight||1));
+      const dpr=Math.max(1,window.devicePixelRatio||1), f=Math.min(dpr,Math.sqrt(ink.MAX_CANVAS_PX/(w*h)));   // backing store capped by area, as the pad's is
+      canvas.style.width=w+'px'; canvas.style.height=h+'px'; canvas.width=Math.round(w*f); canvas.height=Math.round(h*f);
+      ctx=canvas.getContext('2d'); ctx.setTransform(f,0,0,f,0,0);
+      return {w,h};
+    }
+    const lineEls=()=>{ const out=[]; for(const v of container.querySelectorAll('.verse')){ const n=+v.dataset.n; for(const [lang,sel] of LINES){ const el=v.querySelector(sel); if(el) out.push({n,lang,el}); } } return out; };
+    const lineEl=(n,lang)=>{ for(const L of lineEls()) if(L.n===n&&L.lang===lang) return L.el; return null; };
+
+    // Anchor a finished stroke: the line under its box, the characters under it, the range's rect.
+    function anchor(pts){
+      const box=bboxOf(pts), lines=lineEls().map(L=>({n:L.n,lang:L.lang,el:L.el,rect:local(L.el.getBoundingClientRect())}));
+      // No verse line under the box (an empty list, ink past the last verse): keep the record, unanchored
+      // (verse:null, dx/dy = the box origin in list space) — ink is never dropped (phase 2: the margin bucket).
+      const L=pickLine(box,lines); if(!L) return Object.assign({verse:null,lang:null,charStart:0,charEnd:0,quote:'',dx:round2(box.l),dy:round2(box.t),w:0},strokesOf(pts,box));
+      const m=measurer(L.el), {start,end}=trimRange(m.text,pickChars(box,m.text.length,i=>{ const r=m.charRect(i); return r?local(r):null; }));
+      const rr=m.text.length?m.rangeRect(start,end):null, rect=rr&&rr.width>0?local(rr):L.rect;
+      return Object.assign({verse:L.n,lang:L.lang,charStart:start,charEnd:end,quote:m.text.slice(start,end),dx:round2(box.l-rect.left),dy:round2(box.t-rect.top),w:round2(rect.width)},strokesOf(pts,box));
+    }
+    const strokesOf=(pts,box)=>({strokes:[Object.assign({p:pts.map(p=>[round2(p.x-box.l),round2(p.y-box.t),round2(p.p)]),c:pen.c,w:pen.w,t:pen.t},pen.t==='highlighter'?{a:pen.a}:{})]});
+    // Where every group draws now. An orphan (no line, quote gone, or never anchored) has no place on
+    // the text and gets a row in the bucket, which this also lays out (so the canvas sizes after it).
+    function placements(){
+      const out=[], lines=lineEls();
+      // No .verse at all: the list is not laid out yet ('Loading…' / 'Could not load'), so nothing is an
+      // orphan — nothing is drawn and the bucket is taken away until the chapter's text is in.
+      if(!lines.length){ layoutBucket(container,bucket,[],local); return groups.map(g=>({g,at:null,orphan:false})); }
+      for(const g of groups){
+        const el=g.verse==null?null:lineEl(g.verse,g.lang); if(!el){ out.push({g,at:null,orphan:true}); continue; }
+        const m=measurer(el), r=resolveRange(m.text,g);
+        if(r.orphan){ out.push({g,at:null,orphan:true}); continue; }
+        const rr=m.text.length?m.rangeRect(r.start,r.end):null, rect=rr&&rr.width>0?local(rr):local(el.getBoundingClientRect());
+        out.push({g,at:place(g,rect),orphan:false});
+      }
+      layoutBucket(container,bucket,out.filter(p=>p.orphan),local);
+      return out;
+    }
+    // Two passes, the pad's compose order: every highlighter stroke first, then the ink over it. A
+    // stroke with no t (written before the pen sheet) is a pen stroke.
+    const isHl=s=>s.t==='highlighter';
+    function drawGroup(g,at,hl){
+      if(!at) return;
+      for(const s of g.strokes) if(isHl(s)===hl) ink.drawStroke(ctx,s.p.map(p=>({x:at.ox+p[0]*at.s,y:at.oy+p[1]*at.s,p:p[2]})),s.c,s.w*at.s,s.t||'pen',s.a);
+    }
+    // Re-measure every anchor and repaint. Called after any layout change; the canvas is re-appended
+    // when the host rebuilt the list (innerHTML='' took it away).
+    function reflow(){
+      if(dead) return;
+      if(canvas.parentNode!==container) container.appendChild(canvas);
+      const placed=placements();                       // lays the bucket out first: the canvas must cover it
+      const {w,h}=size(); ctx.clearRect(0,0,w,h);
+      for(const {g,at} of placed) drawGroup(g,at,true);
+      if(cur&&pen.t==='highlighter') ink.drawStroke(ctx,cur.pts,pen.c,pen.w,pen.t,pen.a);   // live highlighter: behind the ink too
+      for(const {g,at} of placed) drawGroup(g,at,false);
+      if(cur&&pen.t==='pen') drawLive(cur.pts,0);
+    }
+    function schedule(){ if(scheduled||dead) return; scheduled=true; const raf=window.requestAnimationFrame||(f=>setTimeout(f,0)); raf(()=>{ scheduled=false; reflow(); }); }
+    // segTo sets only the width: the live stroke takes the chosen colour here, or it paints canvas-default black until lift.
+    function drawLive(pts,from){ ctx.save(); ctx.strokeStyle=pen.c; ctx.lineCap='round'; for(let i=Math.max(1,from);i<pts.length;i++) ink.segTo(ctx,pen.w,i>=2?pts[i-2]:null,pts[i-1],pts[i]); ctx.restore(); }
+
+    // ── Pen capture: pointerType 'pen' only, in the capture phase so the list's own handlers (tap to
+    //    select, long-press explain) never see the Pencil; touch and mouse are not touched at all.
+    function onDown(e){
+      if(e.pointerType==='pen'&&onPen) onPen();         // a Pencil is here: the host's pen sheet button appears (web/ink-pen.inline.html)
+      if(e.pointerType!=='pen'||cur||!enabled()) return;
+      e.preventDefault(); e.stopPropagation();
+      try{ container.setPointerCapture(e.pointerId); }catch(_){ /* best-effort: window listeners below still follow the pointer */ }
+      cur={id:e.pointerId,pts:[point(e)]};
+      if(!ctx) size();
+    }
+    function onMove(e){ if(!cur||e.pointerId!==cur.id) return; e.preventDefault(); cur.pts.push(point(e)); if(pen.t==='pen') drawLive(cur.pts,cur.pts.length-1); else if(pen.t==='highlighter') schedule(); }
+    function onUp(e){
+      if(!cur||e.pointerId!==cur.id) return;
+      const pts=cur.pts; cur=null; swallowClick=true; setTimeout(()=>{ swallowClick=false; },0);
+      try{ container.releasePointerCapture(e.pointerId); }catch(_){ /* harmless: the pointer is up either way */ }
+      // Re-check the gate at the END too: a chapter read that started while the pen was down has already
+      // reset the host's store, and saving this stroke would write that empty store over the chapter file.
+      if(!enabled()){ reflow(); return; }
+      // The eraser tool: the groups the touch or drag passes over leave; it never adds ink.
+      if(pen.t==='erase'){ const gone=hitGroups(pts,placements(),o.eraseHit); if(gone.length) commit(groups.filter(g=>!gone.includes(g))); else reflow(); return; }
+      if(pen.t==='pen'&&isScrub(pts,o.scrub)){ const gone=hitGroups(pts,placements(),o.eraseHit); if(gone.length){ commit(groups.filter(g=>!gone.includes(g))); return; } }
+      commit(groups.concat([anchor(pts)]));            // a scrub over nothing is ink like any other
+    }
+    // A cancelled pointer (palm, system gesture) is not a finished stroke: drop the live ink, keep nothing.
+    function onCancel(e){ if(!cur||e.pointerId!==cur.id) return; cur=null; try{ container.releasePointerCapture(e.pointerId); }catch(_){ /* harmless */ } reflow(); }
+    const onClick=e=>{ if(swallowClick){ swallowClick=false; e.stopImmediatePropagation(); e.preventDefault(); } };
+    const onMsg=e=>{ const m=e&&e.data; if(m&&m.pa==='prefs'&&typeof m.fontScale==='number'){ fs=m.fontScale; schedule(); } };
+    const offs=[], listen=(t,type,fn,opt)=>{ t.addEventListener(type,fn,opt); offs.push(()=>t.removeEventListener(type,fn,opt)); };
+    listen(container,'pointerdown',onDown,{capture:true,passive:false}); listen(container,'click',onClick,true);
+    listen(window,'pointermove',onMove,{passive:false}); listen(window,'pointerup',onUp); listen(window,'pointercancel',onCancel);
+    listen(window,'resize',schedule); listen(window,'orientationchange',schedule); listen(window,'message',onMsg);
+    // The Pencil guard set from the pad (R3), narrowed to the STYLUS: a finger touch still scrolls and
+    // selects the list natively; a selection start is stopped only while a stroke is in progress.
+    const stylus=e=>e.type==='selectstart'?!!cur:[...(e.touches||[])].some(t=>t.touchType==='stylus');
+    ink.guardInk(container,stylus);
+    const ro=typeof ResizeObserver==='function'?new ResizeObserver(schedule):null; if(ro) ro.observe(container);
+
+    reflow();
+    return {
+      render:reflow, reflow, canvas, isDrawing:()=>!!cur,
+      setPen:p=>{ pen=Object.assign({},DEFAULT_PEN,p||{}); }, pen:()=>Object.assign({},pen), onPen:f=>{ onPen=typeof f==='function'?f:null; },
+      groups:()=>groups.slice(), load:x=>{ groups=unpack(x); undoS=[]; redoS=[]; reflow(); hist(); }, clear:()=>commit([]),
+      undo:()=>step(undoS,redoS), redo:()=>step(redoS,undoS), canUndo:()=>undoS.length>0, canRedo:()=>redoS.length>0, onHistory:f=>{ onHist=typeof f==='function'?f:null; },
+      placements, bucket,
+      readout:()=>READOUT({w:window.innerWidth,h:window.innerHeight,dpr:window.devicePixelRatio||1,fs,textW:container.getBoundingClientRect().width,n:groups.length,orphans:placements().filter(p=>p.orphan).length}),
+      destroy:()=>{ dead=true; if(ro) ro.disconnect(); offs.forEach(f=>f()); for(const el of [canvas,bucket]) if(el.parentNode) el.parentNode.removeChild(el); },
+    };
+  }
+  window.PAInkAnchor={TIP,attach,bboxOf,pickLine,pickChars,trimRange,resolveRange,place,measurer,pack,unpack,isScrub,hitGroups,extentOf,
+    HISTORY_MAX,READOUT,READOUT_LABEL,DEFAULT_PEN,PAD,MIN_COVER,LINES,SCRUB,ERASE_HIT,UNANCHORED,BUCKET_TXT,BUCKET_CLS,LABEL_H,ROW_GAP,BUCKET_PADX};
+})();
+</script>

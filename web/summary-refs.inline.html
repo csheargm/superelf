@@ -1,0 +1,112 @@
+<!-- PASummaryRefs — important lines and source links in period summaries（总结中的重点与链接,
+     docs/plans/note-features.md F, ADR 0025). Inlined by web.mjs into any page carrying the
+     PA_SUMMARY_REFS_UI marker: drawer-summary carries it ABOVE its own script, so every drawer that
+     summarises has it with no app code. Split out of PADrawerSummary (R4): that file builds the turn,
+     this one owns (1) the numbering of the notes in a turn and their `Important · 重点` block, (2) the
+     refs a turn leaves behind — [n] → {id, page} — remembered per summary scope for the session, (3) the
+     note-link scheme `?note=<id>&page=<p>` (relative: it names a note of THIS app, never a way out of it;
+     PANote's sanitizer keeps exactly this shape through parseLink), (4) linkifyHtml, which turns a
+     rendered answer's `[n]` into those links (the rail's bubbles through chat-ui's enhance hook, the
+     saved summary note's html) — only once a host has installed onLink, else `[n]` stays text — and
+     (5) the ONE click interception: a tap on a note link anywhere on the page calls the host's
+     onLink({id, page}) hook (summary hooks), which opens that note on that page. A bubble keeps the
+     refs it was first painted with (refsFor), so a later turn in the scope cannot relink it.
+     Links inside PANote's own text layer are PANote's: its tap path calls PASummaryRefs.open(href).
+     Owner 2026-11-11: a link reads `[2] Roof · 2026-11-09` (label: the note's title, 40 chars, and its day — left
+     out when the title already says that date, `New Note 新笔记 · 11/10 10:28`, or is a summary's period title),
+     so the reader knows what it names; the host's onLink leaves the rail alone and the BACK PILL
+     (`← Back to summary · 返回总结`, one fixed element this file owns) returns to the summary note the
+     tapped link came from — the note decorate saved for that scope (noteSaved), else the last one saved.
+     Driven for real by test/summary-refs.test.mjs and test/drawer-summary.test.mjs. -->
+<style id="psr-style">
+.psr-back{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:9999;display:none;background:var(--accent,#0a7a5a);color:#fff;border:none;border-radius:999px;padding:8px 16px;font:inherit;font-size:14px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+.psr-back.show{display:block}
+</style>
+<script id="psr-script">
+(function(){
+  if(window.PASummaryRefs) return;
+  const TXT=Object.freeze({ important:'Important · 重点', back:'← Back to summary · 返回总结' });   // the block's heading (section adds the colon) and the prompt's name for the marked points; the pill
+  const TITLE_MAX=40;   // a link's label keeps this much of the note's title
+  // ── The note-link scheme (ADR 0025) ── the ONE spelling, parsed by the same regexp everywhere.
+  const NOTE_LINK_RE=/^\?note=([^&#\s]+)&page=(\d{1,4})$/;
+  const linkHref=(id,page)=>'?note='+encodeURIComponent(String(id))+'&page='+(Math.max(0,Math.floor(Number(page)||0)));
+  function parseLink(href){ const m=NOTE_LINK_RE.exec(String(href==null?'':href).trim()); if(!m) return null;
+    let id; try{ id=decodeURIComponent(m[1]); }catch(_){ return null; }   // a malformed escape is not a note link
+    return id?{id,page:Number(m[2])}:null; }
+  // ── Important lines of ONE note ── `pages` are its note-text records (field `important`), page-sorted.
+  // {lines: every important line in page order, page: the first page that has one (0 when none)}.
+  function importantOf(pages){ const lines=[]; let page=null;
+    for(const pg of (pages||[])){ const imp=Array.isArray(pg.important)?pg.important.filter(l=>typeof l==='string'&&l.trim()):[]; if(!imp.length) continue;
+      if(page===null) page=Math.max(0,Number(pg.page)||0); lines.push(...imp.map(l=>l.trim())); }
+    return {lines,page:page===null?0:page}; }
+  // ── A numbered section of the turn ── g: {n, title, imp:[lines], text}. The Important block comes
+  // BEFORE the body so a model that trims from the end keeps it.
+  const section=g=>'\n\n### ['+g.n+'] '+g.title+'\n'+(g.imp&&g.imp.length?TXT.important+':\n'+g.imp.map(l=>'- '+l).join('\n')+'\n':'')+g.text;
+  // Number the groups in order (1-based, mutates g.n) and return the refs a turn leaves: one per
+  // group that names a note id — {n, id, page, title, day}. A group without an id (a mapped month that
+  // was never saved) is numbered but has no ref, so its [n] stays plain text.
+  function number(groups){ const refs=[]; let n=0;
+    for(const g of groups){ g.n=++n; if(g.id!=null&&g.id!=='') refs.push({n,id:String(g.id),page:Math.max(0,Number(g.page)||0),title:String(g.title||''),day:String(g.day||'')}); }
+    return refs; }
+  // Does a title already say this day (`YYYY-MM-DD`) or month (`YYYY-MM`)? The ISO form, m/d (`11/10`, the default
+  // note title PANote.defaultTitle writes), or the month name (`Nov 10`, `Nov 2026`; PASummaryTitle.MONTHS, read at use time).
+  function titleHasDate(title,day){ const t=String(title||''), m=/^(\d{4})-(\d{2})(?:-(\d{2}))?$/.exec(String(day||'')); if(!m) return false;
+    if(t.includes(m[0])) return true; const mo=+m[2], dd=m[3]?+m[3]:0, T=window.PASummaryTitle, name=T&&T.MONTHS?T.MONTHS[mo-1]:'';
+    if(!dd) return !!name&&new RegExp('\\b'+name+'\\b.*\\b'+m[1]+'\\b').test(t);
+    return new RegExp('(^|[^\\d/])0?'+mo+'/0?'+dd+'(?![\\d])').test(t)||(!!name&&new RegExp('\\b'+name+' 0?'+dd+'(?![\\d])').test(t)); }
+  // A link's text: `[n] <title> · <day>` — the title as shown (a saved summary's reads as its period title today,
+  // PASummaryTitle.displayTitle), cut at TITLE_MAX; the day is left out when the title already says it, or names a period.
+  function label(r){ const raw=String(r.title||'').trim(), d=String(r.day||'').trim(), T=window.PASummaryTitle;
+    const t=T&&typeof T.displayTitle==='function'?T.displayTitle(raw):raw, period=!!(T&&typeof T.scopeOfLabel==='function'&&T.scopeOfLabel(raw)), short=t.length>TITLE_MAX?t.slice(0,TITLE_MAX)+'…':t;
+    return '['+r.n+']'+(short?' '+short:'')+(d&&d!==t&&!period&&!titleHasDate(t,d)?' · '+d:''); }
+  // The refs of each summary scope, for this session: the rail's bubbles and Save as note read them.
+  let onLink=null, listening=false;   // the host's hook; declared before linkifyHtml, which writes links only once it is installed
+  const byScope=new Map();
+  const remember=(scope,refs)=>{ if(typeof scope==='string'&&scope) byScope.set(scope,Array.isArray(refs)?refs:[]); };
+  const refsOf=scope=>(typeof scope==='string'&&byScope.has(scope))?byScope.get(scope):null;
+  // The refs a rendered bubble was FIRST painted with (enhance stores them beside the element), else the
+  // scope's: a later turn remembered under the same scope must not relink an older answer.
+  const byEl=new WeakMap(), scopeByEl=new WeakMap();   // the refs, and the scope, a bubble was painted under
+  const refsFor=(el,scope)=>(el&&typeof el==='object'&&byEl.has(el))?byEl.get(el):refsOf(scope);
+  // ── [n] → <a> in rendered HTML ── text outside tags only, never inside an existing <a>, only the
+  // numbers that have a ref. Pure string work (no DOM), so a node test runs the real thing.
+  const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  function linkifyHtml(html,refs){
+    const list=Array.isArray(refs)?refs:[]; if(!list.length||typeof onLink!=='function') return String(html==null?'':html);   // no host hook: a link would go nowhere, so [n] stays text
+    const by=new Map(list.map(r=>[String(r.n),r])); let inA=0;
+    return String(html==null?'':html).split(/(<[^>]*>)/).map(part=>{
+      if(part.startsWith('<')){ if(/^<a\b/i.test(part)) inA++; else if(/^<\/a\b/i.test(part)) inA=Math.max(0,inA-1); return part; }
+      if(inA) return part;
+      return part.replace(/\[(\d{1,3})\]/g,(m,n)=>{ const r=by.get(n); return r?'<a href="'+esc(linkHref(r.id,r.page))+'">'+esc(label(r))+'</a>':m; }); }).join('');
+  }
+  // chat-ui's post-render hook: a bubble under a summary scope gets its [n] linked. No refs (a thread
+  // reopened after a reload): the text stays as the model wrote it.
+  function enhance(el,key){ if(!el||typeof el!=='object'||typeof el.innerHTML!=='string') return false; const refs=refsFor(el,key); if(!refs||!refs.length) return false;
+    if(!byEl.has(el)){ byEl.set(el,refs); if(typeof key==='string') scopeByEl.set(el,key); } const out=linkifyHtml(el.innerHTML,refs); if(out===el.innerHTML) return false; el.innerHTML=out; return true; }
+  // ── The summary note of each scope (decorate's save result) and the back pill ── a tapped link opens a
+  // note in the pad while the rail keeps the thread; the pill brings the pad back to the summary note.
+  const noteByScope=new Map(); let lastNote=null, pill=null, backTo=null;
+  function noteSaved(scope,id){ if(typeof scope!=='string'||!scope||id==null||id==='') return false; noteByScope.set(scope,String(id)); lastNote=String(id); return true; }
+  const scopeOfEl=el=>{ for(let n=el;n&&typeof n==='object';n=n.parentNode){ if(scopeByEl.has(n)) return scopeByEl.get(n); } return null; };   // the bubble the link sits in, if it is one enhance painted
+  function ensurePill(){ if(pill||typeof document==='undefined'||!document.body||!document.body.appendChild) return pill;
+    pill=document.createElement('button'); pill.className='psr-back'; pill.type='button'; pill.textContent=TXT.back; pill.onclick=goBack; document.body.appendChild(pill); return pill; }
+  function showBack(id){ backTo=id; const p=ensurePill(); if(p&&p.classList) p.classList.add('show'); return !!p; }
+  function hideBack(){ backTo=null; if(pill&&pill.classList) pill.classList.remove('show'); }
+  function goBack(){ const id=backTo; hideBack(); if(id==null||typeof onLink!=='function') return false; fire({id,page:0}); return true; }   // not open(): the way back shows no pill
+  const fire=l=>{ Promise.resolve().then(()=>onLink(l)).catch(e=>{ console.warn('[PASummaryRefs] onLink failed',e); }); };   // the host reports its own open failures (its notice); a throw here must not break the tap
+  // ── The ONE click interception ── the host passes onLink({id,page}) in its summary hooks. `from` is the tapped
+  // <a> (the rail's bubbles); PANote's own tap path passes none, so the pill falls back to the last saved summary.
+  function open(href,from){ const l=parseLink(href); if(!l||typeof onLink!=='function') return false;
+    const scope=from?scopeOfEl(from):null, target=(scope&&noteByScope.get(scope))||lastNote;
+    if(target&&target!==l.id) showBack(target); else hideBack();   // a link back to the summary itself needs no pill
+    fire(l); return true; }
+  function onClick(e){ const t=e&&e.target; const a=t&&typeof t.closest==='function'?t.closest('a[href]'):null; if(!a) return;
+    if(a.closest('.pan-textlayer')) return;                        // PANote's own tap path decides links in a note (openLink → PASummaryRefs.open)
+    if(!parseLink(a.getAttribute('href'))) return;                 // any other link: not ours
+    e.preventDefault(); if(e.stopPropagation) e.stopPropagation(); open(a.getAttribute('href'),a); }
+  function install(hooks){ if(!hooks||typeof hooks.onLink!=='function') return false; onLink=hooks.onLink;
+    if(!listening&&typeof document!=='undefined'&&document.addEventListener){ document.addEventListener('click',onClick,true); listening=true; }
+    return true; }
+  window.PASummaryRefs={TXT,TITLE_MAX,NOTE_LINK_RE,linkHref,parseLink,importantOf,section,number,label,titleHasDate,remember,refsOf,refsFor,linkifyHtml,enhance,noteSaved,showBack,hideBack,goBack,backTarget:()=>backTo,open,install,onClick};
+})();
+</script>

@@ -1,0 +1,39 @@
+<script>
+// PA — the one request function to the shell's broker（与外壳通信的唯一入口）.
+// No app carries its marker: web.mjs (sendAppHtml) puts PA_BROKER_UI ahead of the first script of
+// EVERY served app page, after PATwoTap, PAStore and PALeave, so every app has it at top level.
+//
+// WHY. Twenty-one apps each wrote their own id counter, waiting table and 'message' listener, and
+// the latest (Matrix Conf, 2026-10-28) read the reply off the EVENT instead of e.data, so it
+// waited forever and showed a blank page. A hand-written broker is the defect; this is the one.
+//   await PA.req(kind, data)              → the shell's reply {ok, …}: {ok:false, code, error, text} on failure
+//   await PA.req(kind, data, onEvent)     → for a streaming kind ('chat'): onEvent(ev) per event, resolves on done
+// `data` is spread into the request as given ({path, data, what, message, …}; see superelf.md Kinds).
+// Ids are this page's own ('pa' + counter): the shell echoes them back as-is. A reply with an unknown
+// id is ignored, so an app that still has a listener of its own cannot be confused by one.
+// `var`, and kept if already present, so the page has one instance even if the marker appears twice.
+// Unit-tested by test/broker-helper.test.mjs.
+var PA = PA || (function () {
+  'use strict';
+  let seq = 0;
+  const wait = Object.create(null);        // id → {res, onEvent}; prototype-free (ADR 0015)
+  addEventListener('message', (e) => {
+    const m = e.data;                      // the reply is the event's DATA, never the event
+    if (!m || m.pa !== 'res') return;
+    const w = wait[m.id];
+    if (!w) return;
+    if (m.ev && w.onEvent) w.onEvent(m.ev);
+    if (m.ev && !m.done) return;           // a stream: keep waiting until the shell says done
+    delete wait[m.id];
+    w.res(m);
+  });
+  function req(kind, data, onEvent) {
+    return new Promise((res) => {
+      const id = 'pa' + (++seq);
+      wait[id] = { res, onEvent };
+      parent.postMessage(Object.assign({ pa: 'req', id, kind }, data || {}), '*');
+    });
+  }
+  return { req };
+})();
+</script>

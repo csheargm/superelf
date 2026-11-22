@@ -1,0 +1,35 @@
+{
+  "default_project": "assistant",
+  "projects": {
+    "assistant": {
+      "dir": "workspace"
+    }
+  },
+  "claude_cmd": "claude",
+  "claude_token_file": "claude-token",
+  "claude_args": [
+    "--model",
+    "sonnet",
+    "--dangerously-skip-permissions"
+  ],
+  "fast_args": [
+    "--model",
+    "haiku",
+    "--dangerously-skip-permissions",
+    "--settings",
+    "{\"alwaysThinkingEnabled\":false}"
+  ],
+  "task_timeout_minutes": 30,
+  "one_shot_args": [
+    "--settings",
+    "{\"alwaysThinkingEnabled\":false}"
+  ],
+  "one_shot_model": "claude",
+  "research": {
+    "writer": "claude"
+  },
+  "users": [],
+  "max_concurrent": 5,
+  "public_base_url": "",
+  "local_origin": ""
+}

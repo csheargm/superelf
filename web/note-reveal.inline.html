@@ -1,0 +1,84 @@
+<!-- PANoteReveal — the search-hit reveal（命中定位）, phase 3 of note search (docs/plans/note-search.md,
+     ADR 0023). Inlined by web.mjs into any page carrying the PA_NOTE_REVEAL_UI marker (note-ui carries
+     it, so the Journal and the Bible get it with no app code).
+     API: PANoteReveal.attach({host,stage,pageInner,textLayer,flipTo,listen}) returns {show(at), clear(), active()}.
+     `at` is what the drawer hands a host at a hit row's click: {page, boxes:[[x,y,w,h]…], terms:[…]}.
+     show() flips to the page (PANote's own flipTo), lays translucent rectangles over the matched
+     handwriting / photo lines (boxes in page widths, the page's one unit) and marks the matched
+     typed runs with a CSS Custom Highlight; all of it goes at the next touch of the pad or after
+     REVEAL_MS. Driven for real by test/note-reveal.test.mjs. -->
+<style id="pnr-style">
+.pan-reveal{position:absolute;inset:0;pointer-events:none;z-index:3}
+.pan-reveal>div{position:absolute;background:rgba(255,214,0,.35);outline:1px solid rgba(255,170,0,.55);border-radius:3px}
+::highlight(pan-reveal){background:rgba(255,214,0,.45)}
+</style>
+<script id="pnr-script">
+(function(){
+  if(window.PANoteReveal) return;
+  const REVEAL_MS=4000;         // the marks go on their own after this, or at the next touch of the pad
+  const HL_NAME='pan-reveal';   // the CSS Custom Highlight registry key — the ::highlight() name above
+  const revealMs=()=>(Number(window.PA_REVEAL_MS)>0?Number(window.PA_REVEAL_MS):REVEAL_MS);   // read at use time: a test shortens it
+  const boxOk=b=>Array.isArray(b)&&b.length===4&&b.every(Number.isFinite);
+  // The Custom Highlight API, or null where the browser lacks it: typed text is then simply not
+  // marked (the page still opens where it matched). Feature-detected at use time.
+  const hlApi=()=>((window.CSS&&window.CSS.highlights&&typeof window.Highlight==='function'&&typeof document.createTreeWalker==='function')?window.CSS.highlights:null);
+
+  function attach(c){
+    let layer=null, timer=0;
+    function clear(){
+      if(timer){ clearTimeout(timer); timer=0; }
+      if(layer){ layer.remove(); layer=null; }
+      const reg=hlApi(); if(reg) reg.delete(HL_NAME);
+    }
+    // Rectangles in page widths → px of the page as laid out NOW: the page's unit is its width, so
+    // every edge is a fraction of pageInner's width (y included). Nothing is drawn while the pad is
+    // hidden (width 0): a box could not be placed, and the reveal is a courtesy, not a state.
+    function paintBoxes(boxes){
+      const W=Number(c.pageInner.clientWidth)||0; if(!W) return 0;
+      const el=document.createElement('div'); el.className='pan-reveal';
+      let n=0;
+      for(const b of boxes){
+        if(!boxOk(b)) continue;
+        const d=document.createElement('div');
+        d.style.left=(b[0]*W)+'px'; d.style.top=(b[1]*W)+'px'; d.style.width=Math.max(2,b[2]*W)+'px'; d.style.height=Math.max(2,b[3]*W)+'px';
+        el.appendChild(d); n++;
+      }
+      if(!n) return 0;
+      c.pageInner.appendChild(el); layer=el; return n;
+    }
+    // Typed text: the matched runs are MARKED, never wrapped. The text layer's innerHTML IS the saved
+    // page (PANote commitPageHtml), so a mark element inserted here would be written into the note. A
+    // CSS Custom Highlight paints ranges without touching the DOM. Plain substring, case-folded:
+    // the terms are the node's lowercase tokens, so a prefix match marks the whole token's start.
+    function paintTerms(terms){
+      const reg=hlApi(); if(!reg||!terms.length) return 0;
+      const hl=new window.Highlight(); let n=0;
+      const walker=document.createTreeWalker(c.textLayer, window.NodeFilter?window.NodeFilter.SHOW_TEXT:4);
+      for(let node=walker.nextNode(); node; node=walker.nextNode()){
+        const low=String(node.data||'').toLowerCase();
+        for(const t of terms){ let i=low.indexOf(t); while(i>=0){ const r=document.createRange(); r.setStart(node,i); r.setEnd(node,i+t.length); hl.add(r); n++; i=low.indexOf(t,i+t.length); } }
+      }
+      if(n) reg.set(HL_NAME,hl);
+      return n;
+    }
+    // Resolves whether anything was marked. A page past the notebook, or a flip already in motion,
+    // leaves the pad on its current page (flipTo refuses; nothing is forced).
+    async function show(at){
+      clear();
+      if(!at||typeof at!=='object') return false;
+      const page=Math.max(0,Math.floor(Number(at.page)||0));
+      if(typeof c.flipTo==='function') await c.flipTo(page);   // page 0 too: a kept-in-memory reload leaves cur where it was
+      const boxes=Array.isArray(at.boxes)?at.boxes:[];
+      const terms=Array.isArray(at.terms)?at.terms.filter(t=>typeof t==='string'&&t).map(t=>t.toLowerCase()):[];
+      const n=paintBoxes(boxes)+paintTerms(terms);
+      if(n) timer=setTimeout(clear,revealMs());
+      return n>0;
+    }
+    // Any touch of the pad ends the reveal: the next stroke, tap, or flip. Capture + passive: it
+    // never changes what the touch does.
+    c.listen(c.host,'pointerdown',()=>{ if(layer||timer) clear(); },{capture:true,passive:true});
+    return {show,clear,active:()=>!!(layer||timer)};
+  }
+  window.PANoteReveal={attach,REVEAL_MS};
+})();
+</script>

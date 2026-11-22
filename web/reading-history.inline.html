@@ -1,0 +1,115 @@
+<!-- PAReadingHistory — where you were reading, and what you read lately（阅读记录）. Inlined by web.mjs into any page
+     carrying the PA_READING_HISTORY_UI marker (the Bible carries it). Owner 2026-11-13: "The bible app should
+     remember the current reading book ... There is a history feature that we want to have."
+     - ONE server data file per app, 'reading.json': {v:1, last:{b,c,at}, history:[{b,c,at}]}, newest first,
+       deduped by (b,c) — a re-read chapter moves to the top — and capped at CAP entries.
+     - Storage goes through the HOST's checked reader/writer (the Bible's DATA: sandboxed apps have no
+       localStorage). A failed read NEVER leads to a write: nothing is written until the read succeeded or
+       proved the file absent, and the failure is reported through the host's notice (R5).
+     - Writes are serialized and coalesced: one in flight at a time, and the next one carries the newest
+       state, so rapid chapter taps never race and never lose the latest chapter.
+     - render(box) draws the list (Reading history · 阅读历史) with a two-tap "Clear history · 清除历史"
+       (window.PATwoTap: sandboxed pages have no confirm()); a row tap calls onPick(b, c).
+     attach({store:{read(path), write(path,text)}, ST:{loaded,absent,failed}, bookName(b)->{en,zh},
+             onPick(b,c), notice(msg,key), noticeOk(key), now?(), locale?})
+       -> {restore() -> Promise<{b,c}|null>, record(b,c), clear(), render(box), entries(), idle()}
+     Pure helpers for tests and hosts: PAReadingHistory.merge, timeLabel, sanitize, CAP, PATH.
+     Unit-tested by test/reading-history.test.mjs; end to end by test/reading-history-e2e.test.mjs. -->
+<style id="prh-style">
+.prh-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px 6px}
+.prh-title{font-size:13px;font-weight:700;color:var(--muted,#6b7370)}
+.prh-clear{font:inherit;font-size:12px;border:1px solid var(--line,#e2e2de);background:none;color:var(--muted,#6b7370);border-radius:8px;padding:4px 8px;cursor:pointer;white-space:nowrap}
+.prh-clear.arm{color:#b3261e;border-color:#b3261e}
+.prh-name{font-size:15px;line-height:1.35;overflow-wrap:anywhere}
+.prh-when{font-size:12px;color:var(--muted,#6b7370);margin-top:2px}
+</style>
+<script id="prh-script">
+(function(){
+  if(window.PAReadingHistory) return;
+  const PATH='reading.json';
+  const CAP=100;                               // entries kept; older ones fall off the end
+  const JUST_NOW_MS=60*1000;                   // under a minute reads "Just now"
+  const TXT={ title:'Reading history · 阅读历史', clear:'Clear history · 清除历史', ask:'Clear? · 清除?',
+    justNow:'Just now · 刚刚', unreadable:'Reading history unreadable · 阅读记录无法读取',
+    notSaved:'Reading history not saved · 阅读记录未保存' };
+  const okInt=(n,min)=>Number.isInteger(n)&&n>=min;
+  const okEntry=(e)=>!!e&&okInt(e.b,0)&&okInt(e.c,1)&&typeof e.at==='number'&&isFinite(e.at);
+
+  // Anything that is not the v1 shape reads as empty rather than throwing; bad rows are dropped.
+  function sanitize(d){
+    const o=(d&&typeof d==='object')?d:{};
+    const history=(Array.isArray(o.history)?o.history:[]).filter(okEntry).map(e=>({b:e.b,c:e.c,at:e.at})).slice(0,CAP);
+    const last=okEntry(o.last)?{b:o.last.b,c:o.last.c,at:o.last.at}:(history[0]||null);
+    return {v:1,last,history};
+  }
+  // A new state with (b,c) read at `at`: on top, any older row for the same chapter removed, capped.
+  function merge(state,b,c,at,cap){
+    const s=sanitize(state), e={b,c,at};
+    return {v:1,last:e,history:[e,...s.history.filter(x=>!(x.b===b&&x.c===c))].slice(0,cap||CAP)};
+  }
+  function timeLabel(at,now,locale){
+    if(now-at<JUST_NOW_MS) return TXT.justNow;
+    const d=new Date(at);
+    return d.toLocaleDateString(locale,{weekday:'short',month:'short',day:'numeric'})+' · '
+      +d.toLocaleTimeString(locale,{hour:'2-digit',minute:'2-digit'});
+  }
+
+  function attach(o){
+    const now=o.now||(()=>Date.now());
+    let state=sanitize(null);
+    let writable=false;                        // only after a read that loaded, or proved the file absent
+    let dirty=false, flushing=null, box=null;
+    let restored=false; const pend=[];         // chapters read before the stored file answered, replayed on top of it
+    const notice=(m)=>{ if(o.notice) o.notice(m,PATH); };
+    const ok=()=>{ if(o.noticeOk) o.noticeOk(PATH); };
+
+    // One write at a time; whatever changed meanwhile goes out in ONE more write with the newest state.
+    function flush(){
+      if(!writable) return Promise.resolve();
+      if(flushing) return flushing;
+      flushing=(async()=>{
+        while(dirty){ dirty=false;
+          const r=await o.store.write(PATH,JSON.stringify(state));
+          if(r&&r.ok) ok(); else notice(TXT.notSaved+' — '+((r&&r.error)||'?'));
+        }
+      })().finally(()=>{ flushing=null; });
+      return flushing;
+    }
+    async function restore(){
+      const r=await o.store.read(PATH);
+      restored=true;
+      if(r&&r.status===o.ST.loaded){ state=sanitize(r.data); writable=true; ok(); }
+      else if(r&&r.status===o.ST.absent){ writable=true; }
+      else { notice(TXT.unreadable+' — '+((r&&r.error)||'?')+' — writes blocked 已停止写入'); return null; }
+      for(const [b,c,at] of pend.splice(0)) state=merge(state,b,c,at);
+      if(dirty) flush();                       // chapters read while the read was in flight
+      return state.last?{b:state.last.b,c:state.last.c}:null;
+    }
+    function record(b,c){ const at=now(); if(!restored) pend.push([b,c,at]); state=merge(state,b,c,at); dirty=true; if(box) draw(); return flush(); }
+    function clear(){ state={v:1,last:state.last,history:[]}; dirty=true; if(box) draw(); return flush(); }
+
+    function el(tag,cls,text){ const e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e; }
+    function draw(){
+      if(!box||!box.isConnected){ box=null; return; }
+      box.textContent='';
+      if(!state.history.length) return;
+      const head=el('div','prh-head'); head.appendChild(el('div','prh-title',TXT.title));
+      const btn=el('button','prh-clear',TXT.clear); btn.type='button';
+      btn.onclick=(e)=>{ e.stopPropagation(); if(!window.PATwoTap||window.PATwoTap.press(btn,{label:TXT.ask})) clear(); };
+      head.appendChild(btn); box.appendChild(head);
+      const t=now();
+      for(const h of state.history){
+        const n=o.bookName(h.b); if(!n) continue;
+        const row=el('div','sr prh-row'); row.dataset.b=h.b; row.dataset.c=h.c;
+        row.appendChild(el('div','prh-name',`${n.zh} ${n.en} 第 ${h.c} 章`));
+        row.appendChild(el('div','prh-when',timeLabel(h.at,t,o.locale)));
+        row.onclick=(e)=>{ e.stopPropagation(); o.onPick(h.b,h.c); };
+        box.appendChild(row);
+      }
+    }
+    function render(target){ box=target; draw(); }
+    return { restore, record, clear, render, entries:()=>state.history.slice(), idle:()=>flushing||Promise.resolve() };
+  }
+  window.PAReadingHistory={attach,merge,timeLabel,sanitize,CAP,PATH,TXT};
+})();
+</script>

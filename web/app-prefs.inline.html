@@ -1,0 +1,58 @@
+<!-- PAAppPrefs — this app's server-side prefs, ONE read/write chain per page（每页唯一的应用偏好读写链）.
+     Inlined by web.mjs wherever the PA_APP_PREFS_UI marker appears: chat-ui carries it (the drawer's sort,
+     groups and hidden tags), so every PAChat page has it, the Bible included (its pen sheet, PAInkPen).
+     WHY ONE. The shell's set-app-settings REPLACES this app's whole prefs object AND its system-prompt
+     override. Two private chains on one page (the drawer's and the pen's) each sent the object they had
+     read, so within one round trip one of them dropped the other's key; and the drawer sent no
+     systemPrompt at all, which the shell then read as "clear the override".
+       PAAppPrefs.get()          → the latest known prefs, this page's unsaved changes on top (sync)
+       PAAppPrefs.read()         → re-read from the shell; resolves {ok, prefs} (prefs = get()) or the refusal
+       PAAppPrefs.patch({k: v})  → set those keys at once (get() shows them), then write; resolves the shell's reply
+       PAAppPrefs.whenIdle()     → the chain, settled
+     Rules: every write RE-READS first and merges ONLY its own keys into what the shell answered, and
+     re-sends the override it answered, unchanged. A key changed here carries a generation number until a
+     write of THAT generation is confirmed, so a reply requested before a local change never overwrites it
+     (on screen or on the server). Nothing is swallowed: a refused read or write resolves {ok:false, error},
+     and the caller shows it (R5). Driven by test/app-prefs.test.mjs against the real shell saveAppSettings. -->
+<script id="pap-script">
+(function(){
+  if(window.PAAppPrefs) return;
+  const DEFAULT_TIMEOUT_MS=20000;   // when PANote (SAVE_TIMEOUT_MS) is not on the page
+  const NO_REPLY='no reply · 无响应';
+  // Own ids ('pap…'), so no other broker on the window ever takes these replies.
+  let n=0; const wait={};
+  window.addEventListener('message',e=>{ const m=e&&e.data; if(m&&m.pa==='res'&&wait[m.id]){ const f=wait[m.id]; delete wait[m.id]; f(m); } });
+  const req=o=>new Promise(res=>{ const id='pap'+(++n);
+    const ms=(window.PANote&&window.PANote.SAVE_TIMEOUT_MS)||DEFAULT_TIMEOUT_MS;
+    const t=setTimeout(()=>{ delete wait[id]; res({ok:false,error:'timed out · 超时'}); },ms);
+    wait[id]=m=>{ clearTimeout(t); res(m); };
+    parent.postMessage(Object.assign({pa:'req',id},o),'*'); });
+
+  let server={}, override='', seq=0, chain=Promise.resolve();
+  const local={};                                  // key → {v, gen}: changed here, not yet confirmed written
+  const get=()=>{ const o=Object.assign({},server); for(const k of Object.keys(local)) o[k]=local[k].v; return o; };
+  const enqueue=f=>{ const run=chain.then(f); chain=run.then(()=>{},()=>{}); return run; };
+  async function fetchNow(){
+    const r=await req({kind:'app-settings'});
+    if(!(r&&r.ok)) return {ok:false,error:(r&&r.error)||NO_REPLY};
+    server=r.prefs&&typeof r.prefs==='object'&&!Array.isArray(r.prefs)?r.prefs:{};
+    override=(r.systemPrompt&&typeof r.systemPrompt.override==='string')?r.systemPrompt.override:'';
+    return {ok:true,prefs:get()};
+  }
+  const read=()=>enqueue(fetchNow);
+  function patch(p){
+    const gens={};
+    for(const k of Object.keys(p||{})){ gens[k]=++seq; local[k]={v:p[k],gen:gens[k]}; }
+    return enqueue(async()=>{
+      const r=await fetchNow(); if(!r.ok) return r;          // never write over prefs we could not read
+      const prefs=get();                                     // the shell's answer, this page's changes on top
+      const w=await req({kind:'set-app-settings',prefs,systemPrompt:override});
+      // Confirmed or refused, THIS generation is settled: a newer local change (higher gen) stays pending.
+      for(const k of Object.keys(gens)) if(local[k]&&local[k].gen===gens[k]) delete local[k];
+      if(!(w&&w.ok)) return {ok:false,error:(w&&w.error)||NO_REPLY};
+      server=prefs; return w;
+    });
+  }
+  window.PAAppPrefs={get,read,patch,whenIdle:()=>chain};
+})();
+</script>

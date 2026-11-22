@@ -1,0 +1,96 @@
+<!-- PANoteText — the Transcript panel（转写）and the ONE client of the broker kind `note-text`
+     (docs/plans/note-features.md A; web.mjs GET /api/note-text, lib/note-text.mjs; ADR 0023).
+     Inlined by web.mjs into any page carrying the PA_NOTE_TEXT_UI marker (note-ui carries it, so
+     the Journal and the Bible get it with no app code).
+     API: PANoteText.fetch({paths?, scope?, fields?}) → {ok, pages, truncated, pending, ocr, reason} |
+          {ok:false, error, code} — through PAStore.ask, like PANote.search (R3); an outcome, never a throw.
+          PANoteText.attach({host, doc}) → {open(), close(), isOpen(), el}: a read-only, selectable
+          panel over the pad — state line, then per page its ink lines, photo text and picture labels.
+          `doc()` is the host's {path, scope} of the open note (PANote opts.doc); null = not saved yet.
+     The transcript is never stored in the note: it is read from the index each time the panel opens,
+     and re-read while pages are still being transcribed. Driven for real by test/note-text-panel.test.mjs. -->
+<style id="pnt-style">
+.pan-tr{position:absolute;inset:0;z-index:13;/* above .pan-top (12): the title and ✕ must stay tappable */display:none;flex-direction:column;background:var(--bg,#fff);color:var(--text,#1a1a1a)}
+.pan-tr.on{display:flex}
+.pan-trtop{display:flex;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top,0px) + 10px) 12px 10px;border-bottom:1px solid var(--line,#e6e6e6)}
+.pan-trttl{flex:1;font-weight:600;font-size:16px}
+.pan-trx{background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted,#888);width:30px;flex-shrink:0}
+.pan-trstate{font-size:12px;color:var(--muted,#888);padding:8px 12px 0}
+.pan-trbody{flex:1;overflow:auto;padding:0 12px 24px;-webkit-user-select:text;user-select:text;-webkit-touch-callout:default;white-space:pre-wrap;font-size:15px;line-height:1.5;-webkit-overflow-scrolling:touch}
+.pan-trpg{font-weight:600;margin:14px 0 2px}
+.pan-trsrc{font-size:11px;color:var(--accent,#0f6355);font-weight:600;margin:8px 0 2px;-webkit-user-select:none;user-select:none}
+</style>
+<script id="pnt-script">
+(function(){
+  if(window.PANoteText) return;
+  // Every line the panel can say, ONE place, English then 中文 (the repo's style, PANote.SEARCH_TXT).
+  const TXT=Object.freeze({ title:(window.PANote&&window.PANote.SEARCH_TXT&&window.PANote.SEARCH_TXT.transcript)||'Transcript', close:'Close · 关闭', loading:'Loading · 加载中',
+    transcribing:'Transcribing · 识别中', failed:'Failed on this node · 本机识别失败', noOcr:'Needs the Mac node · 需要 Mac 节点',
+    ready:'Transcribed · 已转写', none:'Nothing to transcribe on this note · 这条笔记没有可转写的内容',
+    unsaved:'Save the note first · 请先保存笔记', unavailable:'Transcript unavailable · 转写不可用',
+    page:'Page {n} · 第 {n} 页', labels:'Picture labels · 图片标签' });
+  const REFRESH_MS=4000;   // while pages are owed, the panel re-reads this often (read at use time: a test shortens it)
+  const refreshMs=()=>(Number(window.PA_TEXT_REFRESH_MS)>0?Number(window.PA_TEXT_REFRESH_MS):REFRESH_MS);
+  const esc=s=>String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  // The ink/photo headings are PANote's own where-labels (R3): one wording for a hit chip and a transcript section.
+  const where=w=>(window.PANote&&window.PANote.SEARCH_TXT&&window.PANote.SEARCH_TXT[w])||w;
+
+  async function fetchText(o){
+    const q=o||{};
+    if(!(window.PAStore&&typeof window.PAStore.ask==='function')) return {ok:false,error:TXT.unavailable,code:'no-broker'};
+    const m={kind:'note-text'};
+    if(Array.isArray(q.paths)&&q.paths.length) m.paths=q.paths.filter(p=>typeof p==='string'&&p);
+    if(typeof q.scope==='string') m.scope=q.scope;
+    if(Array.isArray(q.fields)&&q.fields.length) m.fields=q.fields.map(String);
+    const r=await window.PAStore.ask(m);
+    if(r&&r.ok) return {ok:true,pages:Array.isArray(r.pages)?r.pages:[],truncated:r.truncated===true,pending:Math.max(0,Number(r.pending)||0),ocr:typeof r.ocr==='string'?r.ocr:'',reason:typeof r.reason==='string'?r.reason:''};
+    return {ok:false,error:(r&&(r.text||r.error))||TXT.unavailable,code:(r&&r.code)||'text-failed'};
+  }
+
+  // A page is SHOWN when it has, or still owes, something a transcript can say; a typed-only page is not.
+  const hasText=p=>!!(p.pending||p.error||(p.src&&(p.src.ink||p.src.photo))||(p.labels&&p.labels.length));
+  // The state line: owed pages name the node's state (cannot / failed lately / transcribing); else the
+  // first page-level failure with its reason; else transcribed; nothing to show when no page qualifies.
+  function stateLine(r,shown){
+    if(!shown.length) return TXT.none;
+    if(shown.some(p=>p.pending)) return r.ocr==='unavailable'?TXT.noOcr:r.ocr==='failed'?TXT.failed+(r.reason?' — '+r.reason:''):TXT.transcribing;
+    const bad=shown.find(p=>p.error);
+    return bad?TXT.failed+' — '+bad.error:TXT.ready;
+  }
+  function pageSection(p){
+    const src=p.src||{}; let h='';
+    if(src.ink) h+='<div class="pan-trsrc">'+esc(where('ink'))+'</div><div>'+esc(src.ink)+'</div>';
+    if(src.photo) h+='<div class="pan-trsrc">'+esc(where('photo'))+'</div><div>'+esc(src.photo)+'</div>';
+    if(p.labels&&p.labels.length) h+='<div class="pan-trsrc">'+esc(TXT.labels)+'</div><div>'+esc(p.labels.join(' · '))+'</div>';
+    return '<div class="pan-trpg">'+esc(TXT.page.replace(/\{n\}/g,String((Number(p.page)||0)+1)))+'</div>'+h;
+  }
+
+  function attach(c){
+    const el=document.createElement('div'); el.className='pan-tr'; el.setAttribute('role','dialog'); el.setAttribute('aria-label',TXT.title);
+    el.innerHTML='<div class="pan-trtop"><div class="pan-trttl">'+esc(TXT.title)+'</div>'+
+      '<button class="pan-trx" title="'+esc(TXT.close)+'" aria-label="'+esc(TXT.close)+'">✕</button></div>'+
+      '<div class="pan-trstate" role="status" aria-live="polite"></div><div class="pan-trbody"></div>';
+    c.host.appendChild(el);
+    const state=el.querySelector('.pan-trstate'), body=el.querySelector('.pan-trbody');
+    let seq=0, timer=0;
+    const stopTimer=()=>{ if(timer){ clearTimeout(timer); timer=0; } };
+    async function load(my){
+      const doc=typeof c.doc==='function'?c.doc():null;
+      if(!doc||typeof doc.path!=='string'||!doc.path){ state.textContent=TXT.unsaved; body.innerHTML=''; return false; }
+      const o={paths:[doc.path],fields:['src','labels']}; if(typeof doc.scope==='string') o.scope=doc.scope;
+      let r; try{ r=await fetchText(o); }catch(e){ r={ok:false,error:String((e&&e.message)||e)}; }   // said on the state line below (R5)
+      if(my!==seq) return false;                                  // closed, or reopened, meanwhile
+      if(!r.ok){ state.textContent=r.error||TXT.unavailable; return false; }
+      const shown=r.pages.filter(hasText);
+      state.textContent=stateLine(r,shown); body.innerHTML=shown.map(pageSection).join('');
+      if(shown.some(p=>p.pending)&&r.ocr!=='unavailable'&&r.ocr!=='failed') timer=setTimeout(()=>{ timer=0; if(my===seq) load(my); },refreshMs());
+      return true;
+    }
+    function open(){ ++seq; stopTimer(); el.classList.add('on'); state.textContent=TXT.loading; body.innerHTML=''; return load(seq); }
+    function close(){ ++seq; stopTimer(); el.classList.remove('on'); }
+    el.addEventListener('click',e=>{ const t=e&&e.target; if(t&&t.closest&&t.closest('.pan-trx')) close(); });
+    return {open,close,isOpen:()=>el.classList.contains('on'),el};
+  }
+  window.PANoteText={attach,fetch:fetchText,TXT,REFRESH_MS};
+})();
+</script>

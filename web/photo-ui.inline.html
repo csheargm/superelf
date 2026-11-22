@@ -1,0 +1,301 @@
+<!-- ─────────────────────────────────────────────────────────────────────────────────────────
+     PAPhoto — the ONE photo-as-input path: pick (camera or library) → read → optional
+     downscale → pre-flight → upload → an outcome the caller can act on.
+
+     Inlined at serve time by web.mjs into any page carrying the marker
+
+       PA_PHOTO_UI                          (the HTML-comment marker, once in <body>)
+
+     written here WITHOUT the comment delimiters on purpose: the literal form would close this
+     header early AND be replaced by this file's own content at serve time (web.mjs replaces
+     every occurrence). chat-ui/note-ui/split-ui write theirs bare for the same reason.
+
+     WHY IT EXISTS (R1 — this is a deletion, not a feature)
+     Measured 2026-09-10: picking, reading and uploading an image was implemented FOUR times and
+     the four disagreed — only the note pad knew the real cap, only the meal UI resized, and the
+     shell posted /api/upload with no cap at all. Each new "photograph your glucose meter / your
+     Apple Health screen / your plate" surface was copying whichever one it found first. This is
+     the one path they collapse into; adding it WITHOUT migrating callers would make it five.
+
+     DELIVERY (why chat-ui.inline.html carries this marker)
+     Apps are sandboxed (allow-scripts, no allow-same-origin) and the CSP has no 'self', so
+     there are no shared script files — serve-time inlining is the only way to single-source
+     browser code here. web.mjs walks PA_COMPONENTS IN ORDER and re-tests the ALREADY INLINED
+     html for each remaining marker, so a component registered AFTER chat-ui is pulled in by
+     chat-ui's own source. PAPhoto therefore reaches every app that mounts PAChat with no
+     per-app edit. An app may also place the marker itself; the guard below makes the double
+     inline a no-op instead of two window.PAPhoto definitions.
+
+     THE CAP IS NEVER HARDCODED HERE
+     A component that hardcodes its own cap refuses photos the server would have accepted —
+     a size message that is simply false. The number comes, in order:
+       1. {pa:'prefs', uploadMaxBytes} — what the SERVER publishes to every app frame;
+       2. PAChat.limits.upload — the copy pinned to lib/webutil.mjs BODY_LIMITS.upload by test;
+       3. unknown → NO pre-flight. The server decides. Refusing on a guessed cap would be the
+          false refusal this component exists to stop.
+
+     THE FAILURE SENTENCE IS NEVER RE-RENDERED HERE
+     PAChat.failText(reply,{what,bytes}) is the ONE mapping (the shell rendered it into
+     reply.text; PAChat falls back to the noun table for a bare 413). A 401, a dropped socket
+     and an oversized photo must not all read "Upload failed" — that leftover cost a user their
+     work once already. PAPhoto calls that seam, it does not own a second copy of it.
+
+     API (every result is a shaped object — never a bare null)
+       PAPhoto.MAX_BYTES                     file bytes that fit right now, 0 when unknown
+       PAPhoto.pick({accept,camera,multiple})      → {ok, files, cancelled}
+       PAPhoto.toBase64(file,{maxEdge,quality,maxBytes})
+                                             → {ok, data, dataUrl, bytes, name} | {ok:false,…}
+       PAPhoto.upload(file,{maxEdge,maxBytes,name,what})
+                                             → {ok, path, dataUrl, bytes, name} | {ok:false,…}
+       PAPhoto.capture({camera,maxEdge,…})   → pick + upload in one call
+     Every failure carries {ok:false, code, limit, bytes, error, text} — `text` is the sentence
+     to show a human, `code` is what a caller branches on.
+
+     NO CLIENT-SIDE STORAGE: localStorage/sessionStorage/IndexedDB/cookie all throw
+     SecurityError at an opaque origin. Everything crosses the postMessage broker.
+────────────────────────────────────────────────────────────────────────────────────────── -->
+<script id="pap-script">
+(function(){
+  // Idempotent: chat-ui carries this marker, and an app may carry it too. Two inlines of the
+  // same source must not produce two components (two broker listeners, two id counters).
+  if(window.PAPhoto) return;
+
+/* ══ PA_PHOTO_CORE_BEGIN ── DOM-free: every accept/refuse/report decision lives here ════════
+   Extracted and RUN by test/photo-component.test.mjs — keep it one contiguous block, free of
+   document/element access, so the guards can be executed and MUTATED rather than described.
+   `window` is read through a typeof guard for exactly that reason: the test drives this block
+   with a stub window (a real PAChat.failText sliced out of chat-ui.inline.html) and with none. */
+  const PAP_TOO_LARGE='too-large';              // == lib/webutil.mjs CODE_TOO_LARGE (pinned by test)
+  const PAP_ENVELOPE_BYTES=1024;                // the shell's JSON wrapper around {name,data}
+  const PAP_MAX_EDGE=1600;                      // default longest edge when a caller asks to resize
+  const PAP_QUALITY=0.82;                       // keeps a plate/meter/screen legible to a vision model
+  const PAP_REQ_TIMEOUT_MS=120000;              // a 15MB photo over cellular is slow; silence is still an ANSWER (R5)
+  const PAP_CANCEL_MS=800;                      // focus-back grace before a picker with no file counts as cancelled
+  const PAP_TXT={
+    noFile:'No photo chosen · 未选择照片',
+    unreadable:'Could not read that photo · 无法读取该照片',
+    notImage:'That file is not an image · 该文件不是图片',
+    noReason:'Upload failed · 上传失败 — no reason given by the shell · 外壳未给出原因',
+    noPath:'Upload confirmed but no file was stored · 上传已确认但未保存文件',
+    timeout:'No answer from the app shell · 外壳无响应 — the photo was not uploaded 照片未上传',
+    // ONLY reachable on a page that has PAPhoto and NO PAChat. The full sentence (cap, bytes,
+    // what to do, both languages) belongs to PAChat.failText and is not copied here (R3); this
+    // is the shell's own heading and nothing more, so the two can never drift into dialects.
+    bigNoChat:'Photo too large · 照片过大',
+  };
+  // Base64 decodes 3 bytes per 4 characters, minus the padding. Measured, not estimated: a
+  // 4/3 guess is wrong by up to 2 bytes and this number is printed to the user.
+  const papB64Bytes=(b64)=>{ const s=String(b64||''); if(!s) return 0;
+    const pad=s.charCodeAt(s.length-1)===61?(s.charCodeAt(s.length-2)===61?2:1):0;
+    return Math.max(0, Math.floor(s.length/4)*3-pad); };
+  // The FILE size that fits a given BODY cap. base64 inflates 4/3 and the shell wraps the
+  // payload, so a 20MB body admits ~15MB of file. This is the number the user is told, because
+  // "max 20 MB" for a file that must be under 15MB does not say what would fit.
+  const papFileCap=(bodyLimit)=>{ const b=Number(bodyLimit)||0; return b>PAP_ENVELOPE_BYTES?Math.floor((b-PAP_ENVELOPE_BYTES)*3/4):0; };
+  // A caller may impose a STRICTER cap of its own (the meal ingest route's own photo limit, a
+  // note store's). It may never raise the server's. 0 from either side means "not specified".
+  const papCap=(bodyLimit,maxBytes)=>{ const a=papFileCap(bodyLimit), b=Number(maxBytes)>0?Math.floor(Number(maxBytes)):0;
+    return (a&&b)?Math.min(a,b):(a||b||0); };
+  const papWin=()=>(typeof window!=='undefined'&&window)?window:null;
+  const papChat=()=>{ const w=papWin(); return (w&&w.PAChat)||null; };
+  // The cap, in priority order. 0 means UNKNOWN — see papRefuse: unknown never refuses.
+  let PAP_PREFS_LIMIT=0;                        // last {pa:'prefs', uploadMaxBytes} from the shell
+  const papBodyLimit=(o)=>{
+    const own=o&&Number(o.bodyLimit); if(own>0) return own;
+    if(PAP_PREFS_LIMIT>0) return PAP_PREFS_LIMIT;
+    const c=papChat(); const lim=c&&c.limits&&Number(c.limits.upload);
+    return lim>0?lim:0; };
+  /* THE GUARD (accept / refuse). Returns null to ACCEPT, or the refusal reply to report.
+     Two ways to get this wrong, both of them a lie to the user:
+       · refusing what the server would take  — happens if a cap is guessed when none is known;
+       · accepting what the server will not   — happens if the comparison is dropped.
+     Both directions are mutation-tested. */
+  const papRefuse=(bytes,cap)=>{ const n=Number(bytes)||0, c=Number(cap)||0;
+    if(c<=0) return null;                       // cap unknown: the SERVER decides, never a guess here
+    return n>c ? {ok:false,code:PAP_TOO_LARGE,limit:c,bytes:n} : null; };
+  // Longest-edge fit. Never ENLARGES (scale is capped at 1): upscaling a small photo would cost
+  // bytes and add nothing a model can read.
+  const papScale=(w,h,maxEdge)=>{ const W=Number(w)||0, H=Number(h)||0, M=Number(maxEdge)||0;
+    if(!(W>0&&H>0)) return {w:0,h:0,scaled:false};
+    const s=M>0?Math.min(1,M/Math.max(W,H)):1;
+    return {w:Math.max(1,Math.round(W*s)),h:Math.max(1,Math.round(H*s)),scaled:s<1}; };
+  // THE ONE failure renderer — PAChat's, not a second copy of it (R3).
+  const papFailText=(reply,ctx)=>{ const c=ctx||{}, chat=papChat();
+    if(chat&&typeof chat.failText==='function') return chat.failText(reply,c);
+    if(reply&&typeof reply.text==='string'&&reply.text) return reply.text;
+    if(reply&&reply.code===PAP_TOO_LARGE) return PAP_TXT.bigNoChat;
+    return (reply&&reply.error)||PAP_TXT.noReason; };
+  const papWhat=(name,override)=>{ if(override) return override; const chat=papChat();
+    return (chat&&typeof chat.whatForFile==='function')?chat.whatForFile(name):'Photo'; };
+  // Every failure leaves here in ONE shape, so no caller has to guess whether it got a null, a
+  // false, an empty string or a thrown error. `text` is for a human, `code` is for a branch.
+  const papFail=(reply,ctx)=>{ const c=ctx||{};
+    return {ok:false, path:'', name:c.name||'', bytes:Number(c.bytes)||Number(reply&&reply.bytes)||0,
+      code:String((reply&&reply.code)||c.code||''), limit:Number(reply&&reply.limit)||0,
+      error:String((reply&&reply.error)||c.error||PAP_TXT.noReason), text:papFailText(reply,c)}; };
+  /* THE REPORT (what a broker reply means). An ok:true with NO path is a store confirming work
+     it did not do — the notebook's `wroteNothing` scar — and is a FAILURE that says so, not a
+     success carrying an empty path for the caller to trip over later. */
+  const papOutcome=(reply,ctx)=>{ const c=ctx||{};
+    if(reply&&reply.ok===true&&reply.path) return {ok:true, path:String(reply.path), name:c.name||'', bytes:Number(c.bytes)||0, code:'', error:'', text:''};
+    if(reply&&reply.ok===true) return papFail({ok:false,code:'no-path',error:PAP_TXT.noPath,text:PAP_TXT.noPath}, c);
+    return papFail(reply, c); };
+/* ══ PA_PHOTO_CORE_END ══ */
+
+  // ── broker ────────────────────────────────────────────────────────────────────────────────
+  // Own id prefix: chat-ui, note-ui and an app's own relay all listen on this same window.
+  let _pid=0; const _pwait={};
+  window.addEventListener('message',e=>{ const m=e&&e.data;
+    if(m&&m.pa==='res'&&_pwait[m.id]){ const f=_pwait[m.id]; delete _pwait[m.id]; f(m); }
+    if(m&&m.pa==='prefs'&&Number(m.uploadMaxBytes)>0) PAP_PREFS_LIMIT=Number(m.uploadMaxBytes); });
+  const papReq=(o)=> new Promise(res=>{ const id='pap'+(++_pid);
+    // A shell that never answers must not leave the caller's spinner running forever: silence
+    // resolves as a named failure like any other (R5).
+    const t=setTimeout(()=>{ if(_pwait[id]){ delete _pwait[id]; res({ok:false,code:'timeout',error:PAP_TXT.timeout}); } }, PAP_REQ_TIMEOUT_MS);
+    _pwait[id]=(m)=>{ clearTimeout(t); res(m); };
+    parent.postMessage(Object.assign({pa:'req',id},o),'*'); });
+
+  // ── reading the bytes ─────────────────────────────────────────────────────────────────────
+  const papRead=(file)=> new Promise((res,rej)=>{ const r=new FileReader();
+    r.onload=()=>res(String(r.result||'')); r.onerror=()=>rej(new Error(PAP_TXT.unreadable)); r.readAsDataURL(file); });
+  // Downscale through a canvas. This is what makes a phone photo usable everywhere instead of
+  // only in the one place that happened to implement it: a 12MP camera shot is ~4-8MB and a
+  // vision model reads the 1600px version just as well.
+  const papShrink=(file,maxEdge,quality)=> new Promise((res,rej)=>{
+    const img=new Image(); const url=URL.createObjectURL(file);
+    img.onload=()=>{ URL.revokeObjectURL(url);
+      try{
+        const fit=papScale(img.width,img.height,maxEdge);
+        const c=document.createElement('canvas'); c.width=fit.w; c.height=fit.h;
+        c.getContext('2d').drawImage(img,0,0,fit.w,fit.h);
+        res(c.toDataURL('image/jpeg', Number(quality)>0?Number(quality):PAP_QUALITY));
+      }catch(err){ rej(new Error(PAP_TXT.unreadable)); }   // canvas tainted / out of memory: named, never swallowed (R5)
+    };
+    img.onerror=()=>{ URL.revokeObjectURL(url); rej(new Error(PAP_TXT.notImage)); };
+    img.src=url; });
+
+  // The INVERSE of toBase64: a stored photo comes back from the broker as a data: URL, and an
+  // editor needs a File. fetch() cannot do this here and never could — app pages are served
+  // `connect-src 'none'` (web.mjs), so fetching even a data: URL fails with a bare
+  // "Failed to fetch". `img-src data:` is what lets the picture RENDER, which is why the
+  // restriction is invisible until something tries to read the bytes back.
+  function papToFile(dataUrl,name){
+    const m=/^data:([^;,]*)(;base64)?,([\s\S]*)$/.exec(String(dataUrl||''));
+    if(!m) throw new Error(PAP_TXT.unreadable);
+    const mime=m[1]||'image/jpeg';
+    const raw=m[2]?atob(m[3]):decodeURIComponent(m[3]);
+    const buf=new Uint8Array(raw.length);
+    for(let i=0;i<raw.length;i++) buf[i]=raw.charCodeAt(i);
+    return new File([buf],name||'photo.jpg',{type:mime});
+  }
+
+  // The same decode-and-downscale, stopping at the CANVAS instead of a JPEG string. Exported
+  // because an editor needs pixels, not an encoded image: PAScan was decoding files itself with
+  // its own new Image()/createObjectURL pair, which is the duplication photo-component's
+  // enumeration test is there to catch. One loader, one set of failure messages (R3/R5).
+  const papCanvas=(file,maxEdge)=> new Promise((res,rej)=>{
+    const img=new Image(); const url=URL.createObjectURL(file);
+    img.onload=()=>{ URL.revokeObjectURL(url);
+      try{
+        const fit=papScale(img.width,img.height,maxEdge||PAP_MAX_EDGE);
+        const c=document.createElement('canvas'); c.width=fit.w; c.height=fit.h;
+        c.getContext('2d').drawImage(img,0,0,fit.w,fit.h);
+        res({canvas:c,w:fit.w,h:fit.h});
+      }catch(err){ rej(new Error(PAP_TXT.unreadable)); }
+    };
+    img.onerror=()=>{ URL.revokeObjectURL(url); rej(new Error(PAP_TXT.notImage)); };
+    img.src=url; });
+
+  // Read (and optionally downscale) a File, pre-flighting the size against the real cap.
+  // Returns the bare base64 the broker contract wants — no `data:` prefix — plus the data URL
+  // for a thumbnail, so no caller has to split the string itself again.
+  async function toBase64(file,opts){
+    const o=opts||{};
+    if(!file) return papFail({ok:false,code:'no-file',error:PAP_TXT.noFile,text:PAP_TXT.noFile},{});
+    const what=papWhat(file.name,o.what), cap=papCap(papBodyLimit(o),o.maxBytes);
+    // No resize asked for: refuse BEFORE reading. Reading 20MB on a phone to then throw it away
+    // is exactly the cost the pre-flight exists to avoid.
+    if(!o.maxEdge){ const early=papRefuse(file.size,cap); if(early) return papFail(early,{what,bytes:file.size,name:file.name}); }
+    let url;
+    try{ url = o.maxEdge ? await papShrink(file,o.maxEdge===true?PAP_MAX_EDGE:o.maxEdge,o.quality) : await papRead(file); }
+    catch(err){ const msg=(err&&err.message)||PAP_TXT.unreadable;
+      return papFail({ok:false,code:'unreadable',error:msg,text:msg},{what,name:file.name}); }
+    const data=String(url).split(',')[1]||'';
+    if(!data) return papFail({ok:false,code:'unreadable',error:PAP_TXT.unreadable,text:PAP_TXT.unreadable},{what,name:file.name});
+    // After the resize, because the resize is what decides the real size. Pre-flighting the
+    // ORIGINAL would refuse an 8MB camera shot that lands at 300KB — a false refusal.
+    const bytes=papB64Bytes(data);
+    const late=papRefuse(bytes,cap); if(late) return papFail(late,{what,bytes,name:file.name});
+    return {ok:true, data, dataUrl:url, bytes, name:file.name||'photo.jpg', cap, code:'', error:'', text:''};
+  }
+
+  // Read → pre-flight → broker `upload` → {ok,path}. The upload kind, its bare-base64 payload
+  // and its uploads/<ts>_<name> reply are the contract every other surface already speaks.
+  async function upload(file,opts){
+    const o=opts||{};
+    const enc=await toBase64(file,o);
+    if(!enc.ok) return enc;
+    const name=o.name||enc.name;
+    const reply=await papReq({kind:'upload',name,data:enc.data});
+    const out=papOutcome(reply,{what:papWhat(name,o.what), bytes:enc.bytes, name});
+    if(out.ok){ out.dataUrl=enc.dataUrl; out.data=enc.data; }
+    return out;
+  }
+
+  // Open the picker. camera:true sets capture="environment" — the CAMERA on a phone, the file
+  // picker on a laptop — which is the primary way in now: photograph the glucose meter, the
+  // Apple Health screen, the plate. Left OFF by default: on iOS `capture` removes the library
+  // option entirely, so a chat attachment must not have it.
+  function pick(opts){
+    const o=opts||{};
+    return new Promise(resolve=>{
+      const inp=document.createElement('input');
+      inp.type='file'; inp.accept=o.accept||'image/*';
+      if(o.multiple) inp.multiple=true;
+      if(o.camera) inp.setAttribute('capture', typeof o.camera==='string'?o.camera:'environment');
+      inp.style.cssText='position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0';
+      let done=false, timer=0;
+      const finish=(files)=>{ if(done) return; done=true; clearTimeout(timer);
+        window.removeEventListener('focus',onFocus,true);
+        try{ inp.remove(); }catch(_){ /* already detached by a re-render: nothing to undo */ }
+        resolve({ok:files.length>0, files, cancelled:files.length===0}); };
+      // Not every webview fires `cancel`. Regaining focus with the input still empty means the
+      // sheet closed with nothing — but `change` can land just after `focus`, so this waits and
+      // then RE-CHECKS the input rather than declaring a cancel that would drop a real photo.
+      const onFocus=()=>{ clearTimeout(timer); timer=setTimeout(()=>{
+        if(inp.files&&inp.files.length) return finish([...inp.files]);
+        finish([]); }, PAP_CANCEL_MS); };
+      inp.addEventListener('change',()=>finish([...(inp.files||[])]));
+      inp.addEventListener('cancel',()=>finish([]));
+      document.body.appendChild(inp);
+      window.addEventListener('focus',onFocus,true);
+      inp.click();
+    });
+  }
+
+  // pick + upload, for the common "take a photo of this and send it" button. The camera and a
+  // downscale are the DEFAULTS here — a 12MP phone shot is 4-8MB, a vision model reads the
+  // 1600px version just as well, and "only the meal UI resized" is precisely the divergence
+  // this component exists to end. A caller wanting the original passes maxEdge:0.
+  async function capture(opts){
+    const o=opts||{};
+    const picked=await pick(Object.assign({camera:true,maxEdge:PAP_MAX_EDGE},o));
+    if(!picked.ok) return {ok:false, path:'', name:'', bytes:0, code:'cancelled', limit:0, error:PAP_TXT.noFile, text:PAP_TXT.noFile, cancelled:true};
+    return upload(picked.files[0], Object.assign({maxEdge:PAP_MAX_EDGE},o));
+  }
+
+  window.PAPhoto={
+    pick, toBase64, upload, capture,
+    toCanvas:papCanvas,          // decode+downscale to a canvas, for editors that need pixels
+    toFile:papToFile,            // data: URL -> File, because connect-src 'none' forbids fetch()
+    // The CURRENT file-size cap, re-read on every access — the shell's prefs push can raise or
+    // lower it after load, and a value snapshotted at definition time would go stale silently.
+    // 0 means the cap is not known on this page (see papRefuse: unknown never refuses).
+    get MAX_BYTES(){ return papCap(papBodyLimit(null),0); },
+    get BODY_LIMIT(){ return papBodyLimit(null); },
+    failText:papFailText,          // the seam, re-exported so a caller need not know it is PAChat's
+    fits:(bytes,opts)=>!papRefuse(bytes, papCap(papBodyLimit(opts||null),(opts||{}).maxBytes)),
+    DEFAULT_MAX_EDGE:PAP_MAX_EDGE,
+  };
+})();
+</script>

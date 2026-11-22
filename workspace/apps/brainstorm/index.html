@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" media="(prefers-color-scheme:light)" content="#f4f4f2">
+<meta name="theme-color" media="(prefers-color-scheme:dark)" content="#0f1117">
+<title>Brainstorm 头脑风暴</title>
+<style>
+html{font-size:calc(17px * var(--fs,1))}   /* A-/A+ scale, broadcast by the shell (pa:'prefs' fontScale) */
+:root{--bg:#f4f4f2;--card:#fff;--text:#1c1e1d;--muted:#6b7370;--line:#e2e2de;--accent:#7c3aed;--accent-d:#6d28d9;--sab:env(safe-area-inset-bottom,0px);--sat:env(safe-area-inset-top,0px)}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1117;--card:#1a1d27;--text:#e2e6f0;--muted:#7a8394;--line:#2a2e3a;--accent:#a78bfa;--accent-d:#c4b5fd}}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:-apple-system,system-ui,sans-serif;line-height:1.5}
+body{display:flex;flex-direction:column}
+
+/* ── Nav ── */
+#nav{display:flex;align-items:center;gap:8px;padding:calc(10px + var(--sat)) 14px 10px;border-bottom:1px solid var(--line);background:var(--card);flex-shrink:0}
+#back-btn{display:none;background:none;border:none;font-size:15px;color:var(--accent);cursor:pointer;padding:4px 8px 4px 0;line-height:1;font-weight:600;white-space:nowrap}
+#nav-title{flex:1;font-size:17px;font-weight:700}
+#new-btn{background:var(--accent);color:#fff;border:none;border-radius:20px;padding:6px 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+#new-btn:active{opacity:.85}
+#new-btn:disabled{opacity:.4;cursor:default}
+
+/* ── List view ── */
+#status{padding:8px 14px;font-size:13px;color:#c33;border-bottom:1px solid var(--line);flex-shrink:0}
+#status:empty{display:none}
+#list-view{flex:1;overflow-y:auto;padding:14px 14px calc(20px + var(--sab));display:flex;flex-direction:column;gap:10px}
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--muted);text-align:center;padding:40px}
+.empty .em-ico{font-size:52px}
+.sess-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 15px;cursor:pointer;display:flex;align-items:center;gap:10px}
+.sess-card:active{opacity:.7}
+.sess-info{flex:1;min-width:0}
+.sess-topic{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sess-meta{font-size:12px;color:var(--muted);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap}
+.sess-ideas{color:var(--accent);font-weight:600}
+.sess-del{background:none;border:none;color:var(--muted);font-size:18px;padding:4px 6px;cursor:pointer;flex-shrink:0;border-radius:6px;line-height:1}
+.sess-del:active{color:#e53e3e}
+
+/* ── Chat view ── */
+#chat-view{flex:1;display:none;flex-direction:column;overflow:hidden}
+#chat-view.on{display:flex}
+#chat-topic-bar{padding:7px 14px;background:var(--card);border-bottom:1px solid var(--line);font-size:13px;color:var(--muted);flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#chat-topic-bar b{color:var(--text)}
+
+/* Quick prompts */
+#qp-bar{display:flex;gap:7px;padding:8px 12px;overflow-x:auto;border-bottom:1px solid var(--line);background:var(--card);flex-shrink:0;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+#qp-bar::-webkit-scrollbar{display:none}
+.qp{font:inherit;font-size:12px;padding:5px 11px;border:1.5px solid var(--line);border-radius:999px;background:var(--bg);color:var(--text);cursor:pointer;white-space:nowrap;flex-shrink:0}
+.qp:active{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--bg))}
+
+/* Messages */
+#msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+.msg{display:flex;flex-direction:column;gap:4px;max-width:88%}
+.msg.u{align-self:flex-end;align-items:flex-end}
+.msg.a{align-self:flex-start;align-items:flex-start}
+.bub{padding:10px 13px;border-radius:16px;font-size:14px;line-height:1.55;word-break:break-word}
+.msg.u .bub{background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+.msg.a .bub{background:var(--card);border:1px solid var(--line);border-bottom-left-radius:4px}
+.msg.a .bub p{margin-bottom:7px}
+.msg.a .bub p:last-child{margin-bottom:0}
+.msg.a .bub ul,.msg.a .bub ol{margin:5px 0 5px 18px}
+.msg.a .bub li{margin-bottom:3px}
+.msg.a .bub code{background:color-mix(in srgb,var(--accent) 12%,transparent);padding:1px 5px;border-radius:4px;font-size:13px}
+.msg.a .bub strong{font-weight:700}
+.msg.a .bub h3{font-size:14px;font-weight:700;margin-bottom:4px}
+.msg-acts{display:flex;gap:4px}
+.star-btn{background:none;border:none;font-size:15px;cursor:pointer;padding:2px 5px;border-radius:6px;color:var(--muted);line-height:1}
+.star-btn:active{background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.star-btn.on{color:#f59e0b}
+.typing{display:flex;gap:4px;padding:10px 13px;background:var(--card);border:1px solid var(--line);border-radius:16px;border-bottom-left-radius:4px;align-self:flex-start}
+.typing span{width:6px;height:6px;background:var(--muted);border-radius:50%;animation:bop 1s infinite}
+.typing span:nth-child(2){animation-delay:.15s}
+.typing span:nth-child(3){animation-delay:.3s}
+@keyframes bop{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
+
+/* Ideas tray */
+#ideas-tray{border-top:1px solid var(--line);background:color-mix(in srgb,var(--accent) 5%,var(--bg));max-height:0;overflow:hidden;transition:max-height .28s;flex-shrink:0}
+#ideas-tray.on{max-height:170px;overflow-y:auto}
+.tray-head{padding:7px 14px;font-size:12px;font-weight:600;color:var(--muted);display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);position:sticky;top:0;background:color-mix(in srgb,var(--accent) 5%,var(--bg))}
+.tray-head span{letter-spacing:.04em;text-transform:uppercase}
+.tray-head button{background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;line-height:1;padding:0 2px}
+.idea-row{padding:7px 14px;font-size:13px;border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent);display:flex;gap:8px;align-items:flex-start}
+.idea-row::before{content:'💡';flex-shrink:0}
+
+/* Input bar */
+#ibar{display:flex;gap:8px;padding:10px 12px calc(10px + var(--sab));background:var(--card);border-top:1px solid var(--line);flex-shrink:0}
+#inp{flex:1;font:inherit;font-size:15px;padding:8px 13px;border:1.5px solid var(--line);border-radius:20px;background:var(--bg);color:var(--text);outline:none;resize:none;max-height:100px;min-height:38px;line-height:1.4;-webkit-appearance:none}
+#inp:focus{border-color:var(--accent)}
+#send-btn{width:38px;height:38px;background:var(--accent);border:none;border-radius:50%;color:#fff;font-size:18px;cursor:pointer;flex-shrink:0;align-self:flex-end;display:flex;align-items:center;justify-content:center}
+#send-btn:disabled{opacity:.35;cursor:default}
+
+/* New session sheet */
+#sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:20;display:none;align-items:flex-end}
+#sheet-bg.on{display:flex}
+#sheet{width:100%;background:var(--card);border-radius:18px 18px 0 0;padding:20px 16px calc(20px + var(--sab))}
+#sheet h2{font-size:17px;font-weight:700;margin-bottom:14px}
+#sheet-inp{width:100%;font:inherit;font-size:16px;padding:10px 13px;border:1.5px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text);outline:none;-webkit-appearance:none;margin-bottom:14px}
+#sheet-inp:focus{border-color:var(--accent)}
+#sheet-btns{display:flex;gap:10px}
+#sheet-cancel{flex:1;padding:11px;border:1px solid var(--line);border-radius:10px;background:none;font:inherit;font-size:15px;color:var(--muted);cursor:pointer}
+#sheet-start{flex:2;padding:11px;background:var(--accent);color:#fff;border:none;border-radius:10px;font:inherit;font-size:15px;font-weight:600;cursor:pointer}
+</style>
+</head>
+<body>
+
+<div id="nav">
+  <button id="back-btn">≡ 列表</button>
+  <span id="nav-title">💡 Brainstorm 头脑风暴</span>
+  <button id="new-btn" disabled>＋ 新建</button>
+</div>
+
+<div id="status" role="status"></div>
+<div id="list-view"></div>
+
+<div id="chat-view">
+  <div id="chat-topic-bar"></div>
+  <div id="qp-bar">
+    <button class="qp" data-p="请列出10个关于这个主题的创意想法，编号列出，每条一句话。">💡 列��想法</button>
+    <button class="qp" data-p="请用SWOT框架分析（S优势 W劣势 O机会 T威胁），每项2-3条。">📊 SWOT分析</button>
+    <button class="qp" data-p="请挑战这个想法的核心假设：有哪些假设可�����错的？有什么强力反驳？">🔥 挑战假设</button>
+    <button class="qp" data-p="请制定具体可执行的行动计划，按步骤列出，包括时间建议。">🎯 行动计划</button>
+    <button class="qp" data-p="请从用户视角、竞争者视角和市场视角各分析一下，有什么新发现？">🔗 换角度</button>
+    <button class="qp" data-p="请���5Why方法深挖：为什么这个想法重要？核心问题是什么？">🤔 问为什么</button>
+    <button class="qp" data-p="请用SCAMPER方法发散：替代 组合 适应 修改 其他用途 消除 重排。">✨ SCAMPER</button>
+  </div>
+  <div id="msgs"></div>
+  <div id="ideas-tray">
+    <div class="tray-head"><span>⭐ 已收藏想法 Saved Ideas</span><button id="close-tray">×</button></div>
+    <div id="ideas-list"></div>
+  </div>
+  <div id="ibar">
+    <textarea id="inp" placeholder="继续探索… Keep exploring…" rows="1"></textarea>
+    <button id="send-btn">↑</button>
+  </div>
+</div>
+
+<div id="sheet-bg">
+  <div id="sheet">
+    <h2>🧠 新头脑风暴 New Brainstorm</h2>
+    <input id="sheet-inp" type="text" placeholder="你想探索什么？What do you want to brainstorm?" maxlength="200" autocomplete="off">
+    <div id="sheet-btns">
+      <button id="sheet-cancel">取消 Cancel</button>
+      <button id="sheet-start">开始探索 ✨</button>
+    </div>
+  </div>
+</div>
+
+<!--PA_CHAT_UI-->
+<script>
+/* ── Broker ���─ */
+let _id=0; const _wait={};
+window.addEventListener('message',e=>{
+  const m=e.data;
+  if(m&&m.pa==='res'&&_wait[m.id]){
+    const keep=m.ev&&!m.done; _wait[m.id](m); if(!keep) delete _wait[m.id];
+  }
+});
+const brok=(kind,extra)=>new Promise(r=>{const id=++_id;_wait[id]=r;parent.postMessage(Object.assign({pa:'req',id,kind},extra),'*');});
+const paRenderMd=md=>brok('render-md',{text:md});
+function paChat(msg,cid,onEv){return new Promise(r=>{const id=++_id;_wait[id]=(m)=>{if(m.ev)onEv(m.ev);if(m.done)r(m);};parent.postMessage({pa:'req',id,kind:'chat',message:msg,convoId:cid,attachments:undefined},'*');});}
+
+/* ── State ── */
+// Stored under data/brainstorm/ by the broker. PAStore (web/store.inline.html, ADR 0010) refuses every
+// save until it has been read: after a failed read `sessions` is still empty, and saving it would
+// replace every saved session.
+const sessionsFile=PAStore.file('sessions.json',{
+  shape:d=>Array.isArray(d)?'':'not a session list',
+  unreadable:why=>'Sessions file unreadable · 记录文件无法读取 ('+why+')',
+});
+let sessions=[], cur=null, busy=false;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const setStatus=t=>{$('status').textContent=t;};
+
+async function load(){
+  const r=await sessionsFile.load();
+  if(r.state==='ok') sessions=r.value;
+  setStatus(r.text||'');
+  $('new-btn').disabled=!sessionsFile.loaded;   // a session started now would chat (paid) and never be kept
+}
+async function save(){ setStatus(await sessionsFile.save(JSON.stringify(sessions))); }
+
+/* ── List view ── */
+function showList(){
+  cur=null;
+  $('list-view').style.display='flex';
+  $('chat-view').classList.remove('on');
+  $('back-btn').style.display='none';
+  $('nav-title').textContent='💡 Brainstorm 头脑风暴';
+  $('new-btn').style.display='';
+  renderList();
+}
+
+function fmtDate(ts){
+  const d=new Date(ts),now=new Date();
+  if(d.toDateString()===now.toDateString()) return d.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
+  return d.toLocaleDateString('zh-CN',{month:'short',day:'numeric'});
+}
+
+function renderList(){
+  const el=$('list-view'); el.innerHTML='';
+  if(sessionsFile.error) return;   // the status line says why; "no sessions yet" here would be a lie
+  if(!sessions.length){
+    el.innerHTML='<div class="empty"><div class="em-ico">🧠</div><p style="font-size:15px;line-height:1.7">还没有头脑风暴记录<br>点击<b> ＋ 新建 </b>开始</p></div>';
+    return;
+  }
+  sessions.slice().reverse().forEach(s=>{
+    const card=document.createElement('div');
+    card.className='sess-card';
+    card.innerHTML=`<div class="sess-info"><div class="sess-topic">${esc(s.topic)}</div><div class="sess-meta"><span>${s.msgs.length} 条消息</span>${s.ideas.length?`<span class="sess-ideas">⭐ ${s.ideas.length} 想法</span>`:''}<span>${fmtDate(s.createdAt)}</span></div></div><button class="sess-del" title="删除">✕</button>`;
+    card.querySelector('.sess-del').addEventListener('click',e=>{e.stopPropagation();deleteSession(s.id);});
+    card.addEventListener('click',()=>openSession(s.id));
+    el.appendChild(card);
+  });
+}
+
+async function deleteSession(id){
+  sessions=sessions.filter(s=>s.id!==id);
+  await save();renderList();
+}
+
+/* ── Chat view ── */
+// TODO(R4): this file is ~380 lines, over budget. Split seam: this hand-rolled chat view (openSession,
+// renderBubble, send and their bubble/typing CSS) belongs on PAChat, which the page already mounts
+// (clause c, still in test/app-contract.test.mjs PENDING) — moving it there removes it from here.
+function openSession(id){
+  const s=sessions.find(x=>x.id===id);
+  if(!s) return;
+  cur=s;
+  $('list-view').style.display='none';
+  $('chat-view').classList.add('on');
+  $('back-btn').style.display='block';
+  $('nav-title').textContent=s.topic.length>20?s.topic.slice(0,18)+'…':s.topic;
+  $('new-btn').style.display='';
+  $('chat-topic-bar').innerHTML='主题: <b>'+esc(s.topic)+'</b>';
+  renderAllMsgs();
+  renderIdeas();
+  setTimeout(()=>$('inp').focus(),200);
+}
+
+async function renderAllMsgs(){
+  const el=$('msgs'); el.innerHTML='';
+  for(const m of cur.msgs) await renderBubble(m,false);
+  el.scrollTop=el.scrollHeight;
+}
+
+async function renderBubble(m,scroll){
+  const el=$('msgs');
+  const wrap=document.createElement('div');
+  wrap.className='msg '+(m.role==='user'?'u':'a');
+  wrap.id='m'+m.id;
+  const bub=document.createElement('div'); bub.className='bub';
+  if(m.role==='ai'){
+    const r=await paRenderMd(m.text);
+    bub.innerHTML=r.ok&&r.html?r.html:esc(m.text);
+  } else {
+    bub.textContent=m.text;
+  }
+  wrap.appendChild(bub);
+  if(m.role==='ai'){
+    const acts=document.createElement('div'); acts.className='msg-acts';
+    const btn=document.createElement('button');
+    btn.className='star-btn'+(m.captured?' on':'');
+    btn.title=m.captured?'已收藏 Saved':'收藏这条 Save idea';
+    btn.textContent=m.captured?'⭐':'☆';
+    btn.onclick=()=>captureIdea(m.id,m.text,btn);
+    acts.appendChild(btn); wrap.appendChild(acts);
+  }
+  el.appendChild(wrap);
+  if(scroll) el.scrollTop=el.scrollHeight;
+}
+
+function renderIdeas(){
+  const tray=$('ideas-tray'),list=$('ideas-list');
+  const ideas=cur.ideas||[];
+  if(!ideas.length){tray.classList.remove('on');return;}
+  list.innerHTML=ideas.map(i=>`<div class="idea-row">${esc(i)}</div>`).join('');
+  tray.classList.add('on');
+}
+
+function captureIdea(msgId,text,btn){
+  const msg=cur.msgs.find(m=>m.id===msgId);
+  if(!msg||msg.captured) return;
+  msg.captured=true;
+  const snippet=text.replace(/[#*`_>]/g,'').replace(/\n+/g,' ').trim().slice(0,160);
+  cur.ideas.push(snippet);
+  btn.className='star-btn on'; btn.textContent='⭐'; btn.title='已收藏 Saved';
+  save(); renderIdeas();
+}
+
+/* ── Send ── */
+async function send(text){
+  if(busy||!text.trim()) return;
+  busy=true; $('send-btn').disabled=true; $('inp').value=''; $('inp').style.height='auto';
+  const uid='u'+Date.now();
+  cur.msgs.push({role:'user',text,id:uid});
+  await save();
+  await renderBubble({role:'user',text,id:uid},true);
+  const el=$('msgs');
+  const typing=document.createElement('div'); typing.className='typing';
+  typing.innerHTML='<span></span><span></span><span></span>';
+  el.appendChild(typing); el.scrollTop=el.scrollHeight;
+  let aiText=''; const aid='a'+Date.now();
+  try{
+    const res=await paChat(text,cur.convoId||null,ev=>{
+      if(ev.type==='convo'){cur.convoId=ev.id; save();}
+      if(ev.type==='delta') aiText+=ev.text;
+    });
+    if(typing.parentNode) typing.remove();
+    const final=aiText||res.text||'(no response)';
+    cur.msgs.push({role:'ai',text:final,id:aid,captured:false});
+    await save();
+    await renderBubble({role:'ai',text:final,id:aid,captured:false},true);
+  }catch(err){
+    if(typing.parentNode) typing.remove();
+    const errMsg='出错了，请重试。Something went wrong — please try again.';
+    cur.msgs.push({role:'ai',text:errMsg,id:aid,captured:false});
+    await save();
+    await renderBubble({role:'ai',text:errMsg,id:aid,captured:false},true);
+  }
+  busy=false; $('send-btn').disabled=false; $('inp').focus();
+}
+
+/* ── New session ── */
+function openModal(){
+  $('sheet-inp').value='';
+  $('sheet-bg').classList.add('on');
+  setTimeout(()=>$('sheet-inp').focus(),150);
+}
+
+async function startSession(){
+  const topic=$('sheet-inp').value.trim();
+  if(!topic) return;
+  $('sheet-bg').classList.remove('on');
+  const s={id:'bs'+Date.now(),topic,createdAt:Date.now(),convoId:null,msgs:[],ideas:[]};
+  sessions.push(s);
+  await save();
+  openSession(s.id);
+  const opener=`我们来头脑风暴：**${topic}**\n\n请先给出3-5个不同的探索角度或切入问题，帮我看清��个主题的全貌。Let's brainstorm: "${topic}" — open with 3-5 creative angles or framing questions.`;
+  await send(opener);
+}
+
+/* ── Quick prompts ── */
+$('qp-bar').addEventListener('click',e=>{
+  const chip=e.target.closest('.qp'); if(!chip) return;
+  if(!cur||busy) return;
+  const prompt=chip.dataset.p;
+  $('inp').value=prompt; $('inp').style.height='auto'; $('inp').style.height=Math.min($('inp').scrollHeight,100)+'px';
+  $('inp').focus();
+});
+
+/* ── Wire ── */
+$('new-btn').addEventListener('click',openModal);
+$('back-btn').addEventListener('click',showList);
+$('sheet-cancel').addEventListener('click',()=>$('sheet-bg').classList.remove('on'));
+$('sheet-start').addEventListener('click',startSession);
+$('sheet-inp').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();startSession();}});
+$('sheet-bg').addEventListener('click',e=>{if(e.target===$('sheet-bg'))$('sheet-bg').classList.remove('on');});
+$('close-tray').addEventListener('click',()=>$('ideas-tray').classList.remove('on'));
+$('send-btn').addEventListener('click',()=>send($('inp').value));
+const inp=$('inp');
+inp.addEventListener('input',()=>{inp.style.height='auto';inp.style.height=Math.min(inp.scrollHeight,100)+'px';});
+inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send(inp.value);}});
+
+/* ── Init ── */
+(async()=>{await load();showList();})();
+</script>
+</body>
+</html>

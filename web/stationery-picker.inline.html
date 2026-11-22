@@ -1,0 +1,197 @@
+<!-- PAStationeryPicker · 信纸选择 — the Stationery group in PANote's page settings: thumbnails (with
+     delete for My templates), the Fade · 淡化 slider, and — for a host that hands over its IO
+     (opts.stationery = {store, ai, upload}) — ✨ Design with AI and 🖼 From a picture. Carried by
+     stationery-ui at PA_STATIONERY_PICKER; mounted through PAStationery.picker (note-ui's one hook).
+     Everything it DRAWS comes from PAStationery (thumbnails) or PAStationeryStudio (checked drafts). -->
+<style>
+.pst-list{display:flex;flex-wrap:wrap;gap:6px;width:100%}
+.pst-cell{position:relative;display:inline-flex}
+.pst-list .pan-tbtn.pst-th{width:auto;height:auto;padding:3px;border-radius:8px}
+.pst-th canvas{display:block;width:44px;height:57px;border-radius:4px;box-shadow:0 0 0 1px var(--line,#d9dbda)}
+.pst-th.pst-bad canvas{opacity:.35}
+.pst-del{position:absolute;top:-6px;right:-6px;min-width:20px;height:20px;border-radius:10px;border:1px solid var(--line,#d9dbda);
+  background:var(--card,#fff);color:var(--muted,#6b7370);font:inherit;font-size:11px;line-height:18px;padding:0 5px;cursor:pointer}
+.pst-del.arm{color:#fff;background:#c0392b;border-color:#c0392b}
+.pst-tools,.pst-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;width:100%}
+.pst-btn{font:inherit;font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid var(--line,#d9dbda);
+  background:var(--card,#fff);color:var(--text,#1c1e1d);cursor:pointer}
+.pst-btn.on{border-color:var(--accent,#0a7a5a);color:var(--accent,#0a7a5a)}
+.pst-btn:disabled{opacity:.5;cursor:default}
+.pst-fade{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted,#6b7370);width:100%}
+.pst-fade input{flex:1}
+.pst-panel{display:none;flex-direction:column;gap:6px;width:100%;box-sizing:border-box;padding:8px;border-radius:10px;
+  border:1px solid var(--line,#e6e6e6)}
+.pst-panel.on{display:flex}
+/* min-width:0 + width:0/cols=1: a field never sets the popover's width. The popover shrinks to fit
+   its content, so a textarea's default 20 columns pushed it 31px off a 390px phone screen. */
+.pst-panel textarea,.pst-panel input[type=text]{font:inherit;font-size:16px;padding:6px 8px;border:1px solid var(--line,#d9dbda);
+  border-radius:8px;width:100%;min-width:0;box-sizing:border-box;background:var(--card,#fff);color:var(--text,#1c1e1d)}
+.pst-panel input[type=text]{flex:1 1 96px;width:0}
+.pst-prev{display:none;width:120px;height:155px;border-radius:6px;box-shadow:0 0 0 1px var(--line,#d9dbda)}
+.pst-prev.on{display:block}
+.pst-prev.pst-zoom{cursor:zoom-in}
+.pst-msg{font-size:12px;color:var(--muted,#6b7370)}
+.pst-msg.err{color:#c0392b}
+</style>
+<script>
+window.PAStationeryPicker=(function(){
+  'use strict';
+  const S=window.PAStationery, ST=()=>window.PAStationeryStudio;
+  const THUMB_W=44, THUMB_H=57, PREV_W=120, PREV_H=155;    // CSS px, page aspect
+  const TICK_MS=1000;                                       // how often a waiting AI run repaints its elapsed time
+  const ZOOM_PAGES=2;                                       // an enlarged draft is at most 2 page widths (1632 px): sharp on any screen, bounded memory
+  // "Working… · 处理中…"; with an AI run's elapsed seconds, "Working… 1:12 · 处理中…".
+  const working=(s)=>'Working… '+(s==null?'':Math.floor(s/60)+':'+String(s%60).padStart(2,'0')+' ')+'· 处理中…';
+  const T={ ai:'✨ Design with AI · AI 设计', pic:'🖼 From a picture · 用图片', describe:'Describe the stationery… · 描述你想要的信纸…',
+    go:'Design · 设计', busy:working(), tweak:'Tweak · 调整', how:'What to change… · 想怎么调整…', keep:'Keep · 保存', cancel:'Cancel · 取消',
+    again:'Try again · 重试', name:'Name · 名称', kept:'Saved to My templates · 已保存到我的模板', choose:'Choose a picture · 选择图片',
+    bg:'Use as background · 作为背景', redo:'Recreate with AI · AI 重绘', fade:'Fade · 淡化', zoom:'Tap to enlarge · 点按放大',
+    stays:'Pictures you import stay in your own notes · 导入的图片只保存在你自己的笔记里。',
+    pdf:'PDFs are not supported: screenshot a PDF page instead · 不支持 PDF：请先截图再导入。' };
+  const mk=(tag,cls,txt)=>{ const e=document.createElement(tag); if(cls) e.className=cls; if(txt!=null) e.textContent=txt; return e; };
+  const btn=(cls,txt,fn)=>{ const b=mk('button','pst-btn'+(cls?' '+cls:''),txt); b.type='button'; b.addEventListener('click',fn); return b; };
+  const dpr=()=>Math.min(3,window.devicePixelRatio||1);
+  // Draw a checked template into a canvas through PAStationery's own raster path; false = could not.
+  function paintInto(cv,tpl,w,h){
+    cv.width=Math.round(w*dpr()); cv.height=Math.round(h*dpr());
+    return S.thumb(tpl,cv.width).then(c=>{ if(c) cv.getContext('2d').drawImage(c,0,0,cv.width,cv.height); return !!c; });
+  }
+  const say=(el,text,isErr)=>{ el.textContent=text||''; el.classList.toggle('err',!!isErr); };
+  // Tap a draft preview: the draft svgNow() returns, rasterized afresh at screen size (not the 120 px canvas blown
+  // up), in chat-ui's one lightbox. It starts no AI turn and touches no busy or run-token state. No PAChat on the
+  // page = no zoom. A raster that fails here failed for the preview too (same SVG, same path): nothing opens.
+  const lb=()=>window.PAChat&&window.PAChat.lightbox, zoomW=()=>Math.round(Math.min((window.innerWidth||S.PAGE_W)*dpr(),ZOOM_PAGES*S.PAGE_W));
+  // The raster goes onto the page's own ground (the host's paper(): PANote's paper colour) as the page will show it,
+  // so a design with no full-page background is not light decorations on the lightbox's black. 'destination-over'
+  // paints only where the draft left the page transparent: an opaque draft is unchanged.
+  const onPaper=(c,paper)=>{ const g=paper&&paper(), x=g&&c.getContext('2d'); if(!x) return;
+    x.globalCompositeOperation='destination-over'; x.fillStyle=g; x.fillRect(0,0,c.width,c.height); };
+  function zoomable(cv,svgNow,paper){
+    if(!lb()) return;
+    const zoom=()=>{ const open=lb(), svg=svgNow(); if(!svg||!open) return;
+      S.thumb({id:'draft',svg},zoomW()).then(c=>{ if(!c) return; onPaper(c,paper); const url=c.toDataURL(); c.width=0; open(url); }); };
+    cv.classList.add('pst-zoom'); cv.title=T.zoom; cv.setAttribute('aria-label',T.zoom); cv.setAttribute('role','button'); cv.tabIndex=0;
+    cv.addEventListener('click',zoom); cv.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); zoom(); } });
+  }
+
+  // ── Thumbnails, with a two-tap ✕ on My templates (window.PATwoTap, on every app page) ───
+  function cell(t,o,h,msg){
+    const c=mk('span','pst-cell'), b=mk('button','pan-tbtn pst-th'), cv=mk('canvas');
+    b.type='button'; b.dataset.id=t.id; b.dataset.src=t.source; b.title=t.name; b.setAttribute('aria-label',t.name);
+    b.appendChild(cv); c.appendChild(b);
+    paintInto(cv,t,THUMB_W,THUMB_H).then(ok=>{ if(!ok) b.classList.add('pst-bad'); });
+    b.addEventListener('click',()=>o.choose({id:t.id,source:t.source}));
+    if(t.source==='mine'&&h&&h.store&&h.store.deleteMine){
+      const x=mk('button','pst-del','✕'); x.type='button'; x.title=window.PATwoTap.LABEL;
+      x.addEventListener('click',async()=>{
+        if(!window.PATwoTap.press(x)) return;
+        const r=await h.store.deleteMine(t.id);
+        if(!r.ok) say(msg,(r.error||'Not deleted · 未删除'),true); });   // success: the list rebuilds without it
+      c.appendChild(x); }
+    return c;
+  }
+  function fadeRow(o){
+    const row=mk('label','pst-fade'), r=mk('input'); r.type='range'; r.min='0'; r.max=String(Math.round(ST()?ST().MAX_FADE*100:80)); r.step='5';
+    row.appendChild(mk('span','',T.fade)); row.appendChild(r);
+    r.addEventListener('input',()=>{ const cur=o.current(); if(!cur) return; const f=(+r.value)/100;
+      const ref={id:cur.id,source:cur.source}; if(f>0) ref.fade=f; o.choose(ref); });
+    return {row,sync(){ const cur=o.current(); row.style.display=cur?'':'none'; if(cur) r.value=String(Math.round((cur.fade||0)*100)); }};
+  }
+
+  // ── The draft: preview, name, tweak, keep, try again — shared by "words" and "picture" ───
+  function draftBox(h,o){
+    const box=mk('div','pst-panel pst-draft'), msg=mk('div','pst-msg'), cv=mk('canvas','pst-prev');
+    const name=mk('input'); name.type='text'; name.placeholder=T.name; name.maxLength=ST().NAME_MAX;
+    const how=mk('input'); how.type='text'; how.placeholder=T.how;
+    let cur=null, last=null, tok=0;                          // cur: the checked draft; last: the request to retry; tok: the live run
+    let ac=null, clock=0;                                    // the live AI run's AbortController and its elapsed-time ticker
+    // While a run is in flight EVERY studio control is off (guard() adds the panels and their toggles):
+    // a second Design tap would start a second AI turn, and whichever answered last would win.
+    // The one exception is Cancel, shown only while an AI run is in flight.
+    const guarded=[box];
+    const busy=(on)=>guarded.forEach(el=>el.querySelectorAll('button').forEach(b=>{ b.disabled=on&&b!==stopB; }));
+    const keepB=btn('',T.keep,keep), tweakB=btn('',T.tweak,()=>{ const t=how.value.trim(); if(t&&cur) run((signal)=>ST().tweak(h.ai,cur.svg,t,{convoId:cur.convoId,signal})); });
+    const againB=btn('',T.again,()=>{ if(last) run(last); });
+    const stopB=btn('',T.cancel,()=>{ if(!ac) return; tok++; halt(true); failed(ST().CANCELLED); });
+    const r1=mk('div','pst-row'), r2=mk('div','pst-row');
+    r1.append(name,keepB); r2.append(how,tweakB);
+    box.append(cv,r1,r2,againB,stopB,msg); stopB.style.display='none';
+    zoomable(cv,()=>cur&&cur.svg,o.paper);                   // reads the draft at tap time: mid-run, the one on screen
+    const show=(ok)=>{ cv.classList.toggle('on',ok); r1.style.display=r2.style.display=ok?'':'none'; againB.style.display=ok?'none':''; };
+    const failed=(why)=>{ say(msg,why,true); show(!!cur); againB.style.display=''; };
+    // Ends the live run's ticker and Cancel; with abort, its signal too, so the job behind it stops
+    // (the server kills the model). Whatever ends a run — its answer, reset, a newer run, Cancel — comes here.
+    const halt=(abort)=>{ if(abort&&ac) ac.abort(); ac=null; clearInterval(clock); stopB.style.display='none'; busy(false); };
+    // fn(signal) -> a studio result. ONLY r.svg — sanitize()'s output — is ever drawn.
+    async function run(fn,nameHint){
+      halt(true); const my=++tok, signal=(ac=new AbortController()).signal, t0=Date.now(); last=fn;
+      box.classList.add('on'); busy(true); if(!cur) show(false); againB.style.display='none'; stopB.style.display='';
+      const tick=()=>say(msg,working(Math.floor((Date.now()-t0)/1000))); tick(); clock=setInterval(tick,TICK_MS);
+      const r=await fn(signal); if(my!==tok) return r;        // reset, superseded or cancelled meanwhile: a late answer writes nothing
+      halt(false);
+      if(!r.ok){ failed(r.reason); return r; }
+      cur={svg:r.svg,convoId:r.convoId,base:cur&&cur.base};
+      if(nameHint&&!name.value) name.value=nameHint;
+      await paintInto(cv,{id:'draft',svg:r.svg},PREV_W,PREV_H); show(true); say(msg,r.note||''); return r;   // note: what simplify took out
+    }
+    async function keep(){
+      if(!cur) return; busy(true);
+      const r=await ST().keep(h.store,{svg:cur.svg,name:name.value,base:cur.base}); busy(false);
+      if(!r.ok) return say(msg,r.reason,true);
+      cur.base=r.base; o.choose(r.ref); say(msg,T.kept);
+    }
+    return {box,run,guard:(...els)=>guarded.push(...els),
+      reset(){ tok++; halt(true); cur=null; last=null; name.value=''; how.value=''; box.classList.remove('on'); }};
+  }
+
+  // ── ✨ Design with AI ────────────────────────────────────────────────────────────────────
+  function aiPanel(h,d){
+    const P=mk('div','pst-panel pst-ai'), ta=mk('textarea'); ta.rows=2; ta.cols=1; ta.placeholder=T.describe;
+    const go=btn('',T.go,()=>{ const desc=ta.value.trim(); if(!desc) return ta.focus();
+      d.reset(); d.run((signal)=>ST().design(h.ai,desc,{signal}),desc.slice(0,40)); });
+    P.append(ta,go); return P;
+  }
+  // ── 🖼 From a picture ────────────────────────────────────────────────────────────────────
+  function picPanel(h,o,d){
+    const P=mk('div','pst-panel pst-pic'), msg=mk('div','pst-msg'), cv=mk('canvas','pst-prev'), row=mk('div','pst-row');
+    let file=null;
+    const pick=btn('',T.choose,async()=>{
+      const r=await window.PAPhoto.pick({accept:'image/*'}); if(!r.ok) return;
+      const f=r.files[0]; if(/pdf/i.test(f.type||'')||/\.pdf$/i.test(f.name||'')) return say(msg,T.pdf,true);
+      try{ const c=await window.PAPhoto.toCanvas(f,PREV_H*2); cv.width=c.w; cv.height=c.h; cv.getContext('2d').drawImage(c.canvas,0,0); }
+      catch(e){ return say(msg,(e&&e.message)||String(e),true); }
+      file=f; cv.classList.add('on'); row.style.display=''; say(msg,''); });
+    const bg=btn('',T.bg,async()=>{ if(!file) return; bg.disabled=true; say(msg,T.busy);
+      const r=await ST().importPicture(h.upload,file); bg.disabled=false;
+      if(!r.ok) return say(msg,r.reason,true);
+      say(msg,''); o.choose({id:r.path,source:'picture',fade:ST().DEFAULT_FADE}); });
+    const redo=btn('',T.redo,()=>{ if(!file) return; d.reset(); d.run((signal)=>ST().recreate(h.ai,h.upload,file,'',{signal})); });
+    row.append(bg,redo); row.style.display='none';
+    P.append(pick,cv,row,mk('div','pst-msg',T.stays),mk('div','pst-msg',T.pdf),msg); return P;
+  }
+  // The studio exists only when the host handed over its IO; a host that just opted in gets thumbnails.
+  function studio(wrap,h,o){
+    const tools=mk('div','pst-tools'), d=draftBox(h,o), ai=aiPanel(h,d), pic=picPanel(h,o,d);
+    const toggle=(p,b,other,ob)=>()=>{ const on=!p.classList.contains('on'); p.classList.toggle('on',on); b.classList.toggle('on',on);
+      other.classList.remove('on'); ob.classList.remove('on'); d.reset(); };   // a draft belongs to the panel that made it
+    const aiB=btn('',T.ai,null), picB=btn('',T.pic,null);
+    aiB.addEventListener('click',toggle(ai,aiB,pic,picB)); picB.addEventListener('click',toggle(pic,picB,ai,aiB));
+    tools.append(aiB,picB); wrap.append(tools,ai,pic,d.box); d.guard(tools,ai,pic);
+  }
+  // mount(listEl, {current, choose, changed, studio, paper}) -> {sync}. note-ui calls sync on every paper redraw;
+  // paper() is the page's ground colour, which an enlarged draft sits on.
+  function mount(el,o){
+    if(!el) return {sync(){}};
+    const h=o.studio&&typeof o.studio==='object'?o.studio:null, msg=mk('div','pst-msg'), fade=fadeRow(o);
+    const sync=()=>{ const cur=o.current();
+      el.querySelectorAll('.pst-th').forEach(b=>b.classList.toggle('on',!!cur&&cur.id===b.dataset.id&&cur.source===b.dataset.src));
+      fade.sync(); };
+    function build(){ el.textContent=''; for(const t of S.list()) el.appendChild(cell(t,o,h,msg)); sync(); }
+    el.after(fade.row,msg);
+    if(h&&ST()) studio(msg.parentNode,h,o);
+    S.onChange(()=>{ build(); if(o.changed) o.changed(); });
+    build(); return {sync};
+  }
+  return {mount};
+})();
+</script>

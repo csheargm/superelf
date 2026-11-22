@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" media="(prefers-color-scheme:light)" content="#f4f4f2">
+<meta name="theme-color" media="(prefers-color-scheme:dark)" content="#111514">
+<title>Research 研究</title>
+<style>
+html{font-size:calc(17px * var(--fs,1))}   /* A-/A+ scale, broadcast by the shell (pa:'prefs' fontScale) */
+:root{--bg:#f4f4f2;--card:#fff;--text:#1c1e1d;--muted:#6b7370;--line:#e2e2de;--accent:#0a5f9a;--green:#0f6355;--sab:env(safe-area-inset-bottom,0px);--sat:env(safe-area-inset-top,0px)}
+@media(prefers-color-scheme:dark){:root{--bg:#111514;--card:#1b201f;--text:#e5e8e6;--muted:#8f9894;--line:#2a302e;--accent:#4db3f0;--green:#57c2ac}}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:-apple-system,system-ui,sans-serif;line-height:1.5}
+body{display:flex;flex-direction:column}
+#nav{display:flex;align-items:center;gap:8px;padding:calc(10px + var(--sat)) 14px 10px;border-bottom:1px solid var(--line);background:var(--card);flex-shrink:0}
+#nav-title{flex:1;font-size:17px;font-weight:700}
+#home{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px;text-align:center}
+#home .icon{font-size:52px}
+#home p{color:var(--muted);font-size:15px;max-width:30ch}
+#start{background:var(--green);color:#fff;border:none;border-radius:12px;padding:13px 26px;font-size:16px;font-weight:600;cursor:pointer}
+#start:active{filter:brightness(.95)}
+.hint{color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+
+<div id="nav"><div id="nav-title">🔬 Research 研究</div></div>
+
+<div id="home">
+  <div class="icon">🔬</div>
+  <p>Ask a question and get a reasoned answer. Pick the model in the composer; tap <b>Verify · 校验</b> to cross-check it with independent models.</p>
+  <button id="start">Ask · 提问</button>
+  <div class="hint">Past sessions live in the drawer · 历史记录在抽屉里</div>
+</div>
+
+<!--PA_CHAT_UI-->
+
+<script>
+// The chat surface IS this app. PAChat (the shared component, inlined at the marker above)
+// brings the model chooser, the Verify · 校验 checkbox and the conversation drawer, so this
+// file owns none of that — the bespoke 300-line chat it replaced was a second implementation
+// of all three (R1/R3), and its Verify toggle and history list drifted from the Bible app's.
+//
+// The three research sessions recorded before this rewrite are ALREADY server-side
+// conversations tagged app:'research' (each old session carried its convoId), so PAChat's
+// drawer lists them natively — nothing needed migrating.
+const chat = PAChat.fullscreen({
+  // Claude answers these best in practice, so this app starts there instead of on the first
+  // fast lane. The user's own pick in the chooser wins for the rest of the session, and the
+  // Research · 联网研究 lane is one tap away when the question needs live sources.
+  defaultModel: 'claude',
+  placeholder: 'Ask anything…',
+  system: 'You are a research assistant. Answer carefully and concretely. State what is well established, what is contested, and what you are unsure of — never pad. When you rely on a source, name it. 重要术语保留英文。',
+  greeting: 'Ask anything · 问点什么。Pick a model below, and tap Verify · 校验 to cross-check the answer.',
+  getLabel: () => 'Research 研究',
+  persist: 'research-chats',
+  onClose: () => { document.getElementById('home').style.display = 'flex'; },
+  onShow:  () => { document.getElementById('home').style.display = 'none'; },
+});
+document.getElementById('start').addEventListener('click', () => chat.open('general'));
+</script>
+</body>
+</html>

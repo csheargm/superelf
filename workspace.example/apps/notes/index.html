@@ -1,0 +1,844 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<title>Journal 手写</title>
+<style>
+html{font-size:calc(17px * var(--fs,1))}   /* A-/A+ scale, broadcast by the shell (pa:'prefs' fontScale) */
+/* The journal is just the shared drawer + one shared PANote surface (PANote.fullscreen). PANote
+   owns the whole writing page (text + ink on one canvas) and its own top bar (☰ opens the drawer,
+   the title, page tools). There is no app-specific header, mode toggle or trash any more. */
+:root{--bg:#eceded;--card:#fff;--text:#1c1e1d;--muted:#6b7370;--line:#d9dbda;--accent:#0f6355;--pan-bg:#eceded;--danger:#c8433b}
+@media(prefers-color-scheme:dark){:root{--bg:#0d1110;--card:#1b201f;--text:#e5e8e6;--muted:#8f9894;--line:#2a302e;--accent:#57c2ac;--pan-bg:#0d1110;--danger:#e5706a}}
+*{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;overscroll-behavior:none;background:var(--bg);color:var(--text);
+  font-family:-apple-system,system-ui,sans-serif;font-size:16px}
+/* The PANote surface IS the app — no "close" target exists here, so hide the fullscreen ✕. */
+.pan-hx{display:none!important}
+/* ══ PA_NOTICE_CSS_BEGIN ══ the save/load-failure surface, mirrored verbatim in every app ══
+   V2 SCAR (2026-09-02, round 2): this app's only save-failure surface was a STATIC in-flow
+   element with no position and no z-index, so PAChat's .pac-fs and PANote's .pan-fs — both
+   position:fixed, z-index:50, background:var(--card), i.e. FULLY OPAQUE — painted straight over
+   it. The one message that reports a lost write was invisible exactly when it fired: the chat
+   pointer write (setConvoId) only ever runs while that overlay is open. A static element cannot
+   use z-index at all, which is why the fix is position:fixed FIRST and z-index second.
+   --pa-notice-z must beat every layer that can be on screen in these apps:
+       #panel 10 · #back-chat 12 · #search-overlay 30 · .pac-fs 50 · .pan-fs 50 ·
+       .pac-drawerhost 60 · .pac-lb 1000 (the chat's image lightbox)
+   2000 clears all of them with room for a future overlay, and test/app-load.test.mjs recomputes
+   this ladder from the real component files — a new overlay that outranks the notice fails the
+   build instead of hiding it.
+   --pa-notice-top is the vertical slot: BELOW every surface's top control row (this app's #nav
+   is 57px, PAChat's .pac-top ~51px, PANote's .pan-top ~ safe-area+47px) so the notice can never
+   cover ☰ / ✕ and trap the user inside an overlay, and BELOW PANote's own .pan-save pill
+   (top 78px, ~32px tall) so the two failure surfaces never overlap.
+   V6 (round 3): the surface now holds ONE message PER PATH and a tap dismisses the one on
+   screen (the next takes the slot), so it is a control, not a label — hence cursor:pointer. */
+:root{--pa-notice-z:2000;--pa-notice-top:118px}
+.pa-notice{position:fixed;top:calc(var(--pa-notice-top) + env(safe-area-inset-top,0px));
+  left:50%;transform:translateX(-50%);z-index:var(--pa-notice-z);
+  max-width:calc(100vw - 24px);width:max-content;display:none;cursor:pointer;
+  padding:8px 14px;border-radius:999px;background:var(--danger,#c8433b);color:#fff;
+  font-size:12.5px;font-weight:600;line-height:1.35;text-align:center;
+  box-shadow:0 3px 14px rgba(0,0,0,.3)}
+.pa-notice.on{display:block}
+.pa-notice.info{background:var(--accent,#0f6355)}
+/* ══ PA_NOTICE_CSS_END ═══════════════════════════════════════════════════════════════════ */
+</style>
+</head>
+<body>
+<!-- The one persistent failure surface for this app. It is EMPTY and hidden until something
+     fails; see the PA_NOTICE CSS block for why it is fixed and why its z-index is what it is. -->
+<div id="pa-notice" class="pa-notice"></div>
+<!-- The shared handwriting engine (web/note-ui.inline.html) — its full-screen surface is the app. -->
+<!--PA_NOTE_UI-->
+<!-- The shared PAChat component — provides PAChat.listDrawer for the notes list drawer (☰),
+     and PAChat.panel for the Ask-AI rail. -->
+<!--PA_CHAT_UI-->
+<!-- PAAppBar — ← Home and A-/A+ in the pad's own top bar (ADR 0032). -->
+<!--PA_APP_BAR_UI-->
+<!-- PASplit — the side rail the Ask-AI chat sits in, beside the page instead of over it. -->
+<!--PA_SPLIT_UI-->
+
+<script>
+// ── Broker ── (sandboxed apps have an opaque origin with no network; all IO goes through the
+// parent shell via postMessage, which auto-namespaces this app's data channel to data/notes/ —
+// so we pass BARE paths only. PANote/PAChat never talk to the network either.)
+let _id=0; const _wait={};
+window.addEventListener('message',e=>{ const m=e.data; if(m&&m.pa==='res'&&_wait[m.id]){ _wait[m.id](m); delete _wait[m.id]; } });
+function paLoad(path){ return new Promise(res=>{ const id=++_id; _wait[id]=res; parent.postMessage({pa:'req',id,kind:'data',path},'*'); }); }
+// paSave RESOLVES THE OUTCOME — {ok:true} or {ok:false,error} — and every caller below checks it.
+// SCAR 2026-09-02: this used to resolve the raw broker reply and never reject, so the try/catch
+// around it was dead code, a 413 {ok:false} was discarded, and a page of Pencil strokes was lost
+// while the drawer showed a fresh "updated" time. It also had no deadline: a broker that never
+// replied left the promise pending forever, hanging flushAll() during pagehide. Both fixed here;
+// the ok-vs-not rule and the deadline are PANote's (R3 — one definition for every app).
+function paSave(path,data){ return new Promise(res=>{ const id=++_id;
+  const t=setTimeout(()=>{ delete _wait[id]; res({ok:false,error:'save timed out · 保存超时'}); },PANote.SAVE_TIMEOUT_MS);
+  _wait[id]=m=>{ clearTimeout(t); res(PANote.saveOutcome(m)); };
+  parent.postMessage({pa:'req',id,kind:'save-data',path,data},'*'); }); }
+// Image IO for PANote's photo hooks (same broker kinds as the Bible app's Draw pad — R3):
+// photo bytes go through the shell's uploads/ store, never into the entry JSON (body-size
+// capped). upload takes raw base64 and returns a path; attach-url resolves it to a data: URL.
+function paAttachUrl(path){ return new Promise(res=>{ const id=++_id; _wait[id]=res; parent.postMessage({pa:'req',id,kind:'attach-url',path},'*'); }); }
+// paUpload + fileToB64 used to live here: a private FileReader and a private `upload` postMessage,
+// one of FOUR copies of that pair in the tree, and the only one with no downscale — so a phone
+// photo was refused outright by the pad's cap instead of being resized to fit. Both are now
+// window.PAPhoto.upload (web/photo-ui.inline.html), which arrives with PAChat (R1/R3).
+// ══ PA_DATA_CORE_BEGIN ══ DOM-FREE ON PURPOSE ═════════════════════════════════════════════
+// test/app-load.test.mjs extracts everything between the PA_DATA_CORE markers out of EVERY app
+// that carries it and runs it against a real HTTP server, so nothing in here may touch
+// document/window. The block is byte-identical in all four copies (Notes and Bible, template and
+// live), and that test fails the build if they drift — R3 enforced by a machine instead of by a
+// promise. The shelf's copies in shared-apps/ follow at the owner's next promote.
+//
+// THE V1 SCAR (2026-09-02, round 2): every failure to READ was indistinguishable from "the file
+// does not exist". The shell relay answered {ok:false,error:'not found'} for a 401 (expired
+// session / restarted server), for a 500 and for every network rejection alike; the app then
+// applied a 1.5s deadline that RESOLVED NULL, treated null as "a new empty note", and the next
+// save wrote an empty notebook over the user's good data. Measured on the real writer:
+// 800 strokes / 40 pages / 47,076 B → 1 stroke / 1 page / 198 B, answered 200 {"ok":true}; and
+// 50 index entries / 7,399 B → 0 entries / 20 B, also 200 {"ok":true}.
+//
+// THE V6 SCAR (2026-09-02, round 3) — the rule above shipped with an ESCAPE HATCH. `soft:true`
+// said "a failure here blocks nothing", and its only caller was a second store of the user's
+// unsaved work. So a file we could not read stayed WRITABLE and was then overwritten on the
+// strength of an unrelated success. Measured: 184 unconfirmed strokes, the only copy, emptied to
+// {v:1,pages:[]}; no notice, green pill. The hatch is DELETED, and in round 4 so was that second
+// store (see web/note-ui.inline.html "DELETED HERE"). Blocking is PER PATH, so it never bought
+// anything anyway.
+// The same rule has a second half, and it is what now protects a PER-PAGE note: a path that was
+// NEVER READ is not known either. A write that REPLACES whatever a path holds — every page file,
+// every index, every tombstone, {replaces:true} — is refused until THIS session has established
+// what that path holds: a read of the SAME path that resolved `loaded` or EARNED `absent`.
+//
+// THE RULE NOW: a read resolves exactly ONE of three states and never collapses them —
+// loaded / absent / failed, the engine's contract (web/note-ui.inline.html `const LOAD`).
+// `failed` never creates and never overwrites: the path is BLOCKED for writing until some later
+// read of it succeeds. A wrongly-`failed` read only makes the app refuse to write (recoverable,
+// visible); a wrongly-`absent` read destroys the file (unrecoverable, silent). So every
+// undecidable case resolves to `failed`, and `absent` must be EARNED — see the two evidence
+// steps in makeReader below.
+const LOAD_TIMEOUT_MS=20000;
+// The engine owns the reply→outcome rule (R3) and this app CONSUMES it: PA_LOAD IS PANote.LOAD
+// (web/note-ui.inline.html, exported on window.PANote). There is no copy to fall back on: this app
+// reads PANote at load anyway (PANote.PHOTO_TXT), so a copy could never run, and it had drifted
+// from the engine's rule (ADR 0015, amendment).
+const PA_LOAD=PANote.LOAD;
+const PA_ST=PA_LOAD.STATUS;
+// The refusal a REPLACE-ONLY write gets when this session never established what the path holds.
+const PA_UNKNOWN='not read this session · 本次未读取 — refusing to replace it 拒绝覆盖';
+// io = { load(path)->Promise<brokerReply>, save(path,text)->Promise<{ok,error}>, now?, timeoutMs? }
+function makeReader(io){
+  const timeoutMs=io.timeoutMs||LOAD_TIMEOUT_MS;
+  const blocked=new Map();               // path -> bilingual reason; a blocked path is never written
+  const known=new Set();                 // paths whose CONTENT this session established: loaded, or PROVEN absent
+  let allBlocked='';                     // app-wide stop (e.g. the note index itself is unreadable)
+  // clearTimeout matters: Promise.race settles, but the loser's timer keeps running. Without
+  // this every read left a 20s timer armed — harmless-looking in a browser, but it is a real
+  // leak (one per read, and a notebook reads many pages) and it held Node's event loop open
+  // for the full LOAD_TIMEOUT_MS after the tests had finished.
+  const deadline=(pr)=>{ let t; return Promise.race([pr,new Promise(r=>{ t=setTimeout(()=>r({__late:true}),timeoutMs); })]).finally(()=>clearTimeout(t)); };
+  // A failed read blocks ITS OWN path — ALWAYS, for every caller, with no opt-out (V6). It also
+  // drops the path from `known`: whatever we thought was there, we no longer know.
+  const fail=(path,err,code)=>{ const out=PA_LOAD.failed(err,code);
+    known.delete(path); blocked.set(path,out.error); return out; };
+  const ok=(path,out)=>{ blocked.delete(path); known.add(path); return out; };
+  // "This file is missing" is only believable when its BACKUP is missing too. A file that has
+  // been saved twice has a rolling previous generation at <path>.bak (lib/appdata.mjs
+  // maybeBackup), so a readable .bak PROVES the file existed — which turns "missing" back into a
+  // per-file read fault (a 500 out of sendFile, a half-deleted file) and never into a licence to
+  // start blank and overwrite. Anything but a PROVEN-absent backup withholds that licence.
+  // Cost: one extra 404 on a genuinely new file. Runs for EVERY caller, with no opt-out: a page
+  // file that answers "missing" when its index names it is a fault, not an empty page.
+  async function absentEarned(path){
+    const m=await deadline(io.load(path+'.bak'));
+    if(m&&m.__late) return false;
+    return PA_LOAD.fromBroker(m).status===PA_ST.absent;
+  }
+  // opts = { mustExist:true  a listing the app JUST read named this file, so "no such file" is a
+  //                          fault (it vanished between the listing and the read), never a new
+  //                          file to start blank from. Use it only where something really did
+  //                          prove existence — an index row alone does NOT, because a row whose
+  //                          content write failed at creation must stay openable rather than be
+  //                          locked out for ever. }
+  // There is deliberately no `soft` any more: see the V6 scar above.
+  async function read(path,opts){
+    const o=opts||{};
+    const m=await deadline(io.load(path));
+    if(m&&m.__late) return fail(path,'read timed out · 读取超时','timeout');
+    const out=PA_LOAD.fromBroker(m);
+    if(out.status===PA_ST.loaded) return ok(path,out);
+    // Every non-loaded outcome that is not a PROVEN absence is a failure — including a reply that
+    // carried no code at all, which is what the shell used to send for a 401/500/network drop.
+    if(out.status===PA_ST.failed) return fail(path,out.error,out.code);
+    if(o.mustExist) return fail(path,'listed but missing · 已列出却读不到 — refusing to recreate it 拒绝重建','vanished');
+    return (await absentEarned(path)) ? ok(path,out)
+      : fail(path,'a previous version exists · 存在旧版本 — refusing to start blank 拒绝以空白开始','bak_present');
+  }
+  // EVERY write goes through here: a path we could not READ is a path we must not WRITE.
+  // opts = { replaces:true   this write DESTROYS whatever the path currently holds (a page file,
+  //                          an index, a tombstone). It needs more than "not blocked": the path
+  //                          must be KNOWN — read to `loaded` or PROVEN absent in this session —
+  //                          or a file nobody in this app has ever looked at is replaced blind. }
+  async function write(path,text,opts){
+    const why=allBlocked||blocked.get(path);
+    if(why) return {ok:false,error:why};
+    if(opts&&opts.replaces&&!known.has(path)) return {ok:false,error:PA_UNKNOWN};
+    return io.save(path,text);
+  }
+  return {
+    read, write, LOAD:PA_LOAD, ST:PA_ST, UNKNOWN:PA_UNKNOWN,
+    blockedReason:(p)=>allBlocked||blocked.get(p)||'',
+    isKnown:(p)=>known.has(p),
+    // A path the app is CREATING: an id it has just minted, which nothing has ever written to.
+    // That is the ONE way a path becomes known without a read, and it exists because the
+    // alternative is worse: a brand-new note's very first page file could never be written at all
+    // ({replaces:true} refusing an unread path), so the note could not be created.
+    // It is the app's claim rather than the store's, so it is deliberately a separate call with
+    // exactly one legitimate caller ("I generated this id a line ago"), and a path whose read has
+    // FAILED cannot be claimed this way — evidence beats assertion.
+    fresh:(p)=>{ if(!blocked.has(p)) known.add(p); },
+    block:(p,why)=>{ known.delete(p); blocked.set(p,why); },
+    unblock:(p)=>{ blocked.delete(p); },
+    blockAll:(why)=>{ allBlocked=why||''; },
+    anyBlocked:()=>!!allBlocked||blocked.size>0,
+  };
+}
+// ══ PA_DATA_CORE_END ══════════════════════════════════════════════════════════════════════
+// ══ PA_NOTICE_JS_BEGIN ══ mirrored verbatim in every app; the WHY is in the CSS block ══════
+// ONE persistent, bilingual failure surface per app — and every message on it is KEYED BY THE
+// PATH IT IS ABOUT. It is NOT a toast: a message about work that did not reach disk stays up
+// until THAT PATH is confirmed, or the user dismisses it by tapping it.
+//
+// V6 SCAR (2026-09-02, round 3): the surface was one anonymous slot and `paNotice('')` wiped it.
+// Every app called that on the next confirmed read or write of ANY path — loadAnn() of a
+// different chapter, saveGen() of the general note, a note switch — so a chapter whose save had
+// been REJECTED lost its own report (and, one global slot again, its retry ladder) the moment an
+// unrelated file succeeded. A lost write could end up visible to nobody. A report may now be
+// retired ONLY by paNoticeOk(<its own path>) or by the user's tap; success on any other path
+// cannot touch it.
+//
+// Two or more live reports: errors outrank info, the newest of the winning kind takes the slot,
+// and the rest are COUNTED in the suffix — a second failure can never silently hide the first.
+// `kind` is 'err' by default; 'info' is the same slot in the accent colour, for a recovery or
+// progress message that is not a failure. Never console-only (R5); `alert` is not a fallback
+// either — the sandbox has no allow-modals, so it is a no-op here.
+const PA_NOTICES=new Map();                        // key (the PATH it is about) -> {msg,kind,n}
+let _paSeq=0, _paShown='';
+const PA_MORE=(n)=>' (+'+n+' more 其他)';
+function paRenderNotice(){
+  const el=document.getElementById('pa-notice'); if(!el) return;
+  let best=null;
+  const rank=(x)=>(x.kind==='info'?0:1);
+  for(const [k,v] of PA_NOTICES) if(!best||rank(v)>rank(best.v)||(rank(v)===rank(best.v)&&v.n>best.v.n)) best={k,v};
+  if(!best){ _paShown=''; el.classList.remove('on','info'); el.textContent=''; return; }
+  _paShown=best.k;
+  el.textContent=best.v.msg+(PA_NOTICES.size>1?PA_MORE(PA_NOTICES.size-1):'');
+  el.classList.toggle('info',best.v.kind==='info');
+  el.classList.add('on');
+}
+// `key` is the path the message is about, and it is what paNoticeOk() will later clear. A message
+// that belongs to no path (boot, a listing) passes its own stable tag; without one the message
+// text itself is the key, so a repeat replaces itself instead of stacking.
+function paNotice(msg,kind,key){
+  const k=key||('msg:'+String(msg));
+  if(!msg) PA_NOTICES.delete(k);
+  else PA_NOTICES.set(k,{msg:String(msg),kind:kind==='info'?'info':'err',n:++_paSeq});
+  paRenderNotice();
+}
+// The ONE way a report is retired by the app: a CONFIRMED read or write of that same path.
+function paNoticeOk(path){ if(PA_NOTICES.delete(path)) paRenderNotice(); }
+function paNoticeHas(path){ return PA_NOTICES.has(path); }
+// The user's tap dismisses the message on screen; the next one (if any) takes the slot, so
+// dismissing one report can never quietly drop the others.
+(function(){ const el=document.getElementById('pa-notice');
+  if(el&&el.addEventListener) el.addEventListener('click',()=>{ if(_paShown){ PA_NOTICES.delete(_paShown); paRenderNotice(); } });
+})();
+// ══ PA_NOTICE_JS_END ═══════════════════════════════════════════════════════════════════════
+// The ONE reader for this app. Every load below goes through it and every write below goes
+// through DATA.write, so "we could not read it" can never become "there is nothing there".
+// (Deleted here, deliberately: `withTimeout(paLoad(path),1500)` + `loadJSON` returning null.
+// A 1.5s deadline on a notebook the design permits to reach 8MB expired on HEALTHY loads over
+// Tailscale, and null then meant "new empty note".)
+const DATA=makeReader({load:paLoad,save:paSave});
+// Deleted here (V6, round 3): `noticeClear()`, which cleared the WHOLE surface whenever the two
+// paths it happened to check were unblocked. It erased reports about every OTHER path — the
+// draft, the previous note, the legacy notebook — on an unrelated success. Every clear below is
+// now paNoticeOk(<the path that just succeeded>) and touches nothing else.
+
+// ── Constants (single source; R3) ──
+const IDX_PATH='journal.json';          // entry index (metadata only)
+const LEGACY_PATH='notebook.json';      // the pre-Tier-2 single notebook (imported once, never overwritten)
+// ── ONE FILE PER NOTE. There is no second layout, and there must not be one. ───────────────
+// A note is entry-<id>.json: the whole notebook, one atomic write, exactly as every note already
+// on disk is stored. DELETED HERE (2026-09-02, round 5): the per-page layout — noteDir / idxPath /
+// pagePath / LAYOUT / isLegacyNote / IDX_PAGES / readPages / savePages / writeIndex, and the
+// entry-<id>/index.json + entry-<id>/page-<pid>.json files they wrote.
+//
+// WHY, at the save so it is read by whoever would bring it back:
+//  · WHOLE-FILE IS ATOMIC BY CONSTRUCTION. lib/appdata.mjs writes tmp+rename and keeps a rolling
+//    .bak, so the note is either the old one or the new one. Per-page had TWO files that had to
+//    agree (index.json naming page-*.json) and no transaction across them — every failure mode was
+//    an orphan page, a dangling ref, or an index that disagreed with the pages it named.
+//  · TWO LAYOUTS MEANT GUESSING WHICH ONE A NOTE WAS IN, from a session-local map that only
+//    loadNote() ever filled. Deleting a note this session had never opened therefore wrote a
+//    NEW-LAYOUT tombstone for an OLD-LAYOUT note: entry-<id>.json survived untouched, the app read
+//    the tombstoned index first and manufactured an "absent", and the note opened EMPTY with its
+//    handwriting unreachable. (F3, measured.) One path per note makes that unrepresentable.
+//  · THE PAYLOAD FITS. BODY_LIMITS.appData is 8MB and the densest measured real page is 60.4KB —
+//    about 135 dense pages of headroom. Hitting it is LOUD (save-failure banner + retry ladder) and
+//    the shrink guard refuses the overwrite that used to follow.
+// THE COST, stated: a save is O(the whole note), so one rejected request risks the whole note. That
+// is bounded and visible. Revisit only with a real concurrency design (one writer owning ordering
+// across every file of a note, failure state keyed to the note) and only if measured note sizes
+// actually demand it — not as an optimisation.
+const entryPath=id=>'entry-'+id+'.json';          // the ONE file a note lives in
+const genId=()=>Math.random().toString(36).slice(2,10);
+const PREVIEW_MAX=2000;                 // plaintext kept in the index for the drawer's search
+const TITLE_MAX=40;                     // derived-title length cap (first line of the page)
+// A blank page's creation time, minted once so the title on screen is the one that gets stored
+// when the page is promoted to a real entry. Reset by newEntry().
+let blankAt=Date.now();
+// The default name for an unnamed note comes from PANote, so Journal, Bible and the server
+// all produce ONE string (R3). A handwriting-only page therefore reads 'New Note 新笔记 · 14:32'
+// in the drawer instead of a row of identical 'Untitled's.
+const blankTitle=()=>PANote.defaultTitle(blankAt);
+
+// ── One-time migration: an old entry {v,id,text:<html>,draw:<notebook|null>} becomes a single
+// PANote notebook — the typed text folds into page 0's pageHtml (PANote's load-time sanitize
+// keeps b/i/u/lists), strokes are preserved. Idempotent: a file that is already a notebook (has
+// .pages) is returned unchanged. No text or stroke is ever dropped. ──
+function migrateEntry(data){
+  if(!data||typeof data!=='object') return null;
+  if(Array.isArray(data.pages)) return data;                       // already a notebook (new format)
+  const nb=(data.draw&&Array.isArray(data.draw.pages))?data.draw:{pages:[{strokes:[],pageHtml:'',images:[]}]};
+  if(!nb.pages.length) nb.pages.push({strokes:[],pageHtml:'',images:[]});
+  const txt=(data.text||'').trim();
+  if(txt){ const p0=nb.pages[0]; p0.pageHtml=p0.pageHtml?(p0.pageHtml+txt):txt; }   // PANote sanitizes on load
+  return nb;
+}
+// Plain-text preview of a notebook's typed content (first page), for the drawer row + search.
+function previewOf(nb){ try{ const h=(nb&&nb.pages&&nb.pages[0]&&nb.pages[0].pageHtml)||'';
+  const d=document.createElement('div'); d.innerHTML=String(h); return (d.textContent||'').replace(/\s+/g,' ').trim().slice(0,PREVIEW_MAX);
+}catch(_){ return ''; /* unparsable pageHtml: the drawer row shows the fallback preview — cosmetic only, and the notebook itself is untouched (R5 (c)) */ } }
+// Derived display title — the first non-empty line of the first page's text (≤TITLE_MAX chars),
+// recomputed on every save (so it follows the first line). Block tags/<br> become line breaks
+// before extracting text; a pure-handwriting page has no text → '' → the timestamp fallback.
+function derivedTitleOf(nb){ try{ const h=(nb&&nb.pages&&nb.pages[0]&&nb.pages[0].pageHtml)||'';
+  const d=document.createElement('div'); d.innerHTML=String(h).replace(/<\/?(?:br|div|p|li|h[1-6])\b[^>]*>/gi,'$&\n');
+  const line=(d.textContent||'').split('\n').map(s=>s.trim()).find(Boolean)||'';
+  return line.slice(0,TITLE_MAX);
+}catch(_){ return ''; /* unparsable pageHtml: title falls back to the timestamp — cosmetic only */ } }
+// Explicit title (⋯ Rename — always wins) → derived first line → PANote's 'New Note 新笔记 · HH:MM'.
+// An entry predating `created` degrades to the bare label — never a bogus date.
+const displayTitle=e=> (e&&e.title)||(e&&e.derived)||PANote.defaultTitle(e&&e.created);
+
+// ── State ──
+const S={ entries:[], iTimer:0 };
+let curId=null;                          // open entry id; null = a fresh blank page (promoted to a real entry on first save)
+const entryById=id=>S.entries.find(x=>x.id===id);
+const visibleEntries=()=>S.entries.slice().sort((a,b)=>(b.updated||0)-(a.updated||0));
+
+// ── Index persistence (debounced; flushed on hide) ──
+// The index is metadata only — losing it costs ordering/titles, never handwriting — but a failed
+// index write is still surfaced on the pad's save pill rather than swallowed (R5).
+async function writeIndexNow(){ clearTimeout(S.iTimer); S.iTimer=0;
+  const r=await DATA.write(IDX_PATH, JSON.stringify({v:1,entries:S.entries}));
+  if(r.ok) paNoticeOk(IDX_PATH); else paNotice(IDX_NOT_SAVED+' — '+r.error,'',IDX_PATH);
+  return r; }
+function scheduleIndex(){ clearTimeout(S.iTimer); S.iTimer=setTimeout(writeIndexNow,600); }
+async function flushIndex(){ return S.iTimer ? writeIndexNow() : {ok:true}; }
+// TWO message surfaces, split by consequence (R3/R5):
+//  · paNotice  — persistent, above every overlay, for anything that means WORK MAY BE LOST or
+//                writes are blocked. It stays up until the situation clears.
+//  · padFlash  — PANote's own 2.2s transient INSIDE the pad, for cosmetic/degrade notes only.
+//                It is NOT a data-loss surface: it is gone in 2.2s and it is painted inside the
+//                pad, so it cannot be the report for a lost write.
+// `alert` is deliberately not a fallback anywhere: the sandbox has no allow-modals (no-op here).
+function padFlash(msg){ if(pad&&pad.flash) pad.flash(msg); }
+// Bilingual message prefixes — one source each (R3).
+const IDX_NOT_SAVED='Note list not saved · 笔记列表未保存';
+const NOT_LOADED='Could not open this note · 无法打开此笔记';
+const WRITES_BLOCKED=' — not saving until it loads 载入成功前不会保存';
+const PHOTO_FAILED=PANote.PHOTO_TXT.failed;
+const UPLOAD_KEY='uploads';             // notice key for the photo store (not an app-data path)
+
+// ── The one PANote surface (fullscreen). Its load/save target the CURRENT entry. ──
+// `let`, not `const`: PANote calls load() from inside its constructor (boot pull), so a `const`
+// binding would still be in its temporal dead zone and even `typeof pad` would THROW there —
+// swallowed by PANote's load catch, leaving a blank pad with no explanation. With `let` the
+// closures below simply see `undefined` until the assignment completes and guard for it.
+let pad;
+// ── READ one note: its ONE file (design: whole-file, atomic) ───────────────────────────────
+// Returns the LOAD OUTCOME. There is exactly one path a note can live at, so there is nothing to
+// decide here and nothing to remember for later: no layout map, no index, no guess. That is the
+// point — the layout map WAS the F3 bug (a delete of a note this session never opened consulted an
+// empty map and wrote the tombstone to the wrong path).
+async function loadNote(id){
+  const ep=entryPath(id);
+  const r=await DATA.read(ep);
+  if(r.status===DATA.ST.failed){ paNotice(NOT_LOADED+' — '+r.error+WRITES_BLOCKED,'',ep); return r; }
+  paNoticeOk(ep);
+  if(r.status===DATA.ST.loaded){
+    // A tombstone ({deleted:true}) has no pages: migrateEntry answers a blank notebook and the
+    // engine treats a notebook it cannot sanitize but which says deleted:true as a proven absence.
+    const nb=migrateEntry(r.data);
+    return nb?DATA.LOAD.loaded(r.data&&r.data.deleted===true?r.data:nb):DATA.LOAD.absent();
+  }
+  return DATA.LOAD.absent();                          // PROVEN absent — a listed note with no content yet
+}
+// ── WRITE one note: the WHOLE notebook, one file, one request ─────────────────────────────
+// This is the only writer of a note's content. It is deliberately the dullest function in the file:
+// serialize, POST, report the outcome. Every durability rule that used to be spread across
+// savePages/writeIndex — ordering, partial failure, which page is dirty — has no addressee any
+// more, because there is only one write and it either lands or it does not.
+async function writeNote(id,nb){
+  const ep=entryPath(id);
+  const r=await DATA.write(ep, JSON.stringify(nb));
+  if(r.ok) paNoticeOk(ep);                             // a confirmed write clears the report FOR THIS FILE and nothing else
+  else paNotice(PANote.notSavedText(r),'',ep);
+  return r;
+}
+pad=PANote.fullscreen({
+  pages:true,
+  // The safe opening tool is DIFFERENT on the two kinds of device, because the accident is
+  // different:
+  //   · MOUSE — a click in pen mode commits a dot immediately (startStroke draws a single point
+  //     so a tap is visible before any movement). Select is safe: a click selects nothing.
+  //   · TOUCH — select is the DANGEROUS one. A finger landing on a photo or a stroke drags it,
+  //     and the note is changed before you have decided to change anything. In pen mode a finger
+  //     never draws at all (palm rejection); it flips the page, which alters nothing. Only the
+  //     Pencil marks, and picking up a Pencil IS the decision to write.
+  // `pointer: coarse` asks what the PRIMARY pointer is, which is the one that will land by
+  // accident — an iPad with a trackpad attached still answers coarse, and that is correct here.
+  tool:(window.matchMedia&&matchMedia('(pointer: coarse)').matches)?'pen':'select',
+  onAsk:()=>openAsk(),                   // ✨ in the pad's top bar — the page-level question
+  onAskImage:(im)=>askAboutImage(im),    // ✨ in a selected image's ⋯ menu — ask about THAT picture
+  title:blankTitle(),
+  onHistory:()=>drawer.open(),           // ☰ in PANote's top bar opens the shared Notes drawer
+  // Returns a LOAD OUTCOME (PANote.LOAD / PA_LOAD), never data-or-null — that collapse is V1.
+  // A blank page (curId===null) has nothing on disk by definition: there is no second store any
+  // more, so "no note yet" is a proven absence rather than something that has to be earned from
+  // another file. Its first save promotes it and writes it.
+  load:async()=>{
+    if(!curId) return DATA.LOAD.absent();
+    return loadNote(curId);
+  },
+  // Which note the two closures above are pointed at, for PANote's per-note failure state (F2).
+  // A save failure is filed under THIS string, so switching notes cannot re-aim it at another
+  // note's notebook, and coming back here re-surfaces a write that never landed.
+  noteKey:()=>curId||'blank-page',
+  doc:()=>curId?{path:entryPath(curId)}:null,   // which file the open note is (PANote's Transcript row); a blank page has none yet
+  // Returns the OUTCOME. The index is stamped only AFTER the content write is confirmed: the
+  // drawer's timestamp/preview must describe what is on disk, never what is only in memory.
+  // SCAR: this stamped e.updated unconditionally, so the one surface that could have exposed the
+  // failure instead confirmed the illusion of a successful save.
+  save:async(nb)=>{
+    // A path whose read FAILED is never written — checked BEFORE promoteNote so a blocked app
+    // cannot even mint a new entry id (that would strand the note: the index write is blocked too).
+    if(curId){ const why=DATA.blockedReason(entryPath(curId));
+      if(why){ paNotice(NOT_LOADED+' — '+why+WRITES_BLOCKED,'',contentPath(curId)); return {ok:false,error:why}; } }
+    else if(DATA.blockedReason(IDX_PATH)) return {ok:false,error:DATA.blockedReason(IDX_PATH)};
+    const e=curId?entryById(curId):promoteNote(nb);   // first save of a blank page promotes it to a real entry
+    if(!e) return {ok:false,error:'no entry · 无条目'};
+    const r=await writeNote(e.id,nb);
+    if(!r.ok) return r;
+    e.updated=Date.now(); e.preview=previewOf(nb); e.derived=derivedTitleOf(nb); scheduleIndex();
+    if(!e.title&&pad) pad.setTitle(displayTitle(e));   // no explicit title: bar tracks the derived/timestamped one
+    syncDrawer();
+    return r;
+  },
+  // Optional image IO — enables PANote's 🖼 "Add photo". Bytes route through the shell
+  // broker (uploads/ store); only {path,x,y,w,h} lands in the page JSON.
+  // The reason a photo was refused — too large vs signed out vs the store being down — comes back
+  // ALREADY RENDERED from the shell (`text`: the right noun, both languages and, for a size
+  // rejection, the cap). Using it rather than the raw `error` is what stops "Photo too large ·
+  // 照片过大 (max 20 MB)" from reading like a 401 (leftover (e)).
+  uploadImage:async(file)=>{
+    // R5: a missing component is NAMED. The pad's button guards too, but the paste/drop paths
+    // reach this hook directly, so the one place that actually needs PAPhoto checks for it.
+    if(!window.PAPhoto){ const why=PANote.PHOTO_TXT.noComponent; paNotice(why,'',UPLOAD_KEY); return {ok:false,error:why,text:why}; }
+    // maxEdge is REQUIRED, not implied: PAPhoto.upload() only downscales when it is asked to
+    // (capture() is the call that defaults it). Without it this hook would send the original —
+    // and since the pad has stood down from its own pre-flight in favour of PAPhoto's, an 8MB
+    // camera shot would go all the way to the server to earn a 413. DEFAULT_MAX_EDGE rather
+    // than a literal 1600: the component owns that number (R3).
+    const r=await window.PAPhoto.upload(file,{name:file.name||'image.png',what:'Photo',
+      maxEdge:window.PAPhoto.DEFAULT_MAX_EDGE});
+    if(r&&r.ok){ paNoticeOk(UPLOAD_KEY); return r.path; }
+    const why=(r&&(r.text||r.error))||'upload rejected · 上传被拒绝';
+    paNotice(PHOTO_FAILED+' — '+why,'',UPLOAD_KEY);
+    return {ok:false,error:why,text:(r&&r.text)||''}; },   // an OUTCOME, so the pad's own flash carries the reason too
+  imageUrl:async(path)=>{ const r=await paAttachUrl(path); return (r&&r.ok)?r.dataUrl:null; },
+});
+// The app's own bar (PAAppBar, ADR 0032/0035): ← Home and A-/A+ in PANote's .pan-top; it hides itself after
+// a few idle seconds for full-screen writing, a finger pull down or the top handle brings it back.
+if(window.PAAppBar) PAAppBar.attach({bar:()=>pad.el.querySelector('.pan-top'),
+  homeSlot:()=>pad.el.querySelector('.pan-top'), sizeBefore:()=>pad.el.querySelector('.pan-top .pan-hask'),
+  narrowSizeSlot:()=>pad.el.querySelector('.pan-paperpop'),
+  keepOpen:()=>pad.popsOpen()||!!document.querySelector('.pac-drawerhost.on,dialog[open]')});   // PANote's own popover check (R3)
+// TODO(R4 seam): this PAAppBar wiring + the drawer host block → notes/host-chrome.js when this file is split.
+// The file a note's failure reports are keyed to — the ONE file it lives in. Keyed per path so a
+// success on one note can never retire another's report.
+const contentPath=id=>id?entryPath(id):'blank-page';
+
+// A blank page becomes a listed entry only once it has content (first save) — keeps the list
+// free of empty notes. Synchronous state mutation; the notebook write is done by save() itself.
+function promoteNote(nb){
+  const id=genId(), now=Date.now();
+  const e={id,title:'',created:blankAt,updated:now,preview:previewOf(nb)};   // created = when the blank page was opened, so its title never shifts on promotion
+  S.entries.unshift(e); curId=id; scheduleIndex(); syncDrawer();
+  // The id was minted a line ago, so entry-<id>.json is a path nothing has ever written. That is
+  // the legitimate DATA.fresh claim (SUMMARY_HOOKS.saveNote makes the same one); without it the first write of a brand-new note could not
+  // be made at all once a future caller passes {replaces:true}.
+  DATA.fresh(entryPath(id));
+  return e;
+}
+
+// ── The shared drawer (same slide-in list + ⋯ rename/delete as the Bible ☰). Delete lives ONLY
+// on the row's ⋯ — it is an action on a list item, not on the note being edited. ──
+// ── Period summaries · 按时期总结 (plan E) — the drawer's bulk Summarize, through THIS rail ────
+// run: the pressed turn goes into the Ask AI rail under its summary scope (a normal chat turn,
+// saved like any other, follow-ups continue it); monthSummary: an existing "Summary · 总结 YYYY-MM"
+// entry's text, read from its own file (the year preset reuses it instead of re-sending the month);
+// saveNote: a NEW entry for EVERY run (owner 2026-11-12: runs of the same period are all kept), through
+// the same writeNote + index path as every note, bound to the thread, on the blank 'plain' page; with `id`
+// (that run's own follow-up or re-save) exactly that entry updated in place (updateSummaryNote: page 0's text
+// replaced, ink and images kept) — a deleted one answers {gone:true} and nothing is created (R5).
+// Both opens keep the rail as it is ({keepRail}): the summary thread stays beside the note it wrote
+// (owner 2026-11-11), and a [n] link never opens the note's own chat (the openAi pref path, G).
+// TODO(R4 seam): SUMMARY_HOOKS + askData are the Ask AI host hooks — move them to their own inlined part.
+const newestSummary=period=>period?S.entries.filter(x=>x.summary===period).sort((a,b)=>(Number(b.created)||0)-(Number(a.created)||0))[0]||null:null;
+async function updateSummaryNote(e,{title,html,convoId,quiet}){   // quiet: written, not opened (the follow-up's second save, web/summary-followup.inline.html)
+  const r=await loadNote(e.id); if(r.status!==DATA.ST.loaded||!r.data||r.data.deleted===true||!Array.isArray(r.data.pages)||!r.data.pages.length) return {ok:false,error:NOT_LOADED};
+  const nb=r.data, now=Date.now(); nb.updated=now; nb.pages[0].pageHtml=html; nb.pages[0].updated=now;
+  const w=await writeNote(e.id,nb); if(!w.ok) return w;
+  Object.assign(e,{title,updated:now,preview:previewOf(nb)}); if(convoId) e.chat=convoId;
+  const ri=await writeIndexNow(); if(!ri.ok) return ri;
+  // quiet, but this note is the one on the pad (the first save opened it): reload it in place, or the pad keeps
+  // showing — and its next save writes back — the page without the follow-up block (owner 2026-11-11: "no research").
+  if(!quiet||curId===e.id) await openEntry(e.id,null,{keepRail:true}); return {ok:true,id:e.id};
+}
+const SUMMARY_HOOKS={
+  run:async({scope,message,images,model})=>{ if(!await openAsk(scope)) return false; const r=await railChat.send(message,{attachments:images||[],model}); syncDrawer(); return r; },   // images + model: the summary's page images and lane (note-features.md I)
+  monthSummary:async(period,title)=>{           // the period's own summary entry (e.summary), else one titled as the component names it
+    const e=newestSummary(period)||S.entries.find(x=>x.title===title); if(!e) return null;   // the NEWEST run of that month
+    const r=await loadNote(e.id); if(r.status!==DATA.ST.loaded||!r.data||r.data.deleted===true||!Array.isArray(r.data.pages)) return null;
+    return String((r.data.pages[0]&&r.data.pages[0].pageHtml)||'').replace(/<[^>]*>/g,' ').replace(/&nbsp;/g,' ').replace(/\s+/g,' ').trim()||null; },
+  saveNote:async({id:runId,title,html,period,convoId,quiet})=>{
+    if(runId!=null){ const old=entryById(String(runId)); return old?updateSummaryNote(old,{title,html,convoId,quiet}):{ok:false,gone:true}; }
+    const id=genId(), now=Date.now();
+    const nb={v:2,id,created:now,updated:now,template:'plain',pages:[{id:genId(),created:now,updated:now,strokes:[],pageHtml:html,images:[]}]};
+    DATA.fresh(entryPath(id));                       // minted a line ago — the same claim promoteNote makes
+    const w=await writeNote(id,nb); if(!w.ok) return w;
+    const e={id,title,created:now,updated:now,preview:previewOf(nb)}; if(convoId) e.chat=convoId; if(period) e.summary=period;
+    S.entries.unshift(e); const r=await writeIndexNow(); if(!r.ok){ S.entries=S.entries.filter(x=>x.id!==id); return r; }
+    if(!quiet) await openEntry(id,null,{keepRail:true}); return {ok:true,id}; },
+  onLink:({id,page})=>openEntry(id,{page},{keepRail:true}),      // a [n] link in a summary (note-features.md F): open that note on that page (the reveal path flips to it); the rail keeps the summary
+};
+const drawer=PAChat.listDrawer({
+  title:'Journal 手写',
+  summary:SUMMARY_HOOKS,               // the Summarize · 总结 button in the multi-select bar (plan E)
+  onNew:()=>newEntry(),
+  onOpen:(id,at)=>openEntry(id,at),   // `at`: a search hit's {page,boxes,terms}, shown by the pad after the reload
+  onRename:async(id,t)=>{ const e=entryById(id); if(e){ e.title=t.slice(0,120); scheduleIndex(); if(curId===id) pad.setTitle(displayTitle(e)); syncDrawer(); } },
+  // Bookmark · 收藏: `pin:true` on the index entry (absent = not), written now through the index's
+  // own path; the note file is never touched for it (plan D).
+  onPin:async(id,flag)=>{ const e=entryById(id); if(e){ if(flag) e.pin=true; else delete e.pin; await writeIndexNow(); syncDrawer(); } },
+  onDelete:async(id)=>deleteById(id),
+  // Deleting the CONVERSATION, not the note. The ⋯ offers this only on a row whose ✨ badge is
+  // lit, and the handwriting is untouched: what goes is the thread and the note's pointer to it.
+  onDeleteAi:async(id)=>{
+    const e=entryById(id); if(!e||!e.chat) return;
+    const cid=e.chat;
+    const r=await PAChat.deleteConvo(cid);
+    // The pointer is released only AFTER the server confirms. Releasing first would leave a live
+    // thread with nothing pointing at it — invisible in the list, and unreachable (R5: the
+    // failure is shown and the binding is kept, rather than silently half-applied).
+    if(!r||!r.ok){ paNotice('Could not delete the AI chat · 无法删除 AI 对话'+((r&&r.error)?' — '+r.error:''),'',IDX_PATH); return; }
+    askData.unbindConvo(cid);            // drops e.chat — the same release path a ☰ delete uses
+    if(railChat) railChat.newChat();     // the surface must not keep showing a thread that is gone
+    if(curId===id) syncAsk();            // ...and the rail closes: this note no longer has a chat
+    syncDrawer();
+  },
+  // Re-read the index from disk. Goes through DATA.read like every other read in this app: the
+  // guarded reader is what turns a broker reply into a checked outcome and keeps the failure
+  // visible on the notice surface. A raw paLoad here was silently bypassing all of that (R5).
+  onRefresh:async()=>{
+    const r=await DATA.read(IDX_PATH);
+    if(r.status===PA_ST.loaded&&r.data&&Array.isArray(r.data.entries)){
+      S.entries=r.data.entries; DATA.unblock(IDX_PATH);
+    }
+  },
+  activeId:()=>curId,
+  items:async()=> visibleEntries().map(e=>({ id:e.id, icon:'📝', title:displayTitle(e),
+    preview:e.preview||'Handwritten note 手写笔记', chip:'Note 笔记', updated:e.updated, created:e.created,
+    doc:{path:entryPath(e.id)},   // which file this row is, so the drawer's note search (PANote.search) can mark it. TODO(R4 seam): the drawer rows → notes/drawer.js
+    // The note remembers its conversation, so the list can say which notes have been asked about
+    // without opening each one. e.chat is the same pointer Ask AI reopens.
+    ai:!!e.chat, pin:!!e.pin })),
+});
+// Refresh the drawer after any change (no-op while closed); re-mark the open row.
+function syncDrawer(){ if(drawer.isOpen()) drawer.refresh(); drawer.setActive(curId); }
+
+// ── The chat↔note binding ─────────────────────────────────────────────────────────────────
+// WITHOUT THIS THE CHAT FORGETS. PAChat only holds a conversation id for the life of the page;
+// the note is what must remember which thread belongs to it, or every reload starts a fresh one
+// and the drawer fills with one-exchange conversations about the same note. That is not
+// hypothetical — it is exactly what happened in the Bible app (measured: 45 two-message threads,
+// 4 of 9 pointers dangling) and the fix there is the contract mirrored here.
+const scopeId=(k)=>String(k||'').replace(/^note:/,'');
+const entryOfScope=(k)=>{ const id=scopeId(k); return (id&&id!=='blank')?entryById(id):null; };
+
+const askData={
+  // A short, per-turn system directive. The fast lanes ignore instructions buried in the user
+  // message once a conversation is a few turns long, so this goes in the system slot every turn.
+  // A summary thread (plan E) gets the component's ONE system line instead; `k` is the thread's key.
+  system:(k)=>(window.PADrawerSummary&&window.PADrawerSummary.isScope(k))?window.PADrawerSummary.SYSTEM:
+    'You are helping with a personal handwritten journal. Answer briefly and plainly. '+
+    'Reply in the language the user writes in · 用用户使用的语言回答。',
+  // The chip the chat list shows for this thread, so a conversation is recognisable as belonging
+  // to a note rather than appearing as an untitled chat.
+  getLabel:(k)=>{ if(window.PADrawerSummary&&PADrawerSummary.isScope(k)) return PADrawerSummary.titleOf(PADrawerSummary.periodOfScope(k));
+    const e=entryOfScope(k); return e?displayTitle(e):'Journal 手写'; },
+  summary:SUMMARY_HOOKS,               // the rail's own drawer and its Save as note (plan E)
+  contextPrefix:(body,k)=>{ const e=entryOfScope(k);
+    return e ? ('About my journal note "'+displayTitle(e)+'" · 关于我的日记《'+displayTitle(e)+'》\n\n'+body) : body; },
+  getConvoId:(k)=>{ const e=entryOfScope(k); return e&&e.chat; },
+  // AWAITED, and it must be self-sufficient: chat-ui calls setCid without awaiting, so this is
+  // the only place the outcome can be handled — writeIndexNow puts its own failure on the notice.
+  setConvoId:async(k,id)=>{
+    const e=entryOfScope(k);
+    // A blank page has no entry yet. Binding a thread to the literal scope "blank" would give
+    // every future unsaved note the SAME conversation — the "null scope" defect from the Bible
+    // app, which every later chat then overwrote.
+    if(!e) return {ok:true};
+    e.chat=id; return writeIndexNow();
+  },
+  // Deleting a conversation from the ☰ list must release the note pointing at it, or the next
+  // question sends a dead id, the server quietly opens a new thread, and the note's history is
+  // orphaned with no sign that anything was lost.
+  unbindConvo:(id)=>{ if(!id) return;
+    let changed=false;
+    for(const e of S.entries) if(e.chat===id){ delete e.chat; changed=true; }
+    if(changed) scheduleIndex();
+  },
+};
+
+// ── Ask AI · 问一问 ───────────────────────────────────────────────────────────────────────
+// A chat BESIDE the page, not over it: the whole point is to read the note and the answer at
+// once — which is why this is a PASplit rail and not PAChat.fullscreen. The rail's own gate keeps
+// it off phones, where there is no room for two panes and the full-screen chat is right.
+let rail=null, railChat=null, askOpen=false;   // askOpen: is the chat slot expanded right now
+const splitOn=()=>!!(window.PASplit&&PASplit.available&&PASplit.gateOpen());
+// The thread is bound to the NOTE, so follow-up questions continue the same conversation and a
+// note you come back to still has what you asked about it.
+const chatScope=()=>'note:'+(curId||'blank');
+const OCR_PROMPT=
+  'Transcribe this photographed document into text, keeping its headings and numbering · '+
+  '请将这张文档照片转写为文字，保留标题与编号。\n\n'+
+  'Then answer questions about it from the transcription · 之后请依据转写内容回答我的提问。';
+
+function ensureRail(){
+  if(rail||!splitOn()) return rail;
+  rail=PASplit.open({ ratio:0.34, slots:[
+    { key:'chat', title:'Ask AI · 问一问', zone:'right', min:280, collapsed:true,
+      mount:(host,r)=>{ railChat=PAChat.panel(Object.assign({ host }, askData, {
+        // PAChat calls this before opening a thread from its own ☰ list, so tapping a chat row
+        // expands the slot instead of loading into a pane nobody can see.
+        onShow:()=>{ r.open(); r.expand('chat'); },
+        onClose:()=>{ askOpen=false; r.collapse('chat'); },   // closes the CHAT, not the rail
+      })); return railChat; } },
+  ]});
+  return rail;
+}
+
+// Open the chat for this note. Returns false when there is no room for a rail — the caller says
+// so rather than appearing to do nothing.
+async function openAsk(scope){                     // scope: a thread other than this note's (a period summary)
+  if(!ensureRail()||!railChat){ paNotice('Ask AI needs a wider screen · 问一问需要更宽的屏幕','','ask'); return false; }
+  rail.open(); rail.expand('chat'); askOpen=true;
+  const s=scope||chatScope();
+  if(await railChat.open(s)===false||(!scope&&chatScope()!==s)) return false;   // AWAITED: a send before this lands in the wrong thread; false = superseded or the note changed meanwhile
+  return true;
+}
+
+// THE CHAT FOLLOWS THE NOTE, BOTH WAYS. Called on every note switch:
+//   · the note HAS a conversation  -> open it, because the conversation is part of that note;
+//   · the note has NONE            -> close, because a chat left on screen does not read as
+//                                     stale, it reads as BELONGING to the note now open, which
+//                                     is the one thing a per-note chat must never do.
+// No notice when there is no rail: on a phone the user opened a NOTE, they did not ask for a
+// chat, and a warning about screen width would be an answer to a question nobody asked.
+function syncAsk(){
+  if(!ensureRail()||!railChat) return;
+  const e=curId?entryById(curId):null;
+  // PANote.prefs().openAi (app pref in ⚙ Settings, default off): a note with a conversation opens ALONE unless
+  // asked for; ✨ (onAsk → openAsk) still reopens the bound thread. Read per open, so a toggle applies next time.
+  if(e&&e.chat&&PANote.prefs().openAi){ rail.open(); rail.expand('chat'); askOpen=true; railChat.open(chatScope()); }
+  else { rail.collapse('chat'); askOpen=false; }
+}
+
+async function askAboutImage(im){
+  if(!await openAsk()) return;
+  // Attached BY PATH — the photo is already on the server, so asking about it costs no upload and
+  // no second copy of the bytes. The model is told where the file is; PAChat writes that line.
+  if(!railChat.attach({name:'page.jpg',path:im.path})){
+    paNotice('Could not attach the photo · 无法附加图片','','ask'); return;
+  }
+  if(await railChat.send(OCR_PROMPT)===false) paNotice('Still answering · 正在回答中…','','ask');
+  syncDrawer();   // the note now has a conversation — the list should say so without a reload
+}
+
+// ── Navigation (always flush the outgoing entry under its OLD id before switching) ──
+// curId is repointed INSIDE pad.reload()'s callback, which runs after the outgoing entry has been
+// flushed under its OLD id and before the new one is pulled. Setting curId first (the obvious
+// spelling) makes the pad's own flush write the OUTGOING notebook into the INCOMING entry — the
+// same class of bug as the Bible Draw pane's scope key. If the outgoing entry did not land, the
+// switch still proceeds (blocking navigation would trap the user) and the pad shows a sticky
+// bilingual notice keyed to THAT note, so the next note's successful save cannot hide the failure.
+// The unsaved strokes are still in this tab's notebook object — there is no second store any more
+// — so the message says exactly that and points back at the note.
+const PREV_UNSAVED='Previous note not saved · 上一条未保存 — reopen it to retry 请重新打开该笔记重试';
+// The report belongs to the OUTGOING note's path, captured before the switch: only a later
+// confirmed write of THAT note may retire it. Keyed to the incoming note (or to nothing at all,
+// as it was) the very next successful save erased it — the note that did not land is exactly the
+// one the user is no longer looking at (V6 c).
+const outgoingPath=()=>contentPath(curId);
+async function openEntry(id,at,o){               // o.keepRail: the rail stays as it is (a summary's save or link), neither the note's chat nor a collapse
+  const from=outgoingPath();
+  const r=await pad.reload(()=>{ curId=id; });
+  if(!r.ok) paNotice(PREV_UNSAVED,'',from);       // sticky: an unlanded note is a data-loss report
+  pad.setTitle(displayTitle(entryById(id)));
+  if(at&&pad.reveal) pad.reveal(at);              // a search hit: its page and the matched lines (PANote owns the overlay)
+  syncDrawer(); if(!(o&&o.keepRail)) syncAsk();
+}
+async function newEntry(){
+  const from=outgoingPath();
+  const r=await pad.reload(()=>{ curId=null; });   // blank page — promoted on first save
+  if(!r.ok) paNotice(PREV_UNSAVED,'',from);
+  blankAt=Date.now(); pad.setTitle(blankTitle()); syncDrawer(); syncAsk();
+}
+async function deleteById(id){
+  const e=entryById(id); if(!e) return;
+  // No broker delete-kind exists; the index is the source of truth. ORDER MATTERS and used to be
+  // backwards: the strokes were overwritten with a tombstone FIRST, result unchecked, so a failed
+  // index write left a note whose handwriting was already destroyed still listed in the drawer.
+  // Now the index write goes first and must be CONFIRMED before anything is destroyed — if it
+  // fails, the entry is restored and nothing on disk has been touched.
+  const keep=S.entries;
+  S.entries=S.entries.filter(x=>x.id!==id);
+  const idx=await writeIndexNow();
+  if(!idx.ok){ S.entries=keep; syncDrawer(); paNotice('Delete failed · 删除失败 — '+idx.error,'',IDX_PATH); return; }
+  // THE TOMBSTONE GOES ON THE NOTE'S OWN FILE — the only file it has (F3). It is derived from the
+  // id, not from any session-local map, so deleting a note this session has never opened writes to
+  // exactly the same path as deleting one that is open. That was the bug: `isLegacyNote(id)` read a
+  // LAYOUT map only loadNote() ever filled, so a never-opened LEGACY note got a NEW-LAYOUT
+  // tombstone (entry-<id>/index.json) while entry-<id>.json kept the handwriting — and the next
+  // open read the tombstoned index first, manufactured an "absent" and showed an EMPTY note whose
+  // real content was unreachable. One path per note makes the wrong path unrepresentable.
+  const tp=entryPath(id);
+  const wiped=await DATA.write(tp, JSON.stringify({v:1,deleted:true}));
+  // Tombstone failure is NOT data loss (the note is already dereferenced and its bytes are still
+  // intact), but the user is told so a stale file is never a silent surprise.
+  if(!wiped.ok) paNotice('Removed from the list; file not cleared · 已从列表移除，文件未清除','',tp);
+  else paNoticeOk(tp);
+  if(curId===id) await newEntry(); else syncDrawer();
+}
+
+// Flush the pad (in-progress strokes/text) + the index when the app is hidden/closed. Nothing can
+// await during teardown, but postMessage reaches the parent shell — which outlives this iframe —
+// synchronously, so the write still completes. flush() no longer rejects (paSave resolves an
+// outcome), so this catch only guards a genuinely broken pad; it reports rather than swallowing.
+async function flushAll(){
+  const target=outgoingPath();                     // the file this flush is ABOUT — the notice key
+  try{ const r=await pad.flush(); if(!r.ok) paNotice(PANote.notSavedText(r),'',target); }
+  catch(err){ paNotice('Save error · 保存错误 — '+((err&&err.message)||err),'',target); }
+  await flushIndex();
+}
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') flushAll(); });
+window.addEventListener('pagehide',()=>{ flushAll(); });
+
+// ── Boot + one-time migration of the pre-Tier-2 single notebook ──
+async function boot(){
+  const r=await DATA.read(IDX_PATH);
+  // ── The index-wipe defect (Refutation 2), closed here ──────────────────────────────────
+  // A read we could not COMPLETE must never become "you have no notes". The old code took
+  // `!idx` — which a 1.5s timeout, an expired session, a 500 or a dropped Wi-Fi all produced —
+  // and wrote {"v":1,"entries":[]} straight over journal.json, the file deleteById calls the
+  // source of truth. Measured: 50 entries / 7,399 bytes → 0 entries / 20 bytes, server 200
+  // {"ok":true}; every entry-*.json survived on disk but was unreachable from the app.
+  // Now: nothing is written, every write in the app is blocked, and the user is told.
+  if(r.status===DATA.ST.failed){
+    DATA.blockAll(r.error);
+    S.entries=[];
+    paNotice('Could not open your notes · 无法读取笔记列表 — '+r.error+
+             ' — nothing has been changed on the server 服务器数据未被改动','',IDX_PATH);
+    curId=null; await pad.open(); syncDrawer(); return;
+  }
+  if(r.status===DATA.ST.loaded&&!(r.data&&Array.isArray(r.data.entries))){
+    // The file READ fine but is not an index. That is a corrupt/foreign file, not an empty one:
+    // same rule as the Bible app's ANN_CORRUPT — a file we cannot make sense of is a file we
+    // must not overwrite.
+    DATA.blockAll('note list is not readable as an index · 笔记列表格式无法识别');
+    S.entries=[];
+    paNotice('Note list is unreadable · 笔记列表无法识别 — refusing to overwrite it 拒绝覆盖','',IDX_PATH);
+    curId=null; await pad.open(); syncDrawer(); return;
+  }
+  let idx=r.status===DATA.ST.loaded?r.data:{v:1,entries:[]};
+  if(r.status===DATA.ST.absent){                                   // PROVEN first run — see makeReader's two evidence steps
+    const lg=await DATA.read(LEGACY_PATH);
+    if(lg.status===DATA.ST.failed){
+      // We cannot tell whether a pre-Tier-2 notebook is sitting there. Writing an empty index
+      // now would strand it behind a list that says "no notes".
+      DATA.blockAll(lg.error);
+      S.entries=[];
+      paNotice('Could not check for an older notebook · 无法确认是否有旧笔记 — '+lg.error+
+               ' — nothing has been changed 未做任何改动','',LEGACY_PATH);
+      curId=null; await pad.open(); syncDrawer(); return;
+    }
+    const legacy=lg.status===DATA.ST.loaded?lg.data:null;
+    const strokes=legacy&&Array.isArray(legacy.pages)?legacy.pages.reduce((a,p)=>a+((p.strokes&&p.strokes.length)||0),0):0;
+    if(strokes>0){                                                 // legacy IS a notebook → write it as the new-format content directly
+      const id=genId(), now=Date.now();
+      const w=await DATA.write(entryPath(id), JSON.stringify(legacy));
+      const back=w.ok?await DATA.read(entryPath(id),{mustExist:true}):null;   // round-trip proof before committing the index
+      if(back&&back.status===DATA.ST.loaded&&back.data&&Array.isArray(back.data.pages)&&back.data.pages.length===legacy.pages.length)
+        idx.entries.push({id,title:'Journal',created:legacy.created||now,updated:legacy.updated||now,preview:''});
+      // A failed migration write leaves notebook.json untouched (it is never overwritten), so the
+      // next boot retries it. Say so rather than starting silently empty.
+      else paNotice('Could not migrate the old notebook · 旧笔记迁移失败 — will retry 下次重试','',LEGACY_PATH);
+    }
+    const w=await DATA.write(IDX_PATH, JSON.stringify(idx));
+    if(!w.ok) paNotice(IDX_NOT_SAVED+' — '+w.error,'',IDX_PATH); else paNoticeOk(IDX_PATH);
+  }
+  S.entries=Array.isArray(idx.entries)?idx.entries:[];
+  // Open the MOST RECENTLY EDITED note, not a blank page. Landing blank every time meant opening
+  // the journal created another empty note to abandon, and the list filled with them — the app's
+  // own drawer showed several "New Note" entries minutes apart. visibleEntries() already sorts by
+  // `updated` descending, so [0] is the one last written. Only a genuinely empty journal starts
+  // blank, which is the one case where a blank page is the right thing to show.
+  // visibleEntries() sorts by `updated`, so [0] is the note last WRITTEN — which is where you
+  // left off, whatever order the drawer happens to be showing.
+  const last=visibleEntries()[0];
+  curId=last?last.id:null;                                         // set BEFORE open(): load() reads curId
+  await pad.open();                                                // show the surface + load
+  if(last) pad.setTitle(displayTitle(last));
+  else { blankAt=Date.now(); pad.setTitle(blankTitle()); }
+  syncDrawer(); syncAsk();   // the rail opens with the note's conversation only when PANote.prefs().openAi says so
+  // Land with the list OPEN and that note marked, so the journal opens on "here is everything
+  // you have written, and here is where you were" rather than on a single page with no context.
+  // Only when there is something to show: an empty drawer over an empty pad is two empty things.
+  if(last) drawer.open();
+}
+// A throw here must not white-screen the app — but it must not look healthy either: writes stay
+// blocked until a read succeeds, and the reason is on the notice (R5: never a bare catch).
+(async()=>{ try{ await boot(); }
+  catch(err){ DATA.blockAll('boot failed · 启动失败');
+    paNotice('Could not start · 无法启动 — '+((err&&err.message)||err)+WRITES_BLOCKED,'','boot');
+    try{ await pad.open(); }catch(_){ /* the pad itself is gone; the notice above is the only surface left */ } } })();
+</script>
+</body>
+</html>

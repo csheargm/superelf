@@ -1,0 +1,96 @@
+<!-- PADrawerTags — the shared drawer's tag chips（标签）and the tag strip under its search box
+     (docs/plans/note-features.md B, H). Inlined by web.mjs into any page carrying the PA_DRAWER_TAGS_UI
+     marker (chat-ui carries it, so every drawer gets it with no app code).
+     Tags are DERIVED: `#word` in a page's typed, handwritten or photographed text, read from the
+     node's index through PANoteText.fetch({fields:['tags']}) (the `note-text` kind) once per drawer
+     refresh, and joined to rows by the drawer's own sameDoc on `doc:{path, scope?}`. Nothing is
+     stored on a row or in a note. A ROW's chips show every tag of its pages; the STRIP under the box
+     shows only tags found in TYPED text (`typedTags` of the same reply): handwriting OCR reads strokes
+     as `#`-words too often for the strip, while the handwritten tags stay searchable and on the rows.
+     A tapped chip puts `#word` in the box and runs the drawer's existing search — tag-only matching
+     already lives in the node (lib/note-match.mjs) — so the box shows what is active and clearing it
+     goes back. A LONG-PRESS on a strip chip hides that tag from the strip (remembered in the app
+     prefs `hiddenTags`, through the `prefs` hook the drawer passes — the app iframe is an opaque origin
+     where localStorage throws); the drawer's ⋯ menu offers `Show hidden · 显示隐藏` while any is hidden (menu()).
+     Bookmarks（书签）are the drawer's own: ★ before the title (--pac-star) and the Bookmarked group
+     (web/drawer-groups.inline.html) — the strip carries no ★ chip (one way only, R3).
+     API: PADrawerTags.attach({host, rows, box, items, sameDoc, search, redraw, prefs}) → {chips(row), tagsOf(row), refresh(), sync(), menu(), hide(tag), hidden()}.
+     Driven for real by test/drawer-tags.test.mjs and test/drawer-pins.test.mjs. -->
+<style id="pdt-style">
+.pac-ltag{font-size:11px;color:var(--accent,#0a7a5a);background:color-mix(in srgb,var(--accent,#0a7a5a) 12%,transparent);border-radius:5px;padding:1px 6px;font-weight:600;border:none;cursor:pointer;font-family:inherit;line-height:inherit}
+.pac-ltags{display:flex;flex-wrap:wrap;gap:6px;padding:7px 0 0}.pac-ltags:empty{display:none}
+</style>
+<script id="pdt-script">
+(function(){
+  if(window.PADrawerTags) return;
+  const TAG_MAX_PER_ROW=3;   // chips on a row; the rest fold into "+n"
+  const STRIP_TOP=8;         // most-used tags under the empty box
+  const LONG_PRESS_MS=500;   // a held strip chip hides its tag
+  const PREF='hiddenTags';   // the app pref: the tags hidden from the strip, in the order they were hidden
+  const TXT=Object.freeze({ showHidden:'Show hidden · 显示隐藏' });
+  const TIP='Tap a #tag to find its notes; hold a tag to hide it · 点按 #标签 查找相关笔记；长按可隐藏该标签';
+  const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const chip=t=>'<button type="button" class="pac-ltag" data-tag="'+esc(t)+'">#'+esc(t)+'</button>';
+  const list=a=>Array.isArray(a)?a.filter(t=>typeof t==='string'&&t):[];
+
+  function attach(c){
+    let recs=null, seq=0;   // [{path, scope, tags, typed}] per indexed page; null until the node answered
+    let _hidden=null;       // this session's hidden list once touched; null = read the stored prefs
+    const prefs=c.prefs||{get:()=>({}),set:()=>null};
+    const hidden=()=>{ if(_hidden) return _hidden; const p=(typeof prefs.get==='function'&&prefs.get())||{}; return list(p[PREF]); };
+    const strip=document.createElement('div'); strip.className='pac-ltags';
+    c.host.querySelector('.pac-lsearch').appendChild(strip);
+    if(window.PATips) window.PATips.register({id:'drawer-tags',anchor:()=>strip.querySelector('.pac-ltag'),text:TIP});   // first-use tip (ADR 0030)
+    const tagsOf=it=>{ if(!recs||!it||!it.doc) return []; const s=new Set();
+      for(const r of recs) if(c.sameDoc(r,it.doc)) for(const t of r.tags) s.add(t);
+      return [...s]; };
+    // Up to TAG_MAX_PER_ROW chips, then "+n" in the drawer's own chip style.
+    function chips(it){ const t=tagsOf(it); if(!t.length) return '';
+      const shown=t.slice(0,TAG_MAX_PER_ROW);
+      return shown.map(chip).join('')+(t.length>shown.length?'<span class="pac-lchip">+'+(t.length-shown.length)+'</span>':''); }
+    // The strip: the STRIP_TOP typed tags by page count (ties by name), the hidden ones left out, only while the box is empty.
+    function top(){ const n=new Map(), hide=new Set(hidden());
+      for(const r of recs||[]) for(const t of r.typed) if(!hide.has(t)) n.set(t,(n.get(t)||0)+1);
+      return [...n].sort((a,b)=>b[1]-a[1]||(a[0]<b[0]?-1:a[0]>b[0]?1:0)).slice(0,STRIP_TOP).map(x=>x[0]); }
+    function sync(){ strip.innerHTML=String(c.box.value||'').trim()?'':top().map(chip).join(''); }
+    // The hidden list moves at once and is saved behind it; a refused save keeps this session's list and says
+    // so once in the console (R5: a strip preference has no line of its own under the box).
+    function setHidden(next){ _hidden=next; sync();
+      Promise.resolve(prefs.set({[PREF]:next})).then(r=>{ if(r&&r.ok===false) console.warn('[PADrawerTags] not saved',r.error||''); },e=>console.warn('[PADrawerTags] not saved',e)); }
+    const hide=t=>{ if(t&&!hidden().includes(t)) setHidden(hidden().concat([t])); };
+    // The drawer's ⋯ menu entries: one, while any tag is hidden.
+    const menu=()=>hidden().length?[{label:TXT.showHidden+' ('+hidden().length+')',run:()=>setHidden([])}]:[];
+    // One ask per refresh; a reply to an older refresh is dropped. A failure leaves the chips off:
+    // they are a courtesy over the list, and the same index failure is said under the box by the
+    // drawer's next search (which reads the same index), so no second sentence is owed here (R5).
+    async function refresh(){
+      if(!(window.PANoteText&&typeof window.PANoteText.fetch==='function')) return false;
+      const my=++seq; let r;
+      try{ r=await window.PANoteText.fetch({fields:['tags']}); }catch(e){ r={ok:false,error:String((e&&e.message)||e)}; }
+      if(my!==seq) return false;
+      if(!r.ok) return false;
+      // `typedTags` rides with `tags` (lib/note-text.mjs recordOut); a reply from an older node (version skew during an update) has none and lists its tags.
+      recs=r.pages.map(p=>({path:String(p.path||''),scope:String(p.scope||''),tags:list(p.tags),typed:Array.isArray(p.typedTags)?list(p.typedTags):list(p.tags)}));
+      sync(); c.redraw(); return true;
+    }
+    // Registered BEFORE the drawer's own row-click listener, so a chip tap never opens the row under it.
+    // _held: the tag a long-press just hid; the ONE strip click that follows the release is swallowed. It is
+    // cleared by that click AND by the next press (a touch long-press may end with no click at all: the next
+    // tap must not be eaten), and a row chip never consults it (a row chip is a tap, whatever the strip did).
+    let _held=null;
+    const onChip=(e,strip)=>{ const b=e&&e.target&&e.target.closest&&e.target.closest('.pac-ltag'); if(!b) return;
+      if(e.stopImmediatePropagation) e.stopImmediatePropagation(); if(e.preventDefault) e.preventDefault();
+      const t=String((b.dataset&&b.dataset.tag)||''); if(strip&&_held!==null){ const was=_held; _held=null; if(was===t) return; }
+      c.box.value='#'+t; c.search(); };
+    // Long-press on a STRIP chip only (a row chip is the row's): set on the press, cleared on any release or move away.
+    let _timer=null;
+    const press=e=>{ const b=e&&e.target&&e.target.closest&&e.target.closest('.pac-ltag'); if(!b) return; const t=String((b.dataset&&b.dataset.tag)||'');
+      _held=null; if(_timer) clearTimeout(_timer); _timer=setTimeout(()=>{ _timer=null; _held=t; hide(t); },LONG_PRESS_MS); };
+    const release=()=>{ if(_timer){ clearTimeout(_timer); _timer=null; } };
+    c.rows.addEventListener('click',e=>onChip(e,false)); strip.addEventListener('click',e=>onChip(e,true));
+    strip.addEventListener('pointerdown',press); for(const ev of ['pointerup','pointercancel','pointerleave']) strip.addEventListener(ev,release);
+    return {chips,tagsOf,refresh,sync,menu,hide,hidden};
+  }
+  window.PADrawerTags={attach,TAG_MAX_PER_ROW,STRIP_TOP,LONG_PRESS_MS,PREF,TXT,TIP};
+})();
+</script>

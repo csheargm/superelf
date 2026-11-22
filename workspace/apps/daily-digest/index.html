@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" media="(prefers-color-scheme:light)" content="#f4f4f2">
+<meta name="theme-color" media="(prefers-color-scheme:dark)" content="#111514">
+<title>每日简报</title>
+<style>
+html{font-size:calc(17px * var(--fs,1))}   /* A-/A+ scale, broadcast by the shell (pa:'prefs' fontScale) */
+:root{--bg:#f4f4f2;--card:#fff;--text:#1c1e1d;--muted:#6b7370;--line:#e2e2de;--accent:#0f6355;--warm:#c97a20;--gosim:#b45309;--aivf:#4338ca;}
+@media(prefers-color-scheme:dark){:root{--bg:#111514;--card:#1b201f;--text:#e5e8e6;--muted:#8f9894;--line:#2a302e;--accent:#57c2ac;--warm:#e0a84e;--gosim:#f59e0b;--aivf:#818cf8;}}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--text);font:16px/1.5 -apple-system,system-ui,sans-serif;padding:12px 12px 70px;}
+header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;}
+h1{font-size:20px;font-weight:700;}
+.sub{font-size:12px;color:var(--muted);margin-top:2px;display:flex;gap:6px;align-items:center;}
+.badge{font-size:11px;padding:1px 7px;border-radius:10px;font-weight:600;}
+.badge.web{background:#d1fae5;color:#065f46;}
+.badge.ai{background:#e0e7ff;color:#3730a3;}
+@media(prefers-color-scheme:dark){.badge.web{background:#064e3b;color:#6ee7b7;}.badge.ai{background:#1e1b4b;color:#a5b4fc;}}
+.hbtns{display:flex;gap:6px;margin-top:2px;}
+.ibtn{background:none;border:1px solid var(--line);border-radius:20px;padding:4px 11px;font:inherit;font-size:13px;color:var(--muted);cursor:pointer;}
+.ibtn:active{opacity:.7;}
+.section{background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden;}
+.shead{display:flex;align-items:center;gap:8px;padding:11px 14px 9px;border-bottom:1px solid var(--line);}
+.sicon{font-size:18px;}
+.stitle{font-size:15px;font-weight:600;}
+.sbody{padding:11px 14px;}
+.bullet{display:flex;gap:8px;margin-bottom:9px;}
+.bullet:last-of-type{margin-bottom:0;}
+.dot{flex-shrink:0;margin-top:7px;width:5px;height:5px;border-radius:50%;background:var(--accent);}
+.btext{font-size:14px;line-height:1.55;}
+.sources{margin-top:9px;padding-top:8px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:5px;}
+.src-link{font-size:11px;color:var(--accent);text-decoration:none;background:rgba(0,0,0,.04);border-radius:5px;padding:2px 7px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+@media(prefers-color-scheme:dark){.src-link{background:rgba(255,255,255,.07);}}
+.section.gosim .dot{background:var(--gosim);}
+.section.aivf .dot{background:var(--aivf);}
+.stale{font-size:12px;color:var(--warm);margin-bottom:7px;font-style:italic;}
+.skel{height:13px;background:var(--line);border-radius:4px;margin-bottom:7px;animation:pulse 1.4s ease-in-out infinite;}
+.skel:last-child{width:65%;}
+@keyframes pulse{0%,100%{opacity:.35;}50%{opacity:.7;}}
+#status{position:fixed;bottom:0;left:0;right:0;padding:9px 16px;background:var(--bg);border-top:1px solid var(--line);font-size:13px;color:var(--muted);text-align:center;}
+
+/* Modal */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;z-index:100;}
+.modal.hidden{display:none;}
+.mbox{background:var(--card);border-radius:16px 16px 0 0;width:100%;max-height:88vh;display:flex;flex-direction:column;}
+.mhead{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px;border-bottom:1px solid var(--line);}
+.mhead h2{font-size:16px;font-weight:700;}
+.mclose{background:none;border:none;font-size:22px;color:var(--muted);cursor:pointer;padding:0 4px;}
+.mscroll{flex:1;overflow-y:auto;padding:10px 16px;}
+.trow{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;}
+.trow-top{display:flex;gap:8px;align-items:center;margin-bottom:6px;}
+.t-icon{width:36px;border:1px solid var(--line);border-radius:6px;padding:4px;font-size:16px;text-align:center;background:var(--card);color:var(--text);font:inherit;}
+.t-name{flex:1;border:1px solid var(--line);border-radius:6px;padding:5px 8px;font:inherit;font-size:14px;background:var(--card);color:var(--text);}
+.t-del{background:none;border:1px solid #e2383833;border-radius:6px;padding:5px 9px;font-size:13px;color:#e23838;cursor:pointer;}
+.t-query{width:100%;border:1px solid var(--line);border-radius:6px;padding:5px 8px;font:inherit;font-size:12px;background:var(--card);color:var(--muted);}
+.qlabel{font-size:11px;color:var(--muted);margin-bottom:3px;}
+.merr{padding:6px 16px 0;font-size:13px;color:#e23838;}
+.merr:empty{display:none;}
+.madd{width:100%;padding:9px;border:1px dashed var(--line);border-radius:8px;background:none;font:inherit;font-size:14px;color:var(--accent);cursor:pointer;margin-top:4px;}
+.mfoot{display:flex;gap:8px;padding:10px 16px 20px;border-top:1px solid var(--line);}
+.mfoot button{flex:1;padding:10px;border-radius:8px;font:inherit;font-size:15px;cursor:pointer;border:none;}
+.mbtn-save{background:var(--accent);color:#fff;}
+.mbtn-cancel{background:none;border:1px solid var(--line) !important;color:var(--muted);}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>每日简报</h1>
+    <div class="sub"><span id="date-line"></span><span id="src-badge" class="badge" style="display:none"></span></div>
+  </div>
+  <div class="hbtns">
+    <button class="ibtn" id="edit-btn">编辑</button>
+    <button class="ibtn" id="refresh-btn">刷新</button>
+  </div>
+</header>
+
+<div id="content"></div>
+<div id="status">加载中…</div>
+
+<div id="editor" class="modal hidden">
+  <div class="mbox">
+    <div class="mhead"><h2>编辑主题</h2><button class="mclose" id="editor-close">×</button></div>
+    <div class="mscroll" id="topic-list"></div>
+    <div style="padding:0 16px 4px"><button class="madd" id="add-topic">+ 添加主题</button></div>
+    <div class="merr" id="editor-msg" role="alert"></div>
+    <div class="mfoot">
+      <button class="mfoot mbtn-cancel" id="editor-cancel">取消</button>
+      <button class="mfoot mbtn-save" id="editor-save">保存并刷新</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const DEFAULT_TOPICS=[
+  {key:'longevity',name:'健康与长寿',icon:'🌿',query:'longevity health nutrition sleep anti-aging science research 2026'},
+  {key:'diabetes', name:'糖尿病管理',icon:'💙',query:'diabetes management blood glucose HbA1c insulin sensitivity 2026'},
+  {key:'faith',    name:'圣经与信仰',icon:'✝️',query:'Christianity Bible devotional faith spiritual growth 2026'},
+  {key:'music',    name:'音乐',      icon:'🎵',query:'music composition theory open source audio tools 2026'},
+  {key:'ai',       name:'AI · 科技 · Tesla FSD',icon:'🤖',query:'AI LLM Tesla FSD full self-driving autopilot news 2026'},
+  {key:'oss',      name:'开源动态',  icon:'🔓',query:'open source Linux Foundation CNCF GitHub trending 2026'},
+  {key:'gosim',    name:'GOSIM · 开源AI社区',icon:'🌐',query:'GOSIM open source AI agentic AI MCP A2A protocol robotics embodied AI news 2026'},
+  {key:'aivf',     name:'AI Vision Forum · 智能体时代',icon:'🏢',query:'"AI Vision Forum" OR "agentic OS" OR "AI-BOM" OR "mobile agentic" OR "AI-native organization" OR agentic enterprise governance 2026'},
+];
+const CACHE_PATH='data/daily-digest/cache.json';
+const TOPICS_PATH='data/daily-digest/topics.json';
+
+let topics=[];   // set by loadTopics(): the user's list, or DEFAULT_TOPICS on a first run
+let editTopics=[];
+
+let _paId=0; const _wait={};
+window.addEventListener('message',(e)=>{const m=e.data;if(m&&m.pa==='res'&&_wait[m.id]){_wait[m.id](m);delete _wait[m.id];}});
+function pa(kind,payload){return new Promise((res,rej)=>{const id=++_paId;_wait[id]=(m)=>{if(m.ok===false)rej(Object.assign(new Error(m.error||'err'),{code:m.code,text:m.text}));else res(m);};parent.postMessage({pa:'req',id,kind,...(payload||{})},'*');});}
+
+const esc=(s)=>String(s).replace(/[&<>"]/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function todayStr(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function setStatus(m){document.getElementById('status').textContent=m;}
+
+// A missing topics.json is a first run: DEFAULT_TOPICS. Any other failed or unreadable read is shown,
+// and PAStore (web/store.inline.html, ADR 0010) refuses to save the topics, because DEFAULT_TOPICS
+// saved over an unread topics.json would erase the user's list. 刷新 reads it again.
+const TOPICS_LOADING='加载中…', TOPICS_NOT_LOADED='主题未能读取 · Topics not loaded: ';
+const topicsFile=PAStore.file(TOPICS_PATH,{
+  shape:t=>Array.isArray(t)?'':'not a topic list', loading:TOPICS_LOADING,
+  failed:text=>TOPICS_NOT_LOADED+text, unreadable:why=>TOPICS_NOT_LOADED+why,
+});
+async function loadTopics(){
+  const r=await topicsFile.load();
+  if(r.state!=='failed')topics=r.state==='ok'?r.value:DEFAULT_TOPICS;
+}
+async function start(force){
+  if(!topicsFile.loaded)await loadTopics();
+  if(topicsFile.loaded)load(force);else setStatus(topicsFile.error);
+}
+
+function renderSkeletons(){
+  document.getElementById('content').innerHTML=topics.map(t=>`
+    <div class="section"><div class="shead"><span class="sicon">${t.icon}</span><span class="stitle">${esc(t.name)}</span></div>
+    <div class="sbody"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div></div>`).join('');
+}
+
+function renderDigest(cache,isStale){
+  const srcBadge=document.getElementById('src-badge');
+  if(cache.source==='web'){srcBadge.textContent='🔍 实时';srcBadge.className='badge web';srcBadge.style.display='';}
+  else{srcBadge.textContent='🤖 AI';srcBadge.className='badge ai';srcBadge.style.display='';}
+
+  document.getElementById('content').innerHTML=topics.map(t=>{
+    const bullets=(cache.digest[t.key]||[]).slice(0,4);
+    const srcs=(cache.sources&&cache.sources[t.key])||[];
+    const stale=isStale?'<div class="stale">昨日内容 — 点刷新获取今日</div>':'';
+    const bulletHtml=bullets.length
+      ?bullets.map(b=>`<div class="bullet"><div class="dot"></div><div class="btext">${esc(b)}</div></div>`).join('')
+      :'<div class="btext" style="color:var(--muted)">暂无内容</div>';
+    const srcHtml=srcs.length
+      ?`<div class="sources">${srcs.slice(0,4).map(s=>`<a class="src-link" href="${esc(s.url)}" target="_blank">${esc(s.title.slice(0,50))}</a>`).join('')}</div>`:'';
+    return `<div class="section"><div class="shead"><span class="sicon">${t.icon}</span><span class="stitle">${esc(t.name)}</span></div>
+      <div class="sbody">${stale}${bulletHtml}${srcHtml}</div></div>`;
+  }).join('');
+}
+
+function buildPrompt(){
+  const keyLines=topics.map(t=>`  "${t.key}": ["要点1","要点2","要点3"]`).join(',\n');
+  const details=topics.map(t=>`- ${t.key}（${t.name}）：${t.query}`).join('\n');
+  return `你是用户的个人助理。请生成今日简报。
+
+格式：只返回纯JSON，无多余文字：
+{\n${keyLines}\n}
+
+每个领域3条要点，每条30-55字，中文，专业术语附英文。
+
+领域说明：
+${details}
+
+每条要点具体可操作，不要泛泛而谈。`;
+}
+
+async function fetchAIDigest(){
+  setStatus('⏳ AI 生成中…');
+  const r=await pa('ask',{message:buildPrompt()});
+  const raw=(r.text||'').trim().replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'');
+  return {date:todayStr(),source:'ai',digest:JSON.parse(raw)};
+}
+
+async function load(forceRefresh){
+  const today=todayStr();
+  document.getElementById('date-line').textContent=today.replace(/-/g,' / ');
+
+  if(!forceRefresh){
+    try{
+      const r=await pa('data',{path:CACHE_PATH});
+      const cached=JSON.parse(r.text);
+      if(cached.date===today){renderDigest(cached,false);setStatus('今日简报 ✓');return;}
+      renderDigest(cached,true);setStatus('⏳ 更新中…');
+    }catch{renderSkeletons();}
+  }else{renderSkeletons();setStatus('⏳ 刷新中…');}
+
+  try{
+    const cache=await fetchAIDigest();
+    await pa('save-data',{path:CACHE_PATH,data:JSON.stringify(cache)});
+    renderDigest(cache,false);
+    setStatus('今日简报 ✓ （AI · 实时网搜需运行 fetch 脚本）');
+  }catch(e){setStatus('生成失败，请重试');console.error(e);}
+}
+
+/* ── Topic editor ── */
+function editorHtml(t,i){
+  return `<div class="trow" data-i="${i}">
+    <div class="trow-top">
+      <input class="t-icon" data-f="icon" value="${esc(t.icon)}" maxlength="4">
+      <input class="t-name" data-f="name" value="${esc(t.name)}" placeholder="主题名称">
+      <button class="t-del" data-del="${i}">删除</button>
+    </div>
+    <div class="qlabel">搜索关键词（用于网络搜索）</div>
+    <input class="t-query" data-f="query" value="${esc(t.query)}" placeholder="search query in English for best results">
+  </div>`;
+}
+
+function openEditor(){
+  if(!topicsFile.loaded){setStatus(topicsFile.error||TOPICS_LOADING);return;}
+  editTopics=topics.map(t=>({...t}));
+  document.getElementById('editor-msg').textContent='';
+  renderEditorList();
+  document.getElementById('editor').classList.remove('hidden');
+}
+
+function renderEditorList(){
+  document.getElementById('topic-list').innerHTML=editTopics.map((t,i)=>editorHtml(t,i)).join('');
+}
+
+function closeEditor(){document.getElementById('editor').classList.add('hidden');}
+
+document.getElementById('editor-close').onclick=closeEditor;
+document.getElementById('editor-cancel').onclick=closeEditor;
+
+document.getElementById('topic-list').addEventListener('input',(e)=>{
+  const row=e.target.closest('.trow');
+  if(!row)return;
+  const i=+row.dataset.i, f=e.target.dataset.f;
+  if(f)editTopics[i][f]=e.target.value;
+});
+
+document.getElementById('topic-list').addEventListener('click',(e)=>{
+  const btn=e.target.closest('[data-del]');
+  if(!btn)return;
+  editTopics.splice(+btn.dataset.del,1);
+  renderEditorList();
+});
+
+document.getElementById('add-topic').onclick=()=>{
+  editTopics.push({key:'topic'+Date.now(),name:'新主题',icon:'📌',query:'your search query here 2026'});
+  renderEditorList();
+  document.getElementById('topic-list').lastElementChild?.scrollIntoView({behavior:'smooth'});
+};
+
+document.getElementById('editor-save').onclick=async()=>{
+  // Sync any un-input'd field values from DOM
+  document.querySelectorAll('.trow').forEach((row,i)=>{
+    ['icon','name','query'].forEach(f=>{
+      const el=row.querySelector(`[data-f="${f}"]`);
+      if(el)editTopics[i][f]=el.value;
+    });
+  });
+  // Ensure unique keys
+  editTopics=editTopics.map((t,i)=>({...t,key:t.key||'topic'+i}));
+  // A refused or failed save is shown INSIDE the editor: alert() does nothing in the app sandbox (no
+  // allow-modals), and the page's status bar sits under this sheet. The editor stays open, so
+  // the edits are not lost.
+  const why=await topicsFile.save(JSON.stringify(editTopics));
+  if(why){document.getElementById('editor-msg').textContent=why;return;}
+  topics=editTopics;
+  closeEditor();
+  load(true);
+};
+
+document.getElementById('edit-btn').onclick=openEditor;
+document.getElementById('refresh-btn').onclick=()=>start(true);
+
+start(false);
+</script>
+</body>
+</html>

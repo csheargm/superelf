@@ -1,0 +1,95 @@
+<!-- PASummaryTitle — the period ids and the human titles of period summaries（总结的时期与标题,
+     docs/plans/note-features.md E). Inlined by web.mjs into any page carrying the PA_SUMMARY_TITLE_UI
+     marker: drawer-summary carries it ABOVE its own script, so PADrawerSummary reads it at run time.
+     Split out of PADrawerSummary (R4): that file builds and sends the turn; this one owns the dates.
+     A period id names the scope and the saved note for good (`summary:2026-W46`, `2026-11`, `2026`,
+     `2026-03-03..2026-10-15`); what the user SEES is titleOf(id) — "This week · 本周 Nov 9–15, 2026",
+     "Last month · 上月 Oct 2026", "Selected · 已选 Mar 3–Oct 15, 2026" — the ONE text for the thread
+     label and the saved note's title (owner 2026-11-11: "W46 — not sure what it is"). The period word
+     is relative to now (this / last / plain), so scopeOfLabel, its inverse, accepts every word and the
+     earlier "Summary · 总结 <id>" labels, which existing notes and threads still carry; displayTitle shows any of
+     them as today's titleOf (links, drawer rows) without rewriting what is stored.
+     Driven for real by test/summary-title.test.mjs and test/drawer-summary.test.mjs. -->
+<script id="pst-script">
+(function(){
+  if(window.PASummaryTitle) return;
+  const SCOPE='summary:';
+  const TXT=Object.freeze({ selected:'Selected · 已选', week:'This week · 本周', lastWeek:'Last week · 上周', anyWeek:'Week · 周',
+    month:'This month · 本月', lastMonth:'Last month · 上月', anyMonth:'Month · 月', year:'This year · 今年', lastYear:'Last year · 去年', anyYear:'Year · 年',
+    oldTitle:'Summary · 总结 {p}' });   // the label before 2026-11-11: still recognised, never written again
+  const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const DASH='–';
+  const DAY_MS=86400000;
+  const pad2=n=>String(n).padStart(2,'0');
+  const dayOf=ts=>{ const d=new Date(ts); return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); };
+  const monthOf=ts=>dayOf(ts).slice(0,7);
+  const now=()=>(Number(window.PA_SUMMARY_NOW)>0?Number(window.PA_SUMMARY_NOW):Date.now());   // read at use time: a test pins the week/month/year
+  function isoWeek(ts){ const d=new Date(ts); const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())); const dow=t.getUTCDay()||7;
+    t.setUTCDate(t.getUTCDate()+4-dow); const y=t.getUTCFullYear(); const w=Math.ceil(((t-Date.UTC(y,0,1))/DAY_MS+1)/7); return y+'-W'+pad2(w); }
+  // The presets' windows, from `at` (local time): [from, to) in ms, and the period id that names the scope and the note.
+  function periodOf(key,at){
+    const d=new Date(at), y=d.getFullYear(), m=d.getMonth();
+    if(key==='week'){ const dow=(d.getDay()+6)%7, day=d.getDate()-dow; return {from:new Date(y,m,day).getTime(),to:new Date(y,m,day+7).getTime(),id:isoWeek(at)}; }   // local-midnight arithmetic: a week with a DST change is not 7×24 h
+    if(key==='month') return {from:new Date(y,m,1).getTime(),to:new Date(y,m+1,1).getTime(),id:y+'-'+pad2(m+1)};
+    if(key==='lastMonth') return {from:new Date(y,m-1,1).getTime(),to:new Date(y,m,1).getTime(),id:monthOf(new Date(y,m-1,1).getTime())};
+    if(key==='year') return {from:new Date(y,0,1).getTime(),to:new Date(y+1,0,1).getTime(),id:String(y)};
+    if(key==='lastYear') return {from:new Date(y-1,0,1).getTime(),to:new Date(y,0,1).getTime(),id:String(y-1)};
+    return null;
+  }
+  // A period id → {kind, from, to} (first and last day, local Date), or null for the bare 'selected' and anything else.
+  function daysOf(p){ let m;
+    if((m=/^(\d{4})-W(\d{2})$/.exec(p))){ const y=+m[1], j4=new Date(y,0,4), mon=new Date(y,0,4-((j4.getDay()+6)%7)+(+m[2]-1)*7);   // Jan 4 is always in ISO week 1
+      return {kind:'week',from:mon,to:new Date(mon.getFullYear(),mon.getMonth(),mon.getDate()+6)}; }
+    if((m=/^(\d{4})-(\d{2})$/.exec(p))) return {kind:'month',from:new Date(+m[1],+m[2]-1,1),to:new Date(+m[1],+m[2],0)};
+    if((m=/^(\d{4})$/.exec(p))) return {kind:'year',from:new Date(+m[1],0,1),to:new Date(+m[1],11,31)};
+    if((m=/^(\d{4})-(\d{2})-(\d{2})(?:\.\.(\d{4})-(\d{2})-(\d{2}))?$/.exec(p))) return {kind:'selected',from:new Date(+m[1],+m[2]-1,+m[3]),to:m[4]?new Date(+m[4],+m[5]-1,+m[6]):new Date(+m[1],+m[2]-1,+m[3])};
+    return null; }
+  const mdy=(d,withYear)=>MONTHS[d.getMonth()]+' '+d.getDate()+(withYear?', '+d.getFullYear():'');
+  // "Nov 9–15, 2026" · "Nov 30–Dec 6, 2026" · "Dec 29, 2025–Jan 4, 2026" · "Nov 9, 2026"
+  function rangeText(a,b){
+    if(a.getFullYear()!==b.getFullYear()) return mdy(a,true)+DASH+mdy(b,true);
+    if(a.getMonth()!==b.getMonth()) return mdy(a)+DASH+mdy(b,true);
+    if(a.getDate()!==b.getDate()) return mdy(a)+DASH+b.getDate()+', '+a.getFullYear();
+    return mdy(a,true); }
+  // The period word, relative to now: this / last / plain ("Week · 周" for any other week).
+  const WORDS={week:['week','lastWeek','anyWeek'],month:['month','lastMonth','anyMonth'],year:['year','lastYear','anyYear']};
+  function wordOf(kind,id){ const t=now(), [cur,last,any]=WORDS[kind];
+    if(id===periodOf(kind,t).id) return TXT[cur];
+    const lastId=kind==='week'?isoWeek(t-7*DAY_MS):periodOf(kind==='month'?'lastMonth':'lastYear',t).id;
+    return id===lastId?TXT[last]:TXT[any]; }
+  // ONE source (R3) of what a period is called: the thread label, the saved note's title, the sheet's confirm.
+  function titleOf(p){ const id=String(p==null?'':p), d=daysOf(id); if(!d) return TXT.selected;   // the bare 'selected' id (no rows yet) or an unknown id
+    if(d.kind==='selected') return TXT.selected+' '+rangeText(d.from,d.to);
+    if(d.kind==='month') return wordOf('month',id)+' '+MONTHS[d.from.getMonth()]+' '+d.from.getFullYear();
+    if(d.kind==='year') return wordOf('year',id)+' '+d.from.getFullYear();
+    return wordOf('week',id)+' '+rangeText(d.from,d.to); }
+  // A saved run's title (owner 2026-11-12: every run is its own note): the period's title and the run's local time,
+  // "This week · 本周 Nov 9–15, 2026 · 11/12 14:52" — the ONE formatter (R3); the suffix is part of the title, never a second date.
+  const RUN_SEP=' · ', RUN_RE=/ · (\d{2})\/(\d{2}) (\d{2}):(\d{2})$/;
+  const runOf=ts=>{ const d=new Date(ts); return pad2(d.getMonth()+1)+'/'+pad2(d.getDate())+' '+pad2(d.getHours())+':'+pad2(d.getMinutes()); };
+  const runTitleOf=(p,at)=>titleOf(p)+RUN_SEP+runOf(at);
+  const splitRun=l=>{ const m=typeof l==='string'?RUN_RE.exec(l):null; return m?{base:l.slice(0,m.index),run:l.slice(m.index)}:{base:l,run:''}; };
+  // ── The inverse: a stored label → its summary scope, or null for any other label ──
+  const escRe=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const WORD_KEYS=['selected','week','lastWeek','anyWeek','month','lastMonth','anyMonth','year','lastYear','anyYear'];
+  const LABEL_RE=new RegExp('^('+WORD_KEYS.map(k=>escRe(TXT[k])).join('|')+')(?: (.+))?$');
+  const RANGE_RE=/^([A-Z][a-z]{2}) (\d{1,2})(?:, (\d{4}))?(?:–(?:([A-Z][a-z]{2}) )?(\d{1,2}))?(?:, (\d{4}))?$/;
+  function parseRange(s){ const m=RANGE_RE.exec(s); if(!m) return null;
+    const m1=MONTHS.indexOf(m[1]), m2=m[4]?MONTHS.indexOf(m[4]):m1, y1=+(m[3]||m[6]), y2=+(m[6]||m[3]); if(m1<0||m2<0||!y1) return null;
+    const a=new Date(y1,m1,+m[2]), b=new Date(y2,m2,+(m[5]||m[2])); return (a.getMonth()===m1&&b.getMonth()===m2)?{a,b}:null; }   // Feb 30 is not a day
+  function periodIdOf(word,rest){ let m;
+    if(word===TXT.selected){ if(!rest) return 'selected'; const r=parseRange(rest); return r?dayOf(r.a)+(r.b>r.a?'..'+dayOf(r.b):''):null; }
+    if([TXT.year,TXT.lastYear,TXT.anyYear].includes(word)) return /^\d{4}$/.test(rest)?rest:null;
+    if([TXT.month,TXT.lastMonth,TXT.anyMonth].includes(word)){ m=/^([A-Z][a-z]{2}) (\d{4})$/.exec(rest||''); const mi=m?MONTHS.indexOf(m[1]):-1; return mi<0?null:m[2]+'-'+pad2(mi+1); }
+    const r=parseRange(rest||''); return r?isoWeek(r.a.getTime()):null; }
+  function scopeOfLabel(l0){ if(typeof l0!=='string') return null; const l=splitRun(l0).base;   // a run's time suffix names no period
+    const old=TXT.oldTitle.slice(0,TXT.oldTitle.indexOf('{p}')); if(l.length>old.length&&l.startsWith(old)) return SCOPE+l.slice(old.length);
+    const m=LABEL_RE.exec(l); if(!m) return null; const id=periodIdOf(m[1],m[2]||''); return id?SCOPE+id:null; }
+  const isScope=k=>typeof k==='string'&&k.startsWith(SCOPE);
+  const periodOfScope=k=>isScope(k)?k.slice(SCOPE.length):'';
+  // What a stored label is SHOWN as: a saved summary's title (an old raw "Summary · 总结 2026-W46" included) reads
+  // as titleOf(its period) today; any other label is itself. Display only — nothing stored is rewritten.
+  const displayTitle=l=>{ const sc=scopeOfLabel(l); return sc?titleOf(periodOfScope(sc))+splitRun(l).run:l; };   // a run keeps its time
+  window.PASummaryTitle={SCOPE,TXT,MONTHS,now,pad2,dayOf,monthOf,isoWeek,periodOf,daysOf,titleOf,runTitleOf,splitRun,scopeOfLabel,displayTitle,isScope,periodOfScope};
+})();
+</script>

@@ -1,0 +1,16 @@
+{
+  "title": "Bible 圣经",
+  "desc": "WEB (English) + 和合本 CUV (中文) · public domain",
+  "shared": true,
+  "version": "1.0.0",
+  "gitRef": "109816a7eb05131e3ac7d4d30793854eff105b89",
+  "sharedBy": "owner",
+  "promotedAt": "2026-09-21T16:29:35.946Z",
+  "promotedFrom": {
+    "uid": "owner",
+    "slug": "bible"
+  },
+  "files": {
+    "index.html": "8a79cb4015de"
+  }
+}

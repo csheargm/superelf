@@ -1,0 +1,37 @@
+# superelf pins file BYTES. shared-apps/<slug>/meta.json carries a sha1 manifest of every file
+# (lib/sharedapps.mjs fileManifest), and web.mjs appHash does the same for index.html; both are
+# compared against the file on disk to answer "is there an update" and "did the user edit this".
+#
+# Git for Windows defaults to core.autocrlf=true, which rewrites LF to CRLF on checkout. Measured:
+# shared-apps/bible/index.html hashes a971ec9c441d as committed and 005ef9694e52 after conversion,
+# so every shelf app on a Windows clone would read as permanently modified. The same conversion
+# also breaks the shell scripts under Git Bash and WSL (/bin/bash^M: bad interpreter).
+#
+# So the working tree is LF on every platform, not just in the repo.
+* text=auto eol=lf
+
+# Shell scripts must be LF or they will not run at all.
+*.sh text eol=lf
+
+# PowerShell 5.1 and 7 both read LF-only scripts, so the .ps1 launchers stay LF like everything
+# else — one rule for the whole tree, and the "no tracked file has CRLF" test stays a straight
+# assertion instead of growing an exception list.
+*.ps1 text eol=lf
+
+# cmd.exe is the exception that earns one: a .bat/.cmd with LF-only endings mis-parses labels and
+# multi-line blocks. Nothing here ships as .bat/.cmd today; the rule is here so that the day one
+# does, it is not silently converted. test/line-endings.test.mjs reads these rules rather than
+# hardcoding the list, so the two can never drift apart again.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Never touch bytes we fingerprint or that are not text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.pdf binary

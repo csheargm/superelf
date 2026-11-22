@@ -1,0 +1,13 @@
+# Nightly encrypted backup of the superelf demo · 演示夜间备份. Install (root):
+#   cp superelf-demo-backup.service superelf-demo-backup.timer /etc/systemd/system/
+#   systemctl daemon-reload && systemctl enable --now superelf-demo-backup.timer
+# Edit WorkingDirectory if the demo is not at /home/ubuntu/sandbox/superelf-demo.
+[Unit]
+Description=superelf demo nightly backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/ubuntu/sandbox/superelf-demo/ops/demo
+ExecStart=/usr/bin/docker compose -p superelf-demo --profile backup run --rm backup

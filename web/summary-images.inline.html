@@ -1,0 +1,64 @@
+<!-- PASummaryImages — page images for a period summary（总结页图片, docs/plans/note-features.md I, ADR 0027).
+     The local OCR misreads handwriting, so a summary turn also SENDS the pages that carry important INK
+     lines (note-text `inkImportant`, index imp.ink) as pictures: the node renders each page's ink to a PNG
+     (broker kind `note-page-image` → lib/note-page-image.mjs) and the turn attaches the files the way the
+     rail attaches an uploaded photo (chat-ui send({attachments})). Newest pages first, at most
+     PAGE_IMAGES_MAX (= the lib's, pinned by test); the confirm line says the count and the cap.
+     The lane: SUMMARY_LANE_PREF names the agent lanes that read files (claude, then codex); the first
+     one the node serves answers a summary, else the current lane — and a lane without vision (the
+     /api/models `vision` flag) gets text only, said on the line. PROMPT is the one sentence that tells
+     the model to trust the image over the transcript. drawer-summary carries this marker.
+     A whole-year scope (YEAR_KEYS: the This year / Last year presets) sends NO pictures: a year is built from
+     its month summaries, and twelve months of pages would blow the turn's payload — the plan answers none.
+     API: PASummaryImages.lane() → {id,label,vision} · plan({pages,rows,key}) → {pages,total,lane,line}
+          PASummaryImages.fetch(pages) → Promise<{ok, images:[{name,path}], error?}>
+     Driven by test/summary-images.test.mjs. -->
+<script id="psi-script">
+(function(){
+  if(window.PASummaryImages) return;
+  const PAGE_IMAGES_MAX=6;   // = lib/note-page-image.mjs PAGE_IMAGES_MAX, pinned by test/summary-images.test.mjs
+  const SUMMARY_LANE_PREF=Object.freeze(['claude','codex']);   // by provider, in order: the agent lanes that open a file themselves
+  const YEAR_KEYS=Object.freeze(['year','lastYear']);   // = the drawer's whole-year presets (web/drawer-summary.inline.html), pinned by test: no page images
+  const PROMPT='Page images are attached for the pages with marked handwriting: where the transcript and an image disagree, trust the image. · '+
+    '已附上带重点手写的页面图片：转写与图片不一致时，以图片为准。';
+  const TXT=Object.freeze({ images:'{n} page images · {n} 页图片', cap:'max {n} · 最多 {n}', textOnly:'{lane} cannot see images · {lane} 无法看图 — text only · 仅发送文字',
+    fetching:'Rendering page images · 正在生成页图片', failed:'Page images failed · 页图片失败 — {e}', noBroker:'no broker · 无通道' });
+  const fill=(s,o)=>String(s).replace(/\{(\w+)\}/g,(_,k)=>String(o[k]==null?'':o[k]));
+  const lanes=()=>(window.PAChat&&typeof window.PAChat.lanes==='function'?window.PAChat.lanes():[])||[];
+  // The lane a summary turn asks for: the first preferred provider the node serves, else the current one.
+  function lane(){
+    const all=lanes(); for(const prov of SUMMARY_LANE_PREF){ const l=all.find(x=>x.provider===prov&&x.vision); if(l) return {id:l.id,label:l.label,vision:true}; }
+    const cur=window.PAChat&&typeof window.PAChat.lane==='function'?window.PAChat.lane():null; if(!cur) return null;
+    const known=all.find(x=>x.id===cur.id); return {id:cur.id,label:cur.label,vision:!!(known&&known.vision)};
+  }
+  const tsOf=it=>Number(it&&(it.created||it.updated))||0;
+  // The pages with important ink among the rows' files, newest row first, then page order; capped.
+  function pick(pages,rows){
+    const ts=new Map(); for(const it of rows||[]) if(it&&it.doc&&typeof it.doc.path==='string') ts.set(it.doc.path,Math.max(ts.get(it.doc.path)||0,tsOf(it)));
+    const all=(pages||[]).filter(pg=>pg&&pg.inkImportant===true&&typeof pg.path==='string'&&ts.has(pg.path))
+      .map(pg=>({path:pg.path,scope:typeof pg.scope==='string'?pg.scope:'',page:Number(pg.page)||0,ts:ts.get(pg.path)}))
+      .sort((a,b)=>b.ts-a.ts||a.path.localeCompare(b.path)||a.page-b.page);
+    return {pages:all.slice(0,PAGE_IMAGES_MAX),total:all.length};
+  }
+  // The plan and its words for the confirm line ('' when nothing is to be sent as a picture); a year scope plans none.
+  function plan(o){
+    const q=o||{}, l=lane(), p=YEAR_KEYS.includes(q.key)?{pages:[],total:0}:pick(q.pages,q.rows); let line='';
+    if(p.total&&l&&!l.vision) line=' · '+fill(TXT.textOnly,{lane:l.label});
+    else if(p.total){ line=' · '+fill(TXT.images,{n:p.pages.length}); if(p.total>p.pages.length) line+=' ('+fill(TXT.cap,{n:PAGE_IMAGES_MAX})+')'; }
+    return {pages:l&&l.vision?p.pages:[],total:p.total,lane:l,line};
+  }
+  // The node renders each page; one failure fails the send (said by the caller, R5) — a summary that
+  // silently lost its pictures would be the inaccuracy this exists to remove.
+  async function fetch(pages){
+    if(!(window.PAStore&&typeof window.PAStore.ask==='function')) return {ok:false,images:[],error:TXT.noBroker};
+    const images=[];
+    for(const pg of pages||[]){
+      let r; try{ r=await window.PAStore.ask({kind:'note-page-image',path:pg.path,scope:pg.scope||'',page:pg.page||0}); }catch(e){ r={ok:false,error:String((e&&e.message)||e)}; }
+      if(!r||!r.ok||typeof r.path!=='string') return {ok:false,images,error:(r&&(r.error||r.text))||'no image · 无图片'};
+      images.push({name:r.path.slice(r.path.lastIndexOf('/')+1),path:r.path});
+    }
+    return {ok:true,images};
+  }
+  window.PASummaryImages={lane,pick,plan,fetch,PROMPT,TXT,PAGE_IMAGES_MAX,SUMMARY_LANE_PREF,YEAR_KEYS};
+})();
+</script>

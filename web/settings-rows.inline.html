@@ -1,0 +1,72 @@
+<!-- PASettingsRows — the tick-box rows at the top of the app Settings dialog (PASettings), each one a
+     boolean key in the app's Preferences (JSON). Carried by settings-ui (its PA_SETTINGS_ROWS marker),
+     registered in web.mjs PA_COMPONENTS after it.
+     WHY HERE. A setting has ONE place (owner 2026-11-12): the ⚙ dialog, stored on the account in
+     appPrefs[slug], so every device follows it. A row is shown only when the page has what it is
+     about (when()), never by a slug list: "Open AI notes with the note" needs PANote on the page,
+     which is the Journal and the Bible.
+     THE JSON BOX STAYS THE SOURCE. A tick rewrites the box's JSON (true sets the key, off removes it:
+     false is the default); typing in the box re-ticks; Save sends the box once, as before. A tick
+     while the box holds invalid JSON is undone: the dialog already shows that parse error (R5), and
+     writing over text the owner is mid-way through would lose it.
+       PASettingsRows.mount(bd, jTa) → {sync()} or null (no row applies). Driven by
+       test/settings-rows.test.mjs over the real settings-ui. -->
+<style id="pagr-style">
+.pag-chk{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;user-select:none}
+.pag-tipsreset{display:inline-block;font-size:12px;color:var(--accent,#0f6355);margin-top:4px}
+.pag-chk input{width:16px;height:16px;margin:0;accent-color:var(--accent,#0f6355)}
+</style>
+<script id="pagr-script">
+(function(){
+  if(window.PASettingsRows) return;
+  const ROWS=[
+    { key:'openAi', label:'Open AI notes with the note · 打开笔记时显示 AI 对话',
+      hint:'Off: a note opens alone; ✨ opens its AI · 关闭时笔记单独打开；✨ 打开 AI',
+      when:()=>!!(window.PANote&&typeof window.PANote.prefs==='function'),
+      tip:'New: open a note together with its AI notes · 新功能：打开笔记时一并显示 AI 对话' },
+  ];
+  // "Show tips again": removes tipsSeen from the box, so Save brings the first-use tips back (ADR 0030).
+  const RESET={ key:'tipsSeen', label:'Show tips again · 重新显示提示', done:'Tips will show again after Save · 保存后将重新显示提示', when:()=>!!window.PATips };
+  function el(tag,cls,text){ const n=document.createElement(tag); if(cls) n.className=cls; if(text!=null) n.textContent=text; return n; }
+  // The box's JSON as an object, or null when it is not one (the dialog reports why).
+  function parse(t){
+    const s=String(t||'').trim(); if(!s) return {};
+    try{ const v=JSON.parse(s); return v&&typeof v==='object'&&!Array.isArray(v)?v:null; }
+    catch(_){ return null; }   // not an error here: settings-ui's own input check shows the parse error (R5)
+  }
+  // A text link, not a button (minimal UI): drops tipsSeen from the box; an invalid box is left alone (its error shows).
+  function resetLink(jTa){
+    const a=el('a','pag-tipsreset',RESET.label); a.href='#';
+    a.addEventListener('click',e=>{ if(e&&e.preventDefault) e.preventDefault();
+      const p=parse(jTa.value); if(!p) return;
+      delete p[RESET.key]; jTa.value=Object.keys(p).length?JSON.stringify(p,null,2):'';
+      a.textContent=RESET.done; });
+    return a;
+  }
+  function mount(bd,jTa){
+    const rows=ROWS.filter(r=>r.when()), reset=RESET.when();
+    if(!rows.length&&!reset) return null;
+    const sec=el('div','pag-sec');
+    const boxes=rows.map(r=>{
+      const lab=el('label','pag-chk'), cb=el('input');
+      cb.type='checkbox'; cb.checked=false;
+      lab.appendChild(cb); lab.appendChild(el('span','',r.label));
+      sec.appendChild(lab); sec.appendChild(el('div','pag-hint',r.hint));
+      cb.addEventListener('change',()=>{
+        const p=parse(jTa.value);
+        if(!p){ cb.checked=!cb.checked; return; }
+        if(cb.checked) p[r.key]=true; else delete p[r.key];
+        jTa.value=Object.keys(p).length?JSON.stringify(p,null,2):'';
+      });
+      if(r.tip&&window.PATips) window.PATips.register({id:'settings-'+r.key,anchor:()=>lab,text:r.tip});   // first-use tip (ADR 0030)
+      return {r,cb};
+    });
+    if(reset) sec.appendChild(resetLink(jTa));
+    bd.appendChild(sec);
+    function sync(){ const p=parse(jTa.value); if(p) boxes.forEach(b=>{ b.cb.checked=p[b.r.key]===true; }); if(window.PATips) window.PATips.check(); }
+    jTa.addEventListener('input',sync);
+    return {sync};
+  }
+  window.PASettingsRows={mount,ROWS,RESET};
+})();
+</script>

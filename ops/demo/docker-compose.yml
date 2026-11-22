@@ -1,0 +1,67 @@
+# superelf public demo · 公开演示 — lives at ~/sandbox/superelf-demo on the VM (rebuild-demo.sh).
+# Project name is fixed so it can never collide with another project.
+# NO published ports: cloudflared reaches superelf over the compose network only, so ports
+# 80/443/8448 on the host stay untouched, and cf-connecting-ip is always Cloudflare's.
+name: superelf-demo
+services:
+  superelf:
+    build: { context: ../.., dockerfile: ops/demo/Dockerfile }
+    image: superelf-demo:latest
+    hostname: superelf-demo
+    user: "10001:10001"
+    restart: unless-stopped
+    environment:
+      OLLAMA_API_KEY: ${OLLAMA_API_KEY:?set OLLAMA_API_KEY in .env}
+      SUPERELF_DEMO: "1"   # demo mode whatever config.json says (lib/demo-quota.mjs demoOn)
+      DEMO_DISK_MAX_GB: ${DEMO_DISK_MAX_GB:-20}   # entrypoint.sh: /data larger than this is not the capped disk
+    volumes:
+      - ${DEMO_DATA_DIR:-./data}:/data
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 1g
+    logging: { driver: local, options: { max-size: 10m, max-file: "3" } }
+    pids_limit: 256
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/api/build').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    networks: [demo]
+  cloudflared:
+    image: cloudflare/cloudflared:2025.11.1
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?set TUNNEL_TOKEN in .env}
+    restart: unless-stopped
+    logging: { driver: local, options: { max-size: 10m, max-file: "3" } }
+    depends_on: [superelf]
+    networks: [demo]
+  # One-shot: nightly backup (superelf-demo-backup.timer) and restore (rebuild-demo.sh).
+  # Root inside, so it can read the root-only passphrase file; started only on demand. It runs the
+  # IMAGE's scripts (/opt/superelf), never the copies on the data volume the web process can
+  # write, and with backup_extra off, so nothing the web side controls runs as root here.
+  backup:
+    image: superelf-demo:latest
+    profiles: [backup]
+    hostname: superelf-demo
+    entrypoint: ["/bin/bash"]
+    command: ["/opt/superelf/backup.sh"]
+    environment:
+      RCLONE_CONFIG: /config/rclone/rclone.conf
+      SUPERELF_NODE_DIR: /data/superelf
+      SUPERELF_BACKUP_EXTRA: "off"
+      SUPERELF_BACKUP_DIR: ${BACKUP_REMOTE:-gdrive:superelf-demo-backups}
+      SUPERELF_BACKUP_KEEP: ${BACKUP_KEEP:-7}
+      SUPERELF_BACKUP_PASS_FILE: /run/secrets/backup-pass
+      SUPERELF_REQUIRE_MARKER: /data/.superelf-demo-disk
+      SUPERELF_BUSY_MARKER: /data/.restoring
+      TMPDIR: /data/.tmp   # archives staged on the capped disk, never Docker's host-backed layer
+    volumes:
+      - ${DEMO_DATA_DIR:-./data}:/data
+      - ${BACKUP_PASS_FILE:-/etc/superelf-demo/backup-pass}:/run/secrets/backup-pass:ro
+      - ${RCLONE_CONFIG_DIR:-/etc/superelf-demo/rclone}:/config/rclone
+networks:
+  demo: {}

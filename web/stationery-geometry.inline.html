@@ -1,0 +1,114 @@
+<!-- PAStationeryGeometry · 信纸几何 — what the render-cost budget READS from a design: plain lengths, lists, transforms
+     and their stretch, dashes, widths, and each shape's length, box, segments and edges. Split out of stationery-cost
+     (R4), which carries it ABOVE its own script. Every reader returns an UPPER bound; a value it cannot read is the
+     worst case (Infinity), never a guess. -->
+<script>
+window.PAStationeryGeometry=(function(){
+  'use strict';
+  // ── The page (R3: one source) ───────────────────────────────────────────────────────────
+  const PAGE_W=816, PAGE_H=1056;                // PANote's US-Letter page in CSS px
+  const WS='[ \\t\\n\\r]';                         // CSS whitespace: NOT \s, which also matches a no-break space (the sanitizer's words use it too)
+  const NONE=new RegExp('^'+WS+'*none'+WS+'*$','i');   // only 'none' stops a paint or a dash; CSS whitespace only
+  const attr=(n,k)=>{ const a=n.attrs.find(x=>x[0]===k); return a?a[1]:null; };
+  // ── Values read for the PAINT price. Every reader returns an UPPER bound: a value it cannot read is the
+  //    worst case (Infinity), never a guess, so a form Chromium reads and this does not is over-counted. ──
+  const NUM='[+-]?(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?';
+  const SEP='(?:'+WS+'|,)';                     // what separates the numbers of a list: CSS whitespace or a comma
+  const LIST=new RegExp(SEP+'+'), REST=new RegExp('^'+SEP+'*$');   // a run of separators; nothing but separators
+  const list=(v)=>v.split(LIST).filter(Boolean);
+  const viewBoxOf=(v)=>list(String(v||'')).map(Number);   // the sanitizer's viewBox rule reads it the same way (CSS whitespace or commas)
+  const LEN=new RegExp('^'+WS+'*('+NUM+')(?:px)?'+WS+'*$');
+  const len=(v,d)=>{ if(v==null) return d; const m=LEN.exec(v); return m?Number(m[1]):NaN; };   // user units; NaN for 50%, 2em, auto
+  const INHERIT=new RegExp('^'+WS+'*inherit'+WS+'*$','i'), inherits=(v)=>v==null||INHERIT.test(v);
+  const atLeast1=(s)=>s>1?s:s<=1?1:Infinity;                                             // NaN is the worst case
+  // Dashes per user unit: n lengths summing to S draw n/(2S) (an odd list repeats once: the same ratio).
+  function dashOf(v){
+    if(inherits(v)) return -1; if(NONE.test(v)) return 0;
+    const w=list(v).map((x)=>len(x,NaN));
+    if(!w.length||!w.every((x)=>x>=0)) return Infinity;
+    const S=w.reduce((a,b)=>a+b,0); return S>0?w.length/(2*S):0;
+  }
+  const widthOf=(v)=>{ if(inherits(v)) return -1; const w=len(v,NaN); return w>=0?w:Infinity; };
+  // The most a transform list can stretch a length (each step's largest singular value), at least 1 per
+  // step: a shrink is never counted, so the bound holds whichever steps Chromium honours.
+  const STEP=new RegExp(SEP+'*(matrix|translate|scale|rotate|skewX|skewY)'+WS+'*\\(([^()]*)\\)','y');
+  function stretch(v){
+    if(v==null) return 1; let i=0, f=1;
+    for(;;){ STEP.lastIndex=i; const m=STEP.exec(v); if(!m) break; i=STEP.lastIndex;
+      const a=list(m[2]).map(Number), [p,q,r,t]=a; let s=1;
+      if(!a.every(isFinite)) return Infinity;
+      if(m[1]==='scale') s=Math.max(Math.abs(p),Math.abs(a.length>1?q:p));
+      else if(m[1]==='matrix'){ const F=p*p+q*q+r*r+t*t, D=p*t-q*r; s=Math.sqrt((F+Math.sqrt(Math.max(0,F*F-4*D*D)))/2); }
+      else if(m[1][0]==='s'){ const k=Math.tan(p*Math.PI/180); s=(Math.abs(k)+Math.sqrt(k*k+4))/2; }   // skewX, skewY
+      f*=atLeast1(s); }
+    return REST.test(v.slice(i))?f:Infinity;
+  }
+  // What an element stretches: its transform, a pattern's patternTransform, a viewBox (the root's maps onto the page),
+  // a <use> that sets width/height (it resizes an <svg>).
+  function ownStretch(n,root){
+    let f=stretch(attr(n,'transform'));
+    if(n.name==='use'&&(attr(n,'width')!=null||attr(n,'height')!=null)) return Infinity;
+    if(n.name==='pattern') f*=stretch(attr(n,'patternTransform'));
+    const vb=attr(n,'viewBox'); if(vb==null||n.name!=='svg'&&n.name!=='pattern') return f;
+    const b=viewBoxOf(vb);
+    if(n===root) return f*atLeast1(PAGE_W/b[2]);
+    if(n.name==='pattern'&&attr(n,'patternUnits')!=='userSpaceOnUse') return Infinity;
+    return f*atLeast1(Math.max(len(attr(n,'width'),NaN)/b[2],len(attr(n,'height'),NaN)/b[3]));
+  }
+  // ── Geometry: upper bounds on a shape's length, box (w, h), segments and edges, in its own units. A curve is no
+  //    longer than its control polygon; an arc (radii scaled up when too small, as SVG does) no longer than 2*pi*R
+  //    and within 2R of its start (R the larger radius). Unknown is Infinity (geomOf). ──
+  const ARGS=Object.assign(Object.create(null),{m:2,l:2,t:2,h:1,v:1,c:6,s:4,q:4,a:7,z:0});
+  const TOK=new RegExp(SEP+'*(?:([A-Za-z])|('+NUM+'))','y'), FLAG=new RegExp(SEP+'*([01])','y'), TOKENS=new RegExp('[A-Za-z]|'+NUM,'g');
+  // How often one segment can cross a scanline (a line once, a quadratic or an arc twice, a cubic 3 times), and
+  // how many straight edges Skia may cut it into (a curve up to 64; an arc is up to 4 curves).
+  const CROSS=Object.assign(Object.create(null),{m:0,l:1,h:1,v:1,z:1,q:2,t:2,a:2,c:3,s:3});
+  const LINES=Object.assign(Object.create(null),{m:0,l:1,h:1,v:1,z:1,q:64,t:64,a:256,c:64,s:64});
+  // Data that cannot be read is endless and page-sized; each of its tokens may still be one arc.
+  const unread=(d)=>{ const T=(d.match(TOKENS)||[]).length; return {len:Infinity, w:Infinity, h:Infinity, segs:T, cross:3*T, lines:256*T}; };
+  function pathGeom(d){
+    const a=[]; let i=0, c='', o=false, n=0, k=0, x=0, y=0, sx=0, sy=0, cx=0, cy=0, qx=0, qy=0, L=0, x0=Infinity, y0=Infinity, x1=-Infinity, y1=-Infinity, S=0, X=0, N=0;
+    const at=(px,py)=>{ if(px<x0) x0=px; if(px>x1) x1=px; if(py<y0) y0=py; if(py>y1) y1=py; };
+    const leg=(px,py)=>{ L+=Math.hypot(px-x,py-y); at(px,py); x=px; y=py; };   // one leg of the control polygon
+    for(;;){
+      if(c==='a'&&(k===3||k===4)){ FLAG.lastIndex=i; const m=FLAG.exec(d); if(!m) return unread(d); a[k++]=+m[1]; i=FLAG.lastIndex; }
+      else { TOK.lastIndex=i; const m=TOK.exec(d); if(!m) break; i=TOK.lastIndex;
+        if(m[1]){ const l=m[1].toLowerCase(); if(k||ARGS[l]===undefined) return unread(d); o=m[1]===l; c=l; n=ARGS[l];
+          if(!n){ leg(sx,sy); S++; X++; N++; c=''; cx=qx=x; cy=qy=y; } continue; }   // z closes; a number may not follow it
+        if(!n) return unread(d); a[k++]=Number(m[2]); }
+      if(k<n) continue; k=0; S+=c==='m'?0:1; X+=CROSS[c]; N+=LINES[c];
+      const ox=o?x:0, oy=o?y:0, lx=2*x-cx, ly=2*y-cy, kx=2*x-qx, ky=2*y-qy;   // S and T reflect the last control point
+      if(c==='m'){ x=sx=ox+a[0]; y=sy=oy+a[1]; at(x,y); c='l'; }               // more pairs after a move are lines
+      else if(c==='l') leg(ox+a[0],oy+a[1]);
+      else if(c==='h') leg(ox+a[0],y);
+      else if(c==='v') leg(x,oy+a[0]);
+      else if(c==='c'){ leg(ox+a[0],oy+a[1]); leg(ox+a[2],oy+a[3]); leg(ox+a[4],oy+a[5]); }
+      else if(c==='s'){ leg(lx,ly); leg(ox+a[0],oy+a[1]); leg(ox+a[2],oy+a[3]); }
+      else if(c==='q'){ leg(ox+a[0],oy+a[1]); leg(ox+a[2],oy+a[3]); }
+      else if(c==='t'){ leg(kx,ky); leg(ox+a[0],oy+a[1]); }
+      else { const rx=Math.abs(a[0]), ry=Math.abs(a[1]), px=ox+a[5], py=oy+a[6], h=a[2]*Math.PI/180, co=Math.cos(h), si=Math.sin(h);
+        const ux=(co*(x-px)+si*(y-py))/2, uy=(co*(y-py)-si*(x-px))/2, lam=ux*ux/(rx*rx)+uy*uy/(ry*ry), R=Math.max(rx,ry)*(lam>1?Math.sqrt(lam):1);
+        if(rx&&ry){ L+=2*Math.PI*R; at(x-2*R,y-2*R); at(x+2*R,y+2*R); } leg(px,py); }
+      cx=c==='c'?ox+a[2]:c==='s'?ox+a[0]:x; cy=c==='c'?oy+a[3]:c==='s'?oy+a[1]:y;
+      qx=c==='q'?ox+a[0]:c==='t'?kx:x; qy=c==='q'?oy+a[1]:c==='t'?ky:y;
+    }
+    if(k||!REST.test(d.slice(i))) return unread(d);   // an unfinished command, or text that is not path data
+    return x0>x1?{len:0, w:0, h:0, segs:0, cross:0, lines:0}:{len:L, w:x1-x0, h:y1-y0, segs:S, cross:X, lines:N};   // no point: nothing drawn
+  }
+  function geomOf(n,G){
+    if(G.has(n)) return G.get(n);
+    const g=(k)=>Math.abs(len(attr(n,k),0)), N=n.name; let r;
+    if(N==='rect'){ const o=attr(n,'rx')!=null||attr(n,'ry')!=null;   // rounded: 4 sides and 4 arcs
+      r={len:2*(g('width')+g('height')), w:g('width'), h:g('height'), segs:o?8:4, cross:2, lines:o?260:4}; }
+    else if(N==='circle') r={len:2*Math.PI*g('r'), w:2*g('r'), h:2*g('r'), segs:4, cross:2, lines:256};
+    else if(N==='ellipse') r={len:2*Math.PI*Math.max(g('rx'),g('ry')), w:2*g('rx'), h:2*g('ry'), segs:4, cross:2, lines:256};
+    else if(N==='line'){ const w=Math.abs(len(attr(n,'x2'),0)-len(attr(n,'x1'),0)), h=Math.abs(len(attr(n,'y2'),0)-len(attr(n,'y1'),0)); r={len:Math.hypot(w,h), w, h, segs:1, cross:1, lines:1}; }
+    else if(N==='path') r=pathGeom(attr(n,'d')||'');
+    else { const v=attr(n,'points')||'', p=list(v).map(Number), m=p.length>>1;   // polyline, polygon
+      r=p.every(isFinite)?pathGeom(m?'M'+p.slice(0,2*m).join(' ')+(N==='polygon'?'Z':''):''):unread(v); }
+    const known=(v)=>v>=0?v:Infinity; r.len=known(r.len); r.w=known(r.w); r.h=known(r.h);   // a NaN (50%, 1e309 - 1e309) is the worst case
+    G.set(n,r); return r;
+  }
+  return { PAGE_W, PAGE_H, WS, NONE, attr, viewBoxOf, inherits, dashOf, widthOf, ownStretch, geomOf };
+})();
+</script>

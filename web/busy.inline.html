@@ -1,0 +1,24 @@
+<script>
+// PABusy — "is there unsaved work on this page?"（有未保存的工作吗）, asked by the shell before it
+// reloads itself for a new build (web/update.js, docs/adr/0026).
+// No app carries its marker: web.mjs (sendAppHtml) puts PA_BUSY_UI ahead of the first script of
+// EVERY served app page, after PA. The shell posts {kind:'pa-busy?'}; this answers
+// {kind:'pa-busy', busy} where busy is true if ANY registered watcher says so. PANote registers its
+// save guard's `unsaved` and PAChat a streaming turn — one `PABusy.watch(fn)` call each.
+// A watcher that throws counts as busy: it cannot prove the page idle (fail closed). The shell
+// treats no answer within 500 ms the same way.
+// `var`, and kept if already present, so the page answers once even if the marker appears twice.
+// Unit-tested by test/busy.test.mjs; the shell's side by test/shell-update.test.mjs.
+var PABusy = PABusy || (function () {
+  'use strict';
+  const QUERY = 'pa-busy?', ANSWER = 'pa-busy';
+  const watchers = [];
+  const busy = () => watchers.some((fn) => { try { return !!fn(); } catch (_) { return true; /* cannot prove idle */ } });
+  addEventListener('message', function (e) {
+    const m = e.data;
+    if (e.source !== parent || !m || m.kind !== QUERY) return;
+    parent.postMessage({ kind: ANSWER, busy: busy() }, '*');
+  });
+  return Object.freeze({ watch: (fn) => { if (typeof fn === 'function') watchers.push(fn); }, busy });
+})();
+</script>

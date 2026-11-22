@@ -1,0 +1,16 @@
+{
+  "title": "Journal 手写",
+  "desc": "Apple Pencil handwriting journal · vector ink, multi-page",
+  "shared": true,
+  "sharedBy": "owner",
+  "version": "1.0.0",
+  "gitRef": "109816a7eb05131e3ac7d4d30793854eff105b89",
+  "promotedAt": "2026-09-21T16:35:03.371Z",
+  "promotedFrom": {
+    "uid": "owner",
+    "slug": "notes"
+  },
+  "files": {
+    "index.html": "fada070c423d"
+  }
+}

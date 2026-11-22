@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd service for web.mjs · macOS 服务模板
+
+  This file is a TEMPLATE. install.sh substitutes the four __PLACEHOLDERS__ and writes the result
+  to ~/Library/LaunchAgents/com.superelf.web.plist. Do not install this file as-is.
+
+  Why it exists: start.sh has always required this plist and pointed at "the docs" for it, but no
+  plist and no such doc were ever in the repo — so a fresh clone could not start on macOS either.
+  The working copy on the author's machine was the only one in existence.
+
+  KeepAlive is true, not a crash-only restart, and that is deliberate: POST /api/admin/restart
+  exits with code 0 (web.mjs), so a supervisor that only restarts on FAILURE would treat Restart
+  as "it meant to stop" and leave the node down. launchd respawns on any exit, which is what the
+  Restart button in Settings depends on. The Windows side reproduces this with a supervisor loop
+  (run.ps1), and Linux with Restart=always in the systemd unit, for exactly the same reason.
+
+  PATH must be spelled out. A launchd agent does not get a login shell, so nvm's shims and
+  ~/.local/bin are absent — and `claude` must be on PATH or every agent turn fails with ENOENT.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.superelf.web</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__NODE__</string>
+    <string>__ROOT__/web.mjs</string>
+  </array>
+  <key>WorkingDirectory</key><string>__ROOT__</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>__PATH__</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>__LOG__</string>
+  <key>StandardErrorPath</key><string>__LOG__</string>
+</dict>
+</plist>

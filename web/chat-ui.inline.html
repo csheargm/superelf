@@ -1,0 +1,1554 @@
+<!-- PAChat — the ONE canonical mini-app chat UI. Single source of truth.
+     Inlined into any app HTML at serve time wherever the PA_CHAT_UI marker appears
+     (web.mjs). The sandbox CSP is `script-src 'unsafe-inline'` with no 'self',
+     so a shared chat UI CANNOT be a <script src>; serve-time inlining of this
+     one file is the only way to single-source it (see docs/adr). It talks to the
+     shell through the same broker every app uses (kind: chat/convo/render-md/upload),
+     so the backend pipeline, streaming, history and upload are all reused, not copied.
+     Usage in an app:
+       <div id="mychat"></div>            (any container, gets height:100%)
+       PA_CHAT_UI                         (the HTML-comment marker, once in <body>)
+       <script> const c = PAChat.mount(document.getElementById('mychat'), {
+                  placeholder, greeting, contextPrefix, getConvoId, setConvoId, onConvo });
+                c.open('some-key');        // load/switch a conversation thread
+       </script>
+-->
+<!-- PAPhoto comes WITH PAChat. The composer's ＋ is a photo path, and four surfaces used to
+     carry four different versions of "pick, read, check the size, upload" — only one of which
+     knew the real cap. web.mjs walks PA_COMPONENTS in order and re-tests the ALREADY INLINED
+     html for each remaining marker, so registering PA_PHOTO_UI after chat-ui is what makes the
+     line below resolve, and every app that mounts PAChat gets the shared path with no per-app
+     edit. Double-inlining is a no-op (photo-ui.inline.html guards on window.PAPhoto). -->
+<!--PA_PHOTO_UI-->
+<style id="pac-style">
+/* --pac-pill = the room the log keeps clear at its bottom for the floating composer. The
+   measured value (setPill → an INLINE --pac-pill on this same element) wins; this rule is what
+   holds until a real measurement lands, and a hidden surface measures 0 forever if nothing
+   re-measures. So it is DERIVED from the composer's own box, not guessed:
+     8 pad-top + 0 chips(empty) + 6 gap + 22.4 pills + 6 gap + 40 composer + 10 pad-bottom = 92.4
+     + 12 breathing room (== PAC_PILL_GAP in the script below), rounded up            → 106
+   plus the home-indicator inset, written with the SAME env() .pac-row's own bottom padding
+   uses so the reservation and the thing reserved for can never disagree at any inset.
+   SCAR (iPhone screenshot): this was a flat 84px that predated the pills row and ignored the
+   inset — on a 390x844 iPhone (34px inset) it reserved 84 against a 126.4px composer, so the
+   last message's ✎/⧉ action icons sat 42px underneath the model pill. Every rule below reads
+   the variable with NO fallback of its own: one number, defined once, here.
+   test/chat-pill-reserve.test.mjs recomputes all of this from these very declarations. */
+/* --pac-fs: ONE definition of the chat's reading size (R3), so A-/A+ reaches the chat too.
+   The shell broadcasts the user's scale as {pa:'prefs', fontScale}; web.mjs turns it into either
+   `zoom` (apps sized in absolute px — everything scales for free) or `--fs` (apps that mount
+   PANote, whose canvas coordinates come from a MEASURED width, so zoom would re-lay the page out
+   instead of magnifying it). This component was written in absolute px and consumed NEITHER, so
+   in a --fs app — the Bible — A-/A+ resized the scripture and left the chat beside it unchanged.
+   Only READING text scales. Icons and round buttons keep their px so the composer row and the
+   scroll pill do not deform at 1.5x; a bigger tap target is not what A+ is asking for. */
+.pac{position:relative;display:flex;flex-direction:column;height:100%;min-height:0;--pac-pill:calc(106px + env(safe-area-inset-bottom,0px));--pac-fs:calc(14px * var(--fs,1))}
+/* Full-screen host for PAChat.fullscreen(): fixed, full-height, own bottom safe-area.
+   Owning this here keeps every app's "Ask AI" identical. */
+.pac-fs{position:fixed;inset:0;z-index:50;background:var(--card,#fff);display:none}
+.pac-fs.on{display:block}
+/* Host for PAChat.listDrawer()/the ☰ list: a transparent fixed layer the slide-in .pac-list +
+   .pac-backdrop live in. pointer-events:none while closed so the app underneath stays usable.
+   Below 640px .on makes it live (overlay+backdrop); at ≥640px it DOCKS and is re-neutralized to
+   pointer-events:none (see #pac-dock-style / dockOn) so the pushed app on the right stays usable. */
+.pac-drawerhost{position:fixed;inset:0;z-index:60;pointer-events:none}
+.pac-drawerhost.on{pointer-events:auto}
+.pac-log{flex:1;overflow-y:auto;padding:10px 12px var(--pac-pill);display:flex;flex-direction:column;gap:8px;scroll-padding-bottom:var(--pac-pill)}
+.pac-m{max-width:82%;padding:8px 11px;border-radius:13px;font-size:var(--pac-fs,14px);line-height:1.5;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere}
+.pac-m.me{align-self:flex-end;background:var(--accent,#0a7a5a);color:#fff;border-bottom-right-radius:4px}
+.pac-m.ai{align-self:flex-start;background:var(--card,#fff);border:1px solid var(--line,#e6e6e6);color:var(--text,#111);border-bottom-left-radius:4px}
+.pac-m.status{align-self:flex-start;background:none;border:none;color:var(--muted,#888);font-size:calc(var(--pac-fs,14px) * .86);padding:2px 4px;max-width:100%}
+.pac-m img{max-width:min(200px,60%);max-height:200px;border-radius:8px;border:1px solid var(--line,#e6e6e6);margin-top:5px;display:block;cursor:zoom-in}
+.pac-lb{position:fixed;inset:0;background:rgba(0,0,0,.9);display:none;align-items:center;justify-content:center;z-index:1000;padding:16px;cursor:zoom-out}
+.pac-lb.on{display:flex}
+.pac-lb img{max-width:100%;max-height:100%;object-fit:contain;border-radius:6px}
+/* Rendered markdown opts OUT of the bubble's pre-wrap. .pac-m is white-space:pre-wrap so a typed
+   message and a still-streaming raw chunk keep their line breaks — but rendered HTML carries
+   newlines BETWEEN block tags, and pre-wrap paints every one of them as a blank line ON TOP of
+   the block margins. Measured on a real reply: 351px of bubble for 143px of content — 59% of the
+   height was source newlines. The shell's own chat already scopes pre-wrap to .me/.status/.stream
+   for this reason; this brings PAChat in line. The class is set only where rendered HTML is
+   actually installed, so the plain-text fallback keeps its line breaks. */
+.pac-m.pac-md{white-space:normal}
+.pac-m.ai p{margin:.35em 0}.pac-m.ai p:first-child{margin-top:0}.pac-m.ai p:last-child{margin-bottom:0}
+/* A nested list was doubling the gap — the outer li already spaces it. */
+.pac-m.ai li{margin:.1em 0}.pac-m.ai li>ul,.pac-m.ai li>ol{margin:.15em 0}
+.pac-m.ai pre{white-space:pre-wrap;background:rgba(127,127,127,.14);padding:6px 8px;border-radius:6px;overflow-x:auto;font-size:calc(var(--pac-fs,14px) * .93)}
+.pac-m.ai code{background:rgba(127,127,127,.16);padding:1px 4px;border-radius:4px;font-size:calc(var(--pac-fs,14px) * .93)}
+.pac-m.ai pre code{background:none;padding:0}
+.pac-m.ai a{color:var(--accent,#0a7a5a)}
+.pac-m.ai ul,.pac-m.ai ol{margin:.35em 0;padding-left:1.3em}
+.pac-m.ai h1,.pac-m.ai h2,.pac-m.ai h3{margin:.4em 0;font-size:1.05em}
+.pac-m.ai table{border-collapse:collapse;font-size:12.5px;margin:.5em 0;display:block;overflow-x:auto;max-width:100%}
+.pac-m.ai th,.pac-m.ai td{border:1px solid var(--line,#e6e6e6);padding:4px 8px;text-align:left;vertical-align:top}
+.pac-m.ai th{background:rgba(127,127,127,.1);font-weight:600;white-space:nowrap}
+.pac-acts{display:flex;gap:1px;margin-top:-3px}
+.pac-acts.me{align-self:flex-end}.pac-acts.ai{align-self:flex-start}
+.pac-ab{background:none;border:none;color:var(--muted,#888);font-size:13px;cursor:pointer;padding:3px 6px;border-radius:6px;line-height:1;opacity:.7}
+.pac-ab:active{background:color-mix(in srgb,var(--accent,#0a7a5a) 14%,transparent)}
+.pac-ab.on{color:var(--accent,#0a7a5a);opacity:1}
+.pac-scroll{position:absolute;bottom:var(--pac-pill);left:50%;transform:translateX(-50%);width:34px;height:34px;border-radius:50%;background:var(--card,#fff);border:1px solid var(--line,#e6e6e6);color:var(--text,#111);font-size:16px;cursor:pointer;display:none;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.18);z-index:6}
+.pac-scroll.show{display:flex}
+.pac-chips{display:flex;flex-wrap:wrap;gap:6px}.pac-chips:not(:empty){padding:0 2px 6px}
+.pac-chip{position:relative;width:50px;height:50px;border-radius:8px;overflow:hidden;border:1px solid var(--line,#e6e6e6)}
+.pac-chip img{width:100%;height:100%;object-fit:cover}
+.pac-chip button{position:absolute;top:0;right:0;background:rgba(0,0,0,.55);color:#fff;border:none;width:18px;height:18px;font-size:11px;cursor:pointer}
+/* Floating composer: transparent container fixed at the bottom, the pill carries the
+   surface, and the log flows underneath to the physical bottom — no dead white bar. */
+.pac-row{position:absolute;left:0;right:0;bottom:0;display:flex;flex-direction:column;gap:6px;padding:8px 12px calc(10px + env(safe-area-inset-bottom,0px));background:transparent;pointer-events:none;z-index:4}
+.pac-row>*{pointer-events:auto}
+.pac-frow{display:flex;align-items:flex-end;gap:4px;background:var(--bg,#f4f4f5);border:1px solid var(--line,#e6e6e6);border-radius:20px;padding:2px 4px;box-shadow:0 2px 12px rgba(0,0,0,.22)}
+.pac-plus{background:none;border:none;color:var(--muted,#888);font-size:20px;width:30px;height:34px;cursor:pointer;flex-shrink:0}
+.pac-inp{flex:1;font:inherit;font-size:var(--pac-fs,14px);padding:7px 8px;border:none;background:transparent;color:var(--text,#111);outline:none;resize:none;max-height:120px;line-height:1.4;overflow-y:auto}
+.pac-go{background:var(--accent,#0a7a5a);color:#fff;border:none;border-radius:50%;width:34px;height:34px;padding:0;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;flex-shrink:0}
+.pac-go:disabled{opacity:.4;cursor:default}
+.pac-top{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line,#e6e6e6);flex-shrink:0}
+.pac-tbtn{display:flex;align-items:center;gap:4px;color:var(--accent,#0a7a5a);font-size:13px;font-weight:600;background:color-mix(in srgb,var(--accent,#0a7a5a) 12%,transparent);border:none;border-radius:8px;padding:6px 10px;cursor:pointer}
+.pac-title{flex:1;font-size:var(--pac-fs,14px);font-weight:600;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text,#111)}
+.pac-new{background:none;border:none;color:var(--accent,#0a7a5a);font-size:20px;cursor:pointer;width:30px;flex-shrink:0}
+/* Sort, Select and Refresh live in the header's ONE ⋯ sheet (owner, 2026-11-11): the header shows
+   ＋, Summarize · 总结 (PADrawerSummary mounts it in .pac-dhead) and ⋯. The sheet names the order in
+   WORDS — a tooltip needs a hover and an iPad has none, and every arrow glyph that means "sort" to
+   one person reads as undo or refresh to another. */
+/* Marks a row whose note already carries a conversation, so "has it been asked about?" is
+   answerable from the list instead of by opening every note in turn. */
+.pac-lai{font-size:11px;line-height:1;opacity:.85}
+.pac-dhead{display:flex;align-items:center;flex-shrink:0}
+.pac-list{position:absolute;top:0;left:0;bottom:0;width:86%;max-width:330px;background:var(--card,#fff);display:flex;flex-direction:column;z-index:8;transform:translateX(-102%);transition:transform .22s ease;box-shadow:2px 0 18px rgba(0,0,0,.22)}
+.pac-list.on{transform:none}
+/* Multi-select · 多选. Deliberately a MODE, not an always-on checkbox column: the drawer's
+   everyday job is opening ONE thing, and a permanent column of boxes beside every row makes the
+   common action look like the rare one. */
+.pac-lbox{width:20px;height:20px;border:1.5px solid var(--line,#e6e6e6);border-radius:5px;
+  flex-shrink:0;align-self:center;margin-right:4px;position:relative}
+.pac-list.pac-multi .pac-lrow .pac-lbox{display:block}
+.pac-list.pac-multi .pac-lrow .pac-lic{display:none}
+.pac-lrow.picked .pac-lbox{background:var(--accent,#0a7a5a);border-color:var(--accent,#0a7a5a)}
+.pac-lrow.picked .pac-lbox::after{content:"✓";position:absolute;inset:0;color:#fff;font-size:13px;line-height:20px;text-align:center}
+.pac-list.pac-multi .pac-lmenu{display:none}
+/* Shift-clicking a list selects text in every browser, which puts a blue smear over the rows
+   being ticked. Only while the mode is on. */
+.pac-list.pac-multi .pac-lrows{-webkit-user-select:none;user-select:none}
+.pac-lbulk{display:none;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--line,#e6e6e6);
+  background:var(--card,#fff);flex-shrink:0}
+.pac-list.pac-multi .pac-lbulk{display:flex}
+.pac-lbulkn{flex:1;font-size:13px;color:var(--muted,#888)}
+.pac-lbulkdel{background:var(--danger,#983d24);color:#fff;border:none;border-radius:8px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+.pac-lbulkdel:disabled{opacity:.45;cursor:default}
+.pac-lbulkx{background:none;border:none;color:var(--muted,#888);font:inherit;font-size:13px;cursor:pointer;padding:6px 8px}
+/* Dimming backdrop for the NARROW (overlay) fallback only; #pac-dock-style hides it at ≥640px
+   where the drawer docks and the app is pushed (not dimmed) beside it. */
+.pac-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .22s;z-index:7}
+.pac-backdrop.on{opacity:1;pointer-events:auto}
+.pac-lsearch{padding:9px 11px;border-bottom:1px solid var(--line,#e6e6e6)}
+.pac-lsearch input{width:100%;font:inherit;font-size:14px;padding:8px 34px 8px 10px;border:1px solid var(--line,#e6e6e6);border-radius:9px;background:var(--bg,#f4f4f5);color:var(--text,#111);outline:none}
+.pac-qwrap{position:relative}
+.pac-qx{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:26px;height:26px;border:0;border-radius:13px;background:var(--line,#d9d9dc);color:var(--text,#111);font-size:18px;line-height:26px;padding:0;cursor:pointer}
+.pac-qx[hidden]{display:none}
+.pac-lrows{flex:1;overflow-y:auto}
+.pac-lday{padding:11px 14px 4px;font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--muted,#888)}
+.pac-lrow{display:flex;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line,#e6e6e6);align-items:flex-start;cursor:pointer}
+.pac-lrow:active{background:color-mix(in srgb,var(--accent,#0a7a5a) 8%,transparent)}
+.pac-lrow.active{background:color-mix(in srgb,var(--accent,#0a7a5a) 12%,transparent)}
+.pac-lic{width:32px;height:32px;border-radius:8px;background:color-mix(in srgb,var(--accent,#0a7a5a) 12%,transparent);color:var(--accent,#0a7a5a);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.pac-lbody{flex:1;min-width:0}
+.pac-lttl{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text,#111)}
+.pac-lprev{font-size:12px;color:var(--muted,#888);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.pac-lmeta{display:flex;gap:7px;margin-top:4px;align-items:center}
+.pac-lsmsg{font-size:12px;color:var(--muted,#888);padding:6px 2px 0}.pac-lsmsg:empty{display:none}
+.pac-lchip{font-size:11px;color:var(--accent,#0a7a5a);background:color-mix(in srgb,var(--accent,#0a7a5a) 12%,transparent);border-radius:5px;padding:1px 6px;font-weight:600}
+.pac-ltime{font-size:11px;color:var(--muted,#888)}
+.pac-lmenu{background:none;border:none;color:var(--muted,#888);font-size:17px;padding:0 6px;cursor:pointer;align-self:center;flex-shrink:0}
+.pac-lempty{padding:26px 18px;color:var(--muted,#888);font-size:14px;text-align:center;line-height:1.6}
+.pac-ltabs{display:flex;gap:6px;padding:8px 11px;border-bottom:1px solid var(--line,#e6e6e6);flex-shrink:0}
+.pac-ltab{flex:1;font:inherit;font-size:13px;font-weight:600;padding:6px 4px;border:1px solid var(--line,#e6e6e6);border-radius:8px;background:var(--bg,#f4f4f5);color:var(--muted,#888);cursor:pointer;text-align:center}
+.pac-ltab.on{background:var(--accent,#0a7a5a);color:#fff;border-color:var(--accent,#0a7a5a)}
+.pac-modal{position:absolute;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:20;padding:22px;pointer-events:auto}
+.pac-mbox{background:var(--card,#fff);border-radius:14px;width:100%;max-width:300px;padding:16px;box-shadow:0 8px 30px rgba(0,0,0,.25)}
+.pac-mttl{font-size:14px;font-weight:600;color:var(--text,#111);margin-bottom:11px}
+.pac-minp{width:100%;font:inherit;font-size:14px;padding:8px 10px;border:1px solid var(--line,#e6e6e6);border-radius:8px;background:var(--bg,#f4f4f5);color:var(--text,#111);outline:none;margin-bottom:12px}
+.pac-mbtns{display:flex;gap:8px;justify-content:flex-end}
+.pac-mbtns button{font:inherit;font-size:13px;font-weight:600;padding:7px 14px;border-radius:8px;border:1px solid var(--line,#e6e6e6);background:var(--bg,#f4f4f5);color:var(--text,#111);cursor:pointer}
+.pac-mbtns .pac-mok{background:var(--accent,#0a7a5a);color:#fff;border:none}
+.pac-mbtns .pac-del{background:#c0392b;color:#fff;border:none}
+.pac-msheet{align-items:flex-end}
+.pac-msheet .pac-mbox{max-width:340px;padding:8px}
+/* Composer pills: model chooser + Verify · 校验 toggle share ONE style (R3) */
+.pac-pills{display:flex;gap:6px;align-self:flex-start}
+.pac-model,.pac-vfy{background:var(--card,#fff);border:1px solid var(--line,#e6e6e6);border-radius:14px;padding:3px 10px;font:inherit;font-size:12px;color:var(--muted,#888);cursor:pointer;box-shadow:0 1px 6px rgba(0,0,0,.12)}
+.pac-model:active,.pac-vfy:active{filter:brightness(.96)}
+.pac-vfy.on{color:var(--accent,#0a7a5a);border-color:var(--accent,#0a7a5a);font-weight:600}
+/* Verify chips on an answered message: pending/timeout notice, then the Fast/Deep view switch */
+.pac-vrow{display:flex;gap:6px;margin-bottom:2px}
+.pac-vchip{font:inherit;font-size:12px;border:1px solid var(--line,#e6e6e6);border-radius:12px;padding:2px 9px;background:var(--card,#fff);color:var(--muted,#888);cursor:pointer}
+.pac-vchip.on{color:var(--accent,#0a7a5a);border-color:var(--accent,#0a7a5a);font-weight:600}
+.pac-vchip.pend{cursor:default;border-style:dashed}
+.pac-mmenu{position:absolute;left:12px;bottom:var(--pac-pill);background:var(--card,#fff);border:1px solid var(--line,#e6e6e6);border-radius:12px;box-shadow:0 6px 22px rgba(0,0,0,.28);padding:5px;z-index:9;min-width:180px}
+.pac-mg{font-size:10px;color:var(--muted,#888);padding:6px 10px 2px;text-transform:uppercase;letter-spacing:.05em}
+.pac-mi{display:block;width:100%;text-align:left;font:inherit;font-size:14px;padding:8px 10px;border:none;background:none;color:var(--text,#111);cursor:pointer;border-radius:7px}
+.pac-mi.on{background:color-mix(in srgb,var(--accent,#0a7a5a) 15%,transparent);font-weight:600}
+.pac-mopt{display:block;width:100%;text-align:left;font:inherit;font-size:15px;padding:12px 14px;border:none;background:none;color:var(--text,#111);cursor:pointer;border-radius:8px}
+.pac-mopt.del{color:#c0392b}
+.pac-m .pa-took{display:block;margin-top:6px;font-size:11.5px;color:var(--muted,#888);font-variant-numeric:tabular-nums}
+</style>
+<script id="pac-script">
+(function(){
+  if(window.PAChat) return;               // idempotent: safe if the marker appears twice
+
+  // Isolated broker. String-prefixed ids ('pac1'…) so replies never collide with an
+  // app's own numeric-id broker listening on the same window.
+  let _cid=0; const _wait={};
+  window.addEventListener('message',e=>{ const m=e.data;
+    if(m&&m.pa==='res'&&_wait[m.id]){ const keep=(m.ev&&!m.done); _wait[m.id](m); if(!keep) delete _wait[m.id]; } });
+  const req=(o)=> new Promise(res=>{ const id='pac'+(++_cid); _wait[id]=res; parent.postMessage(Object.assign({pa:'req',id},o),'*'); });
+  // Composer model chooser — options pushed by the shell via {pa:'prefs', models}.
+  let PAC_MODELS=[]; let PAC_CURMODEL=null; const PAC_MODEL_CBS=new Set();
+  // A host may declare which lane it wants selected on load (PAChat opts.defaultModel).
+  // Models arrive asynchronously from the shell (pa:'prefs'), so the wish is recorded here
+  // and resolved against the real list below — an app must not guess at ids the server owns.
+  let PAC_WANTMODEL=null;
+  // PAC_PICKED: the person chose in this chooser. Until then the lane is only a default, and a
+  // remembered lane that arrives in a LATER push replaces it (below) — a frame that first got the
+  // list with no remembered lane used to keep PAC_MODELS[0], the fast DeepSeek lane, for good.
+  let PAC_PICKED=false;
+  // A turn sent BEFORE the list arrives carried no model, so the server's default answered while
+  // the chip, once painted, named another lane (2026-11-12: Bible Ask AI fires Explain as the rail
+  // opens). Every turn now waits for the list, bounded: past the shell's own 3 s models wait.
+  // TODO(R4 seam): this file is over budget; the model chooser state (PAC_MODELS…, pacModelsReady, the prefs handler) is its own inlined part.
+  const PAC_MODELS_WAIT_MS=5000;
+  const pacModelsReady=()=>PAC_MODELS.length?Promise.resolve():new Promise(res=>{ let t=null;
+    const done=()=>{ PAC_MODEL_CBS.delete(done); clearTimeout(t); res(); };
+    t=setTimeout(done,PAC_MODELS_WAIT_MS); PAC_MODEL_CBS.add(done); });
+  // `system` is passed IN (resolved at the call site inside Chat, where opts lives). reqChat is
+  // module-scope and must not reference Chat's `opts` — doing so threw ReferenceError and broke send.
+  // `oneShot` is PAChat.complete's and NEVER the composer's: one answer for a component, not a
+  // conversation turn (the server answers it without extended thinking and kills the job when the
+  // request is cancelled). `onId` hands the caller this request's broker id — the only handle a
+  // later chat-cancel can name, since the waiter is keyed by it.
+  const PAC_CANCELLED='Cancelled · 已取消';   // == RELAY_CANCELLED in web/index.html (test/chat-cancel.test.mjs)
+  const reqChat=(message,convoId,onEvent,attachments,label,system,assess,oneShot,onId,model)=> new Promise(res=>{ const id='pac'+(++_cid);   // model: ONE turn's lane (a summary's preferred agent lane, web/summary-images.inline.html), else the chooser's
+    _wait[id]=(m)=>{ if(m.ev) onEvent(m.ev); if(m.done) res(m); }; if(onId) onId(id);
+    // A turn that names its lane, or a oneShot (its lane is the server's one_shot_model), needs no list;
+    // with the list in hand the post stays synchronous, as before.
+    const go=()=>parent.postMessage({pa:'req',id,kind:'chat',message,convoId,attachments:attachments||undefined,label:label||undefined,model:model||PAC_CURMODEL||undefined,system:system||undefined,assess:assess||undefined,oneShot:oneShot===true||undefined},'*');
+    if(model||oneShot===true||PAC_MODELS.length) go(); else pacModelsReady().then(go); });
+
+  /* ── Size limits（大小上限）— DEFECT V4, 2026-09-02 round 2 ────────────────────────────
+     An oversize /api/chat body was a STRUCTURALLY INVISIBLE failure on the most-used route:
+     the server answered 413 JSON, no chat reader parsed it, nothing threw, and the composer —
+     already cleared — sat on "…" forever with the user's message gone. Two halves fix it:
+       1. PRE-FLIGHT (here). We know the payload before we send it, so an oversize message is
+          refused BEFORE the composer is cleared: the text and the attachment chips stay
+          exactly where the user left them, and the reason is named with the limit.
+       2. POST-FACTO (paint below). Any {ok:false,code:'too-large'} that does come back is
+          rendered as the same sentence instead of "No response — try rephrasing."
+     THE NUMBERS ARE A COPY. A sandboxed component cannot import lib/webutil.mjs, so
+     test/chat-oversize.test.mjs pins PAC_LIMITS and PAC_TOO_LARGE against BODY_LIMITS /
+     CODE_TOO_LARGE and fails the suite the moment they drift (R3 by test).            */
+  const PAC_LIMITS={chat:1024*1024, upload:20*1024*1024};   // == lib/webutil.mjs BODY_LIMITS.chat / .upload
+  const PAC_TOO_LARGE='too-large';                          // == lib/webutil.mjs CODE_TOO_LARGE
+  // The shell wraps our fields in its own envelope (app slug, model id, assess flag, JSON key
+  // names). We cannot see it, so we reserve for it and refuse slightly EARLY — erring toward a
+  // refusal we can explain, never toward one only the server can see.
+  const PAC_ENVELOPE_BYTES=512;
+  // Composer reservation (see .pac's --pac-pill in #pac-style, which is derived from this GAP).
+  const WAKE_MIN_MS=3000;   // focus + visibilitychange both fire on one tab switch
+  const PAC_PILL_GAP=12;      // breathing room between the last message's action icons and the composer
+  const PAC_PILL_TRIES=90;    // ~1.5s of frames for a slow first layout; show() re-measures explicitly, so this never has to cover a long-hidden surface
+  const pacBytes=s=>{ const t=String(s==null?'':s); return new TextEncoder().encode(t).length; };   // UTF-8 bytes: 中文 is 3 bytes per character, .length would under-count by 3×
+  const pacHuman=n=>{ const b=Number(n); if(!isFinite(b)||b<=0) return '0 B';
+    if(b>=1048576){ const m=b/1048576; return (m>=10?Math.round(m):Math.round(m*10)/10)+' MB'; }
+    return b>=1024 ? Math.round(b/1024)+' KB' : b+' B'; };
+  // Bytes the /api/chat body will really weigh. JSON.stringify of exactly the fields reqChat
+  // sends, plus the shell envelope — measured, never guessed from character counts. (oneShot is
+  // not among them: only PAChat.complete sends it, and complete is not measured here.)
+  const pacChatBytes=(message,convoId,attachments,label,system)=>PAC_ENVELOPE_BYTES+pacBytes(JSON.stringify({message,convoId:convoId||null,attachments:attachments||undefined,label:label||undefined,system:system||undefined}));
+  /* ── The noun table（名词表）— a COPY of the shell's RELAY_NOUNS, byte-for-byte ─────────
+     PRE-FLIGHT ONLY. Every failure that comes BACK from the shell already carries the
+     sentence the shell's ONE mapper rendered (relayFail in web/index.html), and this
+     component prints that verbatim. What no reply can cover is a refusal made HERE, before
+     anything is sent — there is no reply to render, so the sentence must exist locally too.
+     The sandbox has an opaque origin and cannot import, so test/fail-legibility.test.mjs
+     runs BOTH renderers over the same matrix and fails the moment one character drifts.
+     LEFTOVER (e): 'Photo' is a noun of its own — an oversized camera-roll insert must not
+     read as the generic "File", and must never read like a 401. */
+  const PAC_NOUNS={
+    Message:{head:'Message too large · 消息过长',act:'Shorten it or remove an attachment, then send again · 请缩短内容或删除附件后重发'},
+    File:   {head:'File too large · 文件过大',   act:'Pick a smaller file · 请选择更小的文件'},
+    Photo:  {head:'Photo too large · 照片过大',  act:'Pick a smaller photo, or crop it · 请选择更小的照片或裁剪后重试'},
+  };
+  // The composer's ＋ delegates to PAPhoto; if the page never received that component there is
+  // nothing to delegate to, and the user is told WHICH piece is missing rather than tapping a
+  // button that does nothing. Reachable only on a page serving PAChat without PA_PHOTO_UI.
+  const PAC_NO_PHOTO='Photo upload unavailable · 无法上传照片 — the shared photo component did not load on this page · 本页未加载共享照片组件';
+  const PAC_IMAGE_RE=/\.(jpe?g|png|heic|heif|gif|webp|bmp|tiff?|avif)$/i;   // == the shell's RELAY_IMAGE_RE
+  const pacWhatForFile=name=>PAC_IMAGE_RE.test(String(name||''))?'Photo':'File';
+  const pacTooLargeText=(what,bytes,limit)=>{ const n=PAC_NOUNS[what]||PAC_NOUNS.Message;
+    return n.head+(limit?' (max '+pacHuman(limit)+')':'')+(bytes?' — '+pacHuman(bytes)+' sent · 已发送':'')+'. '+n.act+'。'; };
+  // Did this reply mean "too large"? Reads the machine-readable code first and falls back to
+  // the 413 status, so it holds whichever of those the relay happens to forward (R14: no
+  // pattern-matching on prose — a translated or reworded message must not turn into a silent
+  // success). Returns the limit (a number) or null.
+  const pacTooLargeLimit=m=>{ if(!m||m.ok===true) return null;
+    if(m.code===PAC_TOO_LARGE||m.status===413) return Number(m.limit)||null;
+    return null; };
+
+  const esc=s=>String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  // Strip our own first-message scaffolding when replaying a saved user turn.
+  const cleanMe=t=>String(t||'').replace(/^Context:[\s\S]*?Question:\s*/,'').replace(/\n*\[Attached file:[^\]]*\]/g,'').trim();
+
+  // Tap-to-zoom lightbox (mirrors the main chat's full-screen image view): ONE element for every mount and PAChat.lightbox; tap or Esc closes.
+  let _lb=null;
+  function lightbox(src){
+    if(!_lb){ _lb=document.createElement('div'); _lb.className='pac-lb';
+      const im=document.createElement('img'); im.alt=''; _lb.appendChild(im);
+      _lb.addEventListener('click',()=>_lb.classList.remove('on'));
+      document.addEventListener('keydown',ev=>{ if(ev.key==='Escape'&&_lb) _lb.classList.remove('on'); });
+      document.body.appendChild(_lb);
+    }
+    _lb.firstChild.src=src; _lb.classList.add('on');
+  }
+
+  // ── per-message actions (copy / read-aloud / retry / edit) — the standard chatbox toolkit ──
+  const stripMd=t=>String(t||'').replace(/```[\s\S]*?```/g,' ').replace(/\[([^\]]*)\]\([^)]*\)/g,'$1').replace(/[#*`_>~]/g,'').replace(/\n{2,}/g,'. ').trim();
+  function mkab(icon,title){ const b=document.createElement('button'); b.className='pac-ab'; b.type='button'; b.title=title; b.textContent=icon; return b; }
+  function flash(b,icon){ const old=b.textContent; b.textContent=icon; setTimeout(()=>{ if(b.isConnected) b.textContent=old; },1200); }
+  function fallbackCopy(t){ try{ const ta=document.createElement('textarea'); ta.value=t; ta.style.cssText='position:fixed;opacity:0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); return true; }catch{ return false; } }
+  function copyText(t,btn){ // clipboard API where allowed, execCommand fallback for the sandbox
+    if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(()=>flash(btn,'✓')).catch(()=>{ if(fallbackCopy(t)) flash(btn,'✓'); });
+    else if(fallbackCopy(t)) flash(btn,'✓'); }
+  // Mixed EN/中文 read-aloud: ONE utterance per script run, each with its own lang/voice —
+  // a single-language utterance silently skips (or mangles) the other script on iOS/macOS.
+  // Neutral chars (digits, punctuation, spaces) attach to the current run to avoid choppy
+  // voice-switching. (Duplicated in web/index.html for the shell chat — separate documents.)
+  const SPEAK_CJK=/[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]/;
+  const SPEAK_SCRIPTED=/[A-Za-z\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]/;
+  function speechSegments(text){
+    const out=[]; let cur='', curZh=null;
+    for(const ch of String(text||'')){
+      const zh=SPEAK_CJK.test(ch), neutral=!SPEAK_SCRIPTED.test(ch);
+      if(curZh===null){ cur+=ch; if(!neutral) curZh=zh; continue; }
+      if(neutral||zh===curZh){ cur+=ch; continue; }
+      out.push({text:cur,zh:curZh}); cur=ch; curZh=zh;
+    }
+    if(cur.trim()) out.push({text:cur,zh:curZh===null?false:curZh});
+    return out.filter(s=>s.text.trim());
+  }
+  function speak(text,onEnd){ const ss=window.speechSynthesis; if(!ss){ onEnd&&onEnd(); return; }
+    ss.cancel();
+    const segs=speechSegments(text);
+    if(!segs.length){ onEnd&&onEnd(); return; }
+    const voices=(ss.getVoices&&ss.getVoices())||[];
+    const pick=zh=>voices.find(v=>v.lang&&v.lang.toLowerCase().startsWith(zh?'zh':'en'))||null;
+    let done=0; const finish=()=>{ if(++done===segs.length) onEnd&&onEnd(); };
+    for(const s of segs){ const u=new SpeechSynthesisUtterance(s.text);
+      u.lang=s.zh?'zh-CN':((navigator.language&&!/^zh/i.test(navigator.language))?navigator.language:'en-US');
+      const v=pick(s.zh); if(v) u.voice=v;
+      u.onend=finish; u.onerror=finish; ss.speak(u); }
+  }
+
+  // ── Verify · 校验: deep-view markdown built from a turn's persisted assessment ──
+  // The participation line is computed from the persisted per-model status so absent and
+  // skipped models are ALWAYS named (R14) — independent of the summarizer's own wording.
+  function assessLine(a){ const ms=a.models||[]; const oks=ms.filter(x=>x.ok);
+    const bits=ms.map(x=>(x.ok?'✓ ':'✗ ')+(x.label||x.id)+(x.ok||!x.error?'':' ('+x.error+')'));
+    let s='**Participation 参与:** '+oks.length+'/'+ms.length+' responded 已响应';
+    if(bits.length) s+=' — '+bits.join(' · ');
+    if(a.skipped&&a.skipped.length) s+=' · skipped 跳过: '+a.skipped.map(x=>x.label||x.id).join(', ')+' (current model 当前模型)';
+    return s; }
+  function assessDeepMd(a){
+    if(a.state==='error') return '⚠ **Verify failed · 校验失败** — '+(a.error||'unknown error 未知错误')+'\n\n'+assessLine(a);   // explicit error, never a blank deep view (R5/R14)
+    return assessLine(a)+'\n\n---\n\n'+(a.summary||''); }
+
+  // ── shared list helpers (day grouping + relative time) ──
+  // Module scope so BOTH the in-chat ☰ list (Chat) and the standalone PAChat.listDrawer
+  // render identical day headers / timestamps from a single definition (R3).
+  // A timestamp is usable only if it is a real, positive instant. Number('') / Number(null) are 0,
+  // which as a date is 1970 — a row must say it has no time rather than claim it was written then.
+  function usableTs(ts){ const ms=Number(ts);
+    if(!Number.isFinite(ms)||ms<=0) return 0; const d=new Date(ms); return Number.isFinite(d.getTime())?ms:0; }
+  function listDay(ts){ const ms=usableTs(ts); if(!ms) return 'No date · 无日期';
+    const d=new Date(ms), now=new Date();
+    const s=x=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime();
+    const diff=Math.round((s(now)-s(d))/86400000);
+    if(diff<=0) return 'Today 今天'; if(diff===1) return 'Yesterday 昨天';
+    const wd=['Sun 周日','Mon 周一','Tue 周二','Wed 周三','Thu 周四','Fri 周五','Sat 周六'][d.getDay()];
+    return wd+' · '+(d.getMonth()+1)+'月'+d.getDate()+'日'; }
+  // The row's own last-modified TIME, because the DAY is already the header above it.
+  //
+  // This replaced a relative label ("now"/"12m"/"4h"/"9/8"), which contradicted that header every
+  // night: that label's "under 24 hours" window spans calendar days and listDay's does not, so
+  // for the whole stretch between midnight and 24h after an edit a row read as e.g. "4h" — plainly
+  // today — while sitting correctly under "Yesterday 昨天". (SCAR 2026-09-12: a note last written
+  // at 20:27 the previous evening was read at 00:20 and reported as a stale-timestamp bug; the
+  // data was right and the label was unreadable.) An absolute time cannot disagree with the day
+  // above it, and it also survives a
+  // docked drawer left open across midnight, which a relative label silently does not — nothing
+  // redraws the list on a timer.
+  //
+  // Deliberately NOT PANote.stamp(): that formats a note's TITLE, it is absent from apps that mount
+  // PAChat without PANote (rows would silently lose their times), and coupling the two would mean a
+  // change to note titles silently restyling this list.
+  function listTime(ts){ const ms=usableTs(ts); if(!ms) return '';
+    const d=new Date(ms);
+    return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+
+  // ── in-panel modals ──
+  // Native prompt()/confirm() are blocked in sandbox=allow-scripts; use these instead.
+  // `host` is the element the .pac-modal overlay is appended to (a Chat host, or a
+  // listDrawer host) — module scope so Chat and listDrawer share one implementation (R3).
+  function pacPrompt(host,title,initial){ return new Promise(res=>{
+    const ov=document.createElement('div'); ov.className='pac-modal';
+    ov.innerHTML='<div class="pac-mbox"><div class="pac-mttl"></div><input class="pac-minp"><div class="pac-mbtns"><button class="pac-mcancel">Cancel</button><button class="pac-mok">Save</button></div></div>';
+    ov.querySelector('.pac-mttl').textContent=title; host.appendChild(ov);
+    const inp=ov.querySelector('.pac-minp'); inp.value=initial||''; setTimeout(()=>{inp.focus();inp.select();},30);
+    const done=v=>{ ov.remove(); res(v); };
+    ov.querySelector('.pac-mcancel').onclick=()=>done(null);
+    ov.querySelector('.pac-mok').onclick=()=>done(inp.value);
+    inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();done(inp.value);} if(e.key==='Escape')done(null); });
+    ov.addEventListener('click',e=>{ if(e.target===ov)done(null); }); }); }
+  function pacConfirm(host,msg){ return new Promise(res=>{
+    const ov=document.createElement('div'); ov.className='pac-modal';
+    ov.innerHTML='<div class="pac-mbox"><div class="pac-mttl"></div><div class="pac-mbtns"><button class="pac-mcancel">Cancel</button><button class="pac-mok pac-del">Delete</button></div></div>';
+    ov.querySelector('.pac-mttl').textContent=msg; host.appendChild(ov);
+    const done=v=>{ ov.remove(); res(v); };
+    ov.querySelector('.pac-mcancel').onclick=()=>done(false);
+    ov.querySelector('.pac-mok').onclick=()=>done(true);
+    ov.addEventListener('click',e=>{ if(e.target===ov)done(false); }); }); }
+  // With an anchor element, the menu opens as a POPOVER next to it (clamped to the viewport,
+  // outside-tap closes — no Cancel row needed); without one it stays the classic bottom sheet.
+  function pacSheet(host,optsArr,anchor){ return new Promise(res=>{
+    const ov=document.createElement('div'); ov.className='pac-modal'+(anchor?'':' pac-msheet');
+    if(anchor) ov.style.background='transparent';
+    const box=document.createElement('div'); box.className='pac-mbox';
+    optsArr.forEach((o,i)=>{ const b=document.createElement('button'); b.className='pac-mopt'+(o.del?' del':''); b.textContent=o.label; b.onclick=()=>{ov.remove();res(i);}; box.appendChild(b); });
+    if(!anchor){ const c=document.createElement('button'); c.className='pac-mopt'; c.textContent='Cancel'; c.onclick=()=>{ov.remove();res(-1);}; box.appendChild(c); }
+    ov.appendChild(box); ov.addEventListener('click',e=>{ if(e.target===ov){ov.remove();res(-1);} }); host.appendChild(ov);
+    if(anchor){ const r=anchor.getBoundingClientRect(), bw=box.offsetWidth||190, bh=box.offsetHeight||100;
+      box.style.position='absolute'; box.style.width='auto'; box.style.minWidth='170px'; box.style.padding='6px';
+      box.style.left=Math.max(8, Math.min(r.left, innerWidth-bw-8))+'px';
+      const below=r.bottom+6; box.style.top=(below+bh>innerHeight-8 ? Math.max(8, r.top-bh-6) : below)+'px';
+      ov.style.alignItems='flex-start'; ov.style.justifyContent='flex-start'; } }); }
+
+  // ── docked-drawer offset (module scope, shared by EVERY buildDrawer instance, R3) ──
+  // On a WIDE viewport (≥640px) the drawer DOCKS at the left and the app's OWN full-screen
+  // root(s) are PUSHED beside it — both stay visible AND interactive, no dimming. Mechanism is
+  // fully app-agnostic: a class on <html> + one idempotent <style> that adds a left MARGIN to
+  // every direct <body> child EXCEPT the component's own overlays, so BOTH a
+  // `position:fixed;inset:0` root (the journal's #app, the Bible's .pac-fs) AND a normal-flow flex
+  // column (the Bible's reading view) narrow to start at the panel's right edge. It used to
+  // override `left`, which positioned children obey and flow children ignore — so the drawer
+  // covered the Bible's text instead of making room for it.
+  // Below 640px the offset is media-gated OFF and the drawer keeps the overlay+backdrop.
+  //   Excluded (never pushed): .pac-drawerhost (holds the panel), .pac-lb (full-screen zoom),
+  //   .pas-rail (PASplit's right-hand rail — it is anchored to the RIGHT edge, so pushing its
+  //   `left` would drag it inward and leave a gap at the right).
+  //   CORRECTION: an earlier version of this comment also listed `.pan-fs` as "never pushed".
+  //   It never was — the constant below does not exclude it, and in the unified Journal .pan-fs
+  //   IS the content surface and must narrow. The claim was simply wrong; the trailing note on
+  //   the constant already said so, which made the two halves contradict each other.
+  //   NOTE: .pac-fs is NOT excluded — it IS the Bible's content surface and must narrow.
+  const PAC_DOCK_EXCL=':not(.pac-drawerhost):not(.pac-lb):not(.pas-rail)';   // .pan-fs (PANote fullscreen) IS the surface in the unified Journal, so it must narrow too; in the Bible it is hidden before the drawer opens, so narrowing it there is a no-op
+  function ensureDockStyle(){
+    if(document.getElementById('pac-dock-style')) return;   // idempotent: inject exactly once
+    const st=document.createElement('style'); st.id='pac-dock-style';
+    st.textContent=
+      ':root{--pac-dock:320px}'+                            // ONE source for panel width + push distance
+      '.pac-dtitle{cursor:pointer}'+                        // the drawer title is the collapse affordance
+      '@media(min-width:640px){'+
+        '.pac-drawerhost.on{pointer-events:none}'+          // docked: never block the pushed app on the right
+        '.pac-list{width:var(--pac-dock);max-width:var(--pac-dock);pointer-events:auto}'+
+        '.pac-backdrop{display:none}'+                      // no dimming when docked — right side stays usable
+        // margin-left, not left. `left` moves only POSITIONED children, so a normal-flow app —
+        // the Bible's reading column — ignored it and the drawer simply covered the text it was
+        // meant to make room for. margin-left narrows BOTH, and on a position:fixed child it
+        // shrinks the box while preserving an existing inset instead of overriding it.
+        // NO transition: `transition:margin-*` on these children leaves the margin computing to 0
+        // on the flow ones (measured 2026-09-10 — the right rail overlaid the text for exactly
+        // that reason). Correct layout beats an eased one.
+        'html.pac-docked>body>*'+PAC_DOCK_EXCL+'{margin-left:var(--pac-dock)!important}'+  // the actual push
+      '}';
+    document.body.appendChild(st);   // after the inlined pac-style → wins ties by source order
+  }
+  const _docked=new Set();   // hosts currently docked-open; the <html> class clears only when empty
+  function dockOn(host){ ensureDockStyle(); const r=document.documentElement;
+    _docked.add(host); r.classList.add('pac-docked'); }   // the ready/transition class went with the transition it gated (R1)
+  function dockOff(host){ _docked.delete(host);
+    if(!_docked.size) document.documentElement.classList.remove('pac-docked'); }
+
+  // ── buildDrawer: the ONE slide-in list drawer (R3) ──
+  // A single, body-appended drawer renderer used by BOTH the in-chat ☰ list (Chat) and the
+  // standalone PAChat.listDrawer, so one behavior fix lands everywhere. It owns: the
+  // .pac-drawerhost layer, search, OPTIONAL tabs, day-grouping (listDay), a SINGLE active-row
+  // highlight, the ⋯ rename/delete sheet (in-panel modals, never native prompt/confirm), and
+  // stay-open-on-select. Opening DOCKS + pushes the app (see dockOn above) on ≥640px, or slides
+  // over an overlay+backdrop below it. open() (the app's menu icon) EXPANDS; clicking the panel
+  // TITLE (.pac-dtitle) COLLAPSES; selecting a row STAYS open.
+  //   cfg: { title, newLabel?, onNew?, tabs?:[{key,label}],
+  //          items:async()=>[{ id, icon, title, preview, chip, updated, tab?, ai?,
+  //                             onOpen, onRename?, onDelete?, onDeleteAi?, pin?, onPin?(flag) }],
+  //          activeId?:()=>id }
+  //   Returns { open, close, refresh, setActive, isOpen, el, confirm, prompt }.
+  function buildDrawer(cfg){
+    const c=cfg||{}, tabs=Array.isArray(c.tabs)&&c.tabs.length?c.tabs:null;
+    const host=document.createElement('div'); host.className='pac-drawerhost';
+    host.innerHTML=
+      '<div class="pac-list">'+
+        '<div class="pac-top"><div class="pac-title pac-dtitle" style="flex:1;text-align:left" role="button" tabindex="0" title="Collapse · 收起" aria-label="Collapse · 收起"></div>'+
+          (c.onNew?'<button class="pac-new pac-dnew" title="New chat 新对话">'+esc(c.newLabel||'＋')+'</button>':'')+
+          (c.onNew2?'<button class="pac-new pac-dnew2" title="New note 新笔记">'+esc(c.newLabel2||'📝')+'</button>':'')+
+          '<span class="pac-dhead"></span>'+   // PADrawerSummary mounts Summarize · 总结 here (owner 2026-11-11: the header shows ＋, Summarize and ⋯ only)
+          '<button class="pac-new pac-dmore" title="More · 更多" aria-label="More · 更多">⋯</button>'+
+        '</div>'+
+        '<div class="pac-lsearch"><div class="pac-qwrap"><input class="pac-q" placeholder="Search · 搜索" autocomplete="off"><button type="button" class="pac-qx" aria-label="Clear · 清除" hidden>×</button></div><div class="pac-lsmsg"></div></div>'+
+        (tabs?'<div class="pac-ltabs">'+tabs.map((t,i)=>'<button class="pac-ltab'+(i===0?' on':'')+'" data-t="'+esc(t.key)+'">'+esc(t.label)+'</button>').join('')+'</div>':'')+
+        '<div class="pac-lrows"></div>'+
+        '<div class="pac-lbulk"><span class="pac-lbulkn"></span>'+
+          '<button class="pac-lbulkx">Cancel · 取消</button>'+
+          '<button class="pac-lbulkdel" disabled>Delete · 删除</button></div>'+
+      '</div>'+
+      '<div class="pac-backdrop"></div>';
+    document.body.appendChild(host);
+    ensureDockStyle();                       // one-time global: the docked-push offset + narrow fallback
+    const q=s=>host.querySelector(s);
+    const list=q('.pac-list'), backdrop=q('.pac-backdrop'), rows=q('.pac-lrows'), qi=q('.pac-q'), qx=q('.pac-qx'), dtitle=q('.pac-dtitle');
+    dtitle.textContent=c.title||'List';      // .pac-dtitle IS the .pac-title — text + close affordance in one
+    let _items=[], sel=null, _tab=tabs?tabs[0].key:null;   // sel = the ONE selected/active id
+    // WHICH TIME THIS LIST IS ABOUT. 'updated' (default) answers "what have I been working on";
+    // 'created' answers "when did I start this". One accessor feeds the SORT, the DAY HEADERS and
+    // the ROW TIME together — the moment those disagree you get the contradiction this drawer
+    // already had once, where a row's own label argued with the header above it.
+    // ONE name for the default, because three things read it: the initial value, the "is this the
+    // usual order" highlight, and the shell's own fallback when nothing is stored. When they
+    // drifted apart the button lit up while showing the default order.
+    const SORT_DEFAULT='created';               // a diary reads in the order it was written
+    let _sortBy=SORT_DEFAULT;                   // 'updated' | 'created'
+    const sortTs=(it)=> (_sortBy==='created' ? (it.created||it.updated||0) : (it.updated||0));
+    let _multi=false; const _picked=new Set();   // multi-select mode, and the ids ticked in it
+    let _shown=[], _anchor=null;                 // drawn order + the row a shift-range measures FROM
+    const itemOf=id=>_items.find(x=>x.id===id)||{};
+    // ── Note search（笔记搜索）── Server hits for the CURRENT query (_hitQ) join the local
+    // title/preview filter: a row whose `doc` ({path,scope}) matches a hit is shown with the hit's
+    // snippet and where it matched (PANote.SEARCH_TXT). Rows without `doc` behave exactly as before.
+    // TODO(R4 seam): buildDrawer is the drawer — move it (and this) to web/drawer-ui.inline.html.
+    let _hits=null, _hitQ='', _hitSeq=0, _hitTimer=null, _pending=false, _hitTerms=[];   // _pending: a node query is owed for the current text; _hitTerms: the reply's query terms (phase 3)
+    // A row doc WITHOUT a scope property claims a hit of any scope in its file (the journal names no
+    // scope; its legacy {draw,text} files once indexed as 'draw'); a doc WITH one ('' or a key) matches
+    // exactly — the Bible passes verseKey||'' (R13 round 2 #2).
+    const sameDoc=(h,d)=>h.path===d.path&&(!('scope' in d)||(h.scope||'')===(d.scope||''));
+    const hitFor=(it,f)=>(_hits&&f&&f===_hitQ&&it.doc&&_hits.find(h=>sameDoc(h,it.doc)))||null;
+    const whereLabel=w=>(window.PANote&&window.PANote.SEARCH_TXT&&window.PANote.SEARCH_TXT[w])||w||'';
+    // The line under the box after a complete answer: the cap cut real matches wins; else, ONLY when
+    // pages are owed (a node with no ink says nothing: R13 round 1 #6), the node failed lately (with
+    // its reason) or cannot transcribe at all; else the pages still being transcribed; else ''.
+    const ocrLine=r=>r.ocr==='failed'?whereLabel('ocrFailed')+(r.reason?' — '+r.reason:''):r.ocr==='unavailable'?whereLabel('noOcr'):whereLabel('pending').replace(/\{n\}/g,String(r.pending));
+    const searchNote=r=>r.truncated?whereLabel('more'):r.pending>0?ocrLine(r):'';
+    // Tag chips on a row + the tag strip under the box (web/drawer-tags.inline.html, carried by the
+    // PA_DRAWER_TAGS_UI marker at the end of this file); null on a page without it. Its chip-tap
+    // listener goes on `rows` HERE, before the row-click listener below, so a chip never opens its row.
+    // TODO(R4 seam): grows this over-budget file by four lines; the seam is buildDrawer → web/drawer-ui.inline.html.
+    // `prefs` is this app's server-side prefs (the sort order's store, below): the components keep their
+    // hidden tags and collapsed groups there, because the app iframe cannot use localStorage.
+    // TODO(R4 seam): grows this over-budget file by four lines; the seam is buildDrawer → web/drawer-ui.inline.html.
+    // ONE chain per PAGE (web/app-prefs.inline.html, carried by the PA_APP_PREFS_UI marker at the end of this file):
+    // the Bible's pen sheet writes the same object, and the shell's write replaces it whole, prompt override included.
+    const prefs={ get:()=>window.PAAppPrefs.get(), set:(patch)=>window.PAAppPrefs.patch(patch) };
+    const tags=window.PADrawerTags?window.PADrawerTags.attach({host,rows,box:qi,items:()=>_items,sameDoc,search:()=>onSearchInput(),redraw:()=>draw(),prefs}):null;
+    // Groups + jump strip (web/drawer-groups.inline.html, marker at the end of this file): the plain list by Bookmarked / Summaries / month; a search stays flat (plan H).
+    const groups=window.PADrawerGroups?window.PADrawerGroups.attach({host,rows,box:qi,items:()=>_items,prefs,redraw:()=>draw(),esc,days:dayHtml,ts:sortTs,tags:it=>tags?tags.tagsOf(it):[]}):null;
+
+    function draw(){
+      const f=(qi.value||'').toLowerCase().trim();
+      const shown=_items.filter(it=>{
+        if(f&&!((it.title||'')+' '+(it.preview||'')).toLowerCase().includes(f)&&!hitFor(it,f)) return false;
+        if(tabs&&_tab!==tabs[0].key&&it.tab!==_tab) return false;   // first tab = show-all
+        return true;
+      }).sort((a,b)=>sortTs(b)-sortTs(a));
+      if(groups) groups.sync();   // the jump strip follows the rows (and leaves while the box has text)
+      // While the node's reply is owed, an empty local filter is "Searching…", not a verdict: a definite
+      // "No matches" for the debounce + round trip (+ the first scan) made users close the drawer (R13 round 2 #3).
+      if(!shown.length){ rows.innerHTML='<div class="pac-lempty">'+(f?(_pending?whereLabel('searching'):'No matches 无匹配'):'Nothing here yet 还没有内容')+'</div>'; return; }
+      const rowHtml=it=>{
+        const menu=(it.onRename||it.onDelete||it.onDeleteAi||it.onPin)?'<button class="pac-lmenu" data-menu="'+esc(it.id)+'" aria-label="More 更多">⋯</button>':'';
+        // A row with no onDelete cannot be bulk-deleted, so it gets no box — offering a tick
+        // that would then be silently skipped is worse than not offering one.
+        const box=(_multi&&it.onDelete)?'<div class="pac-lbox"></div>':'';
+        const picked=(_multi&&_picked.has(it.id))?' picked':'';
+        const hit=hitFor(it,f), prev=(hit&&hit.snippet)||it.preview;   // a search hit shows WHERE the words are, not the page's first line
+        return '<div class="pac-lrow'+(it.id===sel&&!_multi?' active':'')+picked+'" data-id="'+esc(it.id)+'">'+box+'<div class="pac-lic">'+esc(it.icon||'📝')+'</div><div class="pac-lbody">'+   // single highlight: at most ONE row (id===sel) is .active
+          '<div class="pac-lttl">'+(it.pin?'<span class="pac-lstar" aria-label="Bookmarked · 已收藏">★</span> ':'')+esc(window.PASummaryTitle?window.PASummaryTitle.displayTitle(it.title||''):(it.title||''))+'</div>'+   // TODO(R4 seam): row rendering → its own part; a saved summary's raw W title shows as its period title (display only)
+          (prev?'<div class="pac-lprev">'+esc(prev)+'</div>':'')+
+          '<div class="pac-lmeta">'+(it.chip?'<span class="pac-lchip">'+esc(it.chip)+'</span>':'')+(tags?tags.chips(it):'')+
+          (hit?'<span class="pac-lchip pac-lwhere">'+esc(whereLabel(hit.where))+'</span>':'')+
+          (it.ai?'<span class="pac-lai" title="Has an AI conversation · 有 AI 对话" aria-label="Has an AI conversation">✨</span>':'')+'<span class="pac-ltime">'+listTime(sortTs(it))+'</span></div>'+
+          '</div>'+menu+'</div>';
+      };
+      rows.innerHTML=groups?groups.html(shown,rowHtml,!!f):dayHtml(shown,rowHtml);   // grouped (plan H) when the component is on the page; a search stays the day list
+      _shown=groups?groups.drawn():shown;   // the order a range is measured in: what the user can SEE — after search/tab/sort, and group by group with the closed groups left out
+    }
+    // The day list: a header per day of the time the list is sorted by, then the rows under it (the ONE day renderer, R3: the groups reuse it inside a month).
+    function dayHtml(list,rowHtml){ let html='', lastDay='';
+      for(const it of list){ const day=listDay(sortTs(it));   // fallback-free, and the SAME time the list is sorted by
+        if(day!==lastDay){ html+='<div class="pac-lday">'+esc(day)+'</div>'; lastDay=day; }
+        html+=rowHtml(it); }
+      return html; }
+    // Errors surface as an empty list + a console warning, never a thrown boot — the app stays
+    // usable and the user just sees "Nothing here yet 还没有内容" (R5).
+    // `forced` is compared to true, not just truthy. refresh is EXPORTED on the drawer API, so a
+    // host wiring it straight to a handler (onclick=drawer.refresh) would hand it an Event and
+    // silently turn every redraw into a disk re-read.
+    async function refresh(forced){
+      if(forced===true&&c.onRefresh){ try{ await c.onRefresh(); }catch(e){ console.warn('[PAChat] onRefresh failed',e); } }
+      try{ _items=(await c.items())||[]; }catch(e){ _items=[]; console.warn('[PAChat] drawer items() failed',e); }
+      if(tags) tags.sync();   // the ★ chip (and its filter) follow the NEW rows before they are drawn
+      draw();
+      if(tags&&_items.some(i=>i&&i.doc)) tags.refresh(); }   // only a list with docs can show a tag chip; those ride a later redraw; the list never waits for the node
+    // Built from what the row can actually DO, rather than two fixed labels dispatched by their
+    // POSITION. The old form hid a trap: adding one conditional entry above Delete renumbered it,
+    // so a row that offered "Delete AI chat" would have deleted the whole note instead. An entry
+    // that is not offered is now simply absent from the list it is dispatched through.
+    async function rowMenu(id,anchor){
+      const it=itemOf(id);
+      const acts=[];
+      if(it.onRename) acts.push({ label:'Rename 重命名',
+        run:async()=>{ const t=await pacPrompt(host,'Rename 重命名',it.title||'');
+          if(t!=null) await it.onRename(t.trim()||it.title||''); } });
+      // Bookmark · 收藏 (plan D): a reader's mark, kept in the row's own app data, never in the note.
+      // Offered only on a row with an onPin, exactly as Rename is; the label reads the same `pin`
+      // flag the ★ before the title does. TODO(R4 seam): buildDrawer → web/drawer-ui.inline.html.
+      if(it.onPin) acts.push({ label:it.pin?'Unbookmark · 取消收藏':'Bookmark · 收藏',
+        run:async()=>{ await it.onPin(!it.pin); } });
+      // Offered ONLY on a row that has one — the ✨ badge and this entry read the same flag, so
+      // the menu can never promise to delete a conversation that is not there.
+      if(it.onDeleteAi) acts.push({ label:'Delete AI chat 删除 AI 对话', del:true,
+        run:async()=>{ if(await pacConfirm(host,'Delete this note\'s AI chat? The note itself is kept. 删除这条笔记的 AI 对话？笔记本身保留。')) await it.onDeleteAi(); } });
+      if(it.onDelete) acts.push({ label:'Delete 删除', del:true,
+        run:async()=>{ if(await pacConfirm(host,'Delete this entry? 删除这条？')) await it.onDelete(); } });
+      if(!acts.length) return;
+      const pick=await pacSheet(host,acts.map(a=>({label:a.label,del:a.del})),anchor);
+      if(pick==null||!acts[pick]) return;
+      await acts[pick].run();
+      await refresh();
+    }
+    // ── Multi-select · 多选 ────────────────────────────────────────────────────────────────
+    // Deleting one thing at a time through the ⋯ sheet is fine for one; it is not fine for the
+    // forty a long session leaves behind. Selection is a MODE rather than a permanent checkbox
+    // column, because the drawer's everyday job is opening ONE thing.
+    const bulkBar=q('.pac-lbulk'), bulkN=q('.pac-lbulkn'), bulkDel=q('.pac-lbulkdel'), bulkX=q('.pac-lbulkx');
+    // Sorting is a DEVICE preference, like finger-draw and print-on-white: the shell stores it and
+    // broadcasts it back, so the choice survives a reload and holds across every app's drawer.
+    // The ⋯ sheet's entry says what a tap DOES (the other order), bilingual like every label here: a menu
+    // entry that read the current state and toggled it was two things at once.
+    const SORT_TXT={ updated:'Sort by date created · 按创建时间排序', created:'Sort by last edited · 按修改时间排序' };   // keyed by the CURRENT order
+    function applySort(v,quiet){ _sortBy=(v==='created')?'created':'updated'; if(!quiet) draw(); }
+    // STORED ON THE SERVER, per app — not in this device's localStorage. A journal read on a
+    // laptop and an iPad is one journal, and a list that sorts differently depending on which
+    // screen you picked up is two different journals. `set-app-settings` replaces this app's
+    // WHOLE prefs object, so the last-read object is kept and merged into rather than overwritten
+    // — sending only this key would silently drop every other setting the app has (prefs.set above).
+    // A refused read leaves the session default and the toggle still works; the next write re-reads (PAAppPrefs).
+    window.PAAppPrefs.read().then(r=>{ if(r.ok) applySort(typeof r.prefs.noteSort==='string'?r.prefs.noteSort:_sortBy,false); });   // redraw either way: the groups' and strip's prefs arrived with it
+    async function toggleSort(){
+      const was=_sortBy;
+      applySort(was==='created'?'updated':'created');
+      const r=await prefs.set({noteSort:_sortBy});
+      // REVERT on a refused write. The order lives on the server now, so a refusal means the setting did
+      // not change — leaving the list in the new order would show a preference that does not exist and
+      // would come back the other way on the next device. The reason goes under the box (R5).
+      if(r&&r.ok===false){ applySort(was); if(smsg) smsg.textContent='Not saved · 未保存'+(r.error?' — '+r.error:''); }
+    }
+    // The header's ONE ⋯ sheet (owner, 2026-11-11): Sort, Select, Refresh, then the components' entries (Show hidden · 显示隐藏).
+    // TODO(R4 seam): grows this over-budget file by six lines; the seam is buildDrawer → web/drawer-ui.inline.html.
+    async function moreMenu(anchor){
+      const acts=[{label:SORT_TXT[_sortBy],run:toggleSort},{label:_multi?'Done · 完成':'Select · 多选',run:()=>setMulti(!_multi)},{label:'Refresh · 刷新',run:()=>refresh(true)}].concat(tags?tags.menu():[]);
+      const pick=await pacSheet(host,acts.map(a=>({label:a.label})),anchor); if(pick==null||!acts[pick]) return;
+      await acts[pick].run(); }
+    const moreBtn=q('.pac-dmore'); if(moreBtn) moreBtn.onclick=()=>moreMenu(moreBtn);
+    // Paint the ticks from _picked without rebuilding the list (see the toggle note above).
+    function paintPicked(){
+      rows.querySelectorAll('.pac-lrow').forEach((r)=>r.classList.toggle('picked',_picked.has(r.dataset.id)));
+    }
+    // Everything between the anchor and the target, inclusive, skipping rows that cannot be
+    // deleted — a range must not tick something the delete would then have to skip.
+    function pickRange(fromId,toId){
+      const a=_shown.findIndex((x)=>x.id===fromId), b=_shown.findIndex((x)=>x.id===toId);
+      if(a<0||b<0) return;                        // one end scrolled out of the filter: nothing to measure
+      for(let i=Math.min(a,b); i<=Math.max(a,b); i++){ const it=_shown[i]; if(it&&it.onDelete) _picked.add(it.id); }
+      paintPicked();
+    }
+    function syncBulk(){
+      const n=_picked.size;
+      bulkN.textContent = n ? `${n} selected · 已选 ${n}` : 'Tap to select · 点击选择';
+      bulkDel.disabled = !n;
+    }
+    function setMulti(on){
+      _multi=!!on; _picked.clear(); _anchor=null;
+      list.classList.toggle('pac-multi',_multi);
+      draw(); syncBulk();
+    }
+    // Deletes SEQUENTIALLY and counts what actually went. A bulk action that reports success
+    // because it merely finished is the vacuous-success shape (R14): if 3 of 10 fail, the user
+    // must be told 3 failed, and the 3 stay in the list where they can be retried.
+    async function bulkDelete(){
+      const ids=[..._picked];
+      if(!ids.length) return;
+      if(!await pacConfirm(host, ids.length===1
+        ? 'Delete this entry? 删除这条？'
+        : `Delete ${ids.length} entries? 删除这 ${ids.length} 条？`)) return;
+      bulkDel.disabled=true;
+      let ok=0; const failed=[];
+      for(const id of ids){
+        const it=itemOf(id);
+        if(!it.onDelete){ failed.push(id); continue; }
+        try{ const r=await it.onDelete(); if(r&&r.ok===false) failed.push(id); else ok++; }
+        catch(e){ failed.push(id); console.warn('[PAChat] bulk delete failed',id,e); }
+      }
+      // Keep whatever failed still ticked, so a retry does not mean re-finding them by hand.
+      _picked.clear(); failed.forEach((id)=>_picked.add(id));
+      await refresh();
+      if(failed.length){
+        bulkN.textContent=`${ok} deleted, ${failed.length} failed · 已删除 ${ok}，失败 ${failed.length}`;
+        bulkDel.disabled=false;
+      } else { setMulti(false); }
+    }
+    bulkX.onclick=()=>setMulti(false);
+    bulkDel.onclick=bulkDelete;
+    // Summarize · 总结 (plan E): web/drawer-summary.inline.html, carried by the PA_DRAWER_SUMMARY_UI
+    // marker at the end of this file; only a host that passes `summary` hooks gets the button.
+    // TODO(R4 seam): grows this over-budget file by two lines; the seam is buildDrawer → web/drawer-ui.inline.html.
+    if(window.PADrawerSummary) window.PADrawerSummary.attach({host,bar:bulkBar,head:q('.pac-dhead'),picked:()=>[..._picked].map(itemOf),items:()=>_items,done:()=>setMulti(false),hooks:c.summary||null});   // head: the header's Summarize (owner 2026-11-11)
+
+    let _docClose=null;
+    function close(){ if(_multi) setMulti(false); host.classList.remove('on'); list.classList.remove('on'); backdrop.classList.remove('on'); dockOff(host); if(_docClose){ document.removeEventListener('pointerdown',_docClose,true); _docClose=null; } }
+    async function open(){ sel=c.activeId?c.activeId():sel; await refresh(); host.classList.add('on'); list.classList.add('on'); backdrop.classList.add('on'); dockOn(host); if(!_docClose){ _docClose=e=>{ if(!host.contains(e.target)) close(); }; document.addEventListener('pointerdown',_docClose,true); } }
+    // setActive(id): re-mark the ONE active row; redraws now if open, else the next open()
+    // re-reads activeId() anyway.
+    function setActive(id){ sel=(id==null?null:id); if(list.classList.contains('on')) draw(); }
+
+    rows.addEventListener('click',e=>{
+      const mb=e.target.closest('[data-menu]'); if(mb){ e.stopPropagation(); rowMenu(mb.dataset.menu,mb); return; }
+      const row=e.target.closest('.pac-lrow'); if(!row) return;
+      if(_multi){
+        // In select mode a tap TICKS rather than opens — opening would navigate away from the
+        // selection the user is building.
+        const id=row.dataset.id, it0=itemOf(id);
+        if(!it0.onDelete) return;                 // no box was drawn; a tap does nothing
+        // SHIFT extends from the last plain tap to this row, inclusive, in the order the rows are
+        // SHOWN (after search, tab and sort) — a range the user cannot see is not the range they
+        // meant. It only ever ADDS: turning a mis-aimed shift into a silent deselection of work
+        // already ticked is the expensive mistake here, and the list is a delete queue.
+        // Ctrl/Cmd is accepted as the explicit form of the plain tap, so the habit works.
+        if(e.shiftKey && _anchor && _anchor!==id) pickRange(_anchor,id);
+        else {
+          // Toggle the ROW, not the list. draw() rebuilds every row's innerHTML, which on a long
+          // list costs a full re-render per tick AND detaches the element under the user's
+          // finger — losing scroll position, and dropping ticks that land during the rebuild.
+          if(_picked.has(id)){ _picked.delete(id); row.classList.remove('picked'); }
+          else { _picked.add(id); row.classList.add('picked'); }
+          _anchor=id;                             // only a PLAIN tap moves the anchor
+        }
+        syncBulk(); return;
+      }
+      // Stay open on select: highlight the tapped row and run its open handler, but do NOT
+      // close — only a backdrop/outside tap closes the drawer.
+      sel=row.dataset.id; draw();
+      // A search hit opens WHERE it matched: the hit's page, the boxes of the matched OCR lines and
+      // the query terms travel as onOpen's second argument (undefined for a plain row), which the
+      // hosts hand to PANote.reveal after their reload (phase 3). Read at CLICK time from the
+      // current query, never stored on the row.
+      const it=itemOf(sel), hit=hitFor(it,(qi.value||'').toLowerCase().trim());
+      if(it.onOpen) it.onOpen(sel, hit?{page:hit.page,boxes:hit.boxes||[],terms:_hitTerms}:undefined);
+    });
+    // The typed query also goes to the node's index when PANote.search exists (feature-detected: a
+    // page without PANote keeps the local filter alone). Debounced; a reply for an older query is
+    // dropped; a failure is said ONCE under the box — the shell's reason when it carried one, else
+    // the bilingual fallback — and the local filter keeps working (R5). A cleared box supersedes
+    // the pending query exactly like a new one (seq bump) and takes the failure line with it.
+    const SEARCH_DEBOUNCE_MS=250;
+    // When the reply says pages are still being transcribed, the SAME query is asked ONCE more after
+    // this long (the text unchanged), so a hit transcribed meanwhile appears without a keystroke
+    // (R13 round 1 #7). Read at use time: a test shortens it through window.PA_SEARCH_REFRESH_MS.
+    const searchRefreshMs=()=>(Number(window.PA_SEARCH_REFRESH_MS)>0?Number(window.PA_SEARCH_REFRESH_MS):4000);
+    const smsg=q('.pac-lsmsg');
+    async function askNode(f,my,again){
+      let r; try{ r=await window.PANote.search(f); }catch(e){ r={ok:false,error:String((e&&e.message)||e)}; }
+      if(my!==_hitSeq||!r||r.stale) return;                   // a newer query is in flight
+      _pending=false;                                          // the verdict arrived, good or bad
+      if(!r.ok){ if(smsg) smsg.textContent=r.error||whereLabel('failed'); _hits=null; _hitQ=''; draw(); return; }
+      if(smsg) smsg.textContent=searchNote(r);                        // truncation, else OCR state, else nothing (R5)
+      _hits=r.hits||[]; _hitQ=f; _hitTerms=Array.isArray(r.terms)?r.terms:[]; draw();
+      if(r.pending>0&&!again) setTimeout(()=>{ if(my===_hitSeq) askNode(f,my,true); },searchRefreshMs());
+    }
+    function onSearchInput(){
+      const f=(qi.value||'').toLowerCase().trim();
+      if(_hitTimer){ clearTimeout(_hitTimer); _hitTimer=null; }
+      // ANY change of text supersedes the query in flight (seq bump) and takes a failure line with it —
+      // not only a cleared box (R13 round 2 #4).
+      ++_hitSeq; if(smsg) smsg.textContent='';
+      if(tags) tags.sync();                                    // the strip shows only under an empty box
+      if(qx) qx.hidden=!f;                                     // the × clears a tag or query in one tap (owner, 2026-11-10)
+      if(!f||!(window.PANote&&typeof window.PANote.search==='function')){ _pending=false; _hits=null; _hitQ=''; draw(); return; }
+      _pending=true; draw();                                   // local matches at once; hits join when they arrive
+      const my=_hitSeq;
+      _hitTimer=setTimeout(()=>askNode(f,my,false),SEARCH_DEBOUNCE_MS);
+    }
+    qi.addEventListener('input',onSearchInput);
+    if(qx) qx.addEventListener('click',()=>{ qi.value=''; onSearchInput(); });   // TODO(R4 seam): the search block → its own inline file
+    if(tabs) list.querySelectorAll('.pac-ltab').forEach(b=>b.addEventListener('click',()=>{
+      _tab=b.dataset.t; list.querySelectorAll('.pac-ltab').forEach(x=>x.classList.toggle('on',x===b)); draw(); }));
+    const dnew=q('.pac-dnew'); if(dnew) dnew.onclick=()=>{ if(c.onNew) c.onNew(); close(); };
+    const dnew2=q('.pac-dnew2'); if(dnew2) dnew2.onclick=()=>{ if(c.onNew2) c.onNew2(); close(); };
+    backdrop.onclick=close;                  // narrow (overlay) fallback: tap the dim backdrop to close
+    // Title = collapse: clicking the drawer's own title text COLLAPSES it (the menu icon in the
+    // app re-expands via open()). This is the close affordance when docked (there is no backdrop).
+    dtitle.onclick=close;
+    dtitle.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); close(); } });   // role=button a11y
+    // confirm/prompt expose the sandbox-safe in-panel modals so host apps reuse them (e.g. a
+    // header 🗑 that deletes the open entry) instead of the blocked native confirm()/prompt().
+    /* ── Re-read the list when you come back to it ───────────────────────────────────────
+       Reported: a laptop left open all night still listed yesterday's conversations as the
+       newest, while the same account on a phone showed them correctly. The list was fetched
+       once, at load, and nothing ever asked again — there is no polling and no push, so
+       returning to the tab is the only moment we know for certain the user is looking.
+
+       NOT polling. Nothing happens while the tab is hidden or the lid is shut, which matters on
+       a household of phones: a timer would cost every device something, forever, to fix a
+       problem that only exists at the instant someone looks. Browsers also throttle background
+       timers, so a poll would be least reliable exactly when it would have to be right.
+
+       focus and visibilitychange BOTH fire on one tab switch, hence the throttle. */
+    let _woke=0;
+    const onWake=()=>{
+      if(!host.isConnected){                      // drawer torn down: unhook rather than fetch
+        document.removeEventListener('visibilitychange',onWake); window.removeEventListener('focus',onWake); return; }
+      if(document.visibilityState==='hidden') return;
+      const now=Date.now(); if(now-_woke<WAKE_MIN_MS) return;
+      _woke=now; refresh(true);
+    };
+    document.addEventListener('visibilitychange',onWake);
+    window.addEventListener('focus',onWake);
+
+    return { open, close, refresh, setActive, isOpen:()=>list.classList.contains('on'), el:host,
+      // Removable, because a listener on `document` outlives the element that owns it. An
+      // anonymous one here would strand a closure over a dead drawer on every mount/destroy.
+      destroy:()=>{ document.removeEventListener('visibilitychange',onWake); window.removeEventListener('focus',onWake); },
+      confirm:(msg)=>pacConfirm(host,msg), prompt:(title,init)=>pacPrompt(host,title,init) };
+  }
+
+  function render(host){
+    host.classList.add('pac');
+    host.innerHTML=
+      '<div class="pac-top"><button class="pac-tbtn pac-toList" title="Notes & Chats · 笔记与对话" aria-label="Notes & Chats · 笔记与对话">☰</button><div class="pac-title"></div><button class="pac-new pac-newC" title="New chat">＋</button><button class="pac-new pac-close" title="Close" style="display:none">✕</button></div>'+
+      '<div class="pac-log"></div>'+
+      '<button class="pac-scroll" title="Scroll to bottom">↓</button>'+
+      '<div class="pac-row"><div class="pac-chips"></div><div class="pac-pills"><button class="pac-model" style="display:none"></button><button class="pac-vfy" title="Verify with multiple models · 多模型校验">☐ Verify · 校验</button></div><div class="pac-frow">'+
+        '<button class="pac-plus" title="Attach a photo">＋</button>'+
+        '<textarea class="pac-inp" rows="1" autocomplete="off"></textarea>'+
+        '<button class="pac-go" title="Send">↑</button>'+
+      '</div><input type="file" class="pac-file" accept="image/*" style="display:none"></div>';
+    // NOTE: the ☰ list/drawer is no longer in this template — Chat now uses a shared
+    // buildDrawer() instance (body-appended), so there is ONE drawer renderer (R3).
+    const q=s=>host.querySelector(s);
+    return { log:q('.pac-log'),scroll:q('.pac-scroll'),chips:q('.pac-chips'),row:q('.pac-row'),model:q('.pac-model'),vfy:q('.pac-vfy'),
+             plus:q('.pac-plus'),inp:q('.pac-inp'),go:q('.pac-go'),file:q('.pac-file'),
+             title:q('.pac-top .pac-title'),toList:q('.pac-toList'),newC:q('.pac-newC'),closes:[...host.querySelectorAll('.pac-close')] };
+  }
+
+  function Chat(host, opts){
+    // opts.defaultModel: which lane this app prefers on load (e.g. 'claude'). Recorded
+    // before the list arrives; resolved in the pa:'prefs' handler above. A user's own pick
+    // in the chooser always wins afterwards — this only chooses the STARTING lane.
+    if(opts&&opts.defaultModel&&!PAC_CURMODEL) PAC_WANTMODEL=String(opts.defaultModel);
+    const el=render(host);
+    let key=null, atts=[]/*[{name,path,thumb}]*/, sending=false, loadedKey=null, lastUser=null, curConvo=null, _sel=null, _loadSeq=0;   // _sel = the ONE active id (a convo or a note) the ☰ drawer highlights; _loadSeq = monotonic convo-load token (mirrors send()'s _rseq) so a slow load can't overwrite a newer selection
+    if(typeof PABusy!=='undefined') PABusy.watch(()=>sending||!!el.inp.value.trim()||atts.length>0);   // a streaming turn or a draft (text or attachments): the shell must not reload itself under it (web/busy.inline.html)
+    function setTitle(t){ el.title.textContent=t||'Chat'; }
+    // opts.showMe: the host's view of its own user turns (Bible shows an explain turn's header + verse, not its instructions).
+    const shownMe=t=>(typeof opts.showMe==='function'?opts.showMe(t):t);
+
+    const nearBottom=()=> el.log.scrollHeight-el.log.scrollTop-el.log.clientHeight<=120;
+    const pin=()=>{ el.log.scrollTop=el.log.scrollHeight; };
+    const updateScroll=()=> el.scroll.classList.toggle('show', !nearBottom());
+
+    // How long the answer took. Same format the shell uses, in this document's own copy — apps are
+    // sandboxed and cannot share a script file, so the two are held identical by a test instead.
+    const _took=(ms)=>ms<60000?(ms/1000).toFixed(1)+'s':Math.floor(ms/60000)+'m '+String(Math.round(ms%60000/1000)).padStart(2,'0')+'s';
+    // `ms` may be absent (stored before this shipped, or a lane that never reported it): add
+    // nothing rather than 'took NaNs'.
+    // by: the model that actually answered (server 'done'.by / stored mm.by), so a rerouted pick is visible.
+    function _addTook(el,ms,by){ if(!(Number.isFinite(ms)&&ms>=0)) return null;
+      const t=document.createElement('small'); t.className='pa-took'; t.textContent=(by?by+' · ':'')+'took '+_took(ms); el.appendChild(t); return t; }
+    function addMsg(role,text,imgs){
+      const d=document.createElement('div'); d.className='pac-m '+role;
+      if(text) d.textContent=text;
+      if(imgs) for(const a of imgs) if(a.thumb){ const im=document.createElement('img'); im.src=a.thumb; d.appendChild(im); }
+      el.log.appendChild(d); pin(); updateScroll(); return d;
+    }
+    async function addAI(md){ const d=addMsg('ai','…'); await paint(d,md); return d; }
+    // Loading placeholder shown immediately when a conversation's content is being fetched over the
+    // broker (network). The ☰ drawer now STAYS OPEN on select, so a slow/empty fetch would otherwise
+    // just show a blank log. Reuses the existing .pac-m.status style (R3); it is removed when the
+    // messages arrive, or repurposed into an error line on failure (R5, never a silent blank).
+    function showLoading(){ return addMsg('status','Loading… 加载中'); }
+    // Re-fetch attachment images on reload — the in-memory thumbnail isn't persisted, but the
+    // uploaded file is; ask the shell for it as a data URL (mirrors the main chat's renderAtts).
+    async function attImgs(atts){
+      if(!Array.isArray(atts)||!atts.length) return null;
+      const out=[];
+      for(const a of atts){ if(!a||!a.path) continue;
+        if(!/\.(png|jpe?g|gif|webp)$/i.test(a.name||a.path||'')) continue;   // images only
+        try{ const r=await req({kind:'attach-url',path:a.path}); if(r&&r.ok&&r.dataUrl) out.push({thumb:r.dataUrl}); }catch{}
+      }
+      return out.length?out:null;
+    }
+    function addActions(bubble,kind,rawText,prompt,scopeKey){   // scopeKey: the thread this bubble was rendered in (send() passes its snapshot); default = the thread shown now
+      const bar=document.createElement('div'); bar.className='pac-acts '+kind;
+      const copyBtn=mkab('⎘','Copy'); copyBtn.onclick=()=>copyText(rawText,copyBtn); bar.appendChild(copyBtn);
+      if(kind==='ai'){
+        const speakBtn=mkab('🔊','Read aloud');
+        speakBtn.onclick=()=>{ const ss=window.speechSynthesis;
+          if(ss&&ss.speaking){ ss.cancel(); speakBtn.classList.remove('on'); return; }
+          speakBtn.classList.add('on'); speak(stripMd(rawText),()=>speakBtn.classList.remove('on')); };
+        const retryBtn=mkab('↺','Ask again'); retryBtn.onclick=()=>{ const p=(prompt!=null?prompt:lastUser); if(p!=null) send(p); };  // re-ask THIS reply's question
+        bar.append(speakBtn,retryBtn);
+        // Save as note · 存为笔记 under a summary answer (plan E, web/drawer-summary.inline.html). TODO(R4 seam): the actions bar → its own inlined part.
+        if(window.PADrawerSummary) window.PADrawerSummary.decorate(bar,rawText,{el:bubble,key:scopeKey===undefined?key:scopeKey,convo:(c=>()=>c)(curConvo),hooks:opts.summary||null,fresh:scopeKey!==undefined,prompt});   // both snapshots + the bubble + the prompt: it binds the thread, the refs it was rendered with and the turn; fresh = send()'s own answer (openConvo replays pass no scopeKey), which a summary saves as a note at once
+      } else {
+        const editBtn=mkab('✎','Edit'); editBtn.onclick=()=>{ el.inp.value=rawText; autosize(); el.inp.focus(); };
+        bar.appendChild(editBtn);
+      }
+      el.log.appendChild(bar); pin(); updateScroll();
+    }
+    // ── Verify · 校验 chip row under an AI bubble. state 'pending' → a plain
+    //    "Verifying · 校验中" chip + a background poll of the convo (10s→30s backoff, deadline
+    //    from the server-declared timeout — passing it SURFACES the missing result, R14);
+    //    terminal → [Fast · 快速][Deep ×N · 多模型] switch swapping the bubble content. ──
+    function addAssessRow(bubble, fastMd, a0, convoId){
+      const bar=document.createElement('div'); bar.className='pac-acts ai pac-vrow'; el.log.appendChild(bar);
+      let cur=a0, view='fast';
+      const chip=(label,tag)=>{ const b=document.createElement(tag||'button'); b.className='pac-vchip'; b.textContent=label; bar.appendChild(b); return b; };
+      const show=(v)=>{ if(view===v) return; view=v; draw(); if(bubble.isConnected) paint(bubble, v==='deep'?assessDeepMd(cur):fastMd); };
+      function draw(){ bar.innerHTML='';
+        if(cur.state==='pending'){ chip('⏳ Verifying · 校验中','span').classList.add('pend'); return; }
+        if(cur.state==='timeout'){ chip('⚠ Verify timed out · 校验超时','span').classList.add('pend'); return; }
+        const n=(cur.models||[]).filter(x=>x.ok).length;
+        const bf=chip('Fast · 快速'), bd=chip(cur.state==='error'?'⚠ Verify failed · 校验失败':'Deep ×'+n+' · 多模型');
+        bf.classList.toggle('on',view==='fast'); bd.classList.toggle('on',view==='deep');
+        bf.onclick=()=>show('fast'); bd.onclick=()=>show('deep'); }
+      async function poll(){ let wait=10000;
+        const deadline=(cur.started||Date.now())+((cur.timeoutMinutes||30)*60000)+60000;
+        while(bar.isConnected&&cur.state==='pending'){
+          await new Promise(r=>setTimeout(r,wait)); wait=Math.min(Math.round(wait*1.5),30000);
+          if(!bar.isConnected) return;   // thread switched / log cleared — a later replay re-attaches and resumes from the persisted state
+          if(Date.now()>deadline){ cur=Object.assign({},cur,{state:'timeout'}); draw(); return; }   // absence of a result is itself surfaced (R14)
+          try{ const r=await req({kind:'convo',convoId});
+            const mm=((r&&r.ok&&r.data&&r.data.messages)||[]).find(x=>x.aid===cur.aid);
+            if(mm&&mm.assess&&mm.assess.state!=='pending'){ cur=Object.assign({aid:cur.aid},mm.assess); draw(); if(view==='deep'&&bubble.isConnected) paint(bubble,assessDeepMd(cur)); }
+          }catch(e){} } }   // transient broker/network error: keep polling — the deadline above guarantees a visible terminal state (R5)
+      draw(); if(a0.state==='pending'&&convoId) poll();
+    }
+
+    // App-agnostic post-render hook: after any AI bubble's HTML is set, let the host
+    // enhance it (e.g. the Bible app linkifies verse references). Errors never break render.
+    const enh=el=>{ try{ if(window.PASummaryRefs) window.PASummaryRefs.enhance(el,key);   // a summary answer's [n] → note links (web/summary-refs.inline.html). TODO(R4 seam): the render hooks → the actions-bar part
+        if(opts.enhance) opts.enhance(el); }catch(e){ console.warn('[PAChat] enhance hook failed',e); } };
+    // ONE place installs a message body, so "rendered markdown or plain text?" is decided AND
+    // recorded in a single spot. The class it sets is what turns off pre-wrap; a bubble that fell
+    // back to escaped text keeps pre-wrap, and therefore keeps its line breaks.
+    // ONE place installs a message body, so "rendered markdown or plain text?" is decided AND
+    // recorded in a single spot. The class it sets is what turns off pre-wrap; a bubble that fell
+    // back to escaped text keeps pre-wrap, and therefore keeps its line breaks.
+    function setBody(d,md,html){
+      const ok=typeof html==='string'&&html!=='';
+      d.innerHTML=ok?html:esc(md);
+      d.classList.toggle('pac-md',ok);
+    }
+    async function paint(d,md){
+      try{ const r=await req({kind:'render-md',text:md}); setBody(d,md,(r&&r.ok)?r.html:null); }
+      catch{ d.textContent=md; d.classList.remove('pac-md'); }   // plain text: pre-wrap must stay on
+      enh(d); pin(); updateScroll();
+    }
+
+    function renderChips(){ el.chips.innerHTML='';
+      atts.forEach((a,i)=>{ const c=document.createElement('div'); c.className='pac-chip';
+        const im=document.createElement('img'); im.src=a.thumb; im.alt=''; c.appendChild(im);       // .src, not innerHTML
+        const b=document.createElement('button'); b.dataset.i=i; b.textContent='✕'; c.appendChild(b);
+        el.chips.appendChild(c); }); }
+
+    // ── convo-id persistence ──
+    // Priority: app-supplied getConvoId/setConvoId (e.g. bible stores it in its
+    // annotation file). Else, if opts.persist is set, PAChat keeps a {key:convoId}
+    // map in <persist>.json via the broker — so any app gets remembered history for
+    // free. Else session-only (in-memory).
+    let convoMap=null, mapPromise=null;
+    function loadMap(){ if(mapPromise) return mapPromise;   // cache the in-flight promise, not a half-built object
+      mapPromise=(async()=>{ let mp={};
+        if(opts.persist){ try{ const r=await req({kind:'data',path:opts.persist+'.json'}); if(r&&r.ok&&r.text) mp=JSON.parse(r.text)||{}; }
+          // Degrade to an empty map on a missing/corrupt/failed read. Safe by design: this value is
+          // only a {scope:convoId} POINTER — the real conversations live in the shell's store and stay
+          // in ☰ history; the worst case is starting a fresh thread, never losing an existing one. (R5)
+          catch{} }
+        convoMap=mp; return mp; })();
+      return mapPromise; }
+    async function getCid(k){ if(opts.getConvoId) return opts.getConvoId(k); const mp=await loadMap(); return mp[k]; }
+    // Release every scope bound to a conversation that no longer exists. The host owns its own
+    // map (the Bible keeps verse→thread in the chapter file), so it is asked to forget; the
+    // built-in convoMap is cleaned directly. Silent no-op for a host that offers neither.
+    function unbindConvo(id){
+      if(!id) return;
+      if(opts.unbindConvo){ try{ opts.unbindConvo(id); }catch(e){ console.warn('[PAChat] unbindConvo hook failed',e); } return; }
+      if(!convoMap) return;
+      let changed=false;
+      for(const kk of Object.keys(convoMap)) if(convoMap[kk]===id){ delete convoMap[kk]; changed=true; }
+      if(changed&&opts.persist) req({kind:'save-data',path:opts.persist+'.json',data:JSON.stringify(convoMap)});
+    }
+
+    function setCid(k,id){
+      // An unkeyed chat binds to nothing. Without this, `k` of null was written as the STRING
+      // "null" — a real entry named "null" exists in live Bible data — and every later unkeyed
+      // chat overwrote it, so they all collapsed onto one bogus scope.
+      if(k===null||k===undefined||k==='') return;
+      if(opts.setConvoId){ opts.setConvoId(k,id); return; }
+      convoMap=convoMap||{}; convoMap[k]=id;
+      if(opts.persist) req({kind:'save-data',path:opts.persist+'.json',data:JSON.stringify(convoMap)}); }
+
+    // ── Verify · 校验 toggle — remembered PER APP ──
+    // Stored under the RESERVED '_verify' key in the same per-app {scope:convoId} map
+    // (opts.persist JSON, broker-namespaced to data/<slug>/), so each app keeps its own
+    // setting, one app's toggle never leaks into another, and a fresh app starts OFF.
+    // ('_verify' is reserved: apps must not use it as a thread scope key.) Apps without
+    // opts.persist degrade to session-only — the toggle resets when the app reloads.
+    let verifyOn=false;
+    const renderVerify=()=>{ el.vfy.textContent=(verifyOn?'☑':'☐')+' Verify · 校验'; el.vfy.classList.toggle('on',verifyOn); };
+    window.PANewDot.mark(el.vfy,'verify-toggle');   // buffered if the shell's prefs push hasn't arrived yet
+    loadMap().then(mp=>{ if(mp&&mp._verify===true){ verifyOn=true; renderVerify(); } });
+    async function saveVerify(){ if(!opts.persist) return; await loadMap();   // never write before the read finished (a racing save would drop the stored map)
+      convoMap=convoMap||{}; if(verifyOn) convoMap._verify=true; else delete convoMap._verify;
+      req({kind:'save-data',path:opts.persist+'.json',data:JSON.stringify(convoMap)}); }
+
+    // ── history: clear + replay a thread, or greet ──
+    // open() resolves false when a newer open/openConvo/newChat superseded it, so a caller that acts on the
+    // opened thread (e.g. a picture ask) can stop instead of writing into whatever thread is shown now.
+    let _openP, _closeN=0;   // _closeN: ✕ taps (full-screen and rail alike)
+    function open(k){
+      el.inp.focus(); drawer.close();
+      if(k===loadedKey){ const c=_closeN; return Promise.resolve(_openP).then(r=>r===false||_closeN!==c?false:r); }     // same thread shown or still loading — keep it, and resolve when it is ready
+      const c=_closeN; const p=(_openP=openNow(k)); return p.then(r=>r===false||_closeN!==c?false:r);
+    }
+    async function openNow(k){
+      const my=++_loadSeq;                  // token for THIS load; a newer open/openConvo/newChat bumps _loadSeq and drops us
+      key=k; loadedKey=k; atts=[]; renderChips(); el.log.innerHTML='';
+      const cid = await getCid(k);
+      if(my!==_loadSeq) return false;             // a newer selection superseded this one
+      curConvo = cid || null;
+      _sel = cid || null; drawer.setActive(_sel);   // while the chat surface shows convo X, X is the ONE selection (symmetric with openConvo)
+      setTitle(opts.getLabel ? (opts.getLabel(k)||'Chat') : 'Chat');
+      let shown=false;
+      if(cid){ const loading=showLoading();   // network fetch ahead — show feedback immediately
+        try{ const r=await req({kind:'convo',convoId:cid});
+          if(my!==_loadSeq) return false;         // superseded while fetching history — don't append into another thread
+          loading.remove();
+          if(r&&r.ok&&r.data&&r.data.messages){ for(const mm of r.data.messages){
+            if(my!==_loadSeq) return false;       // bail mid-render if superseded (the loop awaits render-md/attach-url)
+            if(mm.role==='md'){ const ae=await addAI(mm.text); if(my!==_loadSeq) return false; addActions(ae,'ai',mm.text, lastUser); _addTook(ae,mm.ms,mm.by); if(mm.assess&&mm.aid) addAssessRow(ae, mm.text, Object.assign({aid:mm.aid},mm.assess), curConvo); }
+            else { const ct=shownMe(cleanMe(mm.text)); const im=await attImgs(mm.attachments); if(my!==_loadSeq) return false; const me=addMsg('me',ct,im); if(ct) addActions(me,'me',ct); lastUser=cleanMe(mm.text)||lastUser; } }
+            shown=r.data.messages.length>0; } }
+        catch(e){ if(my!==_loadSeq) return false; loading.className='pac-m status'; loading.textContent='Could not load this chat — please try again. 无法加载对话，请重试。'; return; } }   // R5: surface the failure, never a silent blank
+      if(my!==_loadSeq) return false;
+      if(!shown){ const g=typeof opts.greeting==='function'?opts.greeting(k):opts.greeting; if(g) addMsg('ai',g); }
+      updateScroll();
+    }
+
+    // Resolves TRUE if the turn was actually started, FALSE if it was refused. It used to
+    // resolve undefined either way, so a caller that sends PROGRAMMATICALLY (the Bible's split
+    // rail asks for a verse explanation without the user typing) could not tell a discarded
+    // send from a delivered one — and a refusal then rendered as an empty pane that reads like
+    // the model said nothing (R5). No existing caller inspects the value, so this is additive.
+    async function send(text,o){   // o: {attachments:[{name,path}], model} — a host's own files and lane for THIS turn (the summary's page images); the composer's chips stay
+      if(sending) return false;                 // a turn is already streaming
+      const ext=!!(o&&Array.isArray(o.attachments)); const q=(typeof text==='string'?text:el.inp.value).trim(); const mine=ext?o.attachments.slice():atts.slice();
+      if(!q&&!mine.length) return false;        // nothing to send
+      const k=key, myLoad=_loadSeq;           // snapshot: the user may switch threads mid-send (myLoad: the thread shown when this turn began)
+      const cid = curConvo;
+      const first=!cid;
+      const lbl = opts.getLabel ? opts.getLabel(k) : undefined;
+      let body=q||'(see the attached photo)';
+      for(const a of mine) body+='\n\n[Attached file: '+a.name+' — saved to workspace/'+a.path+'. Use the Read tool to view it.]';
+      const msg=(first&&opts.contextPrefix)? opts.contextPrefix(body,k) : body;
+      const sys=(typeof opts.system==='function'?opts.system(k):opts.system);   // the thread's key: a host answers a summary scope with its own system line
+      const attRefs=mine.map(a=>({name:a.name,path:a.path}));
+      // PRE-FLIGHT (V4). The whole payload is measured BEFORE anything is cleared: an app's
+      // contextPrefix (a whole Bible chapter, a note) can push an ordinary-looking question
+      // past the cap on its own. On a refusal the composer and the chips are untouched, so
+      // the user still has their work — the incident's shape was that they did not.
+      const bytes=pacChatBytes(msg, cid||null, attRefs, lbl, sys);
+      if(bytes>PAC_LIMITS.chat){ addMsg('status', pacTooLargeText('Message', bytes, PAC_LIMITS.chat)); updateScroll(); return false; }   // too large: reported in the log AND to the caller
+      sending=true; el.go.disabled=true;
+      el.inp.value=''; autosize(); const shown=shownMe(q); const um=addMsg('me',shown,mine); if(!ext) atts=[]; renderChips();
+      if(q){ addActions(um,'me',shown); lastUser=q; }
+      const sendTime=Date.now();
+      let _waiting=true, _elTimer=null;
+      const thinking=addMsg('ai','…');
+      _elTimer=setInterval(()=>{ if(_waiting&&thinking.isConnected) thinking.textContent='… '+_took(Date.now()-sendTime); },200);
+      let acc='', _rt=null, _rseq=0, _rlast=0, assessEv=null, failure=null, _doneBy='';
+      // Live markdown while streaming: re-render the accumulated text through the shared
+      // renderer (render-md), throttled to ~150ms. A seq guard drops stale renders so a
+      // slow one can't clobber a newer one (or the final).
+      const renderLive=()=>{ const my=++_rseq, cur=acc;
+        req({kind:'render-md',text:cur}).then(r=>{ if(my!==_rseq||!thinking.isConnected) return; setBody(thinking,cur,(r&&r.ok)?r.html:null); enh(thinking); pin(); updateScroll(); }).catch(()=>{}); };
+      try{
+        const r=await reqChat(msg, cid||null, (ev)=>{
+          // Adopt the id the server ACTUALLY used, not merely the one we had none for. The old
+          // `!cid` guard meant: if we asked to continue conversation X and the server answered
+          // with Y, we ignored Y and kept pointing at X. X is typically gone — deleting a chat
+          // from the ☰ list tombstones the file but does NOT clear the scope that points at it —
+          // so every later turn asked for a dead id, got a fresh conversation, and never rebound.
+          // Measured: 4 of 9 Bible pointers dangling, 45 conversations holding exactly one
+          // exchange each. Adopting on DIFFERENCE makes a stale binding heal itself on first use.
+          if(ev.type==='convo'&&ev.id&&ev.id!==cid){ setCid(k,ev.id); if(myLoad===_loadSeq||key===k){ curConvo=ev.id; _sel=ev.id; }   // adopted only while this scope is shown (still, or reopened); another thread open meanwhile keeps its own
+            opts.onConvo&&opts.onConvo(ev.id,k); if(!cid&&(myLoad===_loadSeq||key===k)) setTitle(lbl||q.slice(0,40)||'Chat'); }
+          if(ev.type==='status'){ thinking.className='pac-m status'; thinking.textContent='🔧 '+ev.text; pin(); updateScroll(); }
+          // classList, NOT className=. Assigning className wiped pac-md on EVERY delta — many
+          // times a second — while the throttled render only put it back every 150ms. The bubble
+          // therefore flipped between white-space:normal and pre-wrap continuously, and since
+          // those differ in height by ~2.5x on a real reply, the text visibly blinked as it
+          // streamed. The only job here is status→ai; say exactly that and leave the rest alone.
+          if(ev.type==='delta'){ if(_waiting){ _waiting=false; clearInterval(_elTimer); } acc+=ev.text;
+            thinking.classList.remove('status'); thinking.classList.add('ai');
+            const t=Date.now(); if(t-_rlast>=150){ _rlast=t; renderLive(); } else { clearTimeout(_rt); _rt=setTimeout(()=>{ _rlast=Date.now(); renderLive(); },150); }
+            pin(); updateScroll(); }
+          if(ev.type==='done'&&ev.text&&!acc) acc=ev.text;
+          if(ev.type==='done'&&typeof ev.by==='string') _doneBy=ev.by;   // the model that actually answered
+          if(ev.type==='assess'&&ev.state==='started') assessEv=ev;   // Verify panel launched server-side; results arrive via the convo poll
+          // A TERMINAL SERVER FAILURE, not a chunk of an answer (V4). The route answers a
+          // rejected body as one {ok:false,type:'error',code,limit,text} line, so it arrives
+          // here like any other event. Recording it is what stops the old lie below —
+          // "No response — try rephrasing." for a message the server never accepted.
+          if(ev.type==='error'||(ev.ok===false&&ev.type!=='done')){ const lim=pacTooLargeLimit(ev);
+            failure = lim ? pacTooLargeText('Message', bytes, lim) : (ev.text||ev.error||'unknown error 未知错误'); }
+        }, attRefs, lbl, sys, verifyOn, undefined, undefined, (o&&o.model)||undefined);
+        clearTimeout(_rt); _rseq++;   // stop live renders; the final render below is authoritative
+        if(!thinking.isConnected) return;   // user switched threads mid-response — don't write/append into the new one
+        // The relay's own catch path ({done:true,code,text,error}) — a dropped connection,
+        // never a silent stop. `text` first: that is the shell's ONE mapper's sentence
+        // ("Connection failed · 连接失败 — it never left this device"), while `error` is the
+        // raw transport string a user cannot act on (R3/R5).
+        if(r&&(r.text||r.error)&&!failure) failure=r.text||r.error;
+        const final=(r&&r.ev&&r.ev.text)||acc;
+        // classList here too, for the same reason as the delta path: assigning className wipes
+        // pac-md. Harmless on this line alone (paint() below reinstalls it), but the PATTERN is
+        // the trap, so neither ai-transition uses it. The status paths below DO assign className
+        // deliberately — they install plain text and want pre-wrap back.
+        thinking.classList.remove('status'); thinking.classList.add('ai');
+        // A real failure is reported AS a failure. "No response — try rephrasing." is now
+        // reserved for a turn that genuinely succeeded with nothing to say (R5/R14 — an
+        // error must never be dressed up as the model having nothing to say). A failure
+        // that arrives AFTER partial text keeps the text and adds a line: nothing streamed
+        // is ever thrown away to make room for the notice.
+        if(final){ await paint(thinking, final);
+          _addTook(thinking,Date.now()-sendTime,_doneBy);
+          addActions(thinking,'ai',final, q, k);
+          if(assessEv&&thinking.isConnected) addAssessRow(thinking, final, {state:'pending',aid:assessEv.aid,started:Date.now(),timeoutMinutes:assessEv.timeoutMinutes,models:[]}, curConvo);
+          if(failure) addMsg('status','⚠ '+failure); }
+        else if(failure){ thinking.className='pac-m status'; thinking.textContent='⚠ '+failure; }
+        else { thinking.textContent='No response — try rephrasing.'; thinking.classList.remove('pac-md'); }   // plain text again: pre-wrap back on
+      }catch(err){ clearTimeout(_rt); clearInterval(_elTimer); thinking.className='pac-m status';
+        thinking.textContent='⚠ Could not send · 发送失败 — '+((err&&err.message)||'unknown error 未知错误')+'. Your message is in the bubble above; copy it before retrying.'; }
+      finally{ clearInterval(_elTimer); sending=false; el.go.disabled=false; pin(); updateScroll(); }
+      return true;                              // the turn RAN — its outcome is in the log above
+    }
+
+    function autosize(){ el.inp.style.height='auto'; el.inp.style.height=Math.min(el.inp.scrollHeight,120)+'px'; }
+
+    // ── ☰ "Notes & Chats" list: the SHARED buildDrawer instance (R3). One renderer, used
+    //    here and by PAChat.listDrawer. It merges this app's chats (app-convos, 🤖) with the
+    //    host's augmented notes (opts.listAugment, ✏️). Selecting a row keeps the drawer open. ──
+    const drawer=buildDrawer({
+      title:'Notes & Chats · 笔记与对话', newLabel:'＋', onNew:newChat,
+      onNew2:opts.onNewNote||null, newLabel2:'📝',
+      tabs:[{key:'all',label:'All · 全部'},{key:'notes',label:'Notes · 笔记'},{key:'chats',label:'Chats · 对话'}],
+      activeId:()=>_sel, summary:opts.summary,   // summary: the host's period-summary hooks (plan E)
+      items:async()=>{
+        let convos=[]; try{ const r=await req({kind:'app-convos'}); convos=(r&&r.ok&&r.convos)||[]; }catch{ convos=[]; }   // R5: empty on failure → drawer shows "Nothing here yet"
+        let aug=[]; if(opts.listAugment){ try{ aug=(await opts.listAugment())||[]; }catch{ aug=[]; } }   // R5: an augment failure never blanks the chat list
+        const out=[];
+        for(const n of aug) out.push({ id:n.id, icon:'✏️', title:n.title, preview:n.preview, chip:'Note', updated:n.updated||0, created:n.created||0, ai:!!n.ai, tab:'notes', doc:n.doc, pin:!!n.pin,
+          onOpen:n.onClick, onRename:n.onRename, onDelete:n.onDelete, onDeleteAi:n.onDeleteAi, onPin:n.onPin });   // note rows: open + rename/delete/delete-chat come from the augment entry
+        for(const c of convos) out.push({ id:c.id, icon:'🤖', title:c.title||'Chat', preview:c.preview, chip:c.label, updated:c.updated||0, tab:'chats',
+          // open WITHOUT closing the drawer — but first make the chat surface visible (onShow):
+          // the drawer is body-appended and independent, so a prior note-tap may have hidden or
+          // covered the chat host; without this the convo loads into an invisible surface.
+          onOpen:()=>{ if(opts.onShow) opts.onShow(); openConvo(c.id,c); },
+          onRename:async(nn)=>{ await req({kind:'convo-rename',convoId:c.id,title:nn}); if(curConvo===c.id) setTitle(nn); },
+          // Deleting a conversation must also release whatever SCOPE points at it. Without this
+          // the tombstone leaves a live-looking binding: the verse still names a file that is
+          // gone, so every later turn asks for a dead id, is quietly given a new conversation,
+          // and the list fills with one-exchange threads for the same verse. The host owns the
+          // map, so it is told; a host that keeps its own convoMap has it cleared here.
+          onDelete:async()=>{ await req({kind:'convo-delete',convoId:c.id}); unbindConvo(c.id); if(curConvo===c.id) newChat(); } });
+        return out;
+      }
+    });
+    function showList(){ drawer.open(); }   // ☰ opens the shared drawer; the Bible app calls this
+    async function openConvo(id, meta){
+      const my=++_loadSeq;                   // token for THIS load; a newer selection bumps _loadSeq and drops us (mirrors send()'s _rseq)
+      key=null; loadedKey='__c:'+id; curConvo=id; _sel=id; atts=[]; renderChips(); el.log.innerHTML='';   // opening a chat makes it the ONE active row
+      // A summary thread reopened from the list gets its scope back (from a stored scope, else its label), so Save as note is offered again and the host's system line applies.
+      const PS=window.PADrawerSummary; if(PS&&meta) key=(PS.isScope(meta.scope)?meta.scope:PS.scopeOfLabel(meta.label))||null;
+      setTitle((meta&&(meta.label||meta.title))||'Chat');
+      const loading=showLoading();           // drawer stays open; show feedback immediately while the broker fetches (network)
+      try{ const r=await req({kind:'convo',convoId:id});
+        if(my!==_loadSeq) return;            // a newer chat/note was selected while fetching — drop this stale load
+        loading.remove();
+        if(r&&r.ok&&r.data&&r.data.messages){ for(const mm of r.data.messages){
+          if(my!==_loadSeq) return;          // bail mid-render if superseded (the loop awaits render-md/attach-url)
+          if(mm.role==='md'){ const ae=await addAI(mm.text); if(my!==_loadSeq) return false; addActions(ae,'ai',mm.text, lastUser); _addTook(ae,mm.ms,mm.by); if(mm.assess&&mm.aid) addAssessRow(ae, mm.text, Object.assign({aid:mm.aid},mm.assess), curConvo); }
+          else { const ct=shownMe(cleanMe(mm.text)); const im=await attImgs(mm.attachments); if(my!==_loadSeq) return false; const me=addMsg('me',ct,im); if(ct) addActions(me,'me',ct); lastUser=cleanMe(mm.text)||lastUser; } } }
+      }catch(e){ if(my!==_loadSeq) return; loading.className='pac-m status'; loading.textContent='Could not load this chat — please try again. 无法加载对话，请重试。'; }   // R5: surface the failure, never a silent blank
+      if(my!==_loadSeq) return;
+      updateScroll(); el.inp.focus();
+    }
+    function newChat(){
+      ++_loadSeq;   // invalidate any in-flight convo load so its late resolve can't append into this fresh chat
+      if(opts.onShow) opts.onShow();   // a new chat must be on a VISIBLE surface (the drawer's ＋ can fire while the host is hidden/covered)
+      // setActive(null) as well as _sel=null: clearing the VARIABLE without repainting left the
+      // previously opened note still highlighted beside a brand-new empty chat, which reads as
+      // "I picked that note and got a chat instead". setActiveNote() always did both; this did
+      // not. The drawer's highlight must never outlive the selection it represents.
+      // key/loadedKey go too, and that is the whole fix. A new chat used to keep the PREVIOUS
+      // scope's key while clearing curConvo, so the first message created a second conversation
+      // and setCid REBOUND that scope to it — silently orphaning the thread that was there.
+      // Measured on real data: 19 conversations labelled "John 3:2", one pointer, 18 unreachable.
+      // In a keyed app a scope maps to exactly ONE conversation, so a "new chat" must belong to no
+      // scope rather than steal one. It is still a normal conversation and still listed.
+      key=null; loadedKey=null;
+      curConvo=null; _sel=null; drawer.setActive(null); atts=[]; renderChips(); el.log.innerHTML='';   // no drawer close here — the drawer's ＋new closes itself; the top-bar ＋ has no drawer open
+      const g=typeof opts.greeting==='function'?opts.greeting(key):opts.greeting; if(g) addMsg('ai',g);
+      setTitle('New chat'); el.inp.focus(); updateScroll();
+    }
+    // (drawList/noteActions/rowActions/hideList removed — the shared buildDrawer above renders
+    //  the list and owns the ⋯ rename/delete sheet + day-grouping + single-active highlight.)
+
+    // wiring
+    el.log.addEventListener('click',e=>{ if(e.target.tagName==='IMG') lightbox(e.target.src); });   // tap image → full-screen
+    el.log.addEventListener('scroll',updateScroll,{passive:true});
+    window.addEventListener('resize',updateScroll,{passive:true});
+    // Instant, not smooth: some webviews (incl. iOS standalone) no-op behavior:'smooth',
+    // which would make this button do nothing. scrollTop assignment always works.
+    el.scroll.onclick=()=>{ el.log.scrollTop=el.log.scrollHeight; updateScroll(); };
+    el.go.onclick=send;
+    el.inp.addEventListener('input',autosize);
+    el.inp.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); send(); } });
+    el.plus.onclick=()=>el.file.click();
+    el.chips.onclick=e=>{ const b=e.target.closest('button[data-i]'); if(!b) return; atts.splice(+b.dataset.i,1); renderChips(); };
+    // ONE photo path (R1/R3). This handler used to carry its own FileReader, its own 4/3
+    // pre-flight against its own copy of the cap, and its own three-deep fallback chain for the
+    // failure sentence — one of FOUR such copies in the tree, which is how they came to disagree
+    // about the cap and about resizing. All of it now lives in PAPhoto (web/photo-ui.inline.html),
+    // which pre-flights against PAChat.limits — the constant pinned above — and renders through
+    // PAChat.failText, so a 401, a dropped socket and an oversized photo still read differently.
+    // What stays here is the COMPOSER's part: which files were picked, and the chips.
+    el.file.onchange=async e=>{ const files=[...e.target.files]; e.target.value='';
+      for(const f of files){
+        // R5: a missing component is NAMED. Silently doing nothing is what makes a ＋ button
+        // look broken; this says which piece is absent. (Serve-time inlining, see the marker at
+        // the top of this file — an app page that never received it says so instead of pretending.)
+        if(!window.PAPhoto){ addMsg('status','⚠ '+PAC_NO_PHOTO); updateScroll(); continue; }
+        let up;
+        // PAPhoto answers with an outcome for every failure it knows about, so a THROW here is a
+        // bug in it — and a bug must still reach the user rather than an unhandled rejection (R5).
+        try{ up=await window.PAPhoto.upload(f,{what:pacWhatForFile(f.name)}); }
+        catch(err){ up={ok:false,text:'Could not read that file · 无法读取该文件 — '+((err&&err.message)||'unknown error 未知错误')}; }
+        if(up.ok){ atts.push({name:f.name,path:up.path,thumb:up.dataUrl}); renderChips(); }
+        else{ addMsg('status','⚠ '+up.text); updateScroll(); }
+      } };
+    if(opts.placeholder) el.inp.placeholder=opts.placeholder;
+    /* ══ PA_PILL_RESERVE_BEGIN ── how much room the log keeps clear for the composer ═════════
+       Extracted and run by test/chat-pill-reserve.test.mjs — keep it one contiguous block.
+       Measure the floating composer so the log reserves exactly enough room (it grows with a
+       multi-line input, attachment chips, or the model pill arriving from the prefs push).
+       Measured, never hardcoded.
+       THE BUG (iPhone screenshot): a hidden surface measures 0, the old `if(h)` DROPPED that
+       measurement, and nothing ever re-measured — so the CSS fallback stood for the whole
+       session and the last message's ✎/⧉ icons sat under the pills. Three defences, because
+       one was not enough:
+         (1) the CSS fallback is derived from the composer's own box + the same env() inset
+             (see .pac in #pac-style) — even a never-measured surface clears;
+         (2) a zero SCHEDULES A RETRY; "cannot measure yet" is never recorded as "measured";
+         (3) it re-measures on everything that actually changes the answer — the row resizing,
+             the fullscreen overlay being SHOWN (WebKit does not reliably fire ResizeObserver
+             when an ANCESTOR flips display:none→block, which is exactly PAChat.fullscreen()),
+             and visualViewport resize (the iOS keyboard). */
+    let pillTries=0;
+    const setPill=()=>{
+      const h=el.row.offsetHeight;
+      if(h){ pillTries=0; host.style.setProperty('--pac-pill',(h+PAC_PILL_GAP)+'px'); return; }
+      if(pillTries++<PAC_PILL_TRIES && typeof requestAnimationFrame==='function') requestAnimationFrame(setPill);
+    };
+    if(window.ResizeObserver) new ResizeObserver(setPill).observe(el.row);
+    if(window.visualViewport) window.visualViewport.addEventListener('resize',setPill);
+    setPill();
+    /* ══ PA_PILL_RESERVE_END ══ */
+    // A taller composer (pills, chips, a 3-line draft) must not cover the last answer: a log that was
+    // at the bottom stays at the bottom (owner 2026-11-13). Registered after setPill's observer, so the
+    // reservation is already updated when this runs.
+    if(window.ResizeObserver) new ResizeObserver(()=>{ if(nearBottom()) pin(); }).observe(el.row);
+    // Model chooser: reflect the shell's model list; a pick applies to this chat's next sends.
+    const renderModelBtn=()=>{ if(!PAC_MODELS.length){ el.model.style.display='none'; return; }
+      el.model.style.display=''; const cur=PAC_MODELS.find(x=>x.id===PAC_CURMODEL)||PAC_MODELS[0]; el.model.textContent=cur.label+' ▾'; };
+    PAC_MODEL_CBS.add(renderModelBtn); renderModelBtn();
+    if(PAC_MODELS.some(x=>x.id==='research')) window.PANewDot.mark(el.model,'research-lane');   // dot the chooser when the new Research lane exists
+    PAC_MODEL_CBS.add(()=>{ if(PAC_MODELS.some(x=>x.id==='research')) window.PANewDot.mark(el.model,'research-lane'); });   // models arrive via prefs after mount
+    el.model.onclick=()=>{ let menu=host.querySelector('.pac-mmenu'); if(menu){ menu.remove(); return; }
+      menu=document.createElement('div'); menu.className='pac-mmenu';
+      const groups={}; PAC_MODELS.forEach(x=>{ (groups[x.group||'']=groups[x.group||'']||[]).push(x); });
+      let html=''; for(const g of Object.keys(groups)){ if(g) html+='<div class="pac-mg">'+g+'</div>';
+        for(const x of groups[g]) html+='<button class="pac-mi'+(x.id===(PAC_CURMODEL||(PAC_MODELS[0]&&PAC_MODELS[0].id))?' on':'')+'" data-m="'+x.id+'">'+x.label+'</button>'; }
+      menu.innerHTML=html;
+      menu.onclick=(ev)=>{ const b=ev.target.closest('[data-m]'); if(!b) return; PAC_CURMODEL=b.dataset.m; PAC_PICKED=true; renderModelBtn(); menu.remove();
+        // Ask the shell to remember it for THIS app. The app cannot store it itself — sandboxed,
+        // opaque origin, every storage API throws. Fire-and-forget on purpose: the choice is
+        // already applied in this session, so a failed write costs the memory, not the turn.
+        try{ parent.postMessage({pa:'req',id:'sm'+Date.now(),kind:'set-model',model:PAC_CURMODEL},'*'); }catch(e){}
+      };
+      el.row.appendChild(menu);
+      setTimeout(()=>{ const off=(ev)=>{ if(!menu.contains(ev.target)&&ev.target!==el.model){ menu.remove(); document.removeEventListener('click',off); } }; document.addEventListener('click',off); },0);
+    };
+    el.vfy.onclick=()=>{ verifyOn=!verifyOn; renderVerify(); saveVerify(); };   // per-app: applies to every thread in this app until toggled again
+    el.toList.onclick=showList;
+    el.newC.onclick=newChat;   // top-bar ＋ = new chat; the drawer's own ＋new is wired inside buildDrawer
+    if(opts.onClose) el.closes.forEach(b=>{ b.style.display=''; b.onclick=()=>{ drawer.close(); _closeN++;   // an open still loading resolves false: the user dismissed it
+      // Closing the chat surface ends the chat's claim to "where the user is" — otherwise a
+      // peeked-at chat stays highlighted in the drawer while the user is back in a note. The
+      // host's onClose may re-assert the real context (e.g. setActiveNote of a visible note).
+      if(_sel===curConvo){ _sel=null; drawer.setActive(null); }
+      opts.onClose(); }; });
+    // (search / tabs / row-tap / ⋯ menu are all owned by the shared buildDrawer instance now.)
+
+    // Host tells PAChat which note is the current one so the ☰ drawer highlights exactly that
+    // ONE row (a note overrides the open chat). Cleared back to the open chat by openConvo/newChat.
+    function setActiveNote(id){ _sel=id||null; drawer.setActive(_sel); }
+    return { open, send, openConvo, newChat, showList, closeList:()=>drawer.close(),   // closeList: hosts close the ☰ drawer when THEIR surface closes (e.g. the draw pad's ✕), matching the chat ✕
+      // Re-read the ☰ list, but ONLY while it is on screen. A host calls this when it writes
+      // something the list should show (a note that just became real), and a pad autosaves on a
+      // debounce — refreshing a closed drawer would be an /api/notes round trip per keystroke
+      // burst, for a list nobody is looking at. It re-reads on open anyway.
+      refreshList:()=>{ if(drawer.isOpen&&drawer.isOpen()) return drawer.refresh(); },
+      setActiveNote, getConvo:()=>curConvo,   // getConvo: host can restore this exact thread (e.g. back-to-chat after a verse jump)
+      // Attach a file the app has ALREADY uploaded, by path. The ＋ button's flow uploads first
+      // and then pushes the same shape; a note's photo is already on the server, so re-uploading
+      // it to ask a question about it would cost a second copy of the bytes for nothing.
+      attach:(a)=>{ if(!a||!a.path) return false;
+        atts.push({name:a.name||'photo.jpg',path:a.path,thumb:a.thumb||null}); renderChips(); return true; },
+      remeasure:setPill,   // a host that reveals this surface must say so — a hidden composer measures 0 (see PA_PILL_RESERVE)
+             prefill:(t)=>{ el.inp.value=t; autosize(); el.inp.focus(); } };   // quick-prompt: fill, let user edit/send
+  }
+
+  window.PAChat={
+    mount:(host,opts)=>Chat(host, opts||{}),
+    // Deleting a conversation is a CHAT operation, and the ☰ list has always done it through
+    // this same broker kind. Exposed so a host unbinding a note's chat does not hand-roll a
+    // second postMessage that could drift from it (R3). The caller still has to release its own
+    // pointer afterwards — the server owns the thread, the host owns the reference to it.
+    deleteConvo:(convoId)=>req({kind:'convo-delete',convoId}),
+    // The lane the NEXT turn will use, for a component that must say so before sending (the summary sheet's confirm line).
+    // TODO(R4 seam): the broker client (reqChat, complete, this) becomes its own inlined part, see complete below.
+    lane:()=>{ const cur=PAC_MODELS.find(x=>x.id===PAC_CURMODEL)||PAC_MODELS[0]; return cur?{id:cur.id,label:cur.label}:null; },
+    lanes:()=>PAC_MODELS.map(x=>({id:x.id,label:x.label,group:x.group||'',provider:x.provider||'',vision:x.vision===true})),   // every served lane, with /api/models' vision flag: the summary sheet picks its lane from it (web/summary-images.inline.html)
+    lightbox,   // the chat's own lightbox above, not a copy (R3): the 信纸 studio enlarges its too-small draft preview in it
+    // One answer over the SAME 'chat' kind and broker as the composer (R3), for a component that
+    // needs an ANSWER rather than a chat surface (PAStationeryStudio's AI design). Resolves
+    // {ok, text, error, convoId}: the server's FINAL text when it sends one (an agent's deltas can
+    // hold its working-out), else what streamed. A relay or lane failure is ok:false carrying the
+    // shell's sentence — never text, so a warning can never be mistaken for an answer.
+    // Always oneShot. o.signal (an AbortSignal) cancels: aborted BEFORE the call, nothing is posted
+    // (posting only to cancel would still start a job); aborted DURING it, one chat-cancel names
+    // this request — the shell closes its fetch, the server kills the job — and the caller is
+    // answered at once, not when the relay winds down. That cancel's reply is not awaited: the
+    // caller is answered either way, and a shell that cannot cancel leaves the job to finish, as
+    // every job did before chat-cancel existed. Never rejects; always exactly these four fields.
+    // TODO(R4): chat-ui is over budget. Split seam: the broker client (the waiter map, req, reqChat
+    // and this complete) becomes its own inlined part, the way PA_PHOTO_UI is.
+    complete:(message,o)=>{ const c=o||{}, sig=c.signal||null; let acc='', fin='', failure='', convoId=null, chatId=null, onAbort=null;
+      const cancelled=()=>({ok:false,text:'',error:PAC_CANCELLED,convoId});
+      if(sig&&sig.aborted) return Promise.resolve(cancelled());
+      const answer=reqChat(String(message||''),c.convoId||null,(ev)=>{
+        if(ev.type==='convo'&&ev.id) convoId=ev.id;
+        if(ev.type==='delta') acc+=ev.text||'';
+        if(ev.type==='done'){ if(ev.ok===false) failure=ev.text||ev.error||'failed · 失败'; else fin=ev.text||''; }
+        if(ev.type==='error'||(ev.ok===false&&ev.type!=='done')) failure=ev.text||ev.error||'failed · 失败'; },
+        c.attachments,c.label,c.system,undefined,true,(id)=>{ chatId=id; }).then(r=>{
+        const f=failure||(r&&r.ok===false?(r.text||r.error||'failed · 失败'):''), text=f?'':(fin||acc);
+        return {ok:!f&&!!text.trim(),text,error:f||(text.trim()?'':'No response · 无回答'),convoId}; });
+      if(!sig) return answer;
+      const stopped=new Promise(res=>{ onAbort=()=>{ req({kind:'chat-cancel',chatId}); res(cancelled()); }; sig.addEventListener('abort',onAbort,{once:true}); });
+      return Promise.race([answer,stopped]).then(r=>{ sig.removeEventListener('abort',onAbort); return r; }); },
+    /* ── The shared failure surface, for every OTHER component on this page ───────────────
+       PANote and an app's own code are inlined into the SAME sandboxed page as this
+       component, so exposing the mapping here is how they reach it without importing
+       (opaque origin, no <script src>, no ES modules).
+       `limits` is the AUTHORITATIVE cap the server actually enforces — a component that
+       hardcodes its own number refuses photos the server would have accepted, which is a
+       size message that is simply false. Kept in sync with the shell by
+       {pa:'prefs',uploadMaxBytes} below, and with lib/webutil.mjs by
+       test/fail-legibility.test.mjs.
+       `failText(reply,{what,bytes})` is the ONE sentence for a failed broker call: the
+       shell already rendered it into reply.text (relayFail in web/index.html), so this
+       prefers that and only falls back to the local renderer for a bare 413 code. Passing
+       a reply straight through here is what keeps a 401, a dropped socket and an oversized
+       photo from all reading "Upload failed" (leftover (e) of the 2026-09-02 data loss). */
+    limits:Object.freeze({...PAC_LIMITS}),   // a copy: an app must not be able to raise the cap it is checked against
+    whatForFile:pacWhatForFile,
+    failText:(reply,o)=>{ const c=o||{}, what=c.what||'File', lim=pacTooLargeLimit(reply);
+      if(reply&&typeof reply.text==='string'&&reply.text) return reply.text;
+      if(lim) return pacTooLargeText(what,c.bytes||0,lim);
+      return (reply&&reply.error)||'Request failed · 请求失败 — no reason given · 未给出原因'; },
+    // One call gives any app the SAME full-screen "Ask AI": a fixed, full-height
+    // overlay whose composer owns the bottom safe-area, with ✕ to close. The app
+    // just calls .open(key) when its Ask-AI entry point is invoked; .hide()/.show()
+    // let it step away to a passage and back. Keeps full-screen behavior consistent
+    // across every app instead of each one re-implementing (and re-breaking) it.
+    fullscreen:(opts)=>{
+      const o=opts||{};
+      const ov=document.createElement('div'); ov.className='pac-fs';
+      const host=document.createElement('div'); ov.appendChild(host);
+      document.body.appendChild(ov);
+      // This overlay starts display:none, so its composer measures 0 — and WebKit does not
+      // reliably deliver a ResizeObserver callback when an ANCESTOR flips display:none→block.
+      // Re-measure right after the overlay becomes visible (offsetHeight forces the layout that
+      // makes the reading real), or the log keeps the un-measured fallback for the session.
+      let chatApi=null;
+      const show=()=>{ ov.classList.add('on'); if(chatApi) chatApi.remeasure(); }, hide=()=>ov.classList.remove('on');
+      // onShow: reveal this overlay + let the app dismiss any covering surface (e.g. a draw pad)
+      const api=Chat(host, Object.assign({}, o, { onShow:()=>{ show(); o.onShow&&o.onShow(); },
+        onClose:()=>{ hide(); o.onClose&&o.onClose(); } }));
+      chatApi=api;
+      return Object.assign({}, api, {
+        el:ov, show, hide, isOpen:()=>ov.classList.contains('on'),
+        open:(k)=>{ show(); return api.open(k); },   // resolves false when superseded or closed with ✕ while loading (in Chat core)
+        openConvo:(id,meta)=>{ show(); api.openConvo(id,meta); },
+        newChat:()=>{ show(); api.newChat(); },
+        showList:()=>{ show(); api.showList(); },
+        showListOnly:()=>api.showList(),   // open the drawer without revealing the chat overlay (e.g. draw pad is already visible)
+      });
+    },
+    // A STANDALONE slide-in list drawer — a THIN wrapper over the shared buildDrawer (R3), so
+    // the SAME renderer/⋯ menu/single-active/stay-open behavior serves both the chat ☰ list and
+    // this. The opts contract is UNCHANGED, so the Journal notes app needs ZERO edits.
+    // opts: { title, items():Promise<[{id,icon,title,preview,chip,updated}]>,
+    //         onOpen(id), onRename(id,title), onDelete(id), onDeleteAi?(id), onPin?(id,flag), onNew?(), activeId?():id }
+    // Returns { open, close, refresh, setActive, isOpen, el, confirm, prompt }.
+    listDrawer:(opts)=>{
+      const o=opts||{};
+      return buildDrawer({
+        title:o.title, newLabel:'＋', onNew:o.onNew, activeId:o.activeId, onRefresh:o.onRefresh, summary:o.summary,
+        // Map this drawer's flat rows to buildDrawer items, binding each id's handlers. The
+        // per-id onRename receives the new title; onDelete takes none (buildDrawer confirms first).
+        items:async()=>{
+          const raw=(o.items?await o.items():[])||[];
+          return raw.map(it=>({ id:it.id, icon:it.icon, title:it.title, preview:it.preview, chip:it.chip, updated:it.updated, created:it.created, ai:it.ai, doc:it.doc, pin:!!it.pin, summary:it.summary===true,   // summary: the host's own flag for the Summaries group (plan H)
+            onOpen:(_id,at)=>{ if(o.onOpen) o.onOpen(it.id,at); },   // `at`: a search hit's {page,boxes,terms}, forwarded (phase 3)
+            onRename:o.onRename?(t)=>o.onRename(it.id,t):undefined,
+            onPin:o.onPin?(f)=>o.onPin(it.id,f):undefined,          // the bookmark flag, per id like onRename (plan D)
+            onDelete:o.onDelete?()=>o.onDelete(it.id):undefined,
+            // Only where the row HAS a chat: ai and onDeleteAi must agree, or the ⋯ offers to
+            // delete a conversation the badge says does not exist.
+            onDeleteAi:(o.onDeleteAi&&it.ai)?()=>o.onDeleteAi(it.id):undefined }));
+        }
+      });
+    },
+    /* ── panel(): the SAME chat, hosted in a PASplit slot instead of a full-screen overlay ──────
+       Placed AFTER listDrawer deliberately: test/chat-pill-reserve.test.mjs slices the source
+       from `fullscreen:(opts)=>{` to the listDrawer comment and evaluates that window with
+       `new Function`, so anything inserted between them is executed by that test as if it were
+       part of fullscreen.
+
+       Three differences from fullscreen(), each of them load-bearing:
+       1. The host gets `position:absolute;inset:0`. `.pac` is `height:100%` and it is `.pac-fs`
+          (`position:fixed;inset:0`) that resolves that today; a bare flex child would leave the
+          log with an unresolved height.
+       2. open/openConvo/newChat RETURN their promise. fullscreen() drops it, which is survivable
+          for a surface the user just tapped open, but the rail AUTO-SENDS after opening and must
+          be able to await it.
+       3. `remeasure` is re-exposed. A rail is resizable; a fixed overlay is not. This is the one
+          thing a panel host must call that a full-screen host never needs. */
+    panel:(opts)=>{
+      const o=opts||{};
+      if(!o.host) throw new Error('PAChat.panel: no host — a panel with nowhere to mount would render nothing and report success');
+      const host=document.createElement('div');
+      host.className='pac-panel';
+      host.style.cssText='position:absolute;inset:0;background:var(--card,#fff)';
+      o.host.appendChild(host);
+      const api=Chat(host, Object.assign({}, o, {
+        // A panel is always visible while the rail is open, so there is no overlay to reveal or
+        // hide. onShow/onClose stay the HOST's business: the app passes its own, and crucially the
+        // full-screen versions (which tear down the draw pad) must NOT be reused here — in a split
+        // view the note pad is a sibling, not a thing to dismiss.
+        onShow:o.onShow, onClose:o.onClose,
+      }));
+      return Object.assign({}, api, {
+        el:host, hosted:'panel',
+        show:()=>{}, hide:()=>{}, isOpen:()=>true,
+        open:(k)=>api.open(k), openConvo:(id,meta)=>api.openConvo(id,meta), newChat:()=>api.newChat(),
+        showListOnly:()=>api.showList(),
+        // `remeasure` needs no line here: Object.assign spreads it through from the engine, which
+        // is also how fullscreen() gets it. An explicit re-listing was dead code (R1). What must
+        // stay true is the CONTRACT — a panel exposes a working remeasure, because a resizable
+        // host has to re-measure and a fixed overlay never does; the test asserts that, not this.
+      });
+    }
+  };
+
+  // Apply global font scale pushed by the shell ({pa:'prefs', fontScale}).
+  window.addEventListener('message',e=>{
+    const m=e.data;
+    if(m&&m.pa==='prefs'){
+      // The font scale is applied by the snippet web.mjs injects into EVERY app page, so that
+      // apps without PAChat get it too. Setting it here as well double-scaled any app that
+      // also receives zoom (R3: one setter, one place).
+      // The shell's remembered lane for this app, if any. Set BEFORE the fallback below so it
+      // wins over "first in the list", and still subject to that line's membership check — an id
+      // the server no longer offers falls back rather than sending a lane it cannot route.
+      if(typeof m.wantModel==='string'&&m.wantModel) PAC_WANTMODEL=m.wantModel;
+      if(Array.isArray(m.models)){ PAC_MODELS=m.models;
+        if(!PAC_PICKED&&typeof m.wantModel==='string'&&m.wantModel) PAC_CURMODEL=null;   // a default yields to the remembered lane (PAC_PICKED)
+        // Honour the host's preferred lane, but only if the server actually offers it —
+        // an unknown id falls back to the first model rather than sending a lane the server
+        // would not recognise (R14: a wrong default must not become a silent no-lane turn).
+        if(!PAC_CURMODEL&&PAC_MODELS[0]) PAC_CURMODEL=(PAC_WANTMODEL&&PAC_MODELS.some(x=>x.id===PAC_WANTMODEL))?PAC_WANTMODEL:PAC_MODELS[0].id;
+        PAC_MODEL_CBS.forEach(cb=>{ try{ cb(); }catch(err){} }); }
+      if(m.newFeatureKeys && !window.PANewDot._loaded) window.PANewDot._init(m.newFeatureKeys);
+    }
+  });
+
+  // ── PANewDot: generic new-feature blue-dot helper for sandboxed apps ──
+  // Usage: PANewDot.mark(el, 'feature-key')  — add CSS + clear on first tap via broker.
+  // The shell pushes unseen keys via {pa:'prefs', newFeatureKeys:[...]} on app load.
+  ;(()=>{
+    const style=document.createElement('style');
+    style.textContent='.pa-new{position:relative}.pa-new::after{content:"";position:absolute;top:1px;right:1px;width:8px;height:8px;background:#007AFF;border-radius:50%;pointer-events:none;box-shadow:0 0 0 2px var(--card,#fff);z-index:5}';
+    document.head.appendChild(style);
+    let _unseen=new Set();
+    const _pending=[];   // [el,key] marks made before the shell's prefs push — replayed by _init (either order works)
+    window.PANewDot={
+      _loaded:false,
+      _init(keys){ _unseen=new Set(keys); window.PANewDot._loaded=true; _pending.splice(0).forEach(p=>window.PANewDot.mark(p[0],p[1])); },
+      mark(el,key){
+        if(!el) return;
+        if(!window.PANewDot._loaded){ _pending.push([el,key]); return; }
+        if(!_unseen.has(key)||el.classList.contains('pa-new')) return;   // second guard = idempotent re-mark (re-rendered sections)
+        el.classList.add('pa-new');
+        el.addEventListener('pointerdown',()=>{
+          el.classList.remove('pa-new'); _unseen.delete(key);
+          parent.postMessage({pa:'req',id:'nd'+(Date.now()),kind:'seen-feature',key},'*');
+        },{once:true,capture:true});
+      }
+    };
+  })();
+})();
+</script>
+<!--PA_DRAWER_SUMMARY_UI-->
+<!--PA_DRAWER_TAGS_UI-->
+<!--PA_DRAWER_GROUPS_UI-->
+<!--PA_APP_PREFS_UI-->
+<!--PA_TIPS_UI-->

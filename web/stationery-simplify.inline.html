@@ -1,0 +1,208 @@
+<!-- PAStationerySimplify · 信纸简化 — the steps of simplify() (ADR 0003 amendment 5): what may be taken out of an AI design
+     refused only for a size. Split out of stationery-cost (R4). stationery-sanitize carries it ABOVE its own script, after the
+     budget it reads, and its simplify() runs the steps. A page served without it still checks every design: simplify() then
+     refuses an over-budget one with sanitize()'s own reason, as before amendment 5. -->
+<script>
+window.PAStationerySimplify=(function(){
+  'use strict';
+  const {PAGE_W,PAGE_H,WS,NONE,attr,viewBoxOf,inherits,widthOf,geomOf}=window.PAStationeryGeometry;
+  const {REF_URL,SHAPES,GROUPS,SERVER,frac,seeThrough,stopsOf,limitsWhy,octOver,LIMITS}=window.PAStationeryCost, MAX_STOPS=LIMITS.gradientStops;
+  // What may be taken out of a design that is over MAX_COST, kind by kind, in this order: each step is an effect priced in
+  // stationery-cost. A step only REMOVES what it names, or turns a paint into a plain colour the design already holds, and says
+  // whether it changed anything. The sanitizer's simplify() re-checks every result in full; this file never judges one. Sets
+  // and arrays, not tables: keyed by the design's own text.
+  const all=(root)=>{ const out=[], st=[root]; while(st.length){ const n=st.pop(); out.push(n); for(let i=n.kids.length-1;i>=0;i--) st.push(n.kids[i]); } return out; };
+  // ONE work budget per simplify() call (R13 round 4). Every walk that can read an element again and again spends from one
+  // meter(): a tile's walk, through each <use>; a tile's size and colours, read for each shape; the tallies of what a lender
+  // lends to; the climbs up the tree (an inherited paint, an opacity, a <use> drawn once); a gradient's stops; a colour written.
+  // A unit for each element read, kid listed or colour piece, plus one for each SCAN characters of the values read or written:
+  // an element's values as they are AT that read (R13 round 5: a size kept from before lend() wrote a 150 KB colour onto it
+  // charged that colour 1 unit a read, 4,000 reads, 2 s). Spent, it throws SPENT, and simplify() refuses the design plain
+  // (TOO_COMPLEX): it fails CLOSED, never a part-simplified design, never a frozen page (1,600 tiles drawing one <use> chain
+  // took 6 s in Chromium). Not metered, as sanitize()'s own walks are not: what reads each element a bounded number of times
+  // (all(); a lender's own walks, as each element is below one lender per paint). The saved real replies spend at most 650
+  // units, forced through every step (R13 round 4, ADR 0003).
+  // And ONE deadline, a BACKSTOP (R13 round 5): units are not time (a unit costs 0.01-0.6 µs by walk, a charge can be missed,
+  // and sanitize()'s re-checks are not metered), so the meter also reads a clock: at its start, every TICK charges, and where
+  // simplify() asks (before and after each re-check). Past SIMPLIFY_MS it throws SPENT too: fail closed, never a part-simplified
+  // design. A slower device refuses a borderline design sooner, by design. The clock: performance.now(), else Date.now(); a
+  // caller (the tests) may pass its own, told only where it is read ('start', 'walk', 'before', 'after').
+  const WORK=50000, SCAN=128, SIMPLIFY_MS=150, TICK=16, SPENT=Object.freeze(new Error('simplify: over its work budget or its deadline'));
+  const CLOCK=typeof performance==='object'&&performance&&typeof performance.now==='function'?()=>performance.now():()=>Date.now();
+  const meter=(now=CLOCK)=>{ const t0=now('start'); let left=WORK, k=0;
+    const late=(at,ahead=0)=>{ const t=now(at)-t0; if(!(t+ahead<=SIMPLIFY_MS)) throw SPENT; return t; };   // NaN, a broken clock: late
+    const w=(n)=>{ if((left-=n)<0) throw SPENT; if(++k%TICK===0) late('walk'); };
+    w.late=late; return w; };
+  const chars=(vs)=>vs.reduce((t,v)=>t+(v==null?0:v.length),0)/SCAN;   // values read or written, in units
+  function drop(root,els,keys){                 // elements by name and attributes by key, anywhere in the tree
+    let hit=false;
+    for(const n of all(root)){ const k=n.kids.length, a=n.attrs.length;
+      n.kids=n.kids.filter((x)=>!els.includes(x.name)); n.attrs=n.attrs.filter((x)=>!keys.includes(x[0]));
+      hit=hit||n.kids.length<k||n.attrs.length<a; }
+    return hit;
+  }
+  // opacity below 1 on a group or a shape (the layers priced above) -> the same fraction on its fill and stroke: no layer, and
+  // 15% stays 15%; only overlaps differ. A value with no digit ("", " ") is unreadable: Chromium draws it opaque (R13 round 1).
+  const unit=(v)=>{ const x=v==null||/\d/.test(v)?frac(v,1):NaN; return isFinite(x)?Math.min(1,Math.max(0,x)):NaN; };   // clamped as drawn; NaN unreadable
+  const num=(v,d)=>{ const x=v==null?d:unit(v); return x>=0?x:d; }, op=(v)=>num(v,1);   // a fraction as drawn, d when absent or unreadable
+  function flatten(root){
+    let hit=false;
+    for(const n of all(root)){ if(!(GROUPS[n.name]||SHAPES[n.name])||!seeThrough(n)) continue;
+      const o=unit(attr(n,'opacity')), K=o>=0?['opacity','fill-opacity','stroke-opacity']:['opacity'];   // unreadable: Chromium ignores it
+      const own=K.slice(1).map((k)=>[k,op(attr(n,k))]); n.attrs=n.attrs.filter((x)=>!K.includes(x[0])); hit=true;
+      for(const [k,v] of own) n.attrs.push([k,String(+(o*v).toFixed(4))]); }
+    return hit;
+  }
+  // ── Plain colours (R13 rounds 1 and 2) ──────────────────────────────────────────────────────────────────────────────────
+  const set=(n,k,v)=>{ const a=n.attrs.find((x)=>x[0]===k); if(a) a[1]=v; else n.attrs.push([k,v]); };   // in place: the order stays
+  const idsOf=(root)=>{ const ids=new Map(); for(const n of all(root)){ const i=attr(n,'id'); if(i!=null&&!ids.has(i)) ids.set(i,n); } return ids; };
+  const readable=(n,k)=>{ const v=attr(n,k); return v!=null&&unit(v)>=0; };   // an opacity Chromium reads ("", "inherit": not)
+  const flat=(n,G)=>{ const g=geomOf(n,G); return !(g.w>0&&g.h>0); };          // no width or height (an upper bound: 0 is 0)
+  const hrefOf=(n,ids)=>n.name==='use'&&ids.get(String(attr(n,'href')).slice(1));
+  const kidsOf=(x,ids)=>{ const u=hrefOf(x,ids); return u?[u]:x.kids; };          // what x draws: a <use>, its target
+  const drawn=(n)=>GROUPS[n.name]||SHAPES[n.name];                             // not a <defs>, <clipPath>, <mask>, server or filter
+  // A colour's own alpha, as drawn: transparent 0; #rgba, #rrggbbaa; the 4th value of rgba()/hsla() or the one after "/"; else 1.
+  const CLEAR=new RegExp('^'+WS+'*transparent'+WS+'*$','i'), HEXA=/^#(?:[0-9a-f]{3}([0-9a-f])|[0-9a-f]{6}([0-9a-f]{2}))$/i;
+  const FN_A=/^[a-z]+\((?:[^,/()]*,){3}([^,/()]*)\)$|^[a-z]+\([^,/()]*\/([^,/()]*)\)$/i;
+  function alphaOf(c){
+    if(c==null) return 1; if(CLEAR.test(c)) return 0;
+    const s=c.trim(), h=HEXA.exec(s), f=!h&&FN_A.exec(s);
+    return h?parseInt(h[1]?h[1]+h[1]:h[2],16)/255:f?num(f[1]||f[2],1):1;
+  }
+  // Each fill and stroke painting with a server of this kind (2 gradient, 3 pattern) -> one plain colour (one not plain reads as
+  // black, as in Chromium) at the share it draws, so a faint texture stays faint (R13 round 1). A colour's own alpha counts in
+  // the share, and is divided out where the colour is written (it is drawn with it). A gradient: its MEAN opacity over 0..1
+  // (stop-opacity runs straight between stops and pads past the ends), in the colour of the stop that covers most (its opacity
+  // x the half-gaps to its neighbours; the first on a tie).
+  const gradIn=(t,X)=>{ if(!X.grads.has(t)){ X.visit(t,t.kids.length); X.grads.set(t,gradOf(t)); } return X.grads.get(t); };   // read once a call
+  function gradOf(t){
+    const s=stopsOf(t), L=s.length-1; if(L<0) return ['none',0];
+    let at=0, best=0, top=-1; const o=s.map((k)=>at=Math.max(at,num(attr(k,'offset'),0))), a=s.map((k)=>op(attr(k,'stop-opacity'))*alphaOf(attr(k,'stop-color'))); let mean=o[0]*a[0]+(1-o[L])*a[L];
+    for(let i=0;i<=L;i++){ if(i) mean+=(o[i]-o[i-1])*(a[i]+a[i-1])/2;
+      const w=a[i]*((i?(o[i]-o[i-1])/2:o[0])+(i<L?(o[i+1]-o[i])/2:1-o[L])); if(w>top){ top=w; best=i; } }
+    const c=attr(s[best],'stop-color'); return [c==null||inherits(c)||/url\(/i.test(c)?'#000':c,mean];
+  }
+  // A pattern: the share of its tile its shapes cover (area, and stroke length x width, times their opacities; each at most the
+  // tile), in the colour covering most. Only what the tile DRAWS (R13 round 2): shapes, in groups and through each <use> (painted
+  // from the <use>), never inside a <defs>, <clipPath> or <mask>; at most TILE_WALK elements (a doubling <use> chain). The walk
+  // is read once per tile, in its content's units (R13 round 3: it ran again for each size of a bounding-box tile); each shape
+  // then scales it to its own tile: a viewBox, or width x height in user space, or in the painted box.
+  const TILE_WALK=5000, PAINT=['fill','stroke','stroke-width','fill-opacity','stroke-opacity'];
+  function piecesOf(t,X){   // per colour: its pieces' areas, ascending, with running sums of share and of area x share
+    if(X.tiles.has(t)) return X.tiles.get(t);
+    const by=new Map(), paint=(p)=>{ if(p==null||NONE.test(p)) return null; const m=p.matchAll(REF_URL).next().value, g=m&&X.ids.get(m[1]);
+      return !m?[p,alphaOf(p)]:g&&SERVER[g.name]===2?gradIn(g,X):null; };
+    const st=[[t,PAINT.map((k)=>X.inh(t,k)),1]]; let left=TILE_WALK;
+    while(st.length&&left-->0){ const [s,up,o]=st.pop(), so=s===t?1:o*op(attr(s,'opacity')), ks=kidsOf(s,X.ids);
+      const v=PAINT.map((k,i)=>{ const x=attr(s,k); return inherits(x)||i>2&&!readable(s,k)?up[i]:x; }); X.visit(s,ks.length+chars(v));
+      const add=(c,area,i)=>{ const f=c&&c[1]*op(v[i])*so; if(area>0&&f>0){ if(!by.has(c[0])) by.set(c[0],[]); by.get(c[0]).push([area,f]); } };
+      if(SHAPES[s.name]){ const g=geomOf(s,X.G);
+        add(paint(v[0]||'#000'),s.name==='line'?0:(s.name==='circle'||s.name==='ellipse'?Math.PI/4:1)*g.w*g.h,3);
+        add(paint(v[1]),g.len*(v[2]==null?1:widthOf(v[2])),4); }
+      for(const k of ks) if(drawn(k)) st.push([k,v,so]); }
+    const r=[...by].map(([c,p])=>{ p.sort((x,y)=>x[0]-y[0]); const F=[0], AF=[0];
+      for(const [a,f] of p){ F.push(F[F.length-1]+f); AF.push(AF[AF.length-1]+a*f); } return [c,p.map((x)=>x[0]),F,AF]; });
+    X.tiles.set(t,r); return r;
+  }
+  function tileOf(t,n,X){ X.visit(t);   // its size, read again for each shape
+    const vb=viewBoxOf(attr(t,'viewBox')), box=attr(t,'patternUnits')==='userSpaceOnUse'?{w:1,h:1}:SHAPES[n.name]?geomOf(n,X.G):{w:PAGE_W,h:PAGE_H};
+    const A=vb.length===4?vb[2]*vb[3]:frac(attr(t,'width'),0)*box.w*frac(attr(t,'height'),0)*box.h;
+    if(!(A>0&&A<Infinity)) return ['none',0];   // a tile of no size paints nothing
+    let c='none', top=0, sum=0; const P=piecesOf(t,X); X.w(P.length);
+    for(const [k,a,F,AF] of P){ let i=0, j=a.length; while(i<j){ const m=(i+j)>>1; if(a[m]<=A) i=m+1; else j=m; }
+      const f=AF[i]/A+F[a.length]-F[i]; sum+=f; if(f>top){ top=f; c=k; } }   // a piece up to the tile counts its area; a larger one, all of it
+    return [c,Math.min(1,sum)];
+  }
+  // n paints k with c at share s, and LENDS it to what below sets no k of its own (R13 rounds 2 and 3). The share goes where it
+  // reaches only the lent paint: on n, unless a shape below paints a colour of its own with no k-opacity of its own (it would fade,
+  // R13 round 3), then on each part below that it does; and on each k-opacity set there, which overrides n's. A shape of no width
+  // or height draws nothing with a bounding-box server (bb), as in Chromium: none. Nothing below n that a <use> draws elsewhere is
+  // written, nor a <use> target: those instances are not lent this paint. What s cannot reach there (stuck: a shape setting its
+  // own k-opacity, or painted while s is kept off its own colours) draws the colour at its own; n or the <use> paints none instead
+  // when that is nearer: all it lends to draws nothing, or s x what would vanish is under (1 - s) x what is stuck.
+  function lend(n,k,c,s,bb,X){
+    const o=k+'-opacity', lent=new Set(), kids=(x)=>x.kids.filter((y)=>drawn(y)&&inherits(attr(y,k)));
+    for(const st=[n];st.length;){ const x=st.pop(); lent.add(x); if(x.name!=='use') st.push(...kids(x)); }   // all n lends k to
+    const alone=(u)=>{ for(let z=u;z!==n;z=X.up.get(z)){ X.w(1); if(!z||X.users.has(z)) return false; } return lent.has(u); };   // drawn once, lent
+    const eff=(x)=>{ for(let y=x;y;y=X.up.get(y)){ X.visit(y); if(readable(y,o)) return unit(attr(y,o)); } return 1; };
+    const near=(b,stuck=b.other?b.lent:b.own)=>b.lent===b.flat||s*(b.lent-b.flat)<(1-s)*stuck;   // none is nearer
+    const pass=(write)=>{ let stuck=0; const st=[[n,false]];   // [element, whether s reaches it from above]; dry: what is stuck
+      while(st.length){ const [x,on]=st.pop(), use=x.name==='use', b=SHAPES[x.name]?null:X.below(x,k,bb), put=(a,v)=>write&&set(x,a,v);
+        if(x!==n&&!(X.users.get(x)||[]).every(alone)){ const q=X.self(x,k,bb); stuck+=on?q.own:q.lent; continue; }   // never written
+        if(x!==n&&(use?near(b):bb&&SHAPES[x.name]&&flat(x,X.G))){ put(k,'none'); continue; }
+        let to=on; if(s<1&&(x===n||!on||readable(x,o))){ to=!(b&&b.other); if(to) put(o,String(+(s*eff(x)).toFixed(4))); }
+        if(b&&!use) for(const y of kids(x)) st.push([y,to]); }
+      return stuck; };
+    const b=SHAPES[n.name]?null:X.below(n,k,bb);
+    if(c==='none'||(b?near(b,n.name==='use'?undefined:pass(false)):bb&&flat(n,X.G))){ set(n,k,'none'); return; }
+    set(n,k,c); pass(true);
+  }
+  // What x lends paint k to (its kids, or a <use>'s target; self: x too): the shapes painting it (lent), those of no width or height
+  // (bb), and those setting their own k-opacity (own); and the shapes painting a colour of their own that x's k-opacity reaches
+  // (other). Kept per element and what it inherits: a doubling <use> chain is read once per link.
+  const zero=()=>({lent:0,flat:0,own:0,other:0}), plus=(r,q)=>{ r.lent+=q.lent; r.flat+=q.flat; r.own+=q.own; r.other+=q.other; return r; };
+  function tallyOf(ids,G,visit){
+    const memo=new Map(), Z=Object.freeze(zero());
+    const go=(x,k,bb,ks,on)=>{ visit(x); if(!drawn(x)) return Z;   // ks: the k x inherits (lent, none, own); on: a k-opacity set above
+      const v=attr(x,k), K=inherits(v)?ks:NONE.test(v)?'none':'own', O=on||readable(x,k+'-opacity'), key=k+bb+K+O;
+      const m=memo.get(key)||new Map(); memo.set(key,m); if(m.has(x)) return m.get(x);
+      const r=zero(); m.set(x,r);
+      if(SHAPES[x.name]){ if(K==='lent'){ r.lent=1; r.flat=bb&&flat(x,G)?1:0; r.own=O?1:0; } else if(K==='own'&&!O) r.other=1; }
+      else if(K==='lent'||!O) for(const y of kidsOf(x,ids)) plus(r,go(y,k,bb,K,O));
+      return r; };
+    return { below:(x,k,bb)=>kidsOf(x,ids).reduce((r,y)=>plus(r,go(y,k,bb,'lent',false)),zero()), self:(x,k,bb)=>go(x,k,bb,'lent',false) };
+  }
+  function plain(root,kind,w){
+    const ids=idsOf(root), up=new Map(), G=new Map(), users=new Map(); let hit=false;   // users: the <use>s drawing an element
+    for(const n of all(root)){ for(const k of n.kids) up.set(k,n); const u=hrefOf(n,ids); if(u){ if(!users.has(u)) users.set(u,[]); users.get(u).push(n); } }
+    const visit=(x,more=0)=>w(1+chars(x.attrs.map((a)=>a[1]))+more);   // its values NOW: lend() writes colours (R13 round 5)
+    const inh=(n,k)=>{ for(let x=n;x;x=up.get(x)){ visit(x); const v=attr(x,k); if(!inherits(v)) return v; } return null; };   // inherited down the tree
+    const X={ids,up,G,inh,users,w,visit,tiles:new Map(),grads:new Map(),...tallyOf(ids,G,visit)};
+    for(const n of all(root)) for(const a of n.attrs.slice()) if(a[0]==='fill'||a[0]==='stroke')
+      for(const m of a[1].matchAll(REF_URL)){ const t=ids.get(m[1]); if(!t||SERVER[t.name]!==kind) continue;
+        const [c,f]=kind===2?gradIn(t,X):tileOf(t,n,X), bb=attr(t,kind===2?'gradientUnits':'patternUnits')!=='userSpaceOnUse'; w(chars([c]));
+        lend(n,a[0],f>0?c:'none',Math.min(1,f/alphaOf(c)),bb,X); hit=true; break; }
+    return drop(root,kind===3?['pattern']:['linearGradient','radialGradient'],[])||hit;
+  }
+  // A shape whose box has no width or height is not drawn under a filter or a mask: their regions are in its box (filterUnits and
+  // maskUnits are not on the allow-list), as Chromium draws it. Taking the effect off would SHOW it (the neon draft's level frame
+  // lines, R13 round 2), so it paints none. gone(e): effect e goes. A filtered group or <use> is shown, whatever its box (ADR).
+  function hideFlat(root,key,gone){
+    const ids=idsOf(root), G=new Map();
+    for(const n of all(root)) if(SHAPES[n.name]&&[...String(attr(n,key)).matchAll(REF_URL)].some((m)=>gone(ids.get(m[1])))&&flat(n,G)){ set(n,'fill','none'); set(n,'stroke','none'); }
+  }
+  const named=(name)=>(e)=>!!e&&e.name===name;
+  // en/zh name what was taken out, for the studio's note. Order: the passes first (a filter or mask is 100 or more a use,
+  // and the iPad's slowest); then layers (10 each, and folded they look the same); dashes (solid lines look close); last
+  // the paint itself, which shows most: patterns (100 and a tile a shape), then gradients (at most GRAD_COST a shape). `of`:
+  // a later step of one kind takes out all an earlier one did, so the note names only the later one.
+  const SIMPLIFY=Object.freeze([
+    {en:'shadows and glows',zh:'阴影和发光效果',of:'filter',run:(r)=>{ hideFlat(r,'filter',named('filter')); return drop(r,['filter'],['filter']); }},
+    {en:'masks and clipping',zh:'遮罩和裁剪',run:(r)=>{ hideFlat(r,'mask',named('mask')); return drop(r,['mask','clipPath'],['mask','clip-path']); }},
+    {en:'see-through layers',zh:'半透明图层',run:flatten},
+    {en:'dashes',zh:'虚线',run:(r)=>drop(r,[],['stroke-dasharray'])},
+    {en:'pattern fills',zh:'图案填充',run:(r,w)=>plain(r,3,w)},
+    {en:'gradients',zh:'渐变',of:'gradient',run:(r,w)=>plain(r,2,w)}]);
+  // LIMIT_STEPS (sanitize() marks `limit` only when every other rule passed): a filter over its limits, or holding a turbulence
+  // over them, goes with each filter="url(#it)" (a shape it hid stays hidden); a stray numOctaves is dropped (nothing draws it); a
+  // gradient keeps MAX_STOPS stops.
+  function fitFilters(root){
+    const big=new Set(all(root).filter((n)=>n.name==='filter'&&all(n).some((k)=>limitsWhy(k)))), gone=new Set([...big].map((n)=>attr(n,'id'))); let hit=big.size>0;
+    hideFlat(root,'filter',(e)=>big.has(e));
+    for(const n of all(root)){ const a=n.attrs.length; n.kids=n.kids.filter((k)=>!big.has(k));
+      n.attrs=n.attrs.filter(([k,v])=>!(k==='filter'&&[...v.matchAll(REF_URL)].some((m)=>gone.has(m[1])))&&!(k==='numOctaves'&&octOver(v)));
+      hit=hit||n.attrs.length<a; }
+    return hit;
+  }
+  function fitStops(root){ let hit=false;
+    for(const n of all(root)){ const s=stopsOf(n); if(SERVER[n.name]!==2||s.length<=MAX_STOPS) continue;
+      const keep=new Set(Array.from({length:MAX_STOPS},(_,i)=>s[Math.round(i*(s.length-1)/(MAX_STOPS-1))]));   // evenly picked
+      n.kids=n.kids.filter((k)=>k.name!=='stop'||keep.has(k)); hit=true; }
+    return hit;
+  }
+  const LIMIT_STEPS=Object.freeze([
+    {en:'oversized shadows and glows',zh:'过大的阴影和发光效果',of:'filter',run:fitFilters},
+    {en:'some gradient colour stops',zh:'部分渐变色标',of:'gradient',run:fitStops}]);
+  return { SIMPLIFY, LIMIT_STEPS, meter, SPENT };
+})();
+</script>

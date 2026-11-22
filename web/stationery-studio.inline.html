@@ -1,0 +1,160 @@
+<!-- PAStationeryStudio · 信纸工作室 — NEW stationery from words or from a picture. The CORE only (no
+     buttons: those are stationery-picker's). Carried by stationery-ui at PA_STATIONERY_STUDIO.
+     Two rules this file exists to keep:
+       · EVERY SVG an AI answers goes through PAStationery.sanitize — the same allow-list a bundled
+         design passes — before anything draws it. A rejected answer shows its REASON, never its markup.
+       · A picture used AS paper stays sharp: page-shaped, up to 2550x3300, PNG when it has alpha.
+         It is NOT routed through PAPhoto's 1600px JPEG (which also turns transparency black). -->
+<script>
+window.PAStationeryStudio=(function(){
+  'use strict';
+  const S=window.PAStationery;
+  const LABEL='Stationery · 信纸';              // the chat list's chip for these turns
+  const SAFE={x:80,y:100,w:656,h:860};          // what the AI is asked to keep clear, and what a kept design declares
+  const PIC_MAX_W=2550, PIC_MAX_H=3300;         // 8.5x11 in at 300 dpi: print-sharp, already the page aspect
+  const PIC_DECODE_EDGE=4096;                   // a 4:3 decode at this edge is 12.6M px, inside iOS's 16.7M canvas cap
+  const PIC_JPEG_Q=0.92;                        // an opaque PHOTO only; anything lossless or with alpha stays PNG
+  const PIC_TRIES=[1,0.8,0.64];                 // smaller ONLY when the upload cap refuses the full size
+  const ALPHA_BAND_PX=1<<20;                    // pixels per getImageData read while looking for transparency
+  const DEFAULT_FADE=0.3, MAX_FADE=0.8;         // a photo under ink starts lightened; the slider stops at 80%
+  const NAME_MAX=60;
+  const AI_WAIT_MS=5*60*1000;                   // an answer that never ends (no 'done') still ENDS, with a name (R5)
+  const TIMEOUT='no answer after '+AI_WAIT_MS/60000+' minutes · 超时未回答';
+  const CANCELLED='Cancelled · 已取消';          // the caller stopped the turn (reset, a newer run, Cancel)
+
+  // ── The prompt: the shared template contract, built FROM the sanitizer's own lists (R3) ───
+  function contract(){
+    const s=SAFE;
+    return ['FORMAT — a strict checker reads your answer and REJECTS anything outside this:',
+      '- ONE <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+S.PAGE_W+' '+S.PAGE_H+'"> — a US-Letter page, '+S.PAGE_W+'x'+S.PAGE_H+' px.',
+      '- A LIGHT background only: handwriting in any ink colour must stay readable on every part of the page.',
+      '- Decorate the edges and corners. Keep the writing area (x '+s.x+'-'+(s.x+s.w)+', y '+s.y+'-'+(s.y+s.h)+') mostly clear.',
+      '- No <text> and no words unless the request asks for them.',
+      '- Elements allowed, and no others: '+S.ELEMENTS.join(' ')+'.',
+      '- Attributes allowed, and no others: '+S.ATTRS.join(' ')+'; plus href="#id" on <use> only.',
+      '- Never: script, a style element or style attribute, image, foreignObject, event handlers, xlink:, external links, or url() other than url(#id).',
+      '- Light to draw (a cost check rejects heavy ones): use <filter> and <mask> sparingly; at most '+S.LIMITS.filterSteps+
+        ' steps in one <filter>, numOctaves at most '+S.LIMITS.octaves+', at most '+S.LIMITS.gradientStops+' <stop> in one gradient; a <mask>, <clipPath> or <pattern> must not itself use a mask, clip-path, filter or pattern.',
+      '- At most '+Math.round(S.MAX_BYTES/1024)+' KB.',
+      'Do not create or edit any file. Reply with ONLY the SVG: start with <svg, end with </svg>, no explanation, no code fence.'].join('\n');
+  }
+  const designPrompt=(desc)=>'Design decorative writing paper (stationery · 信纸) for a handwritten journal page.\nRequest: '+desc+'\n\n'+contract();
+  const tweakPrompt=(svg,how)=>'Revise this stationery SVG.\nChange: '+how+'\n\nCurrent SVG:\n'+svg+'\n\n'+contract();
+  const recreatePrompt=(desc)=>'Recreate the attached picture as decorative writing paper (stationery · 信纸): keep its motifs, '+
+    'colours and mood, redrawn as vector decoration around the page edges, with the writing area left clear.'+(desc?'\nAlso: '+desc:'')+'\n\n'+contract();
+
+  // The FIRST <svg>…</svg> in a reply (models wrap answers in prose and code fences), preferring one
+  // whose opening tag carries a viewBox or xmlns over a stray "<svg>" mentioned in the prose.
+  function extractSvg(text){
+    const t=String(text||''), low=t.toLowerCase(), re=/<svg\b[^<>]*>/gi; let m, first='';
+    while((m=re.exec(t))){ const end=low.indexOf('</svg>',m.index); if(end<0) break;
+      const s=t.slice(m.index,end+6); if(/viewBox|xmlns/.test(m[0])) return s; if(!first) first=s; }
+    return first;
+  }
+  // ONE AI turn -> {ok, svg, reason, convoId}. `ai(message, {attachments, convoId, label, signal})` is
+  // the HOST's channel (the Journal: PAChat.complete over the 'chat' broker kind, confined lane).
+  // What the AI said reaches the page ONLY as sanitize()'s re-serialised output.
+  // The turn ENDS on the first of: the answer, AI_WAIT_MS, or the caller's o.signal (reset, a newer
+  // run, Cancel). The last two also ABORT the signal the channel holds, so the job behind it stops
+  // (PAChat.complete sends chat-cancel; the server kills the model) — a race alone cancels nothing.
+  function turn(ai,prompt,o){
+    const ac=new AbortController(), up=o&&o.signal;
+    let stop; const ended=new Promise((_,no)=>{ stop=(why)=>{ no(new Error(why)); ac.abort(); }; });
+    const cancel=()=>stop(CANCELLED), t=setTimeout(()=>stop(TIMEOUT),AI_WAIT_MS);
+    if(up){ if(up.aborted) cancel(); else up.addEventListener('abort',cancel,{once:true}); }
+    const asked=ac.signal.aborted?ended:new Promise((res)=>res(ai(prompt,Object.assign({label:LABEL},o,{signal:ac.signal}))));
+    return Promise.race([asked,ended]).finally(()=>{ clearTimeout(t); if(up) up.removeEventListener('abort',cancel); });
+  }
+  async function run(ai,prompt,o){
+    let r; try{ r=await turn(ai,prompt,o); }
+    catch(e){ const why=(e&&e.message)||String(e);
+      return {ok:false,convoId:null,reason:why===CANCELLED?why:'AI request failed · AI 请求失败 — '+why}; }
+    const convoId=(r&&r.convoId)||(o&&o.convoId)||null;
+    if(!r||!r.ok) return {ok:false,convoId,reason:(r&&(r.error||r.text))||'The AI gave no answer · AI 未回答'};
+    const raw=extractSvg(r.text);
+    if(!raw) return {ok:false,convoId,reason:'The answer had no <svg> · 回答中没有 SVG'};
+    // sanitize(); a design refused only for a SIZE (an element over its own limit, or the render-cost budget) comes back
+    // simplified, with a note (ADR 0003 amendment 5)
+    const v=S.simplify(raw);
+    if(v.ok) return {ok:true,svg:v.svg,convoId,reason:'',note:v.note||''};
+    return {ok:false,convoId,reason:v.over?v.reason:'Rejected · 已拒绝 — '+v.reason};   // over: nothing fitted, a plain message
+  }
+  const design=(ai,desc,o)=>run(ai,designPrompt(desc),o);
+  const tweak=(ai,svg,how,o)=>run(ai,tweakPrompt(svg,how),o);   // the CURRENT svg travels with the instruction
+
+  // ── Keep · 保存: versions, never overwrites (base-v1, base-v2 …) ─────────────────────────
+  const slug=(name)=>String(name||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40)||'design';
+  function nextId(base){
+    let n=0; for(const t of S.list()){ if(t.source!=='mine'||!t.id.startsWith(base+'-v')) continue;
+      const v=t.id.slice(base.length+2); if(/^\d+$/.test(v)) n=Math.max(n,+v); }
+    return base+'-v'+(n+1);
+  }
+  // draft = {svg, name, base?} -> {ok, id, base, ref} | {ok:false, reason}. The store re-checks the SVG.
+  async function keep(store,draft){
+    const name=String(draft.name||'').trim().slice(0,NAME_MAX)||'My stationery · 我的信纸';
+    const base=draft.base||slug(name), id=nextId(base);
+    const tpl={id,name:name+' · '+id.slice(base.length+1),group:'stationery',audience:'any',svg:draft.svg,
+      lines:null,safe:Object.assign({},SAFE),dark:false};
+    const r=await store.saveMine(tpl);
+    return r.ok?{ok:true,id,base,ref:{id,source:'mine'}}:{ok:false,reason:r.error||'Not saved · 未保存'};
+  }
+
+  // ── Pictures ─────────────────────────────────────────────────────────────────────────────
+  // Cover-crop to the page aspect, centred; never enlarges; capped at PIC_MAX. Pure: tested as numbers.
+  function fitRect(w,h){
+    const A=S.PAGE_W/S.PAGE_H; let sw=w, sh=h;
+    if(w/h>A) sw=h*A; else sh=w/A;
+    const k=Math.min(1,PIC_MAX_W/sw,PIC_MAX_H/sh);
+    return {sx:(w-sw)/2,sy:(h-sh)/2,sw,sh,w:Math.max(1,Math.round(sw*k)),h:Math.max(1,Math.round(sh*k))};
+  }
+  // Read in BANDS of ~1M px: one getImageData over a 2550x3300 page is a 34 MB copy on top of the
+  // canvases themselves, which on an iPad counts against Safari's total canvas memory.
+  function hasAlpha(ctx,w,h){
+    const rows=Math.max(1,Math.floor(ALPHA_BAND_PX/w));
+    for(let y=0;y<h;y+=rows){ const d=ctx.getImageData(0,y,w,Math.min(rows,h-y)).data;
+      for(let i=3;i<d.length;i+=4) if(d[i]<255) return true; }
+    return false;
+  }
+  // A picked file -> a page-shaped image. o.edge caps the long side (the AI's copy); o.flatten paints
+  // white under it and makes a JPEG (a model must not see transparency as black). Otherwise: PNG when
+  // it has alpha or came as PNG (a screenshot stays crisp), JPEG only for an opaque photo.
+  async function pageImage(file,o){
+    const P=window.PAPhoto, src=await P.toCanvas(file,PIC_DECODE_EDGE);   // PAPhoto's ONE decoder; throws a named error
+    const f=fitRect(src.w,src.h), k=Math.min(o.scale||1,o.edge?o.edge/Math.max(f.w,f.h):1);
+    const w=Math.max(1,Math.round(f.w*k)), h=Math.max(1,Math.round(f.h*k));
+    const c=document.createElement('canvas'); c.width=w; c.height=h;
+    try{ const x=c.getContext('2d');
+      if(o.flatten){ x.fillStyle='#ffffff'; x.fillRect(0,0,w,h); }
+      x.drawImage(src.canvas,f.sx,f.sy,f.sw,f.sh,0,0,w,h);
+      // A PNG stays PNG and a JPEG has no alpha: only another type (webp, gif…) needs the pixel scan.
+      const kept=!o.flatten&&/png/i.test(file.type||''), scan=!o.flatten&&!kept&&!/jpe?g/i.test(file.type||'');
+      const png=kept||(scan&&hasAlpha(x,w,h));
+      return {dataUrl:png?c.toDataURL('image/png'):c.toDataURL('image/jpeg',PIC_JPEG_Q),w,h,png};
+    }finally{ c.width=0; if(src.canvas) src.canvas.width=0; }   // ~34 MB + ~50 MB of canvas, released NOW, not at GC
+  }
+  // -> {ok, path, w, h, png} through the HOST's upload (the Journal: PAPhoto.upload with maxEdge 0,
+  // i.e. the bytes as made here). Steps down in size ONLY when the cap refuses the larger one.
+  async function importPicture(upload,file,o){
+    const c=o||{}; let last=null;
+    for(const scale of c.edge?[1]:PIC_TRIES){
+      let img; try{ img=await pageImage(file,Object.assign({},c,{scale})); }
+      catch(e){ return {ok:false,reason:(e&&e.message)||'Could not read the picture · 无法读取图片'}; }
+      const f=window.PAPhoto.toFile(img.dataUrl,'stationery-'+Date.now()+(img.png?'.png':'.jpg'));
+      const r=await upload(f,{maxEdge:0,name:f.name,what:'Photo'});
+      if(r&&r.ok) return {ok:true,path:r.path,w:img.w,h:img.h,png:img.png};
+      last=r; if(window.PAPhoto.fits(f.size)) break;          // refused for another reason: shrinking will not help
+    }
+    return {ok:false,reason:(last&&(last.text||last.error))||'Upload failed · 上传失败'};
+  }
+  // Recreate · AI 重绘: the picture goes to the AI as an ATTACHMENT (uploaded, by path), and the
+  // answer takes the SAME run() — sanitize included — as a typed description.
+  async function recreate(ai,upload,file,desc,o){
+    const up=await importPicture(upload,file,{edge:window.PAPhoto.DEFAULT_MAX_EDGE,flatten:true});
+    if(!up.ok) return {ok:false,convoId:null,reason:up.reason};
+    return run(ai,recreatePrompt(desc),Object.assign({},o,{attachments:[{name:'picture.jpg',path:up.path}]}));
+  }
+  return { LABEL, SAFE, DEFAULT_FADE, MAX_FADE, NAME_MAX, PIC_MAX_W, PIC_MAX_H, CANCELLED,
+    contract, designPrompt, tweakPrompt, recreatePrompt, extractSvg, design, tweak, recreate,
+    slug, nextId, keep, fitRect, hasAlpha, pageImage, importPicture };
+})();
+</script>

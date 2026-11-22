@@ -1,0 +1,6 @@
+/* The top-centre bar handle's size（顶部把手尺寸）— ONE source (R3) for the shell's #barpeek (web/index.html,
+   inlined by lib/shellhtml.mjs SHELL_PARTS) and PAAppBar's .paab-handle (web/app-bar.inline.html, inlined
+   by web.mjs PA_COMPONENTS). Owner 2026-11-13: "a little longer and thicker, easy to tap or click".
+   Growing it from 64x16 covers no app control the old size did not, at 375px and iPad widths
+   (test/bar-handle-e2e.test.mjs measures every shipped app). */
+:root{--pa-handle-w:120px;--pa-handle-h:28px;--pa-grab-w:60px;--pa-grab-h:6px}

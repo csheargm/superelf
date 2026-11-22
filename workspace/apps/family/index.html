@@ -1,0 +1,619 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#e8845a" media="(prefers-color-scheme:light)">
+<meta name="theme-color" content="#1c1510" media="(prefers-color-scheme:dark)">
+<title>家 · Family</title>
+<style>
+html{font-size:calc(17px * var(--fs,1))}   /* A-/A+ scale, broadcast by the shell (pa:'prefs' fontScale) */
+:root{
+  --bg:#fdf6f0; --card:#fff; --text:#2d1f15; --muted:#8a7060; --line:#e8ddd5;
+  --accent:#e8845a; --accent2:#d4637a; --accent3:#5b9fd4; --gold:#c9973a;
+  --hero1:#f4a26b; --hero2:#d4637a; --hero3:#9b6fc8;
+  --tag-spouse:#fce4ec; --tag-child:#e3f2fd; --tag-teen:#f3e5f5;
+  --tag-spouse-c:#c2185b; --tag-child-c:#1565c0; --tag-teen-c:#6a1b9a;
+  --sh:0 2px 12px rgba(0,0,0,.08); --sh2:0 4px 24px rgba(0,0,0,.13);
+}
+@media(prefers-color-scheme:dark){:root{
+  --bg:#1c1510; --card:#2a201a; --text:#f0e6dc; --muted:#9a8070; --line:#3d2e24;
+  --accent:#f0956e; --accent2:#e07090; --accent3:#7ab8e8; --gold:#daa84a;
+  --hero1:#c07040; --hero2:#a84060; --hero3:#7050a0;
+  --tag-spouse:#4a1525; --tag-child:#0d2540; --tag-teen:#2a1040;
+  --tag-spouse-c:#f48fb1; --tag-child-c:#90caf9; --tag-teen-c:#ce93d8;
+  --sh:0 2px 12px rgba(0,0,0,.3); --sh2:0 4px 24px rgba(0,0,0,.4);
+}}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font:16px/1.5 -apple-system,system-ui,sans-serif;min-height:100dvh;overflow-x:hidden}
+
+/* ── VIEWS ── */
+.view{display:none;flex-direction:column;min-height:100dvh;animation:fadeIn .2s ease}
+.view.active{display:flex}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ── HERO HEADER ── */
+.hero{
+  background:linear-gradient(135deg,var(--hero1),var(--hero2) 55%,var(--hero3));
+  color:#fff; padding:env(safe-area-inset-top,16px) 20px 28px;
+  padding-top:calc(env(safe-area-inset-top,0px) + 16px);
+  position:relative; overflow:hidden;
+}
+.hero::after{content:'';position:absolute;inset:0;background:radial-gradient(circle at 80% 20%,rgba(255,255,255,.15),transparent 60%);pointer-events:none}
+.hero-top{display:flex;align-items:center;justify-content:space-between}
+.hero-icon{font-size:28px;line-height:1}
+.hero-title{font-size:22px;font-weight:700;letter-spacing:-.3px}
+.hero-sub{font-size:13px;opacity:.85;margin-top:2px}
+.hero-btn{background:rgba(255,255,255,.2);border:none;color:#fff;width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+
+/* ── SCROLL BODY ── */
+.scroll{flex:1;overflow-y:auto;padding:16px 16px calc(env(safe-area-inset-bottom,16px) + 16px)}
+
+/* ── MEMBER CARDS GRID ── */
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.member-card{
+  background:var(--card);border-radius:16px;padding:16px 12px;
+  box-shadow:var(--sh);cursor:pointer;border:1.5px solid transparent;
+  transition:transform .15s,box-shadow .15s,border-color .15s;
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  position:relative;overflow:hidden;
+}
+.member-card:active{transform:scale(.97)}
+.member-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--card-accent,var(--accent))}
+.member-card .avatar{font-size:40px;line-height:1}
+.member-card .name{font-weight:700;font-size:15px;text-align:center}
+.member-card .rel-badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:var(--tag-c-bg,var(--tag-child));color:var(--tag-c-text,var(--tag-child-c))}
+.member-card .age-txt{font-size:12px;color:var(--muted)}
+.member-card .streak{position:absolute;top:10px;right:10px;font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px}
+
+/* ── DAILY INSIGHT CARD ── */
+.insight-card{
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:#fff;border-radius:16px;padding:16px;margin-bottom:16px;
+  cursor:pointer;position:relative;overflow:hidden;box-shadow:var(--sh2);
+}
+.insight-card::after{content:'';position:absolute;bottom:-20px;right:-20px;width:80px;height:80px;background:rgba(255,255,255,.1);border-radius:50%}
+.insight-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;opacity:.85;margin-bottom:4px}
+.insight-title{font-size:17px;font-weight:700;margin-bottom:4px}
+.insight-sub{font-size:13px;opacity:.85}
+.insight-spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.5);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+
+/* ── SECTION LABEL ── */
+.section-lbl{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:10px}
+
+/* ── ADD MEMBER BUTTON ── */
+.add-member-btn{
+  background:none;border:2px dashed var(--line);border-radius:16px;
+  color:var(--muted);cursor:pointer;padding:20px;display:flex;
+  flex-direction:column;align-items:center;gap:6px;font:inherit;font-size:13px;
+  transition:border-color .15s,color .15s;
+}
+.add-member-btn:hover{border-color:var(--accent);color:var(--accent)}
+.add-member-btn span{font-size:24px}
+.add-member-btn:disabled{opacity:.4;cursor:default}
+
+/* ── STATUS LINE: a failed read or save, on every view ── */
+.status{position:fixed;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);background:var(--card);color:#e55;border:1.5px solid #e55;border-radius:12px;padding:10px 14px;font-size:13px;text-align:center;box-shadow:var(--sh2)}
+.status:empty{display:none}
+
+/* ── BACK HEADER ── */
+.back-header{
+  background:var(--card);padding:env(safe-area-inset-top,12px) 16px 12px;
+  padding-top:calc(env(safe-area-inset-top,0px) + 12px);
+  border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;
+  position:sticky;top:0;z-index:10;
+}
+.back-btn{background:none;border:none;color:var(--accent);font-size:22px;cursor:pointer;line-height:1;padding:4px}
+.back-title{font-weight:700;font-size:17px;flex:1}
+.back-action{background:none;border:none;color:var(--accent);font-size:22px;cursor:pointer;line-height:1;padding:4px}
+
+/* ── MEMBER HERO ── */
+.member-hero{
+  padding:24px 20px;display:flex;align-items:center;gap:16px;
+  background:var(--card);border-bottom:1px solid var(--line);
+}
+.member-hero .avatar-big{font-size:64px;line-height:1}
+.member-hero .info{}
+.member-hero .big-name{font-size:22px;font-weight:800}
+.member-hero .big-rel{font-size:14px;font-weight:600;padding:3px 10px;border-radius:20px;display:inline-block;margin-top:4px}
+.member-hero .big-age{font-size:13px;color:var(--muted);margin-top:4px}
+
+/* ── SUGGESTION SECTION ── */
+.suggest-wrap{padding:16px}
+.suggest-btn{
+  width:100%;background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:#fff;border:none;border-radius:14px;padding:14px;font:inherit;
+  font-size:16px;font-weight:700;cursor:pointer;box-shadow:var(--sh2);
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:opacity .15s;
+}
+.suggest-btn:active{opacity:.85}
+.suggest-btn:disabled{opacity:.6;cursor:default}
+
+/* ── SUGGESTION CARDS ── */
+.suggestion-list{margin-top:16px;display:flex;flex-direction:column;gap:12px}
+.sug-card{background:var(--card);border-radius:16px;overflow:hidden;box-shadow:var(--sh)}
+.sug-top{padding:14px 14px 10px;display:flex;align-items:flex-start;gap:10px}
+.sug-num{
+  width:28px;height:28px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;
+}
+.sug-content{}
+.sug-title{font-weight:700;font-size:15px;margin-bottom:4px}
+.sug-desc{font-size:14px;color:var(--muted);line-height:1.5}
+.sug-meta{
+  display:flex;align-items:center;gap:8px;padding:8px 14px;
+  border-top:1px solid var(--line);background:rgba(0,0,0,.02);
+}
+.sug-time{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:4px}
+.sug-why{
+  padding:10px 14px;background:linear-gradient(90deg,rgba(232,132,90,.08),rgba(212,99,122,.08));
+  border-top:1px solid var(--line);
+}
+.sug-why-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);margin-bottom:3px}
+.sug-why-txt{font-size:13px;color:var(--text);line-height:1.5}
+
+/* ── NOTES SECTION ── */
+.notes-wrap{padding:0 16px 16px}
+.notes-box{width:100%;font:inherit;font-size:14px;padding:10px 12px;border:1.5px solid var(--line);border-radius:12px;background:var(--card);color:var(--text);resize:vertical;min-height:80px;transition:border-color .15s}
+.notes-box:focus{outline:none;border-color:var(--accent)}
+.notes-save{margin-top:8px;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:8px 16px;font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+
+/* ── FORM VIEW ── */
+.form-wrap{padding:16px;display:flex;flex-direction:column;gap:14px}
+.field-group{}
+.field-lbl{font-size:13px;font-weight:700;color:var(--muted);margin-bottom:6px;display:block}
+.field-input{width:100%;font:inherit;font-size:15px;padding:10px 12px;border:1.5px solid var(--line);border-radius:12px;background:var(--card);color:var(--text);transition:border-color .15s}
+.field-input:focus{outline:none;border-color:var(--accent)}
+.emoji-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:6px}
+.emoji-opt{background:var(--card);border:2px solid var(--line);border-radius:10px;font-size:22px;width:100%;aspect-ratio:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .15s}
+.emoji-opt.selected{border-color:var(--accent);background:rgba(232,132,90,.1)}
+.rel-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:6px}
+.rel-opt{background:var(--card);border:2px solid var(--line);border-radius:10px;padding:10px 6px;cursor:pointer;text-align:center;font-size:13px;font-weight:600;transition:border-color .15s,background .15s}
+.rel-opt.selected{border-color:var(--accent);background:rgba(232,132,90,.12)}
+.form-actions{display:flex;gap:10px;margin-top:4px}
+.form-save{flex:1;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;border-radius:12px;padding:14px;font:inherit;font-size:16px;font-weight:700;cursor:pointer}
+.form-del{background:none;border:2px solid #e55;color:#e55;border-radius:12px;padding:14px 16px;font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.form-del.arm{background:#e55;color:#fff}
+
+/* ── EMPTY STATE ── */
+.empty{text-align:center;padding:40px 20px;color:var(--muted)}
+.empty span{font-size:48px;display:block;margin-bottom:12px}
+.empty p{font-size:14px}
+
+/* ── SPINNER ── */
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{display:inline-block;width:20px;height:20px;border:2.5px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+
+/* ── INSIGHT DETAIL ── */
+.insight-detail{background:var(--card);border-radius:16px;padding:16px;box-shadow:var(--sh);margin-bottom:12px}
+.insight-detail h3{font-size:17px;font-weight:700;margin-bottom:8px}
+.insight-detail p{font-size:14px;color:var(--muted);line-height:1.6}
+.insight-why{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.insight-why-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);margin-bottom:3px}
+</style>
+</head>
+<body>
+
+<!-- ══ MAIN VIEW ══ -->
+<div class="view active" id="view-main">
+  <div class="hero">
+    <div class="hero-top">
+      <div>
+        <div class="hero-icon">🏠</div>
+        <div class="hero-title">家 Family</div>
+        <div class="hero-sub" id="hero-sub">Your people, today</div>
+      </div>
+      <button class="hero-btn" onclick="openInsight()" title="Family activity">✨</button>
+    </div>
+  </div>
+  <div class="scroll">
+    <div class="insight-card" id="insight-banner" onclick="openInsight()">
+      <div class="insight-label">✨ Today's Together Time</div>
+      <div class="insight-title" id="insight-ttl">Tap to get a family activity idea</div>
+      <div class="insight-sub" id="insight-sub"></div>
+    </div>
+    <div class="section-lbl">Family Members</div>
+    <div class="grid" id="member-grid"></div>
+    <button class="add-member-btn" id="add-btn" style="width:100%" onclick="openAdd()" disabled>
+      <span>+</span>Add family member
+    </button>
+  </div>
+</div>
+
+<!-- ══ MEMBER VIEW ══ -->
+<div class="view" id="view-member">
+  <div class="back-header">
+    <button class="back-btn" onclick="goMain()">‹</button>
+    <div class="back-title" id="mem-header-name">Member</div>
+    <button class="back-action" onclick="openEdit()" title="Edit">✏️</button>
+  </div>
+  <div style="overflow-y:auto;flex:1;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 16px)">
+    <div class="member-hero">
+      <div class="avatar-big" id="mem-avatar"></div>
+      <div class="info">
+        <div class="big-name" id="mem-name"></div>
+        <div class="big-rel" id="mem-rel"></div>
+        <div class="big-age" id="mem-age"></div>
+      </div>
+    </div>
+    <div class="suggest-wrap">
+      <button class="suggest-btn" id="sug-btn" onclick="loadSuggestions()">
+        <span>💡</span> Get Connection Ideas
+      </button>
+      <div class="suggestion-list" id="sug-list"></div>
+    </div>
+    <div class="notes-wrap">
+      <div class="section-lbl" style="margin-bottom:8px">Notes &amp; context</div>
+      <textarea class="notes-box" id="mem-notes" placeholder="Interests, recent events, what works…"></textarea>
+      <button class="notes-save" onclick="saveNotes()">Save notes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ INSIGHT VIEW ══ -->
+<div class="view" id="view-insight">
+  <div class="back-header">
+    <button class="back-btn" onclick="goMain()">‹</button>
+    <div class="back-title">Family Time</div>
+    <button class="back-action" onclick="refreshInsight()" title="New idea">🔄</button>
+  </div>
+  <div class="scroll" id="insight-body">
+    <div class="empty"><span>✨</span><p>Loading activity idea…</p></div>
+  </div>
+</div>
+
+<!-- ══ FORM VIEW ══ -->
+<div class="view" id="view-form">
+  <div class="back-header">
+    <button class="back-btn" onclick="cancelForm()">‹</button>
+    <div class="back-title" id="form-title">Add Member</div>
+  </div>
+  <div class="scroll">
+    <div class="form-wrap">
+      <div class="field-group">
+        <label class="field-lbl">Name</label>
+        <input class="field-input" id="f-name" placeholder="e.g. Emma" autocomplete="off">
+      </div>
+      <div class="field-group">
+        <label class="field-lbl">Relationship</label>
+        <div class="rel-grid">
+          <div class="rel-opt" data-rel="spouse" onclick="selRel(this)">💑 Spouse</div>
+          <div class="rel-opt" data-rel="child" onclick="selRel(this)">🧒 Child</div>
+          <div class="rel-opt" data-rel="teen" onclick="selRel(this)">🧑 Teen</div>
+        </div>
+      </div>
+      <div class="field-group">
+        <label class="field-lbl">Age (optional)</label>
+        <input class="field-input" id="f-age" type="number" placeholder="e.g. 8" min="0" max="99">
+      </div>
+      <div class="field-group">
+        <label class="field-lbl">Avatar emoji</label>
+        <div class="emoji-grid" id="emoji-grid"></div>
+      </div>
+      <div class="field-group">
+        <label class="field-lbl">Interests / notes</label>
+        <textarea class="field-input" id="f-notes" placeholder="Loves lego, minecraft, dinosaurs…" rows="3"></textarea>
+      </div>
+      <div class="form-actions">
+        <button class="form-save" onclick="saveMember()">Save</button>
+        <button class="form-del" id="form-del-btn" onclick="deleteMember()" style="display:none">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="status" id="status" role="status"></div>
+
+<script>
+// ── BROKER ──
+let _id=0; const _wait={};
+window.addEventListener('message',e=>{
+  const m=e.data;
+  if(m&&m.pa==='res'&&_wait[m.id]){
+    const keep=m.ev&&!m.done;
+    _wait[m.id](m);
+    if(!keep) delete _wait[m.id];
+  }
+});
+const brok=(kind,p)=>new Promise(r=>{const id=++_id;_wait[id]=r;parent.postMessage({pa:'req',id,kind,...p},'*');});
+const paAsk=msg=>brok('ask',{message:msg});
+const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// ── STATE ──
+let members=[];
+let currentId=null;
+let editingId=null;
+let insightData=null;
+const EMOJIS=['👶','🧒','🧑','👦','👧','👨','👩','🧔','👴','👵','🧓','👱','🧕','🎅','👸','🤴','🧙','🧝','🦸','🤸','🏊','🎨','🎸','⚽','🌟'];
+const RELMAP={spouse:{label:'Spouse/Partner',bg:'var(--tag-spouse)',c:'var(--tag-spouse-c)',accent:'#d4637a'},child:{label:'Child',bg:'var(--tag-child)',c:'var(--tag-child-c)',accent:'#5b9fd4'},teen:{label:'Teen',bg:'var(--tag-teen)',c:'var(--tag-teen-c)',accent:'#9b6fc8'}};
+
+// ── DATA ──
+// PAStore (web/store.inline.html, ADR 0010) refuses every save until the file has been read: after a
+// failed or unreadable read `members` is still empty, and saving it would replace the real family.
+const familyFile=PAStore.file('family-data.json',{
+  shape:d=>Array.isArray(d&&d.members)?'':'no members list',
+  unreadable:why=>'Family file unreadable · 家庭文件无法读取 ('+why+')',
+});
+function setStatus(t){document.getElementById('status').textContent=t;}
+
+async function load(){
+  const r=await familyFile.load();
+  if(r.state==='ok') members=r.value.members;
+  setStatus(r.text||'');
+  document.getElementById('add-btn').disabled=!familyFile.loaded;
+  renderMain();
+}
+
+async function saveAll(){ setStatus(await familyFile.save(JSON.stringify({members}))); }
+
+// ── MAIN VIEW ──
+function renderMain(){
+  const grid=document.getElementById('member-grid');
+  grid.innerHTML='';
+  if(familyFile.error) return;   // the status line says why; an empty-family prompt here would be a lie
+  if(!members.length){
+    grid.innerHTML='<div class="empty" style="grid-column:1/-1"><span>👨‍👩‍👧‍👦</span><p>Add your family members to get started</p></div>';
+    return;
+  }
+  members.forEach(m=>{
+    const info=RELMAP[m.rel]||RELMAP.child;
+    const card=document.createElement('div');
+    card.className='member-card';
+    card.style.setProperty('--card-accent',info.accent);
+    card.innerHTML=`
+      <div class="avatar">${esc(m.emoji||'👤')}</div>
+      <div class="name">${esc(m.name)}</div>
+      <div class="rel-badge" style="background:${info.bg};color:${info.c}">${esc(info.label)}</div>
+      ${m.age?`<div class="age-txt">Age ${esc(m.age)}</div>`:''}
+    `;
+    card.onclick=()=>openMember(m.id);
+    grid.appendChild(card);
+  });
+}
+
+// ── MEMBER VIEW ──
+function openMember(id){
+  currentId=id;
+  const m=members.find(x=>x.id===id);
+  if(!m) return;
+  const info=RELMAP[m.rel]||RELMAP.child;
+  document.getElementById('mem-header-name').textContent=m.name;
+  document.getElementById('mem-avatar').textContent=m.emoji||'👤';
+  document.getElementById('mem-name').textContent=m.name;
+  document.getElementById('mem-rel').textContent=info.label;
+  document.getElementById('mem-rel').style.background=info.bg;
+  document.getElementById('mem-rel').style.color=info.c;
+  document.getElementById('mem-age').textContent=m.age?`Age ${m.age}`:'';
+  document.getElementById('mem-notes').value=m.notes||'';
+  document.getElementById('sug-list').innerHTML='';
+  document.getElementById('sug-btn').disabled=false;
+  document.getElementById('sug-btn').innerHTML='<span>💡</span> Get Connection Ideas';
+  showView('member');
+}
+
+async function loadSuggestions(){
+  const m=members.find(x=>x.id===currentId);
+  if(!m) return;
+  const btn=document.getElementById('sug-btn');
+  btn.disabled=true;
+  btn.innerHTML='<div class="spinner"></div> Thinking…';
+  const info=RELMAP[m.rel]||RELMAP.child;
+  const ageStr=m.age?`age ${m.age}`:'(age unknown)';
+  const prompt=`You are helping the user build a stronger relationship with ${m.name}, their ${info.label.toLowerCase()} ${ageStr}.
+${m.notes?`Context about ${m.name}: ${m.notes}`:''}
+
+Suggest exactly 3 specific, warm, and actionable ways they can connect with ${m.name} TODAY. Each should feel personal, not generic.
+
+For each suggestion return:
+- title: short action phrase (5 words max)
+- action: what exactly to do (2-3 sentences, concrete and specific to their relationship type and age)
+- duration: how long it takes (e.g. "5 min", "20 min", "1 hour")
+- why: why this specifically strengthens connection for a ${info.label.toLowerCase()} ${ageStr} (1-2 sentences, cite a real psychological principle or developmental insight)
+
+Return ONLY a JSON array. No markdown fences. Example format:
+[{"title":"...","action":"...","duration":"...","why":"..."}]`;
+
+  try{
+    const r=await paAsk(prompt);
+    let text=r.text||'';
+    text=text.replace(/```[a-z]*/g,'').replace(/```/g,'').trim();
+    const start=text.indexOf('[');
+    const end=text.lastIndexOf(']');
+    if(start<0||end<0) throw new Error('no JSON array');
+    const sugs=JSON.parse(text.slice(start,end+1));
+    renderSuggestions(sugs);
+  }catch(e){
+    document.getElementById('sug-list').innerHTML=`<div class="empty"><p>Couldn't load ideas. Try again.</p></div>`;
+  }
+  btn.disabled=false;
+  btn.innerHTML='<span>🔄</span> Refresh Ideas';
+}
+
+function renderSuggestions(sugs){
+  const list=document.getElementById('sug-list');
+  list.innerHTML=sugs.map((s,i)=>`
+    <div class="sug-card">
+      <div class="sug-top">
+        <div class="sug-num">${i+1}</div>
+        <div class="sug-content">
+          <div class="sug-title">${esc(s.title)}</div>
+          <div class="sug-desc">${esc(s.action)}</div>
+        </div>
+      </div>
+      <div class="sug-meta">
+        <div class="sug-time">⏱ ${esc(s.duration)}</div>
+      </div>
+      <div class="sug-why">
+        <div class="sug-why-lbl">💡 Why this works</div>
+        <div class="sug-why-txt">${esc(s.why)}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function saveNotes(){
+  const m=members.find(x=>x.id===currentId);
+  if(!m) return;
+  m.notes=document.getElementById('mem-notes').value;
+  saveAll();
+}
+
+// ── INSIGHT VIEW ──
+async function openInsight(){
+  showView('insight');
+  if(!insightData) await refreshInsight();
+  else renderInsightView(insightData);
+}
+
+async function refreshInsight(){
+  document.getElementById('insight-body').innerHTML='<div class="empty"><span>✨</span><p>Generating idea…</p></div>';
+  const names=members.map(m=>`${m.name} (${(RELMAP[m.rel]||RELMAP.child).label}${m.age?', age '+m.age:''})`).join(', ');
+  const prompt=`The user's family: ${names||'their household'}.
+
+Suggest one specific, joyful family activity they can do TOGETHER today that takes 15–60 minutes and genuinely builds closeness.
+
+Return ONLY JSON (no fences):
+{"title":"...","activity":"...","duration":"...","why":"...","tip":"..."}
+
+- title: catchy name (4 words max)
+- activity: exactly what to do, step by step (3-4 sentences, specific and vivid)
+- duration: e.g. "30 min"
+- why: the psychological reason this builds family bonds (cite attachment theory, shared experience, etc.)
+- tip: one small thing they can do to make it extra special`;
+
+  try{
+    const r=await paAsk(prompt);
+    let text=(r.text||'').replace(/```[a-z]*/g,'').replace(/```/g,'').trim();
+    const s=text.indexOf('{'); const e=text.lastIndexOf('}');
+    if(s<0||e<0) throw new Error('no JSON');
+    insightData=JSON.parse(text.slice(s,e+1));
+    renderInsightView(insightData);
+    // Update banner
+    document.getElementById('insight-ttl').textContent=insightData.title;
+    document.getElementById('insight-sub').textContent=insightData.duration+' together';
+  }catch(err){
+    document.getElementById('insight-body').innerHTML='<div class="empty"><p>Couldn\'t load. Tap 🔄 to retry.</p></div>';
+  }
+}
+
+function renderInsightView(d){
+  document.getElementById('insight-body').innerHTML=`
+    <div class="insight-detail">
+      <h3>✨ ${esc(d.title)}</h3>
+      <p>${esc(d.activity)}</p>
+      <div class="insight-why">
+        <div class="insight-why-lbl">💡 Why it works</div>
+        <p>${esc(d.why)}</p>
+      </div>
+    </div>
+    <div class="insight-detail">
+      <h3>⭐ Pro tip</h3>
+      <p>${esc(d.tip)}</p>
+    </div>
+    <div style="text-align:center;color:var(--muted);font-size:13px;padding:8px">⏱ ${esc(d.duration)}</div>
+  `;
+}
+
+// ── FORM VIEW ──
+// TODO(R4): this file is ~630 lines, 2x budget. Split seam: the MEMBER VIEW suggestions and the
+// INSIGHT VIEW are a hand-rolled one-shot AI (paAsk) that belongs on PAChat (clause a, still in
+// test/app-contract.test.mjs PENDING) — moving them there removes their JS and CSS here.
+function buildEmojiGrid(selected){
+  const grid=document.getElementById('emoji-grid');
+  grid.innerHTML=EMOJIS.map(e=>`<button class="emoji-opt${e===selected?' selected':''}" onclick="selEmoji(this,'${e}')">${e}</button>`).join('');
+}
+
+function selEmoji(el,emoji){
+  document.querySelectorAll('.emoji-opt').forEach(e=>e.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function selRel(el){
+  document.querySelectorAll('.rel-opt').forEach(e=>e.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function openAdd(){
+  editingId=null;
+  document.getElementById('form-title').textContent='Add Member';
+  document.getElementById('f-name').value='';
+  document.getElementById('f-age').value='';
+  document.getElementById('f-notes').value='';
+  document.getElementById('form-del-btn').style.display='none';
+  disarmDelete();
+  document.querySelectorAll('.rel-opt').forEach(e=>e.classList.remove('selected'));
+  buildEmojiGrid('🧒');
+  showView('form');
+}
+
+function openEdit(){
+  const m=members.find(x=>x.id===currentId);
+  if(!m) return;
+  editingId=m.id;
+  document.getElementById('form-title').textContent='Edit '+m.name;
+  document.getElementById('f-name').value=m.name;
+  document.getElementById('f-age').value=m.age||'';
+  document.getElementById('f-notes').value=m.notes||'';
+  document.getElementById('form-del-btn').style.display='';
+  disarmDelete();
+  document.querySelectorAll('.rel-opt').forEach(e=>{
+    e.classList.toggle('selected',e.dataset.rel===m.rel);
+  });
+  buildEmojiGrid(m.emoji||'🧒');
+  showView('form');
+}
+
+function saveMember(){
+  const name=document.getElementById('f-name').value.trim();
+  if(!name){document.getElementById('f-name').focus();return;}
+  const rel=document.querySelector('.rel-opt.selected')?.dataset.rel||'child';
+  const age=parseInt(document.getElementById('f-age').value)||null;
+  const notes=document.getElementById('f-notes').value.trim();
+  const emoji=document.querySelector('.emoji-opt.selected')?.textContent||'🧒';
+  if(editingId){
+    const m=members.find(x=>x.id===editingId);
+    if(m){Object.assign(m,{name,rel,age,notes,emoji});}
+  } else {
+    members.push({id:Date.now().toString(),name,rel,age,notes,emoji});
+  }
+  saveAll();
+  renderMain();
+  if(editingId){currentId=editingId;openMember(currentId);}else goMain();
+}
+
+// Two taps to delete, through the shared PATwoTap (superelf.md "Reusable components"):
+// window.confirm() returns false at once in the app sandbox, so "Remove this member?" silently
+// cancelled every delete. The button is reused for every member, so opening the form disarms it:
+// an armed button left over from one member must never delete the next one on a single tap.
+const DELETE_ARM_MS=PATwoTap.MS;
+function disarmDelete(){PATwoTap.disarm(document.getElementById('form-del-btn'));}
+function deleteMember(){
+  if(!editingId) return;
+  if(!PATwoTap.press(document.getElementById('form-del-btn'),{ms:DELETE_ARM_MS})) return;
+  members=members.filter(x=>x.id!==editingId);
+  saveAll();
+  renderMain();
+  goMain();
+}
+
+function cancelForm(){
+  if(editingId) openMember(editingId);
+  else goMain();
+}
+
+// ── NAVIGATION ──
+function showView(name){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+}
+function goMain(){showView('main');}
+
+// ── BOOT ──
+load();
+</script>
+</body>
+</html>

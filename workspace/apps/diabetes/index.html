@@ -1,0 +1,842 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Diabetes Tracker</title>
+<style>
+html{font-size:calc(17px * var(--fs,1))}   /* A-/A+ scale, broadcast by the shell (pa:'prefs' fontScale) */
+:root{--bg:#f4f4f2;--card:#fff;--text:#1c1e1d;--muted:#6b7370;--line:#e2e2de;--accent:#0f6355;--danger:#983d24;--warn:#a06000;--ok:#1a7a50;}
+@media(prefers-color-scheme:dark){:root{--bg:#111514;--card:#1b201f;--text:#e5e8e6;--muted:#8f9894;--line:#2a302e;--accent:#57c2ac;--danger:#e08163;--warn:#e0a040;--ok:#3dba7a;}}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--text);font:16px/1.5 -apple-system,system-ui,sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);min-height:100dvh;}
+header{padding:16px 18px 10px;border-bottom:1px solid var(--line);}
+header h1{font-size:19px;}
+header p{font-size:13px;color:var(--muted);margin-top:2px;}
+.wrap{max-width:480px;margin:0 auto;padding:0 16px 80px;}
+.status-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin:16px 0 10px;display:flex;align-items:center;gap:14px;}
+.big-val{font-size:42px;font-weight:700;line-height:1;}
+.big-unit{font-size:14px;color:var(--muted);margin-top:4px;}
+.status-info{flex:1;}
+.status-label{font-size:13px;color:var(--muted);}
+.status-ctx{font-size:15px;font-weight:600;margin-top:2px;}
+.status-time{font-size:12px;color:var(--muted);margin-top:4px;}
+.dot-ok{color:var(--ok);} .dot-warn{color:var(--warn);} .dot-hi{color:var(--danger);}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;text-align:center;}
+.stat b{display:block;font-size:20px;} .stat small{color:var(--muted);font-size:12px;}
+.tabs{display:flex;border-bottom:1px solid var(--line);margin:0 -16px 14px;overflow-x:auto;}
+.tab{flex:1;min-width:60px;padding:10px 6px;text-align:center;font-size:13px;cursor:pointer;color:var(--muted);border:none;background:none;border-bottom:2px solid transparent;white-space:nowrap;}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
+.panel{display:none;} .panel.active{display:block;}
+.field{margin-bottom:12px;}
+.field label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px;}
+.field input,.field select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--text);font:inherit;font-size:16px;}
+.seg{display:flex;gap:6px;flex-wrap:wrap;}
+.seg button{flex:1;min-width:80px;padding:8px 6px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--muted);font:13px inherit;cursor:pointer;}
+.seg button.sel{background:var(--accent);color:#fff;border-color:var(--accent);}
+.btn{width:100%;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:10px;font:inherit;font-size:16px;cursor:pointer;margin-top:4px;}
+.btn:active{opacity:.85;} .btn:disabled{opacity:.5;cursor:default;}
+.btn-sec{background:var(--card);color:var(--text);border:1px solid var(--line);}
+.reading{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line);}
+.reading:last-child{border-bottom:none;}
+.r-val{font-size:18px;font-weight:700;min-width:52px;}
+.r-info{flex:1;} .r-ctx{font-size:13px;font-weight:600;} .r-time{font-size:12px;color:var(--muted);} .r-note{font-size:12px;color:var(--muted);margin-top:1px;}
+.r-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:4px;}
+.badge{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:20px;margin-left:6px;}
+.badge-ok{background:rgba(26,122,80,.15);color:var(--ok);} .badge-warn{background:rgba(160,96,0,.15);color:var(--warn);} .badge-hi{background:rgba(152,61,36,.15);color:var(--danger);}
+.empty{color:var(--muted);font-size:14px;text-align:center;padding:24px 0;}
+.store-msg{display:none;font-size:13px;line-height:1.45;color:var(--danger);background:var(--card);border:1px solid var(--danger);border-radius:10px;padding:10px 12px;margin-bottom:12px;}
+.r-del.armed,.past-scan-del.armed{color:var(--danger);font-size:12px;font-weight:700;padding:4px 6px;white-space:nowrap;}
+.guide{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:10px;font-size:13px;}
+.guide b{display:block;margin-bottom:6px;}
+.guide-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--line);}
+.guide-row:last-child{border-bottom:none;}
+.guide-note{color:var(--muted);font-size:11px;margin-top:8px;line-height:1.4;}
+.a1c-card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.a1c-val{font-size:24px;font-weight:700;} .a1c-info{flex:1;} .a1c-date{font-size:12px;color:var(--muted);}
+/* Extracted readings */
+.ext-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--card);border:1px solid var(--line);border-radius:10px;margin-bottom:8px;}
+.ext-item input[type=checkbox]{width:18px;height:18px;flex-shrink:0;accent-color:var(--accent);}
+.ext-val{font-size:18px;font-weight:700;min-width:48px;}
+.ext-info{flex:1;}
+.ext-ctx{font-size:13px;font-weight:600;}
+.ext-time{font-size:12px;color:var(--muted);}
+.prov{font-size:11px;margin-left:5px;opacity:.85;}
+.ext-item.lowc{border-color:var(--warn);}
+.ext-why{font-size:11px;color:var(--warn);margin-top:2px;}
+/* Past scans */
+.past-scan{background:var(--card);border:1px solid var(--line);border-radius:10px;margin-bottom:10px;overflow:hidden;}
+.past-scan-header{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;}
+.past-scan-header img{width:56px;height:56px;object-fit:cover;border-radius:6px;flex-shrink:0;}
+.past-scan-meta{flex:1;min-width:0;}
+.past-scan-date{font-size:13px;font-weight:600;}
+.past-scan-preview{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;}
+.past-scan-body{display:none;border-top:1px solid var(--line);padding:10px 12px;}
+.past-scan.open .past-scan-body{display:block;}
+.past-scan-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:4px;flex-shrink:0;}
+/* Scan tab */
+.img-row{display:flex;gap:8px;margin-bottom:12px;}
+.img-btn{flex:1;padding:12px 8px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--text);font:14px inherit;cursor:pointer;text-align:center;}
+#imgPreview{position:relative;margin-bottom:12px;display:none;}
+#imgPreview img{width:100%;border-radius:10px;border:1px solid var(--line);}
+#clearImg{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.5);color:#fff;border:none;border-radius:50%;width:28px;height:28px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+/* Chat thread */
+.thread{margin-top:16px;display:flex;flex-direction:column;gap:10px;}
+.bubble{padding:10px 14px;border-radius:12px;font-size:15px;line-height:1.5;max-width:90%;word-break:break-word;}
+.bubble.user{background:var(--accent);color:#fff;align-self:flex-end;}
+.bubble.ai{background:var(--card);border:1px solid var(--line);align-self:flex-start;white-space:pre-wrap;}
+.bubble.thinking{color:var(--muted);font-style:italic;background:none;border:none;padding:4px 0;}
+.follow-row{display:flex;gap:8px;margin-top:10px;}
+.follow-row input{flex:1;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--text);font:inherit;}
+.follow-row button{padding:10px 14px;background:var(--accent);color:#fff;border:none;border-radius:10px;font:inherit;cursor:pointer;}
+.follow-row button:disabled{opacity:.5;}
+</style>
+</head>
+<body>
+<header>
+  <h1>🩸 Diabetes Tracker</h1>
+  <p>Blood glucose &amp; HbA1c log</p>
+</header>
+<div class="wrap">
+  <div id="statusCard" class="status-card" style="display:none"></div>
+  <div class="stats">
+    <div class="stat"><b id="sAvg">—</b><small>avg mg/dL</small></div>
+    <div class="stat"><b id="sInRange">—</b><small>in range</small></div>
+    <div class="stat"><b id="sCount">0</b><small>readings</small></div>
+  </div>
+  <!-- Where a store failure lands. A health log that cannot write must SAY SO on the page it
+       is failing to write to; a console line is not a user-visible error (R5). -->
+  <div id="storeMsg" class="store-msg"></div>
+  <div class="tabs">
+    <button class="tab active" data-tab="log">Log</button>
+    <button class="tab" data-tab="scan">📷 Scan</button>
+    <button class="tab" data-tab="history">History</button>
+    <button class="tab" data-tab="a1c">HbA1c</button>
+    <button class="tab" data-tab="guide">Guide</button>
+  </div>
+
+  <!-- LOG TAB -->
+  <div id="tab-log" class="panel active">
+    <!-- Two buttons, not two hidden <input>s: PAPhoto owns the picker. BOTH are needed —
+         capture="environment" opens the camera on a phone but REMOVES the library option
+         entirely on iOS, so "from a photo you already have" needs its own way in. -->
+    <div class="img-row">
+      <button class="img-btn" id="logCamBtn">📷 Photograph a meter or graph<br><small>拍照读数</small></button>
+      <button class="img-btn" id="logGalBtn">🖼 From a photo<br><small>从相册选择</small></button>
+    </div>
+    <div id="logImgPreview" style="display:none;position:relative;margin-bottom:12px;">
+      <img id="logPrevImg" alt="preview" style="width:100%;border-radius:10px;border:1px solid var(--line);">
+      <button id="logClearImg" style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.5);color:#fff;border:none;border-radius:50%;width:28px;height:28px;font-size:16px;cursor:pointer;">×</button>
+    </div>
+    <div id="logExtractStatus" style="font-size:13px;color:var(--muted);margin-bottom:8px;display:none;"></div>
+    <!-- Extracted readings review list -->
+    <div id="extractedList" style="display:none;margin-bottom:14px;">
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px;">Extracted readings — uncheck any to skip</div>
+      <div id="extractedItems"></div>
+      <button class="btn" id="saveAllBtn">Save all checked</button>
+    </div>
+    <!-- Analysis -->
+    <div id="logAnalysis" style="display:none;margin-bottom:14px;">
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px;">Analysis &amp; advice</div>
+      <div class="thread" id="logThread"></div>
+      <div class="follow-row" id="logFollowUp" style="display:none;margin-top:8px;">
+        <input id="logFollowIn" placeholder="Ask a follow-up…" maxlength="300">
+        <button id="logFollowBtn">↑</button>
+      </div>
+    </div>
+    <hr style="border:none;border-top:1px solid var(--line);margin:14px 0;">
+    <div style="font-size:13px;color:var(--muted);margin-bottom:10px;">Or log a single reading manually</div>
+    <div class="field"><label>Glucose (mg/dL)</label><input id="inVal" type="number" min="40" max="600" placeholder="e.g. 95" inputmode="numeric"></div>
+    <div class="field">
+      <label>Context</label>
+      <div class="seg" id="ctxSeg">
+        <button class="seg sel" data-ctx="fasting">Fasting</button>
+        <button class="seg" data-ctx="pre-meal">Pre-meal</button>
+        <button class="seg" data-ctx="post-meal">Post-meal</button>
+        <button class="seg" data-ctx="bedtime">Bedtime</button>
+        <button class="seg" data-ctx="random">Random</button>
+      </div>
+    </div>
+    <div class="field"><label>Date &amp; time</label><input id="inTs" type="datetime-local"></div>
+    <div class="field"><label>Note (optional)</label><input id="inNote" type="text" placeholder="e.g. after exercise" maxlength="80"></div>
+    <button class="btn" id="addBtn">Save reading</button>
+  </div>
+
+  <!-- SCAN TAB -->
+  <div id="tab-scan" class="panel">
+    <div class="img-row">
+      <button class="img-btn" id="scanCamBtn">📷 Camera<br><small>拍照</small></button>
+      <button class="img-btn" id="scanGalBtn">🖼 Gallery<br><small>相册</small></button>
+    </div>
+    <div id="imgPreview"><img id="prevImg" alt="preview"><button id="clearImg">×</button></div>
+    <div class="field"><label>Question (optional)</label><input id="analyzeQ" placeholder="e.g. Why did I spike after lunch?" maxlength="200"></div>
+    <button class="btn" id="analyzeBtn" disabled>Analyze with AI</button>
+    <div class="thread" id="convThread"></div>
+    <div class="follow-row" id="followUp" style="display:none">
+      <input id="followIn" placeholder="Ask a follow-up…" maxlength="300">
+      <button id="followBtn">↑</button>
+    </div>
+    <!-- Past scans -->
+    <div id="pastScans" style="margin-top:20px"></div>
+  </div>
+
+  <!-- HISTORY TAB -->
+  <div id="tab-history" class="panel"><div id="histList"></div></div>
+
+  <!-- A1C TAB -->
+  <div id="tab-a1c" class="panel">
+    <div id="a1cList" style="margin-bottom:16px"></div>
+    <div class="field"><label>HbA1c (%)</label><input id="a1cVal" type="number" step="0.1" min="4" max="15" placeholder="e.g. 5.9" inputmode="decimal"></div>
+    <div class="field"><label>Date</label><input id="a1cDate" type="date"></div>
+    <button class="btn" id="a1cBtn">Save HbA1c</button>
+  </div>
+
+  <!-- GUIDE TAB -->
+  <div id="tab-guide" class="panel">
+    <div class="guide">
+      <b>Blood glucose targets (mg/dL)</b>
+      <div class="guide-row"><span>Fasting — normal</span><span class="dot-ok">70–99</span></div>
+      <div class="guide-row"><span>Fasting — prediabetes</span><span class="dot-warn">100–125</span></div>
+      <div class="guide-row"><span>Fasting — diabetes</span><span class="dot-hi">≥ 126</span></div>
+      <div class="guide-row"><span>2h post-meal — normal</span><span class="dot-ok">&lt; 140</span></div>
+      <div class="guide-row"><span>2h post-meal — prediabetes</span><span class="dot-warn">140–199</span></div>
+      <div class="guide-row"><span>2h post-meal — diabetes</span><span class="dot-hi">≥ 200</span></div>
+      <div class="guide-row"><span>Hypoglycemia</span><span class="dot-hi">&lt; 70</span></div>
+      <p class="guide-note">⚠ General reference ranges only. Follow your doctor's personal targets.</p>
+    </div>
+    <div class="guide" style="margin-top:10px">
+      <b>HbA1c</b>
+      <div class="guide-row"><span>Normal</span><span class="dot-ok">&lt; 5.7%</span></div>
+      <div class="guide-row"><span>Prediabetes</span><span class="dot-warn">5.7–6.4%</span></div>
+      <div class="guide-row"><span>Diabetes</span><span class="dot-hi">≥ 6.5%</span></div>
+      <p class="guide-note">Symptoms of a diabetic emergency (extreme thirst, confusion, fruity breath) — seek care immediately.</p>
+    </div>
+  </div>
+</div>
+<!-- PAPhoto, inlined at serve time (web.mjs PA_COMPONENTS). This app mounts no PAChat, so
+     unlike the Journal or the Longevity app it must carry the marker itself; double-inlining
+     is a no-op (photo-ui.inline.html guards on window.PAPhoto). Written with the delimiters
+     because this file is an APP, not a component: nothing re-serves it into another page. -->
+<!--PA_PHOTO_UI-->
+<script>
+/* ── Data ─────────────────────────────────────────────────────────────────────────────────
+   THE STORE. Readings and HbA1c used to live in localStorage. An app here runs SANDBOXED at an
+   opaque origin (web/index.html: iframe sandbox="allow-scripts", no allow-same-origin) where
+   every storage API throws SecurityError — so save() threw inside the click handler, the reading
+   was never written, render() never ran, and "Save reading" looked like a dead button. Measured
+   before the fix: workspace/data/diabetes/ was EMPTY on disk. Nothing this app ever logged by
+   hand existed anywhere. The Scan tab's broker path already worked; everything uses it now.
+
+   THE RULE (the notebook apps' PA_DATA_CORE rule, applied to this app's two files): a read
+   resolves to exactly one of loaded / absent / failed, and a FAILED read BLOCKS writing to that
+   path. An unreadable store must NEVER be treated as an empty one — that is how a save writes
+   {} over months of history and still answers ok:true (the 2026-09-02 empty-overwrite class).
+   `absent` is EARNED by the shell's own code:'not-found', never inferred from a missing field. */
+const DATA_PATH='readings.json';                     // {readings:[],a1c:[]}; the shell scopes it to data/diabetes/
+const STORE_NOT_FOUND='not-found';                   // == web/index.html relayCall's 404 code (pinned by test)
+const STORE_SHAPE_TXT='stored file has the wrong shape · 存储格式不符 — refusing to overwrite it 拒绝覆盖';
+const STORE_PARSE_TXT='stored file could not be parsed · 存储文件无法解析 — refusing to overwrite it 拒绝覆盖';
+const STORE_NOT_SAVED='Not saved · 未保存 — ';
+const blockedPaths=new Map();                        // path -> bilingual reason; a blocked path is NEVER written
+let DB={readings:[],a1c:[]};
+
+// The standing reason, if any, always wins: a block must not be cleared off the screen by an
+// unrelated success elsewhere in the app.
+function storeMsg(t){
+  const el=document.getElementById('storeMsg'); if(!el) return;
+  const why=t||[...blockedPaths.values()][0]||'';
+  el.textContent=why; el.style.display=why?'block':'none';
+}
+// Read one store file. Answers the PARSED value, or `fallback` for a store that is genuinely
+// absent (first run). Every other outcome BLOCKS the path and says why — it never answers a
+// default that a later write would then persist over real data.
+async function storeRead(path,fallback,shapeOk){
+  const block=(why)=>{ blockedPaths.set(path,why); storeMsg(); return fallback; };
+  const r=await pa('data',{path});
+  if(r.ok===true&&typeof r.text==='string'){
+    if(!r.text.trim()){ blockedPaths.delete(path); return fallback; }   // an empty file really is no content
+    let v; try{ v=JSON.parse(r.text); }catch(e){ return block(STORE_PARSE_TXT); }
+    if(!shapeOk(v)) return block(STORE_SHAPE_TXT);
+    blockedPaths.delete(path); return v;
+  }
+  if(r.code===STORE_NOT_FOUND){ blockedPaths.delete(path); return fallback; }   // nothing stored yet: the one legitimate empty
+  return block((r.text||r.error||'could not read the store · 无法读取存储')+' — refusing to overwrite it 拒绝覆盖');
+}
+// EVERY write goes through here: a path this session could not READ is a path it must not WRITE.
+async function storeWrite(path,text){
+  const why=blockedPaths.get(path);
+  if(why) return {ok:false,error:why};
+  return pa('save-data',{path,data:text});
+}
+async function persist(){
+  const r=await storeWrite(DATA_PATH,JSON.stringify(DB));
+  if(!r||r.ok!==true){ storeMsg(STORE_NOT_SAVED+((r&&(r.text||r.error))||'no reason given 未给出原因')); return false; }
+  storeMsg(''); return true;
+}
+const dbShapeOk=(v)=>!!v&&typeof v==='object'&&Array.isArray(v.readings)&&Array.isArray(v.a1c);
+function load(){return DB;}
+async function save(d){DB=d;return persist();}
+
+function glucoseStatus(val,ctx){
+  if(val<70) return{label:'Low',cls:'hi'};
+  if(ctx==='post-meal'){ if(val<140) return{label:'Normal',cls:'ok'}; if(val<200) return{label:'High',cls:'warn'}; return{label:'Very high',cls:'hi'}; }
+  if(val<100) return{label:'Normal',cls:'ok'}; if(val<126) return{label:'Elevated',cls:'warn'}; return{label:'High',cls:'hi'};
+}
+function a1cStatus(v){ if(v<5.7) return{label:'Normal',cls:'ok'}; if(v<6.5) return{label:'Prediabetes',cls:'warn'}; return{label:'Diabetes range',cls:'hi'}; }
+function timeAgo(ts){const d=Math.floor((Date.now()-ts)/60000);if(d<1)return'just now';if(d<60)return d+'m ago';if(d<1440)return Math.floor(d/60)+'h ago';return Math.floor(d/1440)+'d ago';}
+function fmtDt(ts){return new Date(ts).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+/* PROVENANCE（来源）— a number a MODEL read off a photograph is not the same fact as a number a
+   human typed, and a health record that cannot tell them apart is worse than no record. Three
+   things travel with every photo-derived reading and are shown wherever it is:
+     src:'photo'    the reading came from a picture, and `photo` is the stored source image
+     confidence     the model's own 'low' marks a value it read off a curve or a blurred digit
+     tsGuessed      the model gave NO time, so the timestamp is "when it was saved", not when
+                    it was measured — rendering that as a precise clock time would be a lie.
+   Rendered as a marker rather than a colour so it survives a screenshot and a colour-blind
+   reader. A hand-typed reading is deliberately left unmarked: the default is the trustworthy
+   one, and only the derived ones have to argue for themselves. */
+const READ_LOW='low';
+const provMark=(r)=>r&&r.src==='photo'
+  ?`<span class="prov" title="read from a photo · 由照片识别">📷${r.confidence===READ_LOW?'?':''}</span>`:'';
+const whenTxt=(r)=>(r&&r.tsGuessed)?'time not in the photo · 照片中无时间':fmtDt(r.ts);
+
+function renderStatus(){
+  const d=load();const card=document.getElementById('statusCard');
+  if(!d.readings.length){card.style.display='none';return;}
+  const r=d.readings[d.readings.length-1];const st=glucoseStatus(r.val,r.ctx);
+  card.style.display='flex';
+  card.innerHTML=`<div><div class="big-val dot-${st.cls}">${r.val}</div><div class="big-unit">mg/dL</div></div>
+    <div class="status-info"><div class="status-label">Latest reading</div>
+    <div class="status-ctx">${esc(r.ctx)}${provMark(r)}<span class="badge badge-${st.cls}">${st.label}</span></div>
+    <div class="status-time">${r.tsGuessed?whenTxt(r):timeAgo(r.ts)+' · '+fmtDt(r.ts)}</div>
+    ${r.note?`<div class="status-time">${esc(r.note)}</div>`:''}</div>`;
+}
+function renderStats(){
+  const d=load();if(!d.readings.length){document.getElementById('sAvg').textContent='—';document.getElementById('sInRange').textContent='—';document.getElementById('sCount').textContent='0';return;}
+  const avg=Math.round(d.readings.reduce((a,r)=>a+r.val,0)/d.readings.length);
+  const pct=Math.round(d.readings.filter(r=>glucoseStatus(r.val,r.ctx).cls==='ok').length/d.readings.length*100)+'%';
+  document.getElementById('sAvg').textContent=avg;document.getElementById('sInRange').textContent=pct;document.getElementById('sCount').textContent=d.readings.length;
+}
+function renderHistory(){
+  const d=load();const el=document.getElementById('histList');
+  if(!d.readings.length){el.innerHTML='<div class="empty">No readings yet.</div>';return;}
+  el.innerHTML=[...d.readings].reverse().map((r,i)=>{
+    const st=glucoseStatus(r.val,r.ctx);
+    return`<div class="reading"><div class="r-val dot-${st.cls}">${r.val}</div>
+      <div class="r-info"><div class="r-ctx">${esc(r.ctx)}${provMark(r)}<span class="badge badge-${st.cls}">${st.label}</span></div>
+      <div class="r-time">${whenTxt(r)}</div>${r.note?`<div class="r-note">${esc(r.note)}</div>`:''}</div>
+      ${delBtn('r:'+(d.readings.length-1-i))}</div>`;
+  }).join('');
+}
+function renderA1c(){
+  const d=load();const el=document.getElementById('a1cList');
+  if(!d.a1c.length){el.innerHTML='<div class="empty">No HbA1c entries yet.</div>';return;}
+  el.innerHTML=[...d.a1c].reverse().map((r,i)=>{
+    const st=a1cStatus(r.val);
+    return`<div class="a1c-card"><div class="a1c-val dot-${st.cls}">${r.val}%</div>
+      <div class="a1c-info"><div><span class="badge badge-${st.cls}">${st.label}</span></div>
+      <div class="a1c-date">${new Date(r.ts).toLocaleDateString([],{year:'numeric',month:'short',day:'numeric'})}</div></div>
+      ${delBtn('a:'+(d.a1c.length-1-i))}</div>`;
+  }).join('');
+}
+function render(){renderStatus();renderStats();renderHistory();renderA1c();}
+
+/* Two-tap delete, through the shared PATwoTap (superelf.md "Reusable components").
+   window.confirm() is IGNORED in this sandbox (iframe sandbox="allow-scripts", no allow-modals):
+   every `if(!confirm(...)) return;` in this app was a delete that could never fire — and would
+   have become a ONE-TAP irreversible delete of a health record the moment the store started
+   working. The × asks in place instead, and forgets after DEL_ARM_MS. delArm.press() is TRUE only
+   for a second tap on the row already asking; the ask survives a re-render because the renderers
+   read delArm.asking(), rather than the button holding state. */
+const DEL_ARM_MS=4000;
+const delArm=PATwoTap.rows(DEL_ARM_MS);
+const delBtn=(key)=>delArm.asking(key)
+  ?`<button class="r-del armed" data-k="${key}">${PATwoTap.LABEL}</button>`
+  :`<button class="r-del" data-k="${key}">×</button>`;
+
+/* ── Tabs ── */
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab,.panel').forEach(e=>e.classList.remove('active'));
+  t.classList.add('active');document.getElementById('tab-'+t.dataset.tab).classList.add('active');
+});
+
+/* ── Context segment ── */
+let selCtx='fasting';
+document.getElementById('ctxSeg').onclick=e=>{
+  const b=e.target.closest('[data-ctx]');if(!b)return;
+  document.querySelectorAll('#ctxSeg button').forEach(x=>x.classList.remove('sel'));
+  b.classList.add('sel');selCtx=b.dataset.ctx;
+};
+function nowLocal(){const d=new Date();d.setSeconds(0,0);return d.toISOString().slice(0,16);}
+document.getElementById('inTs').value=nowLocal();
+
+/* ── Log glucose ── */
+// alert() is ignored in this sandbox exactly like confirm() — an out-of-range value used to do
+// NOTHING AT ALL, with no message anywhere. The refusal is on the page now.
+const RANGE_TXT='Enter a glucose value between 40 and 600 mg/dL · 请输入 40–600 mg/dL 之间的数值';
+document.getElementById('addBtn').onclick=async()=>{
+  const val=parseInt(document.getElementById('inVal').value,10);
+  if(!val||val<40||val>600){storeMsg(RANGE_TXT);return;}
+  const ts=new Date(document.getElementById('inTs').value||nowLocal()).getTime();
+  const note=document.getElementById('inNote').value.trim();
+  const d=load();
+  // A HAND-TYPED reading. `src` and `confirmed` travel with every record so a number a model
+  // read off a photo can never be mistaken for one a human entered (see the extraction path).
+  d.readings.push({ts,val,ctx:selCtx,note,src:'manual',confirmed:true});
+  render();                                   // show it immediately; the banner says if it did not store
+  // The inputs are cleared only on a REAL save. Clearing them after a failed write would delete
+  // the user's typing and the record in one go.
+  if(await save(d)){
+    document.getElementById('inVal').value='';document.getElementById('inNote').value='';document.getElementById('inTs').value=nowLocal();
+  }
+};
+document.getElementById('histList').onclick=async e=>{
+  const b=e.target.closest('[data-k]');if(!b||!b.dataset.k.startsWith('r:'))return;
+  if(!delArm.press(b.dataset.k,render))return;
+  const d=load();d.readings.splice(Number(b.dataset.k.slice(2)),1);render();await save(d);
+};
+
+/* ── HbA1c ── */
+document.getElementById('a1cDate').value=new Date().toISOString().slice(0,10);
+const A1C_RANGE_TXT='Enter an HbA1c between 4% and 15% · 请输入 4%–15% 之间的数值';
+document.getElementById('a1cBtn').onclick=async()=>{
+  const val=parseFloat(document.getElementById('a1cVal').value);
+  if(!val||val<4||val>15){storeMsg(A1C_RANGE_TXT);return;}
+  const ts=new Date(document.getElementById('a1cDate').value||new Date().toISOString().slice(0,10)).getTime();
+  const d=load();d.a1c.push({ts,val,src:'manual',confirmed:true});
+  render();
+  if(await save(d)) document.getElementById('a1cVal').value='';
+};
+document.getElementById('a1cList').onclick=async e=>{
+  const b=e.target.closest('[data-k]');if(!b||!b.dataset.k.startsWith('a:'))return;
+  if(!delArm.press(b.dataset.k,render))return;
+  const d=load();d.a1c.splice(Number(b.dataset.k.slice(2)),1);render();await save(d);
+};
+
+/* ── Broker ───────────────────────────────────────────────────────────────────────────────
+   ALWAYS RESOLVES with the shell's reply; it never rejects. It used to reject with
+   `new Error(e.data.error)`, which threw away `code` — so nothing could tell a 404 (nothing
+   stored yet) from a 500 (do not overwrite) — and threw away `text`, the sentence the SHELL had
+   already rendered with the right noun, both languages and, for a size refusal, the real cap.
+   Callers that genuinely want an exception use paOrThrow. */
+let _paId=0;
+function pa(kind,payload){
+  return new Promise(res=>{
+    const id=++_paId;
+    let t=0;
+    const h=(e)=>{
+      if(!e.data||e.data.pa!=='res'||e.data.id!==id)return;
+      window.removeEventListener('message',h); clearTimeout(t); res(e.data);
+    };
+    window.addEventListener('message',h);
+    // Silence is an ANSWER, not a hang: a shell that never replies must not leave a spinner
+    // running for ever, and the caller must be able to tell that apart from a refusal (R5).
+    t=setTimeout(()=>{window.removeEventListener('message',h);
+      res({ok:false,code:'timeout',error:'no answer from the app shell · 外壳无响应'});},120000);
+    window.parent.postMessage({pa:'req',id,kind,...payload},'*');
+  });
+}
+const paOrThrow=async(kind,payload)=>{const r=await pa(kind,payload);
+  if(!r||r.ok===false) throw new Error((r&&(r.text||r.error))||'failed'); return r;};
+
+/* ── Photo capture ────────────────────────────────────────────────────────────────────────
+   ONE path for every photo in this app (R1/R3). PAPhoto (web/photo-ui.inline.html, pulled in
+   by the PA_PHOTO_UI marker in <body>) owns the picker, the FileReader, the downscale and the
+   size pre-flight. What was here before: FOUR file inputs, TWO FileReader paths, a private
+   canvas thumbnailer, and NO SIZE CHECK ANYWHERE — a 12MP phone photo went up at full size and
+   whatever the server said about it came back to the user as "Error: failed".
+
+   SCAN_EDGE is what a vision model reads a meter face or a CGM graph from; THUMB_EDGE is the
+   copy STORED in scans.json, so it has to stay tiny — a 1600px data URL per scan would grow
+   that file without bound. Both go through the SAME resize. */
+const SCANS_PATH='scans.json';
+const SCAN_EDGE=1600, THUMB_EDGE=72, THUMB_QUALITY=0.6;
+// Reachable only if this page were served without PA_PHOTO_UI. A camera button that silently
+// does nothing is what makes an app look broken, so the missing piece is NAMED (R5).
+const NO_PHOTO_TXT='Photo component not loaded · 未加载照片组件';
+let imgData=null,imgThumb=null,scanHistory=[],allScans=[];
+const scansShapeOk=(v)=>Array.isArray(v);
+
+// Pick → read → downscale → pre-flight, in one call. Answers a shaped outcome, never a throw:
+// a CANCELLED sheet, an oversized photo and an unreadable file are three different things and
+// only two of them are errors (R5). `camera` is the phone's camera; without it, the library.
+async function pickPhoto(camera){
+  if(!window.PAPhoto) return {ok:false,cancelled:false,text:NO_PHOTO_TXT};
+  const picked=await window.PAPhoto.pick(camera?{camera:true}:{});
+  if(!picked.ok) return {ok:false,cancelled:true,text:''};
+  const file=picked.files[0];
+  const enc=await window.PAPhoto.toBase64(file,{maxEdge:SCAN_EDGE,what:'Photo'});
+  if(!enc.ok) return {ok:false,cancelled:false,text:enc.text||enc.error};
+  // A failed THUMBNAIL is not a failed photo: the scan still stores and still analyses, it just
+  // lists without a preview image (renderPastScans already draws a placeholder for that).
+  const th=await window.PAPhoto.toBase64(file,{maxEdge:THUMB_EDGE,quality:THUMB_QUALITY,what:'Photo'});
+  return {ok:true,cancelled:false,text:'',data:enc.data,dataUrl:enc.dataUrl,thumb:th.ok?th.dataUrl:'',
+    name:file.name||'photo.jpg'};
+}
+
+async function pickScan(camera){
+  const p=await pickPhoto(camera);
+  if(!p.ok){ if(p.text) storeMsg(p.text); return; }
+  storeMsg('');
+  imgData=p.data; imgThumb=p.thumb;
+  document.getElementById('prevImg').src=p.dataUrl;
+  document.getElementById('imgPreview').style.display='block';
+  document.getElementById('analyzeBtn').disabled=false;
+}
+document.getElementById('scanCamBtn').onclick=()=>pickScan(true);
+document.getElementById('scanGalBtn').onclick=()=>pickScan(false);
+document.getElementById('clearImg').onclick=()=>{
+  imgData=null;imgThumb=null;
+  document.getElementById('imgPreview').style.display='none';
+  document.getElementById('analyzeBtn').disabled=true;
+};
+
+// Both used to swallow everything: `catch{allScans=[]}` turned an unreadable scans.json into an
+// empty list, and `catch{}` turned a refused write into a clean-looking success — so the very
+// next save wrote that empty list over every stored scan, with nothing anywhere to see (R5, and
+// the empty-overwrite class again). They share the store primitives now: a failed read BLOCKS
+// the path, and a failed write says so on the page.
+async function loadScans(){
+  allScans=await storeRead(SCANS_PATH,[],scansShapeOk);
+  renderPastScans();
+}
+async function saveScans(){
+  const r=await storeWrite(SCANS_PATH,JSON.stringify(allScans));
+  if(!r||r.ok!==true){ storeMsg(STORE_NOT_SAVED+((r&&(r.text||r.error))||'no reason given 未给出原因')); return false; }
+  storeMsg(''); return true;
+}
+
+async function renderPastScans(){
+  const el=document.getElementById('pastScans');
+  if(!allScans.length){el.innerHTML='';return;}
+  el.innerHTML='<div style="font-size:13px;color:var(--muted);margin-bottom:8px;font-weight:600">Previous scans</div>'+
+    [...allScans].reverse().map((s,ri)=>{
+      const idx=allScans.length-1-ri;
+      const preview=(s.conversation.find(m=>m.role==='ai')?.text||'').replace(/\*+/g,'').slice(0,80);
+      const asking=delArm.asking('s:'+idx);
+      return`<div class="past-scan" data-si="${idx}">
+        <div class="past-scan-header">
+          ${s.thumb?`<img src="${s.thumb}" alt="">`:
+            '<div style="width:56px;height:56px;background:var(--line);border-radius:6px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:20px">🖼</div>'}
+          <div class="past-scan-meta">
+            <div class="past-scan-date">${new Date(s.ts).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div>
+            <div class="past-scan-preview">${esc(preview)}</div>
+          </div>
+          <button class="past-scan-del${asking?' armed':''}" data-k="s:${idx}">${asking?PATwoTap.LABEL:'×'}</button>
+        </div>
+        <div class="past-scan-body" id="sb-${idx}"></div>
+      </div>`;
+    }).join('');
+}
+
+document.getElementById('pastScans').onclick=async e=>{
+  const db=e.target.closest('[data-k]');
+  if(db){ if(!delArm.press(db.dataset.k,renderPastScans))return;
+    allScans.splice(Number(db.dataset.k.slice(2)),1);renderPastScans();await saveScans();return; }
+  const card=e.target.closest('.past-scan');if(!card)return;
+  const idx=Number(card.dataset.si);const s=allScans[idx];if(!s)return;
+  card.classList.toggle('open');
+  const body=document.getElementById('sb-'+idx);
+  if(card.classList.contains('open')&&!body.dataset.loaded){
+    body.dataset.loaded='1';
+    const thread=document.createElement('div');thread.className='thread';body.appendChild(thread);
+    for(const m of s.conversation){
+      const el=document.createElement('div');el.className='bubble '+(m.role==='ai'?'ai':'user');
+      // R5: the markdown renderer failing is not a reason to show nothing — the message is shown
+      // as PLAIN TEXT instead, which is strictly more information than a blank bubble.
+      if(m.role==='ai'){try{const r=await paOrThrow('render-md',{text:m.text});el.innerHTML=r.html;}catch(err){el.textContent=m.text;}}
+      else el.textContent=m.text;
+      thread.appendChild(el);
+    }
+  }
+};
+
+async function addBubble(role,text){
+  const el=document.createElement('div');el.className='bubble '+role;
+  if(role==='ai'){
+    try{ const r=await paOrThrow('render-md',{text}); el.innerHTML=r.html; }
+    catch(err){ el.textContent=text; }   // R5: markdown unavailable → plain text, never an empty bubble
+  } else { el.textContent=text; }
+  document.getElementById('convThread').appendChild(el);el.scrollIntoView({block:'end'});
+  return el;
+}
+
+document.getElementById('analyzeBtn').onclick=async()=>{
+  if(!imgData){storeMsg('Take or pick a photo first · 请先拍照或选择图片');return;}
+  // Whatever was photographed — a meter, a CGM screen, a lab report, a plate. The old default
+  // asserted "Libre 3 CGM screenshot", which tells a vision model what to see before it looks.
+  const q=document.getElementById('analyzeQ').value.trim()||
+    'This is a photo of blood-glucose data — a meter, a CGM screen, a lab report or a written log. Describe what it actually shows: current glucose, recent trend, any highs or lows, and 1-2 practical takeaways. If something is unclear, say so rather than guessing. Keep advice general.';
+  scanHistory=[];
+  document.getElementById('convThread').innerHTML='';
+  document.getElementById('followUp').style.display='none';
+  const btn=document.getElementById('analyzeBtn');
+  btn.disabled=true;btn.textContent='Uploading…';
+  await addBubble('user',q);
+  const thinking=document.createElement('div');thinking.className='bubble thinking';thinking.textContent='Analyzing…';
+  document.getElementById('convThread').appendChild(thinking);
+  try{
+    const up=await paOrThrow('upload',{name:'libre.jpg',data:imgData});
+    btn.textContent='Analyzing…';
+    const prompt=q+`\n\n[Attached file: libre.jpg — saved to workspace/${up.path}. Use the Read tool to view it.]`;
+    const resp=await paOrThrow('ask',{message:prompt});
+    thinking.remove();
+    scanHistory.push({role:'user',text:q},{role:'ai',text:resp.text});
+    await addBubble('ai',resp.text);
+    allScans.push({ts:Date.now(),thumb:imgThumb,imagePath:up.path,conversation:scanHistory});
+    await saveScans();renderPastScans();
+    document.getElementById('followUp').style.display='flex';
+  }catch(e){
+    thinking.remove();await addBubble('ai','Error: '+e.message);
+  }finally{
+    btn.disabled=false;btn.textContent='Analyze with AI';
+  }
+};
+
+document.getElementById('followBtn').onclick=sendFollowUp;
+document.getElementById('followIn').onkeydown=e=>{if(e.key==='Enter')sendFollowUp();};
+
+async function sendFollowUp(){
+  const inp=document.getElementById('followIn');
+  const q=inp.value.trim();if(!q)return;
+  inp.value='';
+  await addBubble('user',q);
+  const thinking=document.createElement('div');thinking.className='bubble thinking';thinking.textContent='Thinking…';
+  document.getElementById('convThread').appendChild(thinking);
+  const btn=document.getElementById('followBtn');btn.disabled=true;
+  const hist=scanHistory.slice(-8).map(m=>`${m.role==='user'?'User':'Assistant'}: ${m.text}`).join('\n');
+  const prompt=(hist?'Previous conversation:\n'+hist+'\n\n':'')+'User: '+q;
+  try{
+    const resp=await paOrThrow('ask',{message:prompt});
+    thinking.remove();
+    scanHistory.push({role:'user',text:q},{role:'ai',text:resp.text});
+    await addBubble('ai',resp.text);
+    if(allScans.length){allScans[allScans.length-1].conversation=scanHistory;await saveScans();}
+  }catch(e){
+    thinking.remove();await addBubble('ai','Error: '+e.message);
+  }finally{
+    btn.disabled=false;
+  }
+}
+
+/* ── Log tab image extraction + analysis ── */
+const VALID_CTX=['fasting','pre-meal','post-meal','bedtime','random'];
+let extractedReadings=[], logHistory=[];
+
+function historySummary(){
+  const d=load(); const r=d.readings;
+  if(!r.length) return 'No prior readings logged.';
+  const recent=[...r].slice(-20).reverse();
+  const avg=Math.round(r.reduce((a,x)=>a+x.val,0)/r.length);
+  const inRange=Math.round(r.filter(x=>glucoseStatus(x.val,x.ctx).cls==='ok').length/r.length*100);
+  const lines=[`Past history (${r.length} readings): avg ${avg} mg/dL, ${inRange}% in range.`,'Recent:'];
+  recent.slice(0,8).forEach(x=>lines.push(`  ${fmtDt(x.ts)}: ${x.val} mg/dL (${x.ctx}${x.note?', '+x.note:''})`));
+  return lines.join('\n');
+}
+
+async function addLogBubble(role,text){
+  const el=document.createElement('div'); el.className='bubble '+(role==='ai'?'ai':'user');
+  if(role==='ai'){try{const r=await paOrThrow('render-md',{text});el.innerHTML=r.html;}catch(err){el.textContent=text;}}   // R5: see addBubble
+  else el.textContent=text;
+  document.getElementById('logThread').appendChild(el); el.scrollIntoView({block:'end'}); return el;
+}
+
+/* THE EXTRACTION PROMPT. A meter face, a CGM graph, a lab printout — whatever was photographed.
+   `confidence` is asked for EXPLICITLY and per reading, because the difference between printed
+   digits and a value eyeballed off a curve is exactly the difference this app has to show the
+   user. `ts:null` is explicitly allowed: a guessed time is worse than an absent one. */
+const EXTRACT_PROMPT=`This photo shows blood-glucose data — a meter display, a CGM graph, a lab
+report or a handwritten log. Extract ONLY the readings you can actually see. Return ONLY a JSON
+array, no other text. Each item: val (mg/dL, integer), ctx (one of fasting/pre-meal/post-meal/
+bedtime/random), ts (ISO datetime ONLY if a date or time is legible in the photo, otherwise
+null), note (short label, e.g. "current", "dinner spike", "morning low"), confidence ("high"
+only when the number is printed and unambiguous; "low" when it is read off a curve, blurred,
+partly hidden, or inferred). Never invent a value or a time. An empty array is a valid answer.`;
+const ANALYSIS_PROMPT=`You are a health assistant looking at a photograph of the user's blood
+glucose data alongside their logged history. Give a concise analysis: what the photo shows,
+the visible trend, notable peaks or lows, and 1-2 practical takeaways. Keep advice general —
+not prescriptive. If the photo is unclear, say so instead of guessing.`;
+
+let logPhoto=null;   // {path,name} of the uploaded source image; travels with every reading read from it
+
+// `p` is a pickPhoto() outcome — already read, downscaled and pre-flighted.
+async function handleLogImage(p){
+  document.getElementById('logPrevImg').src=p.dataUrl;
+  document.getElementById('logImgPreview').style.display='block';
+  document.getElementById('extractedList').style.display='none';
+  document.getElementById('logAnalysis').style.display='none';
+  document.getElementById('logThread').innerHTML='';
+  document.getElementById('logFollowUp').style.display='none';
+  logHistory=[]; extractedReadings=[]; logPhoto=null;
+  const status=document.getElementById('logExtractStatus');
+  status.style.display='block'; status.textContent='Uploading · 上传中…';
+  try{
+    const up=await paOrThrow('upload',{name:p.name,data:p.data});
+    logPhoto={path:up.path,name:p.name};
+    status.textContent='Reading the photo · 识别中…';
+    const fileRef=`\n\n[Attached file: ${p.name} — saved to workspace/${up.path}. Use the Read tool to view it.]`;
+    const [extractResp, analysisResp] = await Promise.all([
+      paOrThrow('ask',{message:EXTRACT_PROMPT+fileRef}),
+      paOrThrow('ask',{message:ANALYSIS_PROMPT+'\n\n'+historySummary()+fileRef}),
+    ]);
+    status.textContent=extractStatus(parseReadings(extractResp.text));
+    // The ANALYSIS is shown even when the extraction found nothing: a conversation about the
+    // photo is the point of this, and the numbers are a bonus on top of it.
+    document.getElementById('logAnalysis').style.display='block';
+    logHistory=[{role:'ai',text:analysisResp.text}];
+    await addLogBubble('ai',analysisResp.text);
+    document.getElementById('logFollowUp').style.display='flex';
+  }catch(err){ status.textContent='Could not read that photo · 无法识别照片 — '+((err&&err.message)||err); }   // R5
+}
+
+/* The model's JSON is UNTRUSTED OUTPUT, not a data structure. Every field is re-checked here,
+   because this is the last gate before a number can end up in a health record:
+     · the array must parse and BE an array (a non-array used to throw inside .filter and take
+       the whole analysis down with it);
+     · val must be a finite integer inside the app's own 40-600 range;
+     · ctx must be one of the five the app knows, or it becomes 'random';
+     · ts must parse to a real time, or the reading is marked tsGuessed and shown as such.
+   Returns the accepted rows; anything else is silently DROPPED here and visibly counted by
+   the caller, never silently accepted. */
+function parseReadings(text){
+  const m=String(text||'').match(/\[[\s\S]*\]/);
+  if(!m) return null;                                  // no array at all: distinct from "an empty array"
+  let arr; try{ arr=JSON.parse(m[0]); }catch(e){ return null; }
+  // Unreachable through the regex above — a `[...]` slice that parses at all is always an
+  // array — and kept anyway as a guard on the REGEX rather than on the model. Said out loud
+  // because a mutation test cannot kill it, and an untested line should say why (R14).
+  if(!Array.isArray(arr)) return null;
+  extractedReadings=arr.map(r=>{
+    const val=Number(r&&r.val);
+    if(!Number.isFinite(val)||val<40||val>600) return null;
+    const t=(r&&r.ts)?new Date(r.ts).getTime():NaN;
+    return { val:Math.round(val),
+      ctx:VALID_CTX.includes(r&&r.ctx)?r.ctx:'random',
+      note:String((r&&r.note)||'').slice(0,80),
+      confidence:(r&&r.confidence===READ_LOW)?READ_LOW:'high',
+      ts:Number.isFinite(t)?t:null, tsGuessed:!Number.isFinite(t) };
+  }).filter(Boolean);
+  return extractedReadings;
+}
+function extractStatus(rows){
+  if(rows===null) return 'Could not read any numbers from that photo · 未能识别数值 — enter one below 可手动填写';
+  if(!rows.length) return 'No readings found in that photo · 照片中未发现读数 — enter one below 可手动填写';
+  renderExtracted();
+  const low=rows.filter(r=>r.confidence===READ_LOW).length;
+  return `Found ${rows.length} reading${rows.length>1?'s':''} · 找到 ${rows.length} 条`
+    + (low?` — ${low} uncertain, left unticked · ${low} 条不确定，默认未勾选`:'')
+    + '. Check each one against the photo before saving · 保存前请核对.';
+}
+
+/* The review step, and the reason the readings are STRUCTURED rather than left in the chat:
+   a number that is going into a health record has to be confirmed by the person whose record it
+   is. A LOW-confidence row starts UNTICKED — recording it takes a deliberate tap, and the
+   default for a value the model is unsure about is "not in the record". A high-confidence row
+   starts ticked, because a family member photographing a meter wants speed, and the photo sits
+   right above the list to check against. */
+function renderExtracted(){
+  const el=document.getElementById('extractedItems');
+  el.innerHTML=extractedReadings.map((r,i)=>{
+    const st=glucoseStatus(r.val,r.ctx);
+    const low=r.confidence===READ_LOW;
+    const ts=r.tsGuessed?'no time in the photo · 照片中无时间'
+      :new Date(r.ts).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+    return`<div class="ext-item${low?' lowc':''}">
+      <input type="checkbox" id="ec${i}"${low?'':' checked'}>
+      <div class="ext-val dot-${st.cls}">${r.val}</div>
+      <div class="ext-info">
+        <div class="ext-ctx">${esc(r.ctx)}${r.note?` — ${esc(r.note)}`:''}<span class="badge badge-${st.cls}">${st.label}</span></div>
+        <div class="ext-time">${esc(ts)}</div>
+        ${low?'<div class="ext-why">uncertain reading · 识别不确定 — check it against the photo 请核对照片</div>':''}
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('extractedList').style.display='block';
+}
+
+document.getElementById('saveAllBtn').onclick=async()=>{
+  const d=load();
+  let saved=0;
+  extractedReadings.forEach((r,i)=>{
+    if(!document.getElementById('ec'+i)?.checked) return;
+    d.readings.push({
+      // A reading with no time in the photo is stamped NOW and says so (tsGuessed): it has to
+      // sort somewhere, and a fabricated "3 hours ago" would be worse than an honest "unknown".
+      ts:r.tsGuessed?Date.now():r.ts,
+      val:r.val, ctx:r.ctx, note:r.note,
+      // PROVENANCE travels with the record, not with the screen that drew it: the SOURCE PHOTO
+      // so the number can be checked later, the model's own confidence, and confirmed:true —
+      // which here means a human ticked this row and tapped save, nothing weaker.
+      src:'photo', photo:(logPhoto&&logPhoto.path)||'', confidence:r.confidence,
+      tsGuessed:r.tsGuessed, confirmed:true,
+    });
+    saved++;
+  });
+  render();
+  const status=document.getElementById('logExtractStatus');
+  // Reports what was STORED, not what was clicked: a write that failed must never be reported
+  // as a save (R14 — the same honesty rule lib/health.mjs now keeps for ingest).
+  if(await save(d)){
+    status.textContent=`Saved ${saved} reading${saved!==1?'s':''} · 已保存 ${saved} 条`;
+    document.getElementById('extractedList').style.display='none';
+    extractedReadings=[];
+  } else {
+    status.textContent=`Not saved · 未保存 — the readings are still listed above, try again 记录仍在上方，可重试`;
+  }
+};
+
+async function sendLogFollowUp(){
+  const inp=document.getElementById('logFollowIn');
+  const q=inp.value.trim(); if(!q) return;
+  inp.value='';
+  await addLogBubble('user',q);
+  const thinking=document.createElement('div');thinking.className='bubble thinking';thinking.textContent='Thinking…';
+  document.getElementById('logThread').appendChild(thinking);
+  document.getElementById('logFollowBtn').disabled=true;
+  const hist=logHistory.slice(-6).map(m=>`${m.role==='ai'?'Assistant':'User'}: ${m.text}`).join('\n');
+  try{
+    const resp=await paOrThrow('ask',{message:(hist?'Previous:\n'+hist+'\n\n':'')+'User: '+q+'\n\nContext: '+historySummary()});
+    thinking.remove();
+    logHistory.push({role:'user',text:q},{role:'ai',text:resp.text});
+    await addLogBubble('ai',resp.text);
+  }catch(err){thinking.remove();await addLogBubble('ai','Error: '+err.message);}
+  finally{document.getElementById('logFollowBtn').disabled=false;}
+}
+document.getElementById('logFollowBtn').onclick=sendLogFollowUp;
+document.getElementById('logFollowIn').onkeydown=e=>{if(e.key==='Enter')sendLogFollowUp();};
+
+async function pickLog(camera){
+  const p=await pickPhoto(camera);
+  if(!p.ok){
+    if(!p.text) return;                                  // cancelled: leave the tab exactly as it was
+    const status=document.getElementById('logExtractStatus');
+    status.style.display='block'; status.textContent=p.text;   // R5: the refusal names itself
+    return;
+  }
+  handleLogImage(p);
+}
+document.getElementById('logCamBtn').onclick=()=>pickLog(true);
+document.getElementById('logGalBtn').onclick=()=>pickLog(false);
+document.getElementById('logClearImg').onclick=()=>{
+  document.getElementById('logImgPreview').style.display='none';
+  document.getElementById('logExtractStatus').style.display='none';
+  document.getElementById('extractedList').style.display='none';
+  document.getElementById('logAnalysis').style.display='none';
+  extractedReadings=[]; logHistory=[]; logPhoto=null;
+};
+
+// Nothing renders from a store that has not been READ yet: rendering an empty log first and
+// filling it in afterwards would show "No readings yet" to someone whose store simply failed.
+async function boot(){
+  DB=await storeRead(DATA_PATH,{readings:[],a1c:[]},dbShapeOk);
+  render();
+  await loadScans();
+  storeMsg('');            // shows any standing block; clears only when there is none
+}
+boot();
+</script>
+</body>
+</html>

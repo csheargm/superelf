@@ -1,0 +1,37 @@
+<script>
+// PALeave — an app's last save, made while the shell still serves the page（离开时先保存）.
+// No app carries its marker: web.mjs (sendAppHtml) puts PA_LEAVE_UI ahead of the first script of
+// EVERY served app page, after PATwoTap and PAStore (ADR 0005, ADR 0010, ADR 0018).
+//
+// WHY. An app saves its last work in its pagehide handler (PANote, Notes). The shell used to blank
+// the frame first, so pagehide ran in a page the shell no longer served, and that save was lost in
+// both engines (ADR 0018). Now the shell says {pa:'leaving'} first and keeps serving the page. This
+// runs the page's own pagehide handlers at that moment and answers {pa:'left'}. The shell then
+// removes the page once it has had no request in flight for a short while (web/app-frame.js), so a
+// save that waits for one reply before sending the next still gets in.
+// The real pagehide comes later, when the page is removed, and runs the same handlers again. By then
+// there is nothing left to write; anything a handler posts then is dropped by the shell.
+// It says {pa:'here'} as soon as it runs, ahead of every script of the page's own. Until then none of
+// the page's own code has run, so the shell removes a page it has not heard from at once.
+// Nothing to call. `var`, and kept if already present, so the page listens once even if the marker
+// appears twice.
+// Unit-tested by test/leave.test.mjs; the shell's side by test/app-leave.test.mjs.
+var PALeave = PALeave || (function () {
+  'use strict';
+  let leaving = false;
+  parent.postMessage({ pa: 'here' }, '*');
+  addEventListener('message', function (e) {
+    const m = e.data;
+    if (leaving || e.source !== parent || !m || m.pa !== 'leaving') return;
+    leaving = true;
+    let ev;
+    try { ev = new PageTransitionEvent('pagehide', { persisted: false }); }
+    catch (_) { ev = new Event('pagehide'); /* no PageTransitionEvent constructor here; no handler reads its fields */ }
+    // A handler that throws is reported by the browser and does not stop the others, or this answer.
+    dispatchEvent(ev);
+    // After the handlers: a page posts in order, so every save they sent synchronously is ahead of this.
+    parent.postMessage({ pa: 'left' }, '*');
+  });
+  return Object.freeze({});
+})();
+</script>

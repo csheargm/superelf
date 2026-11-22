@@ -1,0 +1,100 @@
+{
+  "about": "Model review tests (docs/adr/0017). Read at every run, so an edit applies to the next review. Every prompt is made up: no family data. group: Fast | Deep | Vision. quick: also run in round 1. system: production system pieces (guard, language, app:<slug>) or literal text. prompt_ref: a production prompt (meal). check: text | json | meal | skill (a Hermes SKILL.md; must: words of the correction it has to keep). lang: zh | en. image: a file beside this one. truth: what the grader is told is correct (it cannot see images).",
+  "rubric": "Score 5 = fully correct, helpful and in the asked format and language; 4 = correct with a small flaw; 3 = usable but with a clear flaw (vague, too long, a minor error); 2 = mostly wrong or ignores part of the request; 1 = wrong, off-topic, in the wrong language or format, or written to the grader instead of the user.",
+  "tests": [
+    {
+      "id": "fast-zh-short",
+      "group": "Fast",
+      "quick": true,
+      "system": ["guard", "language"],
+      "prompt": "周末下雨，孩子在家有点无聊。用两三句话推荐一个用家里常见材料就能做的简单手工。",
+      "check": "text",
+      "lang": "zh",
+      "rubric": "A concrete craft with common household materials, two or three sentences, in Chinese, friendly. Long lists or an English reply score low."
+    },
+    {
+      "id": "fast-en-short",
+      "group": "Fast",
+      "quick": true,
+      "system": ["guard", "language"],
+      "prompt": "In two sentences, suggest a quick weeknight dinner that uses eggs and spinach.",
+      "check": "text",
+      "lang": "en",
+      "rubric": "One concrete dish with eggs and spinach, how to make it in brief, two sentences, in English."
+    },
+    {
+      "id": "fast-json-list",
+      "group": "Fast",
+      "quick": true,
+      "system": ["guard", "language"],
+      "prompt": "Reply with ONLY one JSON object, no markdown fence, no commentary, in this shape: {\"title\": string, \"items\": [string]}. Make it a packing list of exactly 5 items for a one-day family hike.",
+      "check": "json",
+      "keys": ["title", "items"],
+      "rubric": "Valid JSON in exactly the asked shape, exactly 5 sensible hiking items, nothing outside the object."
+    },
+    {
+      "id": "fast-zh-json",
+      "group": "Fast",
+      "system": ["guard", "language"],
+      "prompt": "只返回一个 JSON 对象，不要代码块，不要解释，格式为 {\"mood\": \"开心\" 或 \"平静\" 或 \"疲惫\", \"reason\": 字符串}。句子：今天加班到很晚，但项目终于上线了。",
+      "check": "json",
+      "keys": ["mood", "reason"],
+      "rubric": "Valid JSON with mood set to one of the three allowed values (疲惫 or 开心 both defensible; the reason must fit the choice), a short Chinese reason, nothing outside the object."
+    },
+    {
+      "id": "fast-no-tools",
+      "group": "Fast",
+      "system": ["guard", "language"],
+      "prompt": "Please change this app's background color to light blue for me.",
+      "check": "text",
+      "lang": "en",
+      "rubric": "Says plainly that it cannot change the app because it has no tools, and points to switching the model chooser to Claude. Claiming to have done it, or pretending to act, scores 1."
+    },
+    {
+      "id": "deep-bible-zh",
+      "group": "Deep",
+      "system": ["app:bible", "language"],
+      "prompt": "请解释马太福音 5:3「虚心的人有福了，因为天国是他们的」中“虚心”的意思，并给出两点在日常生活中的应用。",
+      "check": "text",
+      "lang": "zh",
+      "rubric": "Explains 虚心 as poor in spirit: knowing one's spiritual need and depending on God, not low self-esteem or mere modesty; links it to the kingdom of heaven; gives two concrete daily applications; in Chinese, keeping a few key terms in English (e.g. poor in spirit); concise."
+    },
+    {
+      "id": "deep-bible-en",
+      "group": "Deep",
+      "system": ["language"],
+      "prompt": "Compare the parable of the lost sheep in Luke 15 with the one in Matthew 18. What does each emphasize in its own context? Keep it under 200 words.",
+      "check": "text",
+      "lang": "en",
+      "rubric": "Luke 15: told to Pharisees and scribes grumbling that Jesus welcomes sinners; emphasis on God's joy over one sinner who repents. Matthew 18: told to the disciples about the community; emphasis on caring for the little ones who stray, since it is not the Father's will that any perish. Accurate, compares both, under 200 words."
+    },
+    {
+      "id": "deep-reasoning",
+      "group": "Deep",
+      "system": ["language"],
+      "prompt": "Three children each read 12 pages a day on weekdays and 20 pages a day on Saturdays and Sundays. How many pages do the three read in total over two full weeks? Show the steps briefly.",
+      "check": "text",
+      "lang": "en",
+      "rubric": "Correct total is 600 (one child: 5 x 12 + 2 x 20 = 100 a week, 200 in two weeks; three children: 600). A wrong total scores at most 2. Clear, brief steps."
+    },
+    {
+      "id": "vision-meal",
+      "group": "Vision",
+      "prompt_ref": "meal",
+      "image": "meal-sample.png",
+      "check": "meal",
+      "truth": "A synthetic drawing of one meal: a large mound of white rice, three broccoli florets and seven carrot slices on a plate, and a glass of cola with a straw. Correct flags: carb_heavy true, fried false, sugary_drink true, vegetables_present true.",
+      "rubric": "Names the foods actually visible (rice, broccoli, carrot, cola) and sets every flag as the truth says. Each invented food or wrong flag costs a point."
+    },
+    {
+      "id": "deep-skill-write",
+      "group": "Deep",
+      "system": ["language"],
+      "prompt": "You are an agent that keeps reusable procedures as skills. A skill is one file, SKILL.md: YAML front matter between --- lines with `name` (a lowercase-dash slug) and `description` (one line saying when to use it), then the procedure as numbered steps.\n\nI gave you this task: \"From a quotes website, collect every quote on pages 1 and 2 that has the tag 'life'. Save them to /data/checks/life-quotes.md as a list (quote, author), then read the file back and tell me how many quotes it has.\" You did it. Then I said: \"Correction: when I ask for quotes like this, always put a one-line count at the top of the file and sort the list by author. Redo the file that way.\"\n\nWrite the SKILL.md you would save so that next time you do it my way without being told. Reply with ONLY the file's content, no fence, no commentary.",
+      "check": "skill",
+      "must": ["count", "sort", "author", "read"],
+      "lang": "en",
+      "rubric": "A SKILL.md a future run can follow for ANY quotes-collection request, not only that site: front matter with a slug name and a one-line description saying when it applies; numbered steps that collect, save as (quote, author), then read the file back and report the number. The correction must be standing rules in the steps: a one-line count on top of the file, the list sorted by author. Dropping either rule scores at most 2. Tying it to the one site, padding, or commentary around the file scores lower."
+    }
+  ]
+}

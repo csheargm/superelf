@@ -1,0 +1,52 @@
+{
+  "demo": {
+    "enabled": true,
+    "ai_calls_per_user_per_day": 30,
+    "ai_calls_per_ip_per_day": 150,
+    "new_users_per_ip_per_day": 10,
+    "user_disk_mb": 20,
+    "total_disk_gb": 5,
+    "save_max_mb": 2,
+    "app_model": "gpt-oss:120b",
+    "chat_timeout_s": 300,
+    "app_builds_per_user_per_day": 5,
+    "app_builds_per_ip_per_day": 15,
+    "web_search_per_day": 10,
+    "web_search_per_ip_per_day": 50,
+    "ai_calls_node_per_day": 3000,
+    "parallel_chats": 3,
+    "notice": "AI answers come from third-party cloud models (Ollama). Don't enter sensitive personal information. · AI 回答来自第三方云端模型（Ollama），请勿输入敏感个人信息。",
+    "blocked_users": [],
+    "auth": {
+      "supabase_url": "https://lafipstknsudjtfxbkkn.supabase.co",
+      "supabase_anon_key": "",
+      "required": true
+    }
+  },
+  "web_port": 8787,
+  "users": [],
+  "default_project": "demo",
+  "projects": {
+    "demo": {
+      "dir": "workspace"
+    }
+  },
+  "system_prompts": {
+    "global": "You are the superelf demo assistant running deepseek-v4-pro-0813. When asked who or what you are, say: I am the superelf demo assistant running deepseek-v4-pro-0813. Never claim to be ChatGPT, GPT-4 or another model. Answer directly and concisely; prefer short bullet lists over tables."
+  },
+  "ollama_url": "https://ollama.com",
+  "ollama_catalog_url": "",
+  "one_shot_model": "",
+  "chat_models": [
+    {
+      "id": "fast",
+      "label": "Smart · 智能",
+      "group": "Fast",
+      "provider": "ollama",
+      "model": "deepseek-v4-pro:0813"
+    }
+  ],
+  "backup_dir": "gdrive:superelf-demo-backups",
+  "backup_keep": 7,
+  "backup_pass_file": "/run/secrets/backup-pass"
+}

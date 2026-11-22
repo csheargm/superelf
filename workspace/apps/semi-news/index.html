@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" media="(prefers-color-scheme:light)" content="#f0f4f8">
+<meta name="theme-color" media="(prefers-color-scheme:dark)" content="#0d1117">
+<title>半导体新闻 Semi News</title>
+<style>
+html{font-size:calc(17px * var(--fs,1))}
+:root{
+  --bg:#f0f4f8;--card:#fff;--text:#1c2333;--muted:#6a7384;--line:#dde3ea;
+  --accent:#1a6bc2;--chip-bg:#e8f0fb;--chip-text:#1a5bad;--chip-border:#c4d7f5;
+  --tag-red:#c62828;--tag-green:#2e7d32;--tag-blue:#1565c0;--tag-orange:#e65100;
+  --sab:env(safe-area-inset-bottom,0px);--sat:env(safe-area-inset-top,0px)
+}
+@media(prefers-color-scheme:dark){:root{
+  --bg:#0d1117;--card:#161b22;--text:#e6edf3;--muted:#8b949e;--line:#21262d;
+  --accent:#58a6ff;--chip-bg:#1f2d3d;--chip-text:#79b8ff;--chip-border:#1f4068;
+  --tag-red:#f85149;--tag-green:#3fb950;--tag-blue:#58a6ff;--tag-orange:#f0883e
+}}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:-apple-system,system-ui,sans-serif;line-height:1.5}
+body{display:flex;flex-direction:column}
+
+/* nav bar */
+#nav{
+  display:flex;align-items:center;gap:10px;
+  padding:calc(8px + var(--sat)) 14px 10px;
+  border-bottom:1px solid var(--line);background:var(--card);flex-shrink:0;
+}
+#nav-icon{font-size:22px}
+#nav-title{flex:1;font-size:17px;font-weight:700}
+#nav-sub{font-size:12px;color:var(--muted)}
+
+/* home screen */
+#home{
+  flex:1;display:flex;flex-direction:column;overflow:hidden;
+}
+
+/* headline */
+#headline{
+  padding:16px 16px 0;
+}
+#headline h1{font-size:22px;font-weight:800;letter-spacing:-.3px}
+#headline p{font-size:13px;color:var(--muted);margin-top:3px}
+
+/* topic sections */
+#topics{
+  padding:14px 16px 8px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;
+  flex:1;
+  padding-bottom:calc(16px + var(--sab));
+}
+
+.section-label{
+  font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;
+  color:var(--muted);margin-bottom:6px;
+}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+
+.chip{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:7px 13px;border-radius:20px;
+  background:var(--chip-bg);color:var(--chip-text);
+  border:1px solid var(--chip-border);
+  font-size:14px;font-weight:600;cursor:pointer;
+  transition:filter .1s;
+  -webkit-tap-highlight-color:transparent;
+}
+.chip:active{filter:brightness(.9)}
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.dot-red{background:var(--tag-red)}
+.dot-green{background:var(--tag-green)}
+.dot-blue{background:var(--tag-blue)}
+.dot-orange{background:var(--tag-orange)}
+
+/* custom query row */
+#custom-row{
+  display:flex;gap:8px;align-items:center;margin-top:4px;
+}
+#custom-input{
+  flex:1;background:var(--card);color:var(--text);
+  border:1px solid var(--line);border-radius:20px;
+  padding:9px 14px;font-size:15px;outline:none;
+  font-family:inherit;
+}
+#custom-input::placeholder{color:var(--muted)}
+#custom-btn{
+  background:var(--accent);color:#fff;border:none;border-radius:20px;
+  padding:9px 16px;font-size:14px;font-weight:600;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+#custom-btn:active{filter:brightness(.9)}
+
+/* divider */
+.divider{height:1px;background:var(--line);margin:4px 0}
+</style>
+</head>
+<body>
+
+<div id="nav">
+  <div id="nav-icon">⚡</div>
+  <div>
+    <div id="nav-title">半导体新闻 Semi News</div>
+    <div id="nav-sub">Industry trends &amp; activities</div>
+  </div>
+</div>
+
+<div id="home">
+  <div id="headline">
+    <h1>What's moving the industry?</h1>
+    <p>Tap a topic — Claude briefs you in seconds. 点击话题，立即获取行业简报。</p>
+  </div>
+
+  <div id="topics">
+
+    <div>
+      <div class="section-label">AI &amp; Advanced Chips</div>
+      <div class="chips">
+        <div class="chip" data-q="Give me a concise brief on the latest AI chip news — new products, announcements, and competitive moves among Nvidia, AMD, Intel, and emerging players. Highlight what's most important for the industry in the last few months."><span class="dot dot-red"></span>AI Chips</div>
+        <div class="chip" data-q="What are the latest developments in AI accelerators and inference chips? Cover startups (Groq, Cerebras, Tenstorrent, etc.) and cloud provider custom silicon (AWS Trainium, Google TPU, Microsoft Maia). What's changed recently?"><span class="dot dot-red"></span>Accelerators / Inference</div>
+        <div class="chip" data-q="What are the most recent announcements and trends around on-device AI chips — Apple Silicon, Qualcomm Snapdragon, MediaTek Dimensity? Focus on NPU performance, efficiency, and what's coming next."><span class="dot dot-red"></span>Edge AI</div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div>
+      <div class="section-label">Foundry &amp; Manufacturing</div>
+      <div class="chips">
+        <div class="chip" data-q="Summarize the latest news about TSMC — capacity, pricing, advanced nodes (2nm, 1.6nm), customer wins, geopolitical considerations, and any new fab announcements. Keep it punchy."><span class="dot dot-blue"></span>TSMC</div>
+        <div class="chip" data-q="What are the latest updates on Intel Foundry Services (IFS)? Cover node progress (18A, 14A), customer traction, financial health, and how Intel compares with TSMC and Samsung in the foundry race."><span class="dot dot-blue"></span>Intel Foundry</div>
+        <div class="chip" data-q="What's the current state of Samsung's foundry business? Cover yield issues, customer defections or wins, advanced node progress, and their strategy to compete with TSMC."><span class="dot dot-blue"></span>Samsung Foundry</div>
+        <div class="chip" data-q="Brief me on the latest in semiconductor advanced packaging — CoWoS, SoIC, FOVEROS, chiplets. Who is winning the packaging race and what new announcements have there been?"><span class="dot dot-blue"></span>Packaging &amp; Chiplets</div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div>
+      <div class="section-label">Memory &amp; Storage</div>
+      <div class="chips">
+        <div class="chip" data-q="What are the latest trends and news in HBM (High Bandwidth Memory)? Cover HBM3E, HBM4, the SK Hynix / Micron / Samsung competition, supply constraints, and AI demand dynamics."><span class="dot dot-green"></span>HBM</div>
+        <div class="chip" data-q="What's new in DRAM and NAND flash markets? Cover pricing trends, technology transitions (DDR5, LPDDR5X), oversupply/shortage cycles, and key player news from Samsung, SK Hynix, Micron, Kioxia, WDC."><span class="dot dot-green"></span>DRAM / NAND</div>
+        <div class="chip" data-q="What are the latest updates on CXL (Compute Express Link) memory technology? Cover standardization progress, product launches, ecosystem adoption, and what it means for AI and data center workloads."><span class="dot dot-green"></span>CXL</div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div>
+      <div class="section-label">EDA, IP &amp; Software</div>
+      <div class="chips">
+        <div class="chip" data-q="What's the latest in EDA (Electronic Design Automation)? Cover Synopsys, Cadence, Siemens EDA — new AI-assisted design tools, major deals, and what's changing in chip design flows."><span class="dot dot-orange"></span>EDA Tools</div>
+        <div class="chip" data-q="What are the latest developments in semiconductor IP — ARM's latest architecture announcements, RISC-V ecosystem growth, and major licensing deals or disputes?"><span class="dot dot-orange"></span>ARM / RISC-V</div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div>
+      <div class="section-label">Geopolitics &amp; Supply Chain</div>
+      <div class="chips">
+        <div class="chip" data-q="What are the latest semiconductor trade policy developments? Cover US-China chip restrictions, export controls on EDA tools and equipment, and responses from China's domestic semiconductor industry."><span class="dot dot-red"></span>US-China / Export Controls</div>
+        <div class="chip" data-q="What's happening with semiconductor supply chain diversification? Cover CHIPS Act progress in the US, EU Chips Act, Japan fab investments, India ambitions, and overall reshoring trends."><span class="dot dot-red"></span>CHIPS Acts &amp; Reshoring</div>
+        <div class="chip" data-q="What are the latest news and trends around ASML and EUV / High-NA EUV lithography? Cover machine shipments, delays, Dutch export restrictions, and what this means for next-generation chip manufacturing."><span class="dot dot-red"></span>ASML &amp; EUV</div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div>
+      <div class="section-label">Ask anything</div>
+      <div id="custom-row">
+        <input id="custom-input" type="text" placeholder="e.g. What's Broadcom's AI networking strategy?" autocomplete="off">
+        <button id="custom-btn">Ask →</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!--PA_CHAT_UI-->
+
+<script>
+const SYSTEM = `You are a semiconductor industry analyst and news briefer. The user taps a topic and you deliver a concise, well-structured brief on the latest industry news and trends.
+
+Format every brief as:
+**[Topic] Brief · 简报**
+- 3–6 bullet points, each ≤ 2 sentences
+- Lead each bullet with a **bold company or technology name**
+- End with one line: **Takeaway / 要点:** [one sentence on what matters most]
+
+Be factual. State what is known vs. what is rumored. If a development is very recent (2025–2026), note it. If your knowledge may not reflect the latest (e.g., post-August 2025), say so and suggest what the user might search for.
+
+Do NOT pad with generic background — the user knows the industry. Get straight to the developments. 重要术语保留英文。`;
+
+const chat = PAChat.fullscreen({
+  defaultModel: 'claude',
+  placeholder: 'Follow up or ask another question…',
+  system: SYSTEM,
+  greeting: '**半导体新闻 Semi News** — tap a topic above for an instant brief. Or ask anything about the semiconductor industry. 点击上方话题，或直接提问。',
+  getLabel: () => 'Semi News',
+  persist: 'semi-news-chats',
+  onClose: () => { document.getElementById('home').style.display = 'flex'; },
+  onShow:  () => { document.getElementById('home').style.display = 'none'; },
+});
+
+document.querySelectorAll('.chip[data-q]').forEach(chip => {
+  chip.addEventListener('click', () => {
+    const key = chip.textContent.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g,'');
+    chat.open(key);
+    chat.send(chip.dataset.q);
+  });
+});
+
+document.getElementById('custom-btn').addEventListener('click', sendCustom);
+document.getElementById('custom-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') sendCustom();
+});
+
+function sendCustom() {
+  const q = document.getElementById('custom-input').value.trim();
+  if (!q) return;
+  document.getElementById('custom-input').value = '';
+  chat.open('custom');
+  chat.send(q);
+}
+</script>
+</body>
+</html>

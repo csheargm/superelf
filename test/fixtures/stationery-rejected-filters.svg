@@ -1,0 +1,318 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 816 1056">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#fff0f5"/>
+      <stop offset="0.5" stop-color="#fff8fb"/>
+      <stop offset="1" stop-color="#fef0f8"/>
+    </linearGradient>
+    <linearGradient id="heartGrad1" x1="0" y1="0" x2="1" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#ff6fa8"/>
+      <stop offset="1" stop-color="#ff3d7f"/>
+    </linearGradient>
+    <linearGradient id="heartGrad2" x1="0" y1="0" x2="1" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#ffb3d1"/>
+      <stop offset="1" stop-color="#ff80b0"/>
+    </linearGradient>
+    <linearGradient id="heartGrad3" x1="0" y1="0" x2="1" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#ffd6e8"/>
+      <stop offset="1" stop-color="#ffaace"/>
+    </linearGradient>
+    <linearGradient id="starGrad" x1="0" y1="0" x2="1" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#ffe066"/>
+      <stop offset="1" stop-color="#ffb800"/>
+    </linearGradient>
+    <linearGradient id="ribbonGrad" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#ffb3d1"/>
+      <stop offset="1" stop-color="#ff6fa8"/>
+    </linearGradient>
+    <linearGradient id="titleGrad" x1="0" y1="0" x2="1" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#ff3d7f"/>
+      <stop offset="0.5" stop-color="#e91e8c"/>
+      <stop offset="1" stop-color="#c2185b"/>
+    </linearGradient>
+    <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#ffb3d1" stop-opacity="0"/>
+      <stop offset="0.2" stop-color="#ffb3d1"/>
+      <stop offset="0.8" stop-color="#ffb3d1"/>
+      <stop offset="1" stop-color="#ffb3d1" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="glowHeart" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ff6fa8" stop-opacity="0.3"/>
+      <stop offset="1" stop-color="#ff6fa8" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="softShadow">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="2" result="blur"/>
+      <feOffset dx="1" dy="2" result="shifted"/>
+      <feFlood flood-color="#ff3d7f" flood-opacity="0.2" result="color"/>
+      <feComposite in="color" in2="shifted" operator="in" result="shadow"/>
+      <feMerge>
+        <feMergeNode in="shadow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="glow">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <pattern id="dotsPattern" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+      <circle cx="10" cy="10" r="1.2" fill="#ffb3d1" fill-opacity="0.35"/>
+    </pattern>
+    <pattern id="diagonalLines" x="0" y="0" width="12" height="12" patternUnits="userSpaceOnUse">
+      <path d="M0,12 L12,0" stroke="#ffd6e8" stroke-width="1" stroke-opacity="0.5"/>
+    </pattern>
+  </defs>
+
+  <!-- Background -->
+  <rect width="816" height="1056" fill="url(#bgGrad)"/>
+  <rect width="816" height="1056" fill="url(#dotsPattern)"/>
+
+  <!-- Border frame outer -->
+  <rect x="18" y="18" width="780" height="1020" rx="12" ry="12" fill="none" stroke="#ff80b0" stroke-width="2" stroke-opacity="0.5"/>
+  <!-- Border frame inner -->
+  <rect x="28" y="28" width="760" height="1000" rx="8" ry="8" fill="none" stroke="#ffb3d1" stroke-width="1.2" stroke-opacity="0.7" stroke-dasharray="6,4"/>
+
+  <!-- Corner decorations — top left -->
+  <g transform="translate(55,55)">
+    <!-- Large heart -->
+    <path d="M0,-18 C0,-30 -20,-30 -20,-16 C-20,-5 0,8 0,8 C0,8 20,-5 20,-16 C20,-30 0,-30 0,-18 Z" fill="url(#heartGrad1)" filter="url(#softShadow)" transform="rotate(-20)"/>
+    <!-- Small heart -->
+    <path d="M22,-30 C22,-36 14,-36 14,-29 C14,-24 22,-18 22,-18 C22,-18 30,-24 30,-29 C30,-36 22,-36 22,-30 Z" fill="url(#heartGrad2)" transform="rotate(10)"/>
+    <!-- Star -->
+    <polygon points="-30,-10 -27,-19 -24,-10 -33,-15 -21,-15" fill="url(#starGrad)" filter="url(#glow)" opacity="0.9"/>
+    <!-- Sparkle lines -->
+    <line x1="-40" y1="5" x2="-35" y2="5" stroke="#ff80b0" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="-37" y1="2" x2="-37" y2="8" stroke="#ff80b0" stroke-width="1.5" stroke-linecap="round"/>
+    <circle cx="35" cy="-35" r="3" fill="#ffb3d1" opacity="0.8"/>
+    <circle cx="42" cy="-25" r="2" fill="#ff6fa8" opacity="0.6"/>
+    <circle cx="-15" cy="30" r="2.5" fill="#ffb3d1" opacity="0.7"/>
+  </g>
+
+  <!-- Corner decorations — top right -->
+  <g transform="translate(761,55)">
+    <path d="M0,-18 C0,-30 -20,-30 -20,-16 C-20,-5 0,8 0,8 C0,8 20,-5 20,-16 C20,-30 0,-30 0,-18 Z" fill="url(#heartGrad1)" filter="url(#softShadow)" transform="rotate(20)"/>
+    <path d="M-22,-30 C-22,-36 -14,-36 -14,-29 C-14,-24 -22,-18 -22,-18 C-22,-18 -30,-24 -30,-29 C-30,-36 -22,-36 -22,-30 Z" fill="url(#heartGrad2)" transform="rotate(-10)"/>
+    <polygon points="30,-10 27,-19 24,-10 33,-15 21,-15" fill="url(#starGrad)" filter="url(#glow)" opacity="0.9"/>
+    <line x1="40" y1="5" x2="35" y2="5" stroke="#ff80b0" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="37" y1="2" x2="37" y2="8" stroke="#ff80b0" stroke-width="1.5" stroke-linecap="round"/>
+    <circle cx="-35" cy="-35" r="3" fill="#ffb3d1" opacity="0.8"/>
+    <circle cx="-42" cy="-25" r="2" fill="#ff6fa8" opacity="0.6"/>
+    <circle cx="15" cy="30" r="2.5" fill="#ffb3d1" opacity="0.7"/>
+  </g>
+
+  <!-- Corner decorations — bottom left -->
+  <g transform="translate(55,1001)">
+    <path d="M0,-18 C0,-30 -20,-30 -20,-16 C-20,-5 0,8 0,8 C0,8 20,-5 20,-16 C20,-30 0,-30 0,-18 Z" fill="url(#heartGrad2)" filter="url(#softShadow)" transform="rotate(15)"/>
+    <polygon points="-30,15 -27,6 -24,15 -33,10 -21,10" fill="url(#starGrad)" opacity="0.8"/>
+    <circle cx="30" cy="20" r="3.5" fill="#ffb3d1" opacity="0.7"/>
+    <circle cx="-15" cy="-30" r="2" fill="#ff80b0" opacity="0.6"/>
+    <line x1="-40" y1="-5" x2="-35" y2="-5" stroke="#ff80b0" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="-37" y1="-8" x2="-37" y2="-2" stroke="#ff80b0" stroke-width="1.5" stroke-linecap="round"/>
+  </g>
+
+  <!-- Corner decorations — bottom right -->
+  <g transform="translate(761,1001)">
+    <path d="M0,-18 C0,-30 -20,-30 -20,-16 C-20,-5 0,8 0,8 C0,8 20,-5 20,-16 C20,-30 0,-30 0,-18 Z" fill="url(#heartGrad2)" filter="url(#softShadow)" transform="rotate(-15)"/>
+    <polygon points="30,15 27,6 24,15 33,10 21,10" fill="url(#starGrad)" opacity="0.8"/>
+    <circle cx="-30" cy="20" r="3.5" fill="#ffb3d1" opacity="0.7"/>
+    <circle cx="15" cy="-30" r="2" fill="#ff80b0" opacity="0.6"/>
+    <line x1="40" y1="-5" x2="35" y2="-5" stroke="#ff80b0" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="37" y1="-8" x2="37" y2="-2" stroke="#ff80b0" stroke-width="1.5" stroke-linecap="round"/>
+  </g>
+
+  <!-- Top edge decoration — left cluster -->
+  <g transform="translate(160,38)">
+    <path d="M0,-12 C0,-20 -13,-20 -13,-11 C-13,-4 0,5 0,5 C0,5 13,-4 13,-11 C13,-20 0,-20 0,-12 Z" fill="url(#heartGrad3)" opacity="0.9"/>
+    <circle cx="22" cy="-3" r="2" fill="#ff80b0" opacity="0.7"/>
+    <circle cx="-22" cy="-5" r="1.5" fill="#ffb3d1" opacity="0.6"/>
+  </g>
+
+  <!-- Top edge decoration — center-left -->
+  <g transform="translate(260,32)">
+    <polygon points="0,-14 3,-5 12,-5 5,1 8,10 0,4 -8,10 -5,1 -12,-5 -3,-5" fill="url(#starGrad)" filter="url(#glow)" opacity="0.85"/>
+  </g>
+
+  <!-- Top edge decoration — center-right -->
+  <g transform="translate(556,32)">
+    <polygon points="0,-14 3,-5 12,-5 5,1 8,10 0,4 -8,10 -5,1 -12,-5 -3,-5" fill="url(#starGrad)" filter="url(#glow)" opacity="0.85"/>
+  </g>
+
+  <!-- Top edge decoration — right cluster -->
+  <g transform="translate(656,38)">
+    <path d="M0,-12 C0,-20 -13,-20 -13,-11 C-13,-4 0,5 0,5 C0,5 13,-4 13,-11 C13,-20 0,-20 0,-12 Z" fill="url(#heartGrad3)" opacity="0.9"/>
+    <circle cx="22" cy="-3" r="2" fill="#ff80b0" opacity="0.7"/>
+    <circle cx="-22" cy="-5" r="1.5" fill="#ffb3d1" opacity="0.6"/>
+  </g>
+
+  <!-- Left edge decorations -->
+  <g transform="translate(38,200)">
+    <path d="M0,-10 C0,-17 -11,-17 -11,-9 C-11,-3 0,5 0,5 C0,5 11,-3 11,-9 C11,-17 0,-17 0,-10 Z" fill="url(#heartGrad2)" opacity="0.7"/>
+  </g>
+  <g transform="translate(38,350)">
+    <polygon points="0,-12 2.5,-4 10,-4 4,1 6.5,9 0,4 -6.5,9 -4,1 -10,-4 -2.5,-4" fill="url(#starGrad)" opacity="0.7"/>
+  </g>
+  <g transform="translate(38,500)">
+    <path d="M0,-10 C0,-17 -11,-17 -11,-9 C-11,-3 0,5 0,5 C0,5 11,-3 11,-9 C11,-17 0,-17 0,-10 Z" fill="url(#heartGrad3)" opacity="0.7"/>
+  </g>
+  <g transform="translate(38,650)">
+    <circle r="4" fill="#ffb3d1" opacity="0.6"/>
+    <circle r="2" fill="#ff80b0" opacity="0.5"/>
+  </g>
+  <g transform="translate(38,800)">
+    <polygon points="0,-12 2.5,-4 10,-4 4,1 6.5,9 0,4 -6.5,9 -4,1 -10,-4 -2.5,-4" fill="url(#starGrad)" opacity="0.65"/>
+  </g>
+  <g transform="translate(38,900)">
+    <path d="M0,-10 C0,-17 -11,-17 -11,-9 C-11,-3 0,5 0,5 C0,5 11,-3 11,-9 C11,-17 0,-17 0,-10 Z" fill="url(#heartGrad2)" opacity="0.65"/>
+  </g>
+
+  <!-- Right edge decorations -->
+  <g transform="translate(778,200)">
+    <path d="M0,-10 C0,-17 -11,-17 -11,-9 C-11,-3 0,5 0,5 C0,5 11,-3 11,-9 C11,-17 0,-17 0,-10 Z" fill="url(#heartGrad2)" opacity="0.7"/>
+  </g>
+  <g transform="translate(778,350)">
+    <polygon points="0,-12 2.5,-4 10,-4 4,1 6.5,9 0,4 -6.5,9 -4,1 -10,-4 -2.5,-4" fill="url(#starGrad)" opacity="0.7"/>
+  </g>
+  <g transform="translate(778,500)">
+    <path d="M0,-10 C0,-17 -11,-17 -11,-9 C-11,-3 0,5 0,5 C0,5 11,-3 11,-9 C11,-17 0,-17 0,-10 Z" fill="url(#heartGrad3)" opacity="0.7"/>
+  </g>
+  <g transform="translate(778,650)">
+    <circle r="4" fill="#ffb3d1" opacity="0.6"/>
+    <circle r="2" fill="#ff80b0" opacity="0.5"/>
+  </g>
+  <g transform="translate(778,800)">
+    <polygon points="0,-12 2.5,-4 10,-4 4,1 6.5,9 0,4 -6.5,9 -4,1 -10,-4 -2.5,-4" fill="url(#starGrad)" opacity="0.65"/>
+  </g>
+  <g transform="translate(778,900)">
+    <path d="M0,-10 C0,-17 -11,-17 -11,-9 C-11,-3 0,5 0,5 C0,5 11,-3 11,-9 C11,-17 0,-17 0,-10 Z" fill="url(#heartGrad2)" opacity="0.65"/>
+  </g>
+
+  <!-- Bottom edge decoration -->
+  <g transform="translate(200,1025)">
+    <path d="M0,-10 C0,-17 -11,-17 -11,-9 C-11,-3 0,5 0,5 C0,5 11,-3 11,-9 C11,-17 0,-17 0,-10 Z" fill="url(#heartGrad3)" opacity="0.8"/>
+    <circle cx="22" cy="-2" r="2" fill="#ffb3d1" opacity="0.6"/>
+  </g>
+  <g transform="translate(350,1022)">
+    <polygon points="0,-12 2.5,-4 10,-4 4,1 6.5,9 0,4 -6.5,9 -4,1 -10,-4 -2.5,-4" fill="url(#starGrad)" opacity="0.7"/>
+  </g>
+  <g transform="translate(466,1022)">
+    <polygon points="0,-12 2.5,-4 10,-4 4,1 6.5,9 0,4 -6.5,9 -4,1 -10,-4 -2.5,-4" fill="url(#starGrad)" opacity="0.7"/>
+  </g>
+  <g transform="translate(616,1025)">
+    <path d="M0,-10 C0,-17 -11,-17 -11,-9 C-11,-3 0,5 0,5 C0,5 11,-3 11,-9 C11,-17 0,-17 0,-10 Z" fill="url(#heartGrad3)" opacity="0.8"/>
+    <circle cx="-22" cy="-2" r="2" fill="#ffb3d1" opacity="0.6"/>
+  </g>
+
+  <!-- Title area top ribbon banner -->
+  <rect x="130" y="62" width="556" height="38" rx="6" ry="6" fill="url(#ribbonGrad)" opacity="0.18"/>
+  <rect x="130" y="62" width="556" height="38" rx="6" ry="6" fill="none" stroke="#ff80b0" stroke-width="1.2" stroke-opacity="0.4"/>
+
+  <!-- Ribbon end triangles -->
+  <polygon points="130,62 148,81 130,100" fill="#ff80b0" opacity="0.22"/>
+  <polygon points="686,62 668,81 686,100" fill="#ff80b0" opacity="0.22"/>
+
+  <!-- Title: "Love Note" in chunky teen-style paths -->
+  <!-- L -->
+  <path d="M185,72 L185,97 L203,97" fill="none" stroke="url(#titleGrad)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" filter="url(#softShadow)"/>
+  <!-- o -->
+  <ellipse cx="222" cy="89" rx="9" ry="10" fill="none" stroke="url(#titleGrad)" stroke-width="5" filter="url(#softShadow)"/>
+  <!-- v -->
+  <path d="M238,79 L246,97 L254,79" fill="none" stroke="url(#titleGrad)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" filter="url(#softShadow)"/>
+  <!-- e -->
+  <path d="M275,89 L261,89 C261,89 261,79 270,79 C279,79 279,89 279,89 C279,89 279,97 270,97 C261,97 261,91 261,91" fill="none" stroke="url(#titleGrad)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" filter="url(#softShadow)"/>
+
+  <!-- Small heart between words -->
+  <path d="M302,84 C302,79 296,79 296,84 C296,88 302,92 302,92 C302,92 308,88 308,84 C308,79 302,79 302,84 Z" fill="url(#heartGrad1)" filter="url(#glow)"/>
+
+  <!-- N -->
+  <path d="M320,97 L320,72 L340,97 L340,72" fill="none" stroke="url(#titleGrad)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" filter="url(#softShadow)"/>
+  <!-- o -->
+  <ellipse cx="360" cy="89" rx="9" ry="10" fill="none" stroke="url(#titleGrad)" stroke-width="5" filter="url(#softShadow)"/>
+  <!-- t -->
+  <path d="M379,72 L379,97 M371,80 L387,80" fill="none" stroke="url(#titleGrad)" stroke-width="5" stroke-linecap="round" filter="url(#softShadow)"/>
+  <!-- e -->
+  <path d="M413,89 L399,89 C399,89 399,79 408,79 C417,79 417,89 417,89 C417,89 417,97 408,97 C399,97 399,91 399,91" fill="none" stroke="url(#titleGrad)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" filter="url(#softShadow)"/>
+
+  <!-- Decorative stars flanking title -->
+  <polygon points="445,81 447,75 449,81 455,81 450,84 452,90 447,87 442,90 444,84 439,81" fill="url(#starGrad)" filter="url(#glow)" opacity="0.9"/>
+  <polygon points="155,81 157,75 159,81 165,81 160,84 162,90 157,87 152,90 154,84 149,81" fill="url(#starGrad)" filter="url(#glow)" opacity="0.9"/>
+
+  <!-- Cute doodle hearts scattered near title -->
+  <path d="M475,76 C475,72 470,72 470,76 C470,79 475,82 475,82 C475,82 480,79 480,76 C480,72 475,72 475,76 Z" fill="url(#heartGrad2)" opacity="0.85"/>
+  <path d="M500,70 C500,65 494,65 494,70 C494,74 500,78 500,78 C500,78 506,74 506,70 C506,65 500,65 500,70 Z" fill="url(#heartGrad1)" opacity="0.8"/>
+  <path d="M525,78 C525,74 520,74 520,78 C520,81 525,84 525,84 C525,84 530,81 530,78 C530,74 525,74 525,78 Z" fill="url(#heartGrad3)" opacity="0.8"/>
+
+  <!-- Left side teen doodles near title -->
+  <circle cx="118" cy="81" r="3" fill="none" stroke="#ff80b0" stroke-width="1.8" opacity="0.7"/>
+  <path d="M108,73 C108,70 104,70 104,73 C104,76 108,78 108,78 C108,78 112,76 112,73 C112,70 108,70 108,73 Z" fill="#ffb3d1" opacity="0.7"/>
+
+  <!-- Underline swoosh below title -->
+  <path d="M165,103 C280,115 400,108 540,103 C600,101 640,105 660,103" fill="none" stroke="#ff80b0" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+  <path d="M175,108 C290,118 400,112 530,108" fill="none" stroke="#ffb3d1" stroke-width="1.2" stroke-linecap="round" opacity="0.4"/>
+
+  <!-- Writing lines -->
+  <rect x="80" y="152" width="656" height="1" fill="url(#lineGrad)" opacity="0.6"/>
+  <rect x="80" y="185" width="656" height="1" fill="url(#lineGrad)" opacity="0.55"/>
+  <rect x="80" y="218" width="656" height="1" fill="url(#lineGrad)" opacity="0.55"/>
+  <rect x="80" y="251" width="656" height="1" fill="url(#lineGrad)" opacity="0.55"/>
+  <rect x="80" y="284" width="656" height="1" fill="url(#lineGrad)" opacity="0.55"/>
+  <rect x="80" y="317" width="656" height="1" fill="url(#lineGrad)" opacity="0.55"/>
+  <rect x="80" y="350" width="656" height="1" fill="url(#lineGrad)" opacity="0.55"/>
+  <rect x="80" y="383" width="656" height="1" fill="url(#lineGrad)" opacity="0.55"/>
+  <rect x="80" y="416" width="656" height="1" fill="url(#lineGrad)" opacity="0.55"/>
+  <rect x="80" y="449" width="656" height="1" fill="url(#lineGrad)" opacity="0.55"/>
+  <rect x="80" y="482" width="656" height="1" fill="url(#lineGrad)" opacity="0.55"/>
+  <rect x="80" y="515" width="656" height="1" fill="url(#lineGrad)" opacity="0.55"/>
+  <rect x="80" y="548" width="656" height="1" fill="url(#lineGrad)" opacity="0.55"/>
+  <rect x="80" y="581" width="656" height="1" fill="url(#lineGrad)" opacity="0.55"/>
+  <rect x="80" y="614" width="656" height="1" fill="url(#lineGrad)" opacity="0.55"/>
+  <rect x="80" y="647" width="656" height="1" fill="url(#lineGrad)" opacity="0.55"/>
+  <rect x="80" y="680" width="656" height="1" fill="url(#lineGrad)" opacity="0.55"/>
+  <rect x="80" y="713" width="656" height="1" fill="url(#lineGrad)" opacity="0.55"/>
+  <rect x="80" y="746" width="656" height="1" fill="url(#lineGrad)" opacity="0.55"/>
+  <rect x="80" y="779" width="656" height="1" fill="url(#lineGrad)" opacity="0.55"/>
+  <rect x="80" y="812" width="656" height="1" fill="url(#lineGrad)" opacity="0.55"/>
+  <rect x="80" y="845" width="656" height="1" fill="url(#lineGrad)" opacity="0.55"/>
+  <rect x="80" y="878" width="656" height="1" fill="url(#lineGrad)" opacity="0.55"/>
+  <rect x="80" y="911" width="656" height="1" fill="url(#lineGrad)" opacity="0.55"/>
+  <rect x="80" y="944" width="656" height="1" fill="url(#lineGrad)" opacity="0.55"/>
+
+  <!-- Left margin line -->
+  <line x1="112" y1="140" x2="112" y2="958" stroke="#ffb3d1" stroke-width="1.2" stroke-opacity="0.45"/>
+
+  <!-- Tiny scattered hearts in margin area (left of margin line) -->
+  <path d="M90,170 C90,167 86,167 86,170 C86,172 90,174 90,174 C90,174 94,172 94,170 C94,167 90,167 90,170 Z" fill="#ffb3d1" opacity="0.5"/>
+  <path d="M90,270 C90,267 86,267 86,270 C86,272 90,274 90,274 C90,274 94,272 94,270 C94,267 90,267 90,270 Z" fill="#ff80b0" opacity="0.45"/>
+  <path d="M90,370 C90,367 86,367 86,370 C86,372 90,374 90,374 C90,374 94,372 94,370 C94,367 90,367 90,370 Z" fill="#ffb3d1" opacity="0.5"/>
+  <path d="M90,470 C90,467 86,467 86,470 C86,472 90,474 90,474 C90,474 94,472 94,470 C94,467 90,467 90,470 Z" fill="#ff80b0" opacity="0.45"/>
+  <path d="M90,570 C90,567 86,567 86,570 C86,572 90,574 90,574 C90,574 94,572 94,570 C94,567 90,567 90,570 Z" fill="#ffb3d1" opacity="0.5"/>
+  <path d="M90,670 C90,667 86,667 86,670 C86,672 90,674 90,674 C90,674 94,672 94,670 C94,667 90,667 90,670 Z" fill="#ff80b0" opacity="0.45"/>
+  <path d="M90,770 C90,767 86,767 86,770 C86,772 90,774 90,774 C90,774 94,772 94,770 C94,767 90,767 90,770 Z" fill="#ffb3d1" opacity="0.5"/>
+  <path d="M90,870 C90,867 86,867 86,870 C86,872 90,874 90,874 C90,874 94,872 94,870 C94,867 90,867 90,870 Z" fill="#ff80b0" opacity="0.45"/>
+
+  <!-- Tiny scattered doodles right margin -->
+  <circle cx="735" cy="200" r="2.5" fill="#ffb3d1" opacity="0.45"/>
+  <circle cx="742" cy="400" r="2" fill="#ff80b0" opacity="0.4"/>
+  <circle cx="737" cy="600" r="2.5" fill="#ffb3d1" opacity="0.45"/>
+  <circle cx="742" cy="800" r="2" fill="#ff80b0" opacity="0.4"/>
+
+  <!-- Bottom decorative band -->
+  <rect x="80" y="958" width="656" height="2" fill="url(#lineGrad)" opacity="0.5"/>
+  <rect x="80" y="963" width="656" height="1" fill="url(#lineGrad)" opacity="0.3"/>
+
+  <!-- Bottom scattered hearts in writing area bottom -->
+  <path d="M200,975 C200,971 195,971 195,975 C195,978 200,981 200,981 C200,981 205,978 205,975 C205,971 200,971 200,975 Z" fill="url(#heartGrad2)" opacity="0.55"/>
+  <path d="M408,973 C408,969 403,969 403,973 C403,976 408,979 408,979 C408,979 413,976 413,973 C413,969 408,969 408,973 Z" fill="url(#heartGrad1)" opacity="0.6"/>
+  <path d="M616,975 C616,971 611,971 611,975 C611,978 616,981 616,981 C616,981 621,978 621,975 C621,971 616,971 616,975 Z" fill="url(#heartGrad2)" opacity="0.55"/>
+  <polygon points="300,976 302,970 304,976 310,976 305,979 307,985 302,982 297,985 299,979 294,976" fill="url(#starGrad)" opacity="0.6"/>
+  <polygon points="510,976 512,970 514,976 520,976 515,979 517,985 512,982 507,985 509,979 504,976" fill="url(#starGrad)" opacity="0.6"/>
+
+  <!-- Top floating hearts above writing area — teen flair -->
+  <path d="M600,125 C600,120 594,120 594,125 C594,129 600,133 600,133 C600,133 606,129 606,125 C606,120 600,120 600,125 Z" fill="url(#heartGrad1)" opacity="0.7" filter="url(#glow)"/>
+  <path d="M640,118 C640,114 636,114 636,118 C636,121 640,124 640,124 C640,124 644,121 644,118 C644,114 640,114 640,118 Z" fill="url(#heartGrad2)" opacity="0.65"/>
+  <path d="M670,128 C670,124 666,124 666,128 C666,131 670,134 670,134 C670,134 674,131 674,128 C674,124 670,124 670,128 Z" fill="url(#heartGrad3)" opacity="0.6"/>
+
+  <!-- Glow circle behind title for dreamy feel -->
+  <ellipse cx="408" cy="82" rx="180" ry="35" fill="url(#glowHeart)" opacity="0.4"/>
+</svg>

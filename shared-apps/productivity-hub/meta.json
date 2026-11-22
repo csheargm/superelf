@@ -1,0 +1,16 @@
+{
+  "title": "Productivity Hub",
+  "desc": "Clock, Pomodoro timer, tasks, and notes — all in one",
+  "shared": true,
+  "sharedBy": "owner",
+  "version": "1.0.0",
+  "gitRef": "40860c66126c8f926e8b6061a4c151a3fc4efaf0",
+  "promotedAt": "2026-10-12T22:09:17.781Z",
+  "promotedFrom": {
+    "uid": "owner",
+    "slug": "productivity-hub"
+  },
+  "files": {
+    "index.html": "45127d952d7d"
+  }
+}

@@ -1,0 +1,52 @@
+<!-- PASummaryFollowup — automatic research after a period summary（总结自动跟进, docs/plans/note-features.md I,
+     ADR 0027). Once a summary turn's answer is SAVED as a note (PADrawerSummary.decorate, the auto-save), the
+     client asks the node ONCE (broker kind `summary-followup` → lib/summary-followup.mjs) with the answer's
+     text; the node extracts the Open to-dos, researches the questions about the world and suggests one line
+     for the personal ones, and answers a brief block. The block is appended to the SAME note under the
+     heading the node names (Follow-up · 跟进) through the host's saveNote ({id, quiet:true}: the id of ITS run's note, never another run's; the
+     host writes the note and neither opens it nor moves the pad or the rail — the owner may be elsewhere by now), and ONE status
+     line under the answer says what happened: researching → added / partial / none / failed — never silent
+     (R5); a partial block is saved as partial. The summary body never leaves the node for the search
+     engine: the node sends only the to-do lines (ADR 0027). drawer-summary carries this marker.
+     A note deleted meanwhile answers {gone:true}: the line says so and nothing is created (R5).
+     API: PASummaryFollowup.run({answer, html, period, scope, title, id, convoId, hooks, bar}) → Promise<{ok, status, html?}>
+     Driven by test/summary-followup-client.test.mjs. -->
+<style id="psf-style">
+.pds-fu{font-size:12px;color:var(--muted,#888);padding:2px 8px;white-space:pre-wrap}
+</style>
+<script id="psf-script">
+(function(){
+  if(window.PASummaryFollowup) return;
+  const TXT=Object.freeze({ researching:'Researching to-dos · 正在研究待办', added:'Follow-up added · 已添加跟进 — {n} to-dos · {n} 项待办',
+    partial:'Follow-up added (partial) · 已添加跟进（部分失败）— {n} to-dos · {n} 项待办', none:'No open to-dos · 没有待办',
+    failed:'Follow-up failed · 跟进失败 — {e}', notSaved:'Follow-up not saved · 跟进未保存 — {e}', noBroker:'no broker · 无通道', gone:'its summary note was deleted · 该总结笔记已删除', via:' — via {lane} · 经 {lane}' });
+  const fill=(s,o)=>String(s).replace(/\{(\w+)\}/g,(_,k)=>String(o[k]==null?'':o[k]));
+  const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const md=t=>window.PANote&&typeof window.PANote.mdToHtml==='function'?window.PANote.mdToHtml(String(t||'')):'<div>'+esc(t)+'</div>';
+  // The block as the saved note keeps it: the node's heading, then its markdown rendered like the summary itself.
+  // mdToHtml writes a link as `text (url)` (a paste never mints links), so the node's [title](url) source links
+  // are lifted out first and put back as <a href> — http(s) only; the note's sanitizer keeps a safe href.
+  const LINK_RE=/\[([^\]\n]{1,120})\]\((https?:\/\/[^)\s]{1,500})\)/g, TOKEN=i=>'PSFLINK'+i+'X';
+  function block(r){
+    const links=[]; const t=String(r.text||'').replace(LINK_RE,(m,a,u)=>TOKEN(links.push('<a href="'+esc(u)+'">'+esc(a)+'</a>')-1));
+    return '<h3>'+esc(r.heading)+'</h3>'+md(t).replace(/PSFLINK(\d+)X/g,(m,i)=>links[Number(i)]||m);
+  }
+  async function run(o){
+    const x=o||{}; if(!x.bar||!x.hooks||typeof x.hooks.saveNote!=='function') return {ok:false,status:''};
+    const st=document.createElement('div'); st.className='pds-fu'; st.setAttribute('role','status'); x.bar.appendChild(st);
+    const say=s=>{ st.textContent=s; return s; };
+    say(TXT.researching);
+    if(!(window.PAStore&&typeof window.PAStore.ask==='function')) return {ok:false,status:say(fill(TXT.failed,{e:TXT.noBroker}))};
+    let r; try{ r=await window.PAStore.ask({kind:'summary-followup',text:String(x.answer||'')}); }catch(e){ r={ok:false,error:String((e&&e.message)||e)}; }
+    if(!r||!r.ok||typeof r.text!=='string') return {ok:false,status:say(fill(TXT.failed,{e:(r&&(r.error||r.text))||'no answer · 无回答'}))};
+    const n=Array.isArray(r.items)?r.items.length:0; if(!n||!r.text.trim()) return {ok:true,status:say(TXT.none)};
+    if(x.id==null) return {ok:false,status:say(fill(TXT.notSaved,{e:'no note id · 无笔记'}))};   // never a new note: the follow-up belongs to its run
+    const html=String(x.html||'')+block(r); let s;
+    try{ s=await x.hooks.saveNote({id:x.id,title:x.title,html,period:x.period,scope:x.scope,convoId:x.convoId||null,quiet:true}); }catch(e){ s={ok:false,error:String((e&&e.message)||e)}; }
+    if(!s||!s.ok) return {ok:false,status:say(fill(TXT.notSaved,{e:(s&&s.gone)?TXT.gone:(s&&s.error)||''})),html};
+    const via=typeof r.writerFallback==='string'&&r.writerFallback?fill(TXT.via,{lane:r.writerFallback}):'';   // said only when the first writer lane failed
+    return {ok:true,status:say(fill(r.partial===true?TXT.partial:TXT.added,{n})+via),html,partial:r.partial===true};
+  }
+  window.PASummaryFollowup={run,block,TXT};
+})();
+</script>

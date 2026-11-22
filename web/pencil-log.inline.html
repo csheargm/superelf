@@ -1,0 +1,133 @@
+<!-- PAPencilLog — the on-device Pencil recorder（笔迹记录）.
+     Inlined by web.mjs into any page carrying the PA_PENCIL_LOG_UI marker (note-ui carries it).
+     API: PAPencilLog.attach({host,stage,ink,textLayer,listen,snap}) returns {dec(decision,event), log()}.
+     Driven for real by test/note-pencil-log.test.mjs. -->
+<script id="ppl-script">
+(function(){
+  if(window.PAPencilLog) return;
+  // WHY IT EXISTS: "the Pencil stops inking until I re-grip it" (finger drawing OFF) survived every
+  // reading of PANote's source and every Node repro of its pointer routing. The next step is
+  // evidence, not another guess: a bounded ring of what iPadOS actually DELIVERED — every pointer,
+  // touch, capture, scroll, page pan/zoom, selection, focus and visibility event the pad sees —
+  // plus the routing DECISION each one got (dec(), one call per branch in PANote's routing). The
+  // owner taps "Send Pencil log" in the ink popover right after it happens, and the file lands in
+  // the app's own data namespace.
+  // TWO RINGS. Writing fills MAX in roughly 10-25 s (a Pencil sends ~120 contact moves/s on a
+  // ProMotion iPad, and palms add their own — an estimate, not measured on the device). The symptom
+  // is noticed after a retry and a re-grip, so that alone would flush the onset. The key ring keeps
+  // everything EXCEPT the repeats of a run: of a contact move or a scroll, only the first with a
+  // new pointer/target/decision. Export = key-ring entries older than the full ring (`thinned` of
+  // them, first) + the full ring.
+  // COST: always on, so it must be free. One small object per event; no layout reads (scroll
+  // positions only on their own scroll events, when layout is already clean); no JSON until
+  // export; hover moves are thinned to one per HOVER_MS so a Pencil held above the glass cannot
+  // flush the ring.
+  // BEHAVIOUR: capture phase, PASSIVE, never preventDefault, never stopPropagation — logging must
+  // not change what it records (pinned by test).
+  // PRIVACY: timings, pointer kinds, contact geometry and a short class name for the target. Never
+  // text, images, note ids or titles. Positions are kept where a contact BEGAN and ENDED and for
+  // contacts that do not ink (a palm); the export drops x/y from every INKING move (scrub), so the
+  // file cannot redraw the handwriting. Every field is listed in KEYS, and the test refuses an
+  // entry carrying a field KEYS does not document.
+  const MAX=3000, KEY_MAX=2000, WINDOW_MS=90000, HOVER_MS=100;
+  // Stamped by the server (lib/buildid.mjs) as "<git short HEAD> · note <blob of note-ui>".
+  const BUILD='%%PA_BUILD_ID%%';
+  const KEYS={t:'ms since the pad mounted',type:'event type',tg:'target: ink, stage, txt, doc, win, vv, else its first class name',pt:'pointerType',
+    id:'pointerId',pr:'isPrimary',b:'buttons',p:'pressure',w:'width',h:'height',x:'clientX (not on inking moves)',y:'clientY (not on inking moves)',
+    n:'touches.length',ch:'changedTouches [{id,rx,ry,f(orce),tt(touchType),x,y}]',st:'stage.scrollTop',vs:'visibilityState',
+    vz:'visualViewport.scale',vy:'visualViewport.offsetTop',wy:'window.scrollY',sl:'selection collapsed (1) or not (0)',
+    d:'routing decision(s), > joined',tool:'tool',pen:'penId',dr:'drawing',fl:'flipping',sc:'scrollTouch id',fd:'fingerDraw',nf:'noFlip',
+    cp:'ink has native panning armed (.pan-canpan, touch-action pan-x pan-y)',hf:'document.hasFocus(), 1/0. 0 is ALSO the normal state when the app never got focus (PANote prevents touches, so a tap moves none): only a 1 then 0, or a win-blur entry, is a signal; see the header focus.ever',
+    el:'shell element (#id, .class or tag) on tg shell entries',lag:'ms from the shell event to its arrival here'};
+  const TYPES=['pointerdown','pointermove','pointerup','pointercancel','gotpointercapture','lostpointercapture','touchstart','touchend','touchcancel'];
+  const OPT={capture:true,passive:true};
+  // A move that draws: a pen/mouse contact move, or a finger's when finger drawing extends with it.
+  const inking=o=>o.type==='pointermove'&&o.b&&(o.pt!=='touch'||/finger-extend/.test(o.d||''));
+  function scrub(o){ if(!inking(o)) return o; const c=Object.assign({},o); delete c.x; delete c.y; return c; }
+
+  // host/stage/ink/textLayer: the pad's elements. listen(target,type,fn,opts): registers a
+  // window/document listener the pad removes on destroy. snap(entry): writes the routing state
+  // into the entry — into it, so an event costs one object, not two.
+  function attach({host,stage,ink,textLayer,listen,snap}){
+    const ring=new Array(MAX), kring=new Array(KEY_MAX), t0=performance.now(), vv=window.visualViewport||null;
+    let n=0, kn=0, last=null, cur=null, settled=null, hoverAt=-Infinity, runs={};
+    // The baseline for hf: focus when the pad mounted, and whether ANY entry since then had it.
+    const hfMount=document.hasFocus?(document.hasFocus()?1:0):null; let hfEver=0;
+    const now=()=>Math.round((performance.now()-t0)*10)/10;
+    function target(t){
+      if(t===ink) return 'ink'; if(t===stage) return 'stage'; if(t===textLayer) return 'txt';
+      if(t===document) return 'doc'; if(t===window) return 'win'; if(vv&&t===vv) return 'vv';
+      const c=t&&t.className;
+      if(typeof c!=='string'||!c) return (t&&t.nodeName)?String(t.nodeName).toLowerCase():'';
+      const i=c.indexOf(' '); return (i<0?c:c.slice(0,i)).slice(0,24); }
+    function fill(o,e){                                      // the event's own fields, by kind
+      if(e.pointerId!==undefined){
+        o.pt=e.pointerType; o.id=e.pointerId; o.pr=e.isPrimary?1:0; o.b=e.buttons; o.p=Math.round((e.pressure||0)*100)/100;
+        o.w=Math.round(e.width||0); o.h=Math.round(e.height||0); o.x=Math.round(e.clientX); o.y=Math.round(e.clientY);
+      } else if(e.changedTouches){
+        o.n=e.touches?e.touches.length:0; o.ch=[];
+        for(let i=0;i<e.changedTouches.length;i++){ const c=e.changedTouches[i];
+          o.ch.push({id:c.identifier,rx:Math.round(c.radiusX||0),ry:Math.round(c.radiusY||0),f:Math.round((c.force||0)*100)/100,
+            tt:c.touchType||'',x:Math.round(c.clientX),y:Math.round(c.clientY)}); }
+      } else if(vv&&e.target===vv){ o.vz=Math.round(vv.scale*100)/100; o.vy=Math.round(vv.offsetTop); }
+      else if(e.type==='scroll'){ if(e.target===stage) o.st=Math.round(stage.scrollTop); else o.wy=Math.round(window.scrollY||0); }
+      else if(e.type==='selectionchange'){ const s=window.getSelection&&window.getSelection(); o.sl=s&&!s.isCollapsed?0:1; }
+      else if(e.type==='visibilitychange') o.vs=document.visibilityState; }
+    // Into the key ring, once the entry's decisions are final (the next event has begun): every
+    // entry except a repeat in a run of contact moves / scrolls / selection changes.
+    function settle(o){
+      if(!o||o===settled) return; settled=o;
+      const run=o.type==='pointermove'&&o.b?'p'+o.id:(o.type==='scroll'||o.type==='resize'||o.type==='selectionchange')?o.type+o.tg:null;
+      if(run){ const k=o.tg+'|'+(o.d||''); if(runs[run]===k) return; runs[run]=k; } else runs={};
+      kring[kn++%KEY_MAX]=o; }
+    function record(e){
+      if(e===last) return;                                   // window, host and stage all see the same event: log it once
+      last=e; settle(cur); cur=null;
+      if(e.type==='pointermove'&&!e.buttons&&e.pointerType!=='touch'){   // a hovering Pencil / mouse: thinned
+        const t=performance.now(); if(t-hoverAt<HOVER_MS) return; hoverAt=t; }
+      const o={type:e.type,tg:target(e.target)};
+      fill(o,e);
+      o.t=now(); snap(o);                                     // the state the routing is ABOUT to see: this listener runs first
+      // hf ALONE PROVES NOTHING. PANote default-prevents its touches, so a tap moves no focus and the
+      // app may never have had it: then every entry is hf 0 and no win-blur can fire (measured in
+      // Chromium on the full shell). Only a 1 -> 0 change, or a win-blur entry, says focus was taken;
+      // a missing win-blur means "not observed", not "did not happen". The header's focus.ever says
+      // which case a log is in.
+      if(document.hasFocus){ o.hf=document.hasFocus()?1:0; if(o.hf) hfEver=1; }
+      ring[n++%MAX]=o; cur=o;
+    }
+    // The routing's ONE logging call: annotate the entry of the event being routed with the branch taken.
+    function dec(d,e){ if(!cur||(e&&e!==last)) return; cur.d=cur.d?cur.d+'>'+d:d; }
+    for(const ty of TYPES){ listen(window,ty,record,OPT); host.addEventListener(ty,record,OPT); stage.addEventListener(ty,record,OPT); }
+    stage.addEventListener('scroll',record,{passive:true});
+    listen(window,'scroll',record,{passive:true});            // bubble phase: the DOCUMENT's scroll only (an element's does not bubble)
+    if(vv){ listen(vv,'resize',record,{passive:true}); listen(vv,'scroll',record,{passive:true}); }   // pinch-zoom / page pan
+    for(const ty of ['visibilitychange','selectionchange','focusin']) listen(document,ty,record,OPT);
+    // WHERE THE STROKES WENT. On the iPad the Pencil stopped inking for 2-5 s and this recorder saw
+    // NOTHING in those seconds — so the input went outside this document. Two witnesses: focus
+    // leaving this window (bubble phase, so only the window's own blur/focus, never an element's),
+    // and the shell's own report of a touch or focus on ITS elements, which it sends only while an
+    // app is open (web/index.html shellEventsToApp). Accepted only from the parent window, and only
+    // as a short kind and an #id/.class tag — a message cannot put text into the log.
+    function mark(e,d,extra){ record(e); if(cur&&last===e){ cur.d=d; if(extra) Object.assign(cur,extra); } }
+    for(const ty of ['blur','focus']) listen(window,ty,e=>{ if(e.target===window) mark(e,'win-'+ty); },{passive:true});
+    listen(window,'message',e=>{ const m=e.data;
+      if(!m||m.pa!=='shell-event'||!e.source||e.source!==window.parent||!/^[a-z]{1,16}$/.test(m.type)) return;
+      const lag=typeof m.t==='number'?Math.round(Date.now()-m.t):undefined;
+      mark(e,'shell-'+m.type,{tg:'shell',el:/^[#.]?[\w-]{1,25}$/.test(m.tag)?m.tag:'',lag}); },{passive:true});
+    // The export: the last WINDOW_MS, oldest first — the key ring's older entries, then the full
+    // ring — with a header naming the build. `thinned` says how many lead entries are key-ring only;
+    // `focus` is hf's baseline (mount: hf at mount, null without hasFocus; ever: 1 once any entry had hf 1).
+    function log(){
+      const t=now(), full=[], inRing=new Set(), head=[];
+      settle(cur);
+      for(let i=Math.max(0,n-MAX);i<n;i++){ const o=ring[i%MAX]; inRing.add(o); if(t-o.t<=WINDOW_MS) full.push(o); }
+      for(let i=Math.max(0,kn-KEY_MAX);i<kn;i++){ const o=kring[i%KEY_MAX]; if(!inRing.has(o)&&t-o.t<=WINDOW_MS) head.push(o); }
+      return {kind:'pa-pencil-log',v:3,build:BUILD.charAt(0)==='%'?'unstamped':BUILD,at:new Date().toISOString(),
+        ua:navigator.userAgent,dpr:window.devicePixelRatio||1,touchPoints:navigator.maxTouchPoints||0,keys:KEYS,
+        focus:{mount:hfMount,ever:hfEver},thinned:head.length,events:head.concat(full).map(scrub)}; }
+    return {dec,log};
+  }
+  window.PAPencilLog={attach,MAX,KEY_MAX,WINDOW_MS,HOVER_MS,KEYS};
+})();
+</script>

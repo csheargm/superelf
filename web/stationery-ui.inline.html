@@ -1,0 +1,167 @@
+<!-- PAStationery · 信纸 — decorative writing paper for PANote (opts.stationery; see note-ui's drawPaper). Inlined by
+     web.mjs at the PA_STATIONERY_UI marker, which ONLY the Journal carries: other PANote hosts pay nothing.
+     THE ENGINE: registry, store, renderer. Its sanitizer (the trust boundary) is stationery-sanitize,
+     carried just below and run FIRST; its UI (picker, AI design, pictures) is stationery-picker +
+     stationery-studio, carried at the markers at the end of this file. -->
+<!--PA_STATIONERY_SANITIZE-->
+<script>
+window.PAStationery=(function(){
+  'use strict';
+  // ── The page and the budgets (R3: one source each; the sanitizer's live in stationery-sanitize) ─
+  const SAN=window.PAStationerySanitize, sanitize=SAN.sanitize, PAGE_W=SAN.PAGE_W, PAGE_H=SAN.PAGE_H;
+  const MAX_RASTERS=4;                          // bitmaps kept per page; each screen one is ~3-7M px
+  const PRIME_MS=4000;                          // how long print waits for a design to decode
+  const DIR='templates/', INDEX=DIR+'index.json';   // "My templates" in the HOST's data namespace
+  // A table looked up by a template file's or a notebook's own value has NO prototype, so a value
+  // such as 'constructor', 'toString' or '__proto__' is not an entry. The value must also be a string:
+  // a lookup turns ["any"] into "any" (ADR 0003, Follow-up — prototype lookups).
+  const AUDIENCES=Object.assign(Object.create(null),{spouse:1,teen:1,any:1});
+  const err=(reason)=>({ok:false,reason});
+  const num=(v,lo,hi)=>typeof v==='number'&&isFinite(v)&&v>=lo&&v<=hi;
+  // A whole template (the shared contract). Returns {ok, tpl, reason}; tpl is a FRESH object.
+  function validTemplate(t,o){
+    if(!t||typeof t!=='object') return err('not an object');
+    if(typeof t.id!=='string'||!/^[a-z0-9][a-z0-9_-]{0,63}$/i.test(t.id)) return err('bad id');
+    if(typeof t.name!=='string'||!t.name.trim()||t.name.length>80) return err('bad name');
+    if(t.group!=='stationery') return err("group must be 'stationery'");
+    if(typeof t.audience!=='string'||!AUDIENCES[t.audience]) return err('bad audience');
+    if(t.dark) return err('light backgrounds only');
+    const s=t.safe, l=t.lines;
+    if(!s||!num(s.x,0,PAGE_W)||!num(s.y,0,PAGE_H)||!num(s.w,1,PAGE_W-s.x)||!num(s.h,1,PAGE_H-s.y)) return err('bad safe area');
+    if(l!=null&&!(num(l.gap,8,200)&&num(l.top,0,PAGE_H)&&/^#[0-9a-f]{6}$/i.test(l.color||''))) return err('bad lines');
+    const sv=sanitize(t.svg,o); if(!sv.ok) return sv;
+    return {ok:true,reason:'',tpl:{id:t.id,name:t.name.trim(),group:'stationery',audience:t.audience,svg:sv.svg,
+      lines:l?{gap:l.gap,top:l.top,color:l.color}:null,safe:{x:s.x,y:s.y,w:s.w,h:s.h},dark:false}};
+  }
+  // ── Registry: the bundled designs (stationery-designs.inline.html) + this host's own ──────
+  const REG=Object.assign(Object.create(null),{bundled:new Map(),mine:new Map(),picture:new Map()}), rejected=[], listeners=new Set();
+  const changed=()=>listeners.forEach(fn=>fn());
+  function add(source,list,o){
+    for(const t of list||[]){ const v=validTemplate(t,o);
+      if(v.ok) REG[source].set(v.tpl.id,v.tpl); else rejected.push({source,id:t&&t.id,reason:v.reason}); }
+    changed();
+  }
+  // A notebook's {id, source, fade?} -> the design, or null. The notebook SCHEMA (which sources and
+  // ids are legal) belongs to PANote's sanitize(); this only looks the reference up.
+  const resolve=(ref)=>{ if(!ref||typeof ref.id!=='string'||!REG[ref.source]) return null;
+    const t=REG[ref.source].get(ref.id); if(!t&&ref.source==='picture') picture(ref.id); return t||null; };
+  // A PICTURE is the host's own uploaded image (id = its upload path), fetched ONCE through the
+  // host's image IO (pictures(fn): path -> data:image URL | null) and drawn by the same raster path.
+  // The host's loader reports its own failure; here a failure is plain paper, retried next paint.
+  let picIO=null; const PICS=new Map();
+  function picture(id){
+    if(!picIO) return null;
+    if(!PICS.has(id)) PICS.set(id,Promise.resolve(picIO(id)).then(url=>{
+      if(typeof url!=='string'||!/^data:image\/(png|jpeg|webp|gif);/.test(url)){ PICS.delete(id); return false; }
+      REG.picture.set(id,{id,url,lines:null}); changed(); return true; },()=>{ PICS.delete(id); return false; }));
+    return PICS.get(id);
+  }
+  const fadeOf=(ref)=>Math.min(0.9,Math.max(0,+ref.fade||0));
+  const list=()=>[...REG.bundled.values()].map(t=>({...t,source:'bundled'}))
+    .concat([...REG.mine.values()].map(t=>({...t,source:'mine'})));
+  // ── Store: "My templates" through the host's own checked read/write (Journal: DATA) ──────
+  // io = { read(path) -> Promise<LOAD outcome {status,data,error}>, write(path,text) -> Promise<{ok,error}> }
+  function store(io){
+    let ids=null;                                           // the index as last read; null = not read
+    async function loadMine(){
+      const r=await io.read(INDEX);
+      if(r.status==='failed') return {ok:false,error:r.error};
+      ids=r.status==='loaded'&&r.data&&Array.isArray(r.data.ids)?r.data.ids.filter(x=>typeof x==='string'):[];
+      const errors=[], got=[]; for(const id of ids){ const f=await io.read(DIR+id+'.json');
+        if(f.status==='loaded') got.push(f.data); else errors.push(id+': '+(f.error||'missing')); }
+      const before=rejected.length; add('mine',got);
+      for(const x of rejected.slice(before)) errors.push(x.id+': '+x.reason);
+      return {ok:!errors.length,n:REG.mine.size,error:errors.join('; ')};
+    }
+    // The index is the source of truth: never written over one we could not read, adopted only once written.
+    async function setIndex(next){
+      if(ids===null){ const l=await loadMine(); if(!l.ok&&ids===null) return l; }
+      const w=await io.write(INDEX,JSON.stringify({v:1,ids:next(ids)})); if(w.ok) ids=next(ids); return w;
+    }
+    async function saveMine(t){
+      const v=validTemplate(t); if(!v.ok) return {ok:false,error:v.reason};
+      if(ids===null){ const l=await loadMine(); if(!l.ok&&ids===null) return l; }
+      const w=await io.write(DIR+v.tpl.id+'.json',JSON.stringify(v.tpl)); if(!w.ok) return w;
+      const wi=await setIndex(x=>x.includes(v.tpl.id)?x:x.concat(v.tpl.id)); if(!wi.ok) return wi;
+      REG.mine.set(v.tpl.id,v.tpl); changed(); return {ok:true};
+    }
+    // No broker kind deletes a file: leaving the index is what deletes (the file stays, unlisted).
+    async function deleteMine(id){
+      const wi=await setIndex(x=>x.filter(y=>y!==id)); if(!wi.ok) return wi;
+      REG.mine.delete(id); changed(); return {ok:true};
+    }
+    return {loadMine,saveMine,deleteMine,DIR,INDEX};
+  }
+  // ── Renderer: sanitized SVG -> data: URL -> Image -> canvas, cached per (template, size) ─
+  const IMGS=new WeakMap(), RASTERS=new Map();          // WeakMap: a discarded AI draft takes its decoded image with it
+  function decoded(tpl){
+    let rec=IMGS.get(tpl); if(rec) return rec;
+    rec={ready:false,failed:false,img:new Image()};
+    rec.p=new Promise(res=>{ rec.img.onload=()=>{ rec.ready=true; res(true); }; rec.img.onerror=()=>{ rec.failed=true; res(false); }; });
+    rec.img.src=tpl.url||'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(tpl.svg);
+    IMGS.set(tpl,rec); return rec;
+  }
+  function raster(tpl,devW,keep){
+    const rec=decoded(tpl); if(!rec.ready||rec.failed) return null;
+    const key=tpl.id+'@'+devW, hit=keep&&RASTERS.get(tpl);
+    if(hit&&hit.key===key) return hit.c;
+    const c=document.createElement('canvas'); c.width=devW; c.height=Math.round(devW*PAGE_H/PAGE_W);
+    const x=c.getContext('2d'); if(!x) return null;
+    x.drawImage(rec.img,0,0,c.width,c.height);
+    // A TAINTED canvas would make print's toDataURL throw and lose the whole print. The probe turns that into
+    // "design unavailable" (plain paper, greyed thumbnail); the SecurityError carries nothing more to report.
+    try{ x.getImageData(0,0,1,1); }catch(_){ rec.failed=true; return null; }
+    if(keep){ if(hit) hit.c.width=0; RASTERS.set(tpl,{key,c});
+      while(RASTERS.size>MAX_RASTERS){ const k=RASTERS.keys().next().value; RASTERS.get(k).c.width=0; RASTERS.delete(k); } }
+    return c;
+  }
+  function drawLines(ctx,tpl,k,n,sheetH){
+    const l=tpl.lines, s=tpl.safe; if(!l) return;
+    ctx.strokeStyle=l.color; ctx.lineWidth=1;
+    for(let sh=0;sh<n;sh++) for(let y=l.top;y<=s.y+s.h;y+=l.gap){ const yy=sh*sheetH+y*k;
+      ctx.beginPath(); ctx.moveTo(s.x*k,yy); ctx.lineTo((s.x+s.w)*k,yy); ctx.stroke(); }
+  }
+  // paint(ctx, ref, {w, h, sheets, fit, onReady}) -> true when the design was drawn. An unknown
+  // ref, or one still decoding, draws NOTHING (plain paper) and onReady fires once it can.
+  function paint(ctx,ref,o){
+    const tpl=resolve(ref); if(!tpl||!ctx) return false;
+    const rec=decoded(tpl);
+    if(!rec.ready){ if(!rec.failed&&o.onReady) rec.p.then(ok=>{ if(ok) o.onReady(); }); return false; }
+    ctx.save();
+    const f=o.fit; if(f&&(f.dx||f.dy||(f.k&&f.k!==1))){ ctx.translate(f.dx||0,f.dy||0); ctx.scale(f.k||1,f.k||1); }
+    const m=ctx.getTransform?ctx.getTransform():{a:1,b:0};
+    const c=raster(tpl,Math.max(1,Math.round(o.w*Math.hypot(m.a,m.b))),true);
+    if(c){ const k=o.w/PAGE_W, sheetH=PAGE_H*k, n=o.sheets||Math.max(1,Math.ceil(o.h/sheetH));
+      ctx.globalAlpha=1-fadeOf(ref);
+      for(let sh=0;sh<n;sh++) ctx.drawImage(c,0,sh*sheetH,o.w,sheetH);
+      ctx.globalAlpha=1; drawLines(ctx,tpl,k,n,sheetH); }
+    ctx.restore(); return !!c;
+  }
+  // Typed text starts INSIDE the design's safe area: the text layer is padded by it (W = the page's CSS
+  // width). No design, or one without a safe area (a picture): the right padding is handed back and
+  // the layer keeps the padding its template gave it.
+  function inset(el,ref,W){
+    const t=resolve(ref), s=t&&t.safe, st=el.style;
+    if(!s||!(W>0)){ st.paddingRight=''; return false; }
+    const k=W/PAGE_W; st.paddingLeft=Math.round(s.x*k)+'px'; st.paddingTop=Math.round(s.y*k)+'px';
+    st.paddingRight=Math.round((PAGE_W-s.x-s.w)*k)+'px'; return true;
+  }
+  // Print waits for the design (a picture: its fetch too), bounded: one that never arrives prints as plain paper.
+  function prime(ref,ms){
+    const go=async()=>{ let tpl=resolve(ref); const p=!tpl&&ref&&ref.source==='picture'&&picture(ref.id);
+      if(p&&await p) tpl=resolve(ref); return tpl?decoded(tpl).p:false; };
+    let t; const cap=new Promise(r=>{ t=setTimeout(()=>r(false),ms||PRIME_MS); });
+    return Promise.race([go(),cap]).finally(()=>clearTimeout(t));
+  }
+  return { PAGE_W, PAGE_H, MAX_BYTES:SAN.MAX_BYTES, BUNDLED_MAX_BYTES:SAN.BUNDLED_MAX_BYTES, DIR, INDEX, ELEMENTS:SAN.ELEMENTS, ATTRS:SAN.ATTRS, LIMITS:SAN.LIMITS,
+    sanitize, simplify:SAN.simplify, validTemplate, store, list, rejected, has:(ref)=>!!resolve(ref), paint, prime, inset,
+    bundle:(designs)=>add('bundled',designs,{maxBytes:SAN.BUNDLED_MAX_BYTES}),
+    pictures:(fn)=>{ picIO=fn; }, onChange:(fn)=>listeners.add(fn),
+    // A thumbnail of ANY checked template (a picker cell, or an AI draft not yet kept): the SAME raster path.
+    thumb:(tpl,devW)=>decoded(tpl).p.then(()=>raster(tpl,devW,false)),
+    picker:(el,o)=>window.PAStationeryPicker?window.PAStationeryPicker.mount(el,o):{sync(){}} };
+})();
+</script>
+<!--PA_STATIONERY_DESIGNS-->
+<!--PA_STATIONERY_STUDIO-->
+<!--PA_STATIONERY_PICKER-->

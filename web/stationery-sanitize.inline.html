@@ -1,0 +1,243 @@
+<!-- PAStationerySanitize · 信纸检查 — THE TRUST BOUNDARY for every stationery SVG (bundled, My templates, an
+     AI's answer). Split out of stationery-ui (R4) and carried by it at PA_STATIONERY_SANITIZE, ABOVE its
+     own script: PAStationery re-exports sanitize() and the page constants from here.
+     Two jobs: (1) a strict ALLOW-LIST over a parsed tree. An element off the list, or anything that
+     could run code or reach outside the document, REJECTS the whole SVG; a harmless attribute off the
+     list is DROPPED (ADR 0003, amendment). The output holds nothing that is not on the list.
+     (2) a RENDER-COST budget: stationery-cost, carried just below and run FIRST (R4). simplify()'s steps,
+     stationery-simplify, are carried after it (R4). -->
+<!--PA_STATIONERY_COST-->
+<!--PA_STATIONERY_SIMPLIFY-->
+<script>
+window.PAStationerySanitize=(function(){
+  'use strict';
+  // ── The page and the budgets (R3: one source each) ────────────────────────────────────────
+  const ASPECT_TOL=0.005;                       // a viewBox may be any SCALE of the page, never another shape
+  const MAX_BYTES=300*1024;                     // a user's or an AI's template
+  const BUNDLED_MAX_BYTES=12*1024;              // a design shipped inline in the journal page
+  const MAX_NODES=5000, MAX_DEPTH=48;           // a parse that big is an attack or a mistake, not stationery
+  const MAX_ATTRS=64;                           // per element (real designs: <= 10); bounds the duplicate check
+  // The page (PANote's US-Letter page in CSS px) lives in stationery-geometry and stationery-cost re-exports it; the
+  // render-cost budget and its limits live in stationery-cost.
+  const C=window.PAStationeryCost, {PAGE_W,PAGE_H,WS,REF_URL,viewBoxOf,limitsWhy,costWhy}=C;
+  const SVG_NS='http://www.w3.org/2000/svg';
+  // ── The allow-list. An ELEMENT off it is REJECTED, never repaired: a template that needed repairing
+  //    is one whose author meant something we would be guessing at. An ATTRIBUTE off it is dropped
+  //    when harmless (attrOk); what is drawn is still built from this list alone. ─────────────────
+  const ELEMENTS=new Set(('svg g defs path rect circle ellipse line polyline polygon linearGradient '+
+    'radialGradient stop clipPath mask pattern use filter feGaussianBlur feTurbulence '+
+    'feDisplacementMap feColorMatrix feOffset feBlend feComposite feFlood feMerge feMergeNode').split(' '));
+  const ATTRS=new Set(('fill stroke stroke-width stroke-linecap stroke-linejoin stroke-dasharray opacity '+
+    'fill-opacity stroke-opacity transform d x y x1 y1 x2 y2 cx cy r rx ry width height points offset '+
+    'stop-color stop-opacity gradientUnits gradientTransform patternUnits patternTransform viewBox id '+
+    'clip-path mask filter fill-rule stdDeviation baseFrequency numOctaves seed type values in in2 '+
+    'operator k1 k2 k3 k4 result mode scale xChannelSelector yChannelSelector dx dy flood-color '+
+    'flood-opacity preserveAspectRatio').split(' '));
+  // Presentation attributes kept ONLY in a plain form — keywords and numbers — so a value can carry no
+  // URL, script or reference, and none adds an element or a draw pass: the cost budget is unchanged.
+  // Sonnet wrote transform="scale(0.7)" transform-origin="96.5 89.5" (measured 2026-10-12); dropping
+  // the origin would MOVE each shape, so these are kept. A value outside its form is dropped.
+  // Keyed by an ATTACKER's attribute name, so no prototype: `constructor` must not look like an entry.
+  const words=(re,max)=>(v)=>{ const w=v.split(new RegExp(WS+'+')).filter(Boolean); return w.length>0&&w.length<=max&&w.every((x)=>re.test(x)); };
+  const SHAPED=Object.assign(Object.create(null),{
+    'transform-origin':words(/^(?:left|center|right|top|bottom|[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?(?:px|%)?)$/i,3),
+    'transform-box':words(/^(?:content-box|border-box|fill-box|stroke-box|view-box)$/i,1),
+    'vector-effect':words(/^(?:none|non-scaling-stroke|non-scaling-size|non-rotation|fixed-position)$/i,4),
+    'paint-order':words(/^(?:normal|fill|stroke|markers)$/i,3)});
+  for(const k in SHAPED) ATTRS.add(k);
+  // The budget sees an effect ONLY through url(#id). A CSS function in its place is an off-screen pass
+  // it cannot price (filter="blur(30px) …" x80 drew for 51 s in Chromium; mask="radial-gradient(…)"),
+  // so these three are kept only as none or one url(#id). Any other value is dropped (R13 round 2).
+  const ONE_REF=new RegExp('^'+REF_URL.source);
+  for(const k of ['filter','mask','clip-path']) SHAPED[k]=(v)=>{ const t=v.trim(), m=ONE_REF.exec(t); return t==='none'||!!m&&m[0]===t; };
+  const NAME=/^[A-Za-z][A-Za-z0-9_.-]*$/;       // no ':' — a namespaced name is rejected by construction
+  const ID=/^[A-Za-z_][A-Za-z0-9_.-]{0,63}$/;
+  const ENT=Object.assign(Object.create(null),{amp:'&',lt:'<',gt:'>',quot:'"',apos:"'"});   // keyed by the input: no prototype (&constructor;)
+  const CMT_OPEN='<!'+'--', CMT_CLOSE='--'+'>';   // split: a literal comment token inside an inline script is read by HTML-comment strippers (and the HTML tokenizer)
+  const err=(reason)=>({ok:false,reason});
+  // ── A tiny STRICT XML tokenizer. Not a regex strip: it builds a tree and refuses anything it
+  //    does not understand (DOCTYPE, ENTITY, CDATA, PIs, unknown entities, stray text). ────────
+  function decodeEnt(v){
+    let bad='';
+    const out=v.replace(/&([^;&\s]{0,12});?/g,(m,e)=>{
+      if(m[m.length-1]!==';'){ bad='bare &'; return ''; }
+      if(ENT[e]) return ENT[e];
+      const n=/^#x([0-9a-f]{1,6})$/i.test(e)?parseInt(e.slice(2),16):/^#\d{1,7}$/.test(e)?+e.slice(1):-1;
+      if(n<=0||n>0x10ffff){ bad='entity &'+e+';'; return ''; }
+      return String.fromCodePoint(n); });
+    return bad?{bad}:{v:out};
+  }
+  function readAttrs(src,re,node){
+    for(;;){
+      re.lastIndex=re.i; const m=re.exec(src); if(!m) return 'malformed tag <'+node.name+'>'; re.i=re.lastIndex;
+      if(m[1]) return m[1]==='/>'?'self':'open';
+      const name=m[2], raw=m[3]!==undefined?m[3]:m[4];
+      if(name.includes(':')) return 'namespaced attribute '+name;
+      if(!NAME.test(name)) return 'bad attribute name';
+      if(node.attrs.length>=MAX_ATTRS) return 'more than '+MAX_ATTRS+' attributes on <'+node.name+'>';
+      if(node.attrs.some(a=>a[0]===name)) return 'duplicate attribute '+name;
+      if(raw.includes('<')) return 'raw < in an attribute';
+      const d=decodeEnt(raw); if(d.bad) return d.bad;
+      node.attrs.push([name,d.v]);
+    }
+  }
+  function parse(src){
+    const TAG=/<([A-Za-z][^\s/>]*)/y, CLOSE=/<\/([^\s>]+)\s*>/y;
+    const AT=/\s*(?:(\/>|>)|([^\s=/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)'))/y;
+    let i=0, root=null, count=0; const stack=[];
+    const head=/^\uFEFF?(<\?xml\s[^<>?]*\?>)?/.exec(src); i=head[0].length;
+    while(i<src.length){
+      if(src.startsWith(CMT_OPEN,i)){ const j=src.indexOf(CMT_CLOSE,i+4); if(j<0) return err('unclosed comment'); i=j+3; continue; }
+      if(src.startsWith('<!',i)) return err('<!DOCTYPE>/<!ENTITY>/CDATA is not allowed');
+      if(src.startsWith('<?',i)) return err('processing instruction');
+      if(src.startsWith('</',i)){ CLOSE.lastIndex=i; const m=CLOSE.exec(src), top=stack.pop();
+        if(!m||!top||m[1]!==top.name) return err('mismatched closing tag'); i=CLOSE.lastIndex; continue; }
+      if(src[i]==='<'){
+        TAG.lastIndex=i; const m=TAG.exec(src); if(!m) return err('malformed tag');
+        if(m[1].includes(':')) return err('namespaced element <'+m[1]+'>');
+        if(!NAME.test(m[1])) return err('bad element name');
+        if(!ELEMENTS.has(m[1])) return err('element <'+m[1]+'> is not allowed');
+        const node={name:m[1],attrs:[],kids:[]};
+        if(++count>MAX_NODES) return err('too many elements');
+        if(stack.length) stack[stack.length-1].kids.push(node);
+        else if(root) return err('more than one root element'); else root=node;
+        AT.i=TAG.lastIndex; const how=readAttrs(src,AT,node);
+        if(how!=='self'&&how!=='open') return err(how);
+        i=AT.i; if(how==='open'){ stack.push(node); if(stack.length>MAX_DEPTH) return err('nested too deep'); }
+        continue; }
+      const j=src.indexOf('<',i), txt=src.slice(i,j<0?src.length:j);
+      if(/\S/.test(txt)) return err('text content is not allowed'); i=j<0?src.length:j;
+    }
+    if(stack.length) return err('unclosed <'+stack[stack.length-1].name+'>');
+    return root?{ok:true,root,count}:err('empty document');
+  }
+  // ── The rules, applied to the parsed tree ─────────────────────────────────────────────────
+  function valueOk(name,v){
+    if(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\\]/.test(v)) return 'control character or backslash in '+name;
+    const u=v.replace(/[\t\n\r]/g,'');             // a URL parser drops these: "java<TAB>script:" IS javascript:
+    if(/(?:^|[^a-z0-9+.-])(?:javascript|vbscript|data):/i.test(u)) return 'script/data URL in '+name;
+    if(/url\s*\(/i.test(v.replace(/url\(\s*#[A-Za-z_][A-Za-z0-9_.-]*\s*\)/g,''))) return 'url() to anything but #id in '+name;
+    // Linear on 300 KB (no [a-z]+ before the colon): any "://", a leading "//", or a special scheme
+    // that a URL parser completes without slashes ("https:evil.example").
+    if(u.includes('://')||/^\s*\/\/|(?:^|[^a-z0-9+.-])(?:https?|ftp|file|wss?):/i.test(u)) return 'external URL in '+name;
+    if(name==='id'&&!ID.test(v)) return 'bad id';
+    return '';                                     // numOctaves: an element's own limit, in stationery-cost (limitsWhy)
+  }
+  // An attribute's verdict: '' keeps it, DROP leaves it out, any other string is why the WHOLE svg is
+  // rejected. The danger rules run first, on EVERY attribute, listed or not, so dropping never launders
+  // an attack: an input that tries to run code or reach outside the document is refused, not cleaned.
+  const DROP={};
+  function attrOk(el,name,v,isRoot){
+    if(/^on/i.test(name)) return 'event handler attribute '+name;
+    if(name==='xmlns') return isRoot&&v===SVG_NS?'':'xmlns other than SVG';
+    if(name==='href') return el==='use'&&/^#[A-Za-z_][A-Za-z0-9_.-]*$/.test(v)?'':'href to anything but #id';
+    if(/^(?:href|src|srcset|style)$/i.test(name)) return 'attribute '+name+' is not allowed';   // a reference, or CSS (a second language)
+    const why=valueOk(name,v); if(why) return why;
+    if(SHAPED[name]) return SHAPED[name](v)?'':DROP;
+    return ATTRS.has(name)?'':DROP;
+  }
+  function walk(node,isRoot,ids,uses,dropped,lim){
+    const keep=[];
+    for(const [k,v] of node.attrs){ const why=attrOk(node.name,k,v,isRoot);
+      if(why===DROP){ dropped.add(k); continue; } if(why) return why;
+      if(k==='id'&&ids.has(v)) return 'duplicate id #'+v;   // the browser draws the FIRST, ids would measure the last
+      keep.push([k,v]); if(k==='id') ids.set(v,node); if(k==='href') uses.push(v.slice(1)); }
+    node.attrs=keep;                                 // a dropped attribute is neither measured nor emitted
+    if(!lim.why) lim.why=limitsWhy(node);           // a SIZE (octaves, a filter's steps or region, stops): noted, and every rule still read
+    for(const kid of node.kids){ const why=walk(kid,false,ids,uses,dropped,lim); if(why) return why; }
+    return '';
+  }
+  function viewBoxOk(root){
+    const vb=(root.attrs.find(a=>a[0]==='viewBox')||[])[1];
+    const n=viewBoxOf(vb);
+    if(n.length!==4||n.some(x=>!isFinite(x))) return 'root needs viewBox="0 0 816 1056"';
+    if(n[0]!==0||n[1]!==0||!(n[2]>0&&n[3]>0)) return 'viewBox must start at 0 0';
+    return Math.abs(n[2]/n[3]-PAGE_W/PAGE_H)<=ASPECT_TOL*(PAGE_W/PAGE_H)?'':'viewBox is not the page shape 816x1056';
+  }
+  const esc=(v)=>v.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  function emit(n,isRoot){
+    let a=n.attrs.filter(x=>!(isRoot&&(x[0]==='width'||x[0]==='height'||x[0]==='xmlns')));
+    if(isRoot) a=[['xmlns',SVG_NS],['width',String(PAGE_W)],['height',String(PAGE_H)]].concat(a);
+    const open='<'+n.name+a.map(x=>' '+x[0]+'="'+esc(x[1])+'"').join('');
+    return n.kids.length?open+'>'+n.kids.map(k=>emit(k,false)).join('')+'</'+n.name+'>':open+'/>';
+  }
+  const byteLen=(s)=>typeof TextEncoder!=='undefined'?new TextEncoder().encode(s).length:s.length*3;
+  // sanitize(svg) -> {ok, svg, reason, dropped, cost}. The OUTPUT is re-serialised from the checked tree, so
+  // what is rendered is exactly what was checked — never the caller's original bytes. `dropped` names
+  // the harmless off-list attributes left out (empty for a design that is exactly on the list).
+  function check(svg,o){
+    const max=(o&&o.maxBytes)||MAX_BYTES;
+    if(typeof svg!=='string'||!svg.trim()) return err('no SVG');
+    if(byteLen(svg)>max) return err('larger than '+Math.round(max/1024)+' KB');
+    const p=parse(svg); if(!p.ok) return p;
+    if(p.root.name!=='svg') return err('root element must be <svg>');
+    const ids=new Map(), uses=[], dropped=new Set(), lim={why:''};
+    const why=walk(p.root,true,ids,uses,dropped,lim)||viewBoxOk(p.root); if(why) return err(why);
+    for(const u of uses) if(!ids.has(u)) return err('<use> points at a missing #'+u);
+    // cost: the budget's price. A loop, a nesting or the depth is a rule: refused as it is; so is the browser's own parse
+    // (R13 round 2: it ran after the flags, so an oversized filter laundered a parse mismatch). Only then `limit`: an element
+    // over its own size; `over`: refused for the budget alone. Only these two may be simplified (simplify).
+    const c=costWhy(p.root,ids), price={cost:c.cost}; if(c.why&&!c.over) return Object.assign(err(c.why),price);
+    const out=emit(p.root,true); if(!domAgrees(out,p.count)) return err('the browser parses it differently');
+    if(lim.why) return Object.assign(err(lim.why),price,{limit:true});
+    if(c.why) return Object.assign(err(c.why),price,{over:true});
+    return {ok:true,svg:out,reason:'',dropped:[...dropped],cost:c.cost};
+  }
+  // Never throws: every caller (the studio's run, the store's loadMine) reads {ok:false, reason}
+  // and SHOWS the reason, so a throw here would strand a spinner or drop the rest of My templates (R5).
+  function sanitize(svg,o){
+    try{ return check(svg,o); }
+    catch(e){ return err('too complex to check · 过于复杂 — '+((e&&e.message)||String(e))); }
+  }
+  // simplify(svg) -> sanitize()'s result, with `note` (ADR 0003 amendment 5). A design refused ONLY for a size is not thrown
+  // away: an element over its own limit (`limit`), or the render-cost budget (`over`), each set only after every other rule
+  // passed. First the limits' own steps (stationery-simplify LIMIT_STEPS) cut each such element down, all at once; then the
+  // budget's steps (SIMPLIFY) take out the effects it prices, one kind at a time. EACH result goes through the whole check
+  // again; the first that passes is the answer. A budget step that saves nothing, or that the check refuses, is undone, so
+  // `note` names only what was taken out. Any other refusal is returned unchanged. A refusal simplify cannot get past is
+  // sanitize()'s own reason with no flag (shown after "Rejected · 已拒绝"); nothing fits the budget, or the call spent its one
+  // work budget or passed its one deadline (stationery-simplify WORK, SIMPLIFY_MS): TOO_COMPLEX, the one result flagged `over`
+  // (shown plain). Neither a limit nor the budget is loosened.
+  const TOO_COMPLEX='Too complex for the iPad to draw · 太复杂，iPad 画不动 — try again or ask for a simpler design · 请重试或要求简单些';
+  const copy=(n)=>({name:n.name,attrs:n.attrs.map((a)=>a.slice()),kids:n.kids.map(copy)});   // depth <= MAX_DEPTH: parse() checked
+  const noteOf=(s)=>{ s=s.filter((x,i)=>!s.slice(i+1).some((y)=>y.of&&y.of===x.of));      // a later step of one kind covers an earlier
+    return 'Simplified to draw fast, without '+s.map((x)=>x.en).join(', ')+' · 已简化：去掉了'+s.map((x)=>x.zh).join('、'); };
+  function simplify(svg,o){
+    // ONE work budget and ONE deadline for the WHOLE call, its first check too (R13 rounds 4 and 5). `o.clock`: the tests'. A
+    // page served without the steps (web.mjs not restarted) has no meter: the try below refuses as before, shown().
+    const X=window.PAStationerySimplify, w=X&&X.meter(o&&o.clock||undefined);
+    const first=sanitize(svg,o); if(first.ok||!first.over&&!first.limit) return first;
+    const shown=()=>Object.assign(err(first.reason),{cost:first.cost});   // sanitize()'s own reason, its flag off
+    const plain=()=>Object.assign(err(TOO_COMPLEX),{over:true,cost:first.cost});   // nothing fits, or the work or time ran out
+    try{
+      // A re-check costs about what the first check took: one that would end past the deadline is not started, and one that
+      // ended past it is not used, though it passed (R13 round 5).
+      const took=w.late('after'), recheck=(next)=>{ w.late('before',took); const r=sanitize(emit(next,true),o); w.late('after'); return r; };
+      let root=parse(svg).root, cost=first.cost, out=[];
+      if(first.limit){ const next=copy(root); out=X.LIMIT_STEPS.filter((s)=>s.run(next,w));   // every element over its limits
+        const r=recheck(next); if(r.ok) return Object.assign(r,{note:noteOf(out)});
+        if(!r.over) return shown();                                        // a limit no step takes out keeps its own reason
+        root=next; cost=r.cost; }
+      for(const step of X.SIMPLIFY){
+        const next=copy(root); if(!step.run(next,w)) continue;               // nothing of this kind in the design
+        const r=recheck(next);
+        if(r.ok) return Object.assign(r,{note:noteOf(out.concat(step))});      // only what the WHOLE check passes is drawn
+        if(r.over&&r.cost<cost){ root=next; cost=r.cost; out.push(step); }   // kept for what it saves, else undone
+      }
+      return plain();
+      // R5: never throws, as sanitize() (the studio's run awaits it). The work budget spent or the deadline passed: it fails
+      // closed, plain (R13 rounds 4 and 5). Any other throw: sanitize()'s own reason, SHOWN after "Rejected".
+    }catch(e){ return X&&e===X.SPENT?plain():shown(); }
+  }
+  // Belt and braces, in the browser only: the platform's own XML parser must read the re-emitted
+  // markup as the same tree. Node (the tests) has no DOMParser and relies on the tokenizer alone.
+  function domAgrees(out,count){
+    if(typeof DOMParser==='undefined') return true;
+    const doc=new DOMParser().parseFromString(out,'image/svg+xml'), r=doc.documentElement;
+    return !!r&&r.localName==='svg'&&r.namespaceURI===SVG_NS&&!doc.getElementsByTagName('parsererror').length
+      &&r.getElementsByTagName('*').length+1===count;
+  }
+  return { PAGE_W, PAGE_H, MAX_BYTES, BUNDLED_MAX_BYTES, MAX_COST:C.MAX_COST, PASS_COST:C.PASS_COST, LAYER_COST:C.LAYER_COST,
+    ELEMENTS:[...ELEMENTS], ATTRS:[...ATTRS], sanitize, simplify, LIMITS:C.LIMITS };
+})();
+</script>

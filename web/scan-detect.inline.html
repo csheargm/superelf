@@ -1,0 +1,203 @@
+<!-- PAScanDetect — finds the slide / screen / sheet in a photo so the straighten editor can start
+     with its corners ON the slide instead of a fixed inset (owner, 2026-11-08: "the camera should
+     try to auto frame the slide"). Inlined by web.mjs into any page carrying PA_SCAN_DETECT
+     (scan-ui carries it, above its own script).
+     API: PAScanDetect.quad(imageData) → [[x,y]×4] (TL,TR,BR,BL, image px) or null when no plausible
+     slide is found. Pure function of {data,width,height}; no DOM, so node runs it as-is in tests.
+     Method, two passes. 1) BRIGHTNESS: a slide is the bright region in a darker room — Otsu
+     threshold, largest bright blob, its four extreme boundary points. 2) EDGES, when 1 finds nothing
+     (owner, 2026-11-08: "also use edge detection so dark slides get framed"): Sobel gradient, the
+     strongest ~6% of pixels vote in a Hough accumulator, every far-apart pair of near-horizontal and
+     of near-vertical lines is intersected into a candidate quad, and the quad whose sides run along
+     edge pixels best wins. Pass 2 also runs when pass 1's blob misses the image centre (a window beside
+     a dark slide). Both passes share the plausibility guards. 3) BEZEL (owner, 2026-11-09: "also crop
+     out the bezel when framing a laptop screen"): the quad from 1 or 2 shrinks to the lit screen when a
+     dark FLAT band runs inside all four of its sides and the screen steps up from it along the whole edge.
+     Known limits (null → the editor's default inset): a sheet no brighter than the desk under it AND
+     with no visible edge, a slide filling the frame. A dark band FLUSH with the slide's edge is cropped
+     off by pass 1, and a bright window or lamp TOUCHING the slide merges into its quad; pass 2 gives up
+     under heavy noise (handles drag back); pass 3 leaves a screen that is OFF (no brighter than its bezel), misses a
+     bezel under ~4 px in the 320 px copy (the Hough side can sit 2 px inside the true edge), and crops a slide whose uniform darker MARGIN surrounds a lighter
+     content area to that content (it looks exactly like a bezel) — the handles drag back out. -->
+<script id="psd-script">
+(function(){
+  if(window.PAScanDetect) return;
+  // Plausibility bounds, as fractions of the image. Outside them the "blob" is the wall or a speck.
+  const MIN_AREA=0.08, MAX_AREA=0.92, MIN_SIDE=0.12, QUAD_FILL_MIN=0.55, QUAD_FILL_MAX=1.6;
+
+  function gray(d,n){ const g=new Uint8Array(n); for(let i=0,j=0;i<n;i++,j+=4) g[i]=(d[j]*299+d[j+1]*587+d[j+2]*114)/1000|0; return g; }
+  // Otsu: the threshold that best separates two brightness classes. No parameters to tune.
+  function otsu(g){ const h=new Uint32Array(256); for(let i=0;i<g.length;i++) h[g[i]]++;
+    const n=g.length; let sum=0; for(let t=0;t<256;t++) sum+=t*h[t];
+    let sb=0,wb=0,best=0,T=128;
+    for(let t=0;t<256;t++){ wb+=h[t]; if(!wb) continue; const wf=n-wb; if(!wf) break;
+      sb+=t*h[t]; const mb=sb/wb, mf=(sum-sb)/wf, v=wb*wf*(mb-mf)*(mb-mf);
+      if(v>best){ best=v; T=t; } }
+    return T; }
+  // Largest 4-connected bright component; ties go to the one holding the image centre.
+  function largestBlob(mask,w,h){ const lab=new Int32Array(w*h), stack=new Int32Array(w*h);
+    let next=1, bestId=0, bestN=0, centreId=0; const c=(h>>1)*w+(w>>1);
+    for(let s=0;s<w*h;s++){ if(!mask[s]||lab[s]) continue;
+      const id=next++; let sp=0,n=0; stack[sp++]=s; lab[s]=id;
+      while(sp){ const p=stack[--sp]; n++; const x=p%w;
+        if(x>0&&mask[p-1]&&!lab[p-1]){ lab[p-1]=id; stack[sp++]=p-1; }
+        if(x<w-1&&mask[p+1]&&!lab[p+1]){ lab[p+1]=id; stack[sp++]=p+1; }
+        if(p>=w&&mask[p-w]&&!lab[p-w]){ lab[p-w]=id; stack[sp++]=p-w; }
+        if(p<w*h-w&&mask[p+w]&&!lab[p+w]){ lab[p+w]=id; stack[sp++]=p+w; } }
+      if(lab[c]===id) centreId=id;
+      if(n>bestN){ bestN=n; bestId=id; } }
+    if(centreId&&centreId!==bestId){ let n=0; for(let i=0;i<w*h;i++) if(lab[i]===centreId) n++;
+      if(n>=bestN*0.5){ bestId=centreId; bestN=n; } }   // the centre blob wins unless it is tiny next to the big one
+    return {lab,id:bestId,n:bestN}; }
+  // Corners = extreme points of the blob: min x+y, max x−y, max x+y, min x−y (TL,TR,BR,BL).
+  function extremes(lab,id,w,h){ let tl=null,tr=null,br=null,bl=null, a=1/0,b=-1/0,c=-1/0,d=1/0;
+    for(let y=0;y<h;y++) for(let x=0;x<w;x++){ if(lab[y*w+x]!==id) continue;
+      const s=x+y, t=x-y;
+      if(s<a){ a=s; tl=[x,y]; } if(t>b){ b=t; tr=[x,y]; } if(s>c){ c=s; br=[x,y]; } if(t<d){ d=t; bl=[x,y]; } }
+    return tl&&[tl,tr,br,bl]; }
+  const shoelace=q=>{ let s=0; for(let i=0;i<4;i++){ const [x0,y0]=q[i],[x1,y1]=q[(i+1)%4]; s+=x0*y1-x1*y0; } return Math.abs(s)/2; };
+  const convex=q=>{ let sgn=0; for(let i=0;i<4;i++){ const [ax,ay]=q[i],[bx,by]=q[(i+1)%4],[cx,cy]=q[(i+2)%4];
+    const z=(bx-ax)*(cy-by)-(by-ay)*(cx-bx); if(!z) continue; if(sgn&&Math.sign(z)!==sgn) return false; sgn=Math.sign(z); } return !!sgn; };
+  const FRAME_EPS=0.03, isFrame=(q,w,h)=>q.every(([x,y])=>(x<w*FRAME_EPS||x>w*(1-FRAME_EPS))&&(y<h*FRAME_EPS||y>h*(1-FRAME_EPS)));
+  const minSide=q=>Math.min(...q.map((p,i)=>Math.hypot(p[0]-q[(i+1)%4][0],p[1]-q[(i+1)%4][1])));
+
+  // Shared guards: a quad is plausible when convex, with sides ≥ MIN_SIDE of the short edge, an area
+  // inside the bounds, and not the frame itself.
+  function plausible(q,w,h){ if(!q||!convex(q)) return false; const a=shoelace(q), n=w*h;
+    return a>=n*MIN_AREA && a<=n*MAX_AREA && minSide(q)>=Math.min(w,h)*MIN_SIDE && !isFrame(q,w,h); }
+
+  // Pass 1 — the bright blob.
+  function byBrightness(g,w,h){ const n=w*h, T=otsu(g);
+    const mask=new Uint8Array(n); let bright=0; for(let i=0;i<n;i++){ if(g[i]>T){ mask[i]=1; bright++; } }
+    if(bright<n*MIN_AREA||bright>n*MAX_AREA) return null;              // flat image, or the whole frame is the slide
+    const blob=largestBlob(mask,w,h); if(blob.n<n*MIN_AREA) return null;
+    const q=extremes(blob.lab,blob.id,w,h); if(!q) return null;
+    const area=shoelace(q);
+    if(area<blob.n*QUAD_FILL_MIN||area>blob.n*QUAD_FILL_MAX) return null;   // blob is not quad-shaped (a lamp, a hand)
+    return plausible(q,w,h)?q:null; }                                   // isFrame: the bright blob IS the wall (dark slide on it)
+
+  // Pass 2 — the edges. Sobel on a 3×3-blurred gray; the strongest EDGE_FRACTION of pixels are edges.
+  const EDGE_FRACTION=0.06, TOP_FRACTION=0.005, STRONG_REL=0.25, EDGE_FLOOR=40, THETAS=180, PEAK_MAX=48, FAMILY_MAX=12, PAIR_MAX_DEG=30, MIN_VOTES=0.4, NMS_DEG=2, NMS_PX=3;
+  // The gradient level that `count` pixels reach or exceed (a percentile from the top).
+  const fromTop=(hist,count)=>{ let t=hist.length-1, acc=0; for(;t>1;t--){ acc+=hist[t]; if(acc>=count) break; } return t; };
+  function edges(g,w,h){ const n=w*h, b=new Uint8Array(n), mag=new Uint16Array(n), hist=new Uint32Array(1024);
+    for(let y=1;y<h-1;y++) for(let x=1;x<w-1;x++){ const i=y*w+x;
+      b[i]=(g[i-w-1]+g[i-w]+g[i-w+1]+g[i-1]+g[i]+g[i+1]+g[i+w-1]+g[i+w]+g[i+w+1])/9|0; }
+    for(let y=2;y<h-2;y++) for(let x=2;x<w-2;x++){ const i=y*w+x;
+      const gx=(b[i-w+1]+2*b[i+1]+b[i+w+1])-(b[i-w-1]+2*b[i-1]+b[i+w-1]), gy=(b[i+w-1]+2*b[i+w]+b[i+w+1])-(b[i-w-1]+2*b[i-w]+b[i-w+1]);
+      const m=Math.min(1023,Math.abs(gx)+Math.abs(gy)); mag[i]=m; hist[m]++; }
+    // Threshold: the strongest EDGE_FRACTION of pixels — but never above STRONG_REL of the near-max
+    // gradient. A slide full of high-contrast text has more text-edge pixels than the fraction allows,
+    // and a fixed percentile then throws the slide's own (weaker) edges away before Hough sees them.
+    // EDGE_FLOOR wins last: a clean photo (the ≤320 px copy averages sensor noise away) has its
+    // top 6% down in the noise bins, and the floor is what keeps those out — not the percentile.
+    const T=Math.max(EDGE_FLOOR,Math.min(fromTop(hist,n*EDGE_FRACTION),Math.round(fromTop(hist,n*TOP_FRACTION)*STRONG_REL)));
+    if(hist.subarray(T).reduce((a,b)=>a+b,0)<Math.min(w,h)) return null;   // fewer edge pixels than one short side: nothing to frame
+    const px=[], near=new Uint8Array(n); let nn=0;                      // near: an edge pixel within 1 px (3×3 dilation), for side support
+    for(let i=0;i<n;i++) if(mag[i]>=T){ px.push(i); const x=i%w, y=(i-x)/w;
+      for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){ const xx=x+dx, yy=y+dy; if(xx>=0&&xx<w&&yy>=0&&yy<h&&!near[yy*w+xx]){ near[yy*w+xx]=1; nn++; } } }
+    return {px,near,density:nn/n}; }                                    // density: what a RANDOM side would score; support is measured above it
+  function hough(px,w,h){ const D=Math.ceil(Math.hypot(w,h)), R=2*D+1, acc=new Uint32Array(THETAS*R);
+    const cs=new Float32Array(THETAS), sn=new Float32Array(THETAS);
+    for(let t=0;t<THETAS;t++){ const a=t*Math.PI/THETAS; cs[t]=Math.cos(a); sn[t]=Math.sin(a); }
+    for(const i of px){ const x=i%w, y=(i-x)/w; for(let t=0;t<THETAS;t++){ acc[t*R+Math.round(x*cs[t]+y*sn[t])+D]++; } }
+    // Peaks: local maxima over ±NMS_DEG / ±NMS_PX with enough votes to be a slide edge, strongest first.
+    const need=Math.min(w,h)*MIN_SIDE*MIN_VOTES, peaks=[];
+    for(let t=0;t<THETAS;t++) for(let r=0;r<R;r++){ const v=acc[t*R+r]; if(v<need) continue; let top=true;
+      for(let dt=-NMS_DEG;dt<=NMS_DEG&&top;dt++){ const tt=(t+dt+THETAS)%THETAS; for(let dr=-NMS_PX;dr<=NMS_PX;dr++){ const rr=r+dr; if(rr<0||rr>=R) continue;
+        const u=acc[tt*R+rr]; if(u>v||(u===v&&(dt<0||(dt===0&&dr<0)))){ top=false; break; } } }
+      if(top) peaks.push({t,rho:r-D,v}); }
+    peaks.sort((a,b)=>b.v-a.v); return peaks.slice(0,PEAK_MAX); }
+  // Every nearly-parallel pair in a family that is at least `gap` apart.
+  function pairs(fam,gap){ const out=[]; for(let i=0;i<fam.length;i++) for(let j=i+1;j<fam.length;j++){ const a=fam[i], b=fam[j];
+      if(Math.abs(a.t-b.t)<=PAIR_MAX_DEG&&Math.abs(a.rho-b.rho)>=gap) out.push([a,b]); } return out; }
+  function cross(a,b){ const a1=Math.cos(a.t*Math.PI/THETAS), b1=Math.sin(a.t*Math.PI/THETAS), a2=Math.cos(b.t*Math.PI/THETAS), b2=Math.sin(b.t*Math.PI/THETAS);
+    const det=a1*b2-a2*b1; if(Math.abs(det)<1e-6) return null; return [(a.rho*b2-b.rho*b1)/det,(a1*b.rho-a2*a.rho)/det]; }
+  // How much of a side runs along edge pixels (0..1), sampled every ~2 px. The caller subtracts the
+  // image's edge density, so a side through noise or dense texture scores ~0, not 1.
+  function support(near,w,h,p,q){ const L=Math.hypot(q[0]-p[0],q[1]-p[1]), k=Math.max(2,Math.round(L/2)); let hit=0;
+    for(let i=0;i<=k;i++){ const x=Math.round(p[0]+(q[0]-p[0])*i/k), y=Math.round(p[1]+(q[1]-p[1])*i/k);
+      if(x>=0&&x<w&&y>=0&&y<h&&near[y*w+x]) hit++; } return hit/(k+1); }
+  // AREA_TIEBREAK is large on purpose: a block of text is fully edge-supported from the inside, and
+  // only its smaller area tells it from the slide around it.
+  const SUPPORT_MIN=0.5, AREA_TIEBREAK=0.3;
+  function quadOf(hp,vp,w,h){ const pts=[]; for(const a of hp) for(const b of vp){ const c=cross(a,b); if(!c) return null; pts.push(c); }
+    const cx=(pts[0][0]+pts[1][0]+pts[2][0]+pts[3][0])/4, cy=(pts[0][1]+pts[1][1]+pts[2][1]+pts[3][1])/4;
+    pts.sort((p,q)=>Math.atan2(p[1]-cy,p[0]-cx)-Math.atan2(q[1]-cy,q[0]-cx));          // around the centre, clockwise in screen coords
+    let k=0; for(let i=1;i<4;i++) if(pts[i][0]+pts[i][1]<pts[k][0]+pts[k][1]) k=i;        // start at TL
+    const q=[0,1,2,3].map(i=>pts[(k+i)%4]);
+    if(q.some(([x,y])=>x<-w*0.05||x>w*1.05||y<-h*0.05||y>h*1.05)) return null;         // a corner well outside the photo: not the slide
+    return q.map(([x,y])=>[Math.round(Math.max(0,Math.min(w,x))),Math.round(Math.max(0,Math.min(h,y)))]); }
+  // The quad is the candidate whose four sides run along edge pixels best. A slide full of text has
+  // long text edges that out-VOTE its own top and bottom, but a text line has gaps between words and
+  // the slide's edge does not; the larger of two equally supported quads wins (the text sits inside).
+  function byEdges(g,w,h){ const e=edges(g,w,h); if(!e) return null;
+    const peaks=hough(e.px,w,h), gap=Math.min(w,h)*MIN_SIDE, n=w*h;
+    // t is the NORMAL's angle. The vertical family wraps at 180° (t=175 is the same direction as
+    // t=−5 with rho negated), so it is unwrapped into (−45°,45°] and rho made continuous.
+    const horiz=peaks.filter(p=>p.t>=45&&p.t<135).slice(0,FAMILY_MAX);
+    const vert=peaks.filter(p=>p.t<45||p.t>=135).map(p=>p.t>=135?{t:p.t-THETAS,rho:-p.rho,v:p.v}:p).slice(0,FAMILY_MAX);
+    let best=null, bs=0;
+    for(const hp of pairs(horiz,gap)) for(const vp of pairs(vert,gap)){ const q=quadOf(hp,vp,w,h); if(!q||!plausible(q,w,h)) continue;
+      let min=1, sum=0; for(let i=0;i<4;i++){ const sp=support(e.near,w,h,q[i],q[(i+1)%4])-e.density; if(sp<min) min=sp; sum+=sp; }
+      if(min<SUPPORT_MIN) continue;                                     // one side with no edge of its own: a text line's end, or noise
+      const sc=sum/4+AREA_TIEBREAK*shoelace(q)/n; if(sc>bs){ bs=sc; best=q; } }
+    return best; }
+
+  // Is the image centre inside the quad? The slide is what the photo was aimed at; a bright blob
+  // that misses the centre (a window beside a dark slide) is not it, and the edge pass gets its turn.
+  const holdsCentre=(q,w,h)=>{ const x=w/2,y=h/2; let sgn=0; for(let i=0;i<4;i++){ const [ax,ay]=q[i],[bx,by]=q[(i+1)%4];
+    const z=(bx-ax)*(y-ay)-(by-ay)*(x-ax); if(!z) continue; if(sgn&&Math.sign(z)!==sgn) return false; sgn=Math.sign(z); } return true; };
+
+  // Pass 3 — the bezel. A laptop's bezel is a dark FLAT band inside the quad on all four sides, and
+  // the lit screen steps up from it along the WHOLE inner edge, in a straight line; a line of text
+  // steps up only where the words are (STEP_COVER, FIT_PX), and a dark slide's margin is the same
+  // shade as the slide's background (the interior MEDIAN, not the mean: text is the minority of
+  // pixels), so neither is cropped.
+  const BEZEL_MAX=0.3, BEZEL_STEP=12, BEZEL_FLAT=12, STEP_COVER=0.8, FIT_PX=2, ROW_K=60, MEDIAN_K=24;
+  // The bezel's inner edge along one side, or null. For each of ROW_K samples along the middle 80% of
+  // the side, walk inward along the unit normal (nx,ny): the depth where the gray first steps
+  // BEZEL_STEP above the flat band walked so far (and stays up) is the screen. A line is fitted through
+  // those depths — the inner edge need not be parallel to the side the Hough pass found — and holds
+  // when STEP_COVER of the samples lie within FIT_PX of it. Returns the depths at u=0 and u=1 and the
+  // band's mean gray.
+  function bezelEdge(g,w,h,p,q,nx,ny,dmax){ const at=(u,d)=>{ const x=Math.round(p[0]+(q[0]-p[0])*u+nx*d), y=Math.round(p[1]+(q[1]-p[1])*u+ny*d); return (x>=0&&x<w&&y>=0&&y<h)?g[y*w+x]:0; };
+    const us=[], ds=[]; let band=0;
+    for(let i=0;i<ROW_K;i++){ const u=0.1+0.8*i/(ROW_K-1); let sum=0, lo=255, hi=0, prev=0;
+      // The band is rows 2..d−2: row 1 may hold the outer edge's blend, row d−1 the inner edge's.
+      for(let d=2;d<=dmax;d++){ const v=at(u,d);
+        // The edge lies between the band's last row (d−1) and the step row (d).
+        if(d>=4){ const mean=sum/(d-3); if(v>=mean+BEZEL_STEP&&at(u,d+1)>=mean+BEZEL_STEP/2){ if(hi-lo<=BEZEL_FLAT){ us.push(u); ds.push(d-0.5); band+=mean; } break; } }
+        if(d>=3){ sum+=prev; if(prev<lo) lo=prev; if(prev>hi) hi=prev; } prev=v; } }
+    const need=ROW_K*STEP_COVER; if(us.length<need) return null;
+    const fit=(idx)=>{ let su=0,sd=0,suu=0,sud=0; for(const i of idx){ su+=us[i]; sd+=ds[i]; suu+=us[i]*us[i]; sud+=us[i]*ds[i]; }
+      const n=idx.length, det=n*suu-su*su; if(Math.abs(det)<1e-9) return null; const b=(n*sud-su*sd)/det; return {a:(sd-b*su)/n,b}; };
+    let f=fit(us.map((_,i)=>i)); if(!f) return null;
+    const inl=us.map((_,i)=>i).filter(i=>Math.abs(ds[i]-(f.a+f.b*us[i]))<=FIT_PX); if(inl.length<need) return null;
+    f=fit(inl)||f; return {d0:f.a,d1:f.a+f.b,mean:band/us.length}; }
+  // Median gray over a MEDIAN_K² grid of the quad (bilinear in its corners).
+  function interiorMedian(g,w,h,q){ const v=[]; for(let i=0;i<MEDIAN_K;i++) for(let j=0;j<MEDIAN_K;j++){ const u=(i+0.5)/MEDIAN_K, t=(j+0.5)/MEDIAN_K;
+      const x=Math.round((1-t)*((1-u)*q[0][0]+u*q[1][0])+t*((1-u)*q[3][0]+u*q[2][0])), y=Math.round((1-t)*((1-u)*q[0][1]+u*q[1][1])+t*((1-u)*q[3][1]+u*q[2][1]));
+      if(x>=0&&x<w&&y>=0&&y<h) v.push(g[y*w+x]); }
+    v.sort((a,b)=>a-b); return v.length?v[v.length>>1]:0; }
+  function cropBezel(q,g,w,h){ const cx=(q[0][0]+q[1][0]+q[2][0]+q[3][0])/4, cy=(q[0][1]+q[1][1]+q[2][1]+q[3][1])/4, lines=[]; let band=0;
+    for(let i=0;i<4;i++){ const p=q[i], r=q[(i+1)%4], dx=r[0]-p[0], dy=r[1]-p[1], L=Math.hypot(dx,dy); if(!L) return null;
+      let nx=-dy/L, ny=dx/L; const mx=(p[0]+r[0])/2, my=(p[1]+r[1])/2, toC=nx*(cx-mx)+ny*(cy-my); if(toC<0){ nx=-nx; ny=-ny; }
+      const e=bezelEdge(g,w,h,p,r,nx,ny,Math.floor(2*Math.abs(toC)*BEZEL_MAX)); if(!e) return null;   // every side must have the band
+      const x0=p[0]+nx*e.d0, y0=p[1]+ny*e.d0; lines.push({x:x0,y:y0,dx:r[0]+nx*e.d1-x0,dy:r[1]+ny*e.d1-y0}); band+=e.mean/4; }
+    const inner=[]; for(let i=0;i<4;i++){ const a=lines[(i+3)%4], b=lines[i], det=a.dx*b.dy-a.dy*b.dx; if(Math.abs(det)<1e-6) return null;
+      const t=((b.x-a.x)*b.dy-(b.y-a.y)*b.dx)/det; inner.push([Math.round(a.x+a.dx*t),Math.round(a.y+a.dy*t)]); }
+    if(!plausible(inner,w,h)||interiorMedian(g,w,h,inner)<band+BEZEL_STEP) return null;   // a screen that is off is left at its bezel
+    return inner; }
+
+  function quad(img){
+    const w=img.width, h=img.height, n=w*h; if(!w||!h||!img.data||img.data.length<n*4) return null;
+    const g=gray(img.data,n), b=byBrightness(g,w,h);
+    const r=(b&&holdsCentre(b,w,h))?b:(byEdges(g,w,h)||b); if(!r) return null;
+    return cropBezel(r,g,w,h) || r; }
+  // quadBy runs ONE pass without the bezel crop — a test seam (it ships, harmlessly: no caller but the
+  // tests) that proves the edge pass alone frames a dark slide. It skips quad()'s empty-image guard on purpose.
+  const quadBy=(img,pass)=>{ const w=img.width,h=img.height; const g=gray(img.data,w*h); return (pass==='edges'?byEdges:byBrightness)(g,w,h); };
+  window.PAScanDetect={quad,quadBy};
+})();
+</script>

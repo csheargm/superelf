@@ -1,0 +1,189 @@
+<!-- PATips — first-use tips（首次使用提示）: ONE small bilingual callout beside a new control, the first time
+     that control is on screen for this account (docs/adr/0030-first-use-tips.md). Carried by chat-ui (its
+     PA_TIPS_UI marker, after PA_APP_PREFS_UI), so every PAChat page has it; registered in web.mjs PA_COMPONENTS.
+     WHY. Owner 2026-11-12: "otherwise I really don't know about these new capabilities". Design rule: every
+     new user-facing feature registers a tip in its OWN code, next to the control it explains.
+     RULES (owner: minimalist UI — no tours, no modal walls):
+       - at most ONE tip on screen, and at most one per page open: the rest wait for the next open;
+       - one tap (the tip or its ✕) dismisses it for good; the id joins appPrefs[slug].tipsSeen through
+         PAAppPrefs.patch (merged with the stored list; the shared chain keeps every other key and the
+         prompt override);
+       - placed below the anchor, else above it, clamped inside the viewport; never on top of a small anchor;
+       - a short fade only, none under prefers-reduced-motion; colours from the page's tokens (dark mode).
+       PATips.register({id, anchor, text, when?, priority?}) anchor = element | selector | () => element; when() → bool
+         priority:true  goes ahead of every non-priority tip (owner 2026-11-13: "Home moved" must not wait
+                        behind older unseen tips), and replaces one already on screen, unseen, so it shows THIS
+                        open. Default false: registration order, as before.
+       PATips.check()   re-look now (a feature that just opened a sheet or dialog calls it)
+       PATips.reset()   forget tipsSeen on the account (Settings: Show tips again · 重新显示提示)
+       PATips.seen() / PATips.current() / PATips.whenIdle() — for tests and hosts.
+     Driven by test/tips.test.mjs over the real component and PAAppPrefs. -->
+<style id="pat-style">
+.pat-tip{position:fixed;z-index:2147483000;display:flex;gap:8px;align-items:flex-start;box-sizing:border-box;
+  max-width:min(320px,calc(100vw - 16px));padding:8px 10px;border-radius:10px;font-size:13px;line-height:1.35;
+  background:var(--card,#fff);color:var(--ink,#1d2321);border:1px solid var(--accent,#0f6355);
+  box-shadow:0 4px 14px rgba(0,0,0,.18);opacity:0;transition:opacity .15s ease;cursor:pointer}
+.pat-tip.on{opacity:1}
+.pat-x{flex:none;border:none;background:none;color:var(--muted,#6b7370);font-size:14px;padding:0 2px;cursor:pointer;font-family:inherit}
+@media(prefers-color-scheme:dark){.pat-tip{background:var(--card,#1c2321);color:var(--ink,#e8ecea);box-shadow:0 4px 14px rgba(0,0,0,.5)}}
+@media(prefers-reduced-motion:reduce){.pat-tip{transition:none}}
+</style>
+<script id="pat-script">
+(function(){
+  if(window.PATips) return;
+  const PREF='tipsSeen';
+  const EDGE_PX=8, GAP_PX=6;                  // viewport margin; space between anchor and tip
+  const CLOSE='Dismiss · 关闭';
+  const regs=[];                              // [{id, anchor, text, when}] in registration order
+  const MAX_W_PX=320;                         // tip width cap, also bounded by the viewport
+  let seen=null, failed=false, loading=null, cur=null, shown=false, waiting=false, chain=Promise.resolve();
+  const prefs=()=>window.PAAppPrefs;
+  const later=f=>(typeof window.requestAnimationFrame==='function'?window.requestAnimationFrame(f):queueMicrotask(f));
+  const listOf=v=>Array.isArray(v)?v.filter(x=>typeof x==='string'):[];
+
+  function load(){
+    if(loading) return loading;
+    const p=prefs();
+    // No PAAppPrefs, or a refused read: tips do NOT show. Failing quiet is the intended behaviour (R5 case c):
+    // a tip is a hint, not data, and showing it with no way to remember the dismissal would nag on every open.
+    if(!p){ failed=true; loading=Promise.resolve(); return loading; }
+    loading=p.read().then(r=>{ if(r&&r.ok){ seen=new Set(listOf(r.prefs[PREF])); failed=false; } else failed=true; });
+    chain=loading; return loading;
+  }
+  function resolve(a){
+    try{ const el=typeof a==='function'?a():typeof a==='string'?document.querySelector(a):a; return el&&el.getBoundingClientRect?el:null; }
+    catch(_){ return null; }   // an anchor callback that throws means "not on screen"; the tip waits (R5 case c)
+  }
+  function visible(el){
+    const r=el.getBoundingClientRect(), H=window.innerHeight||0, W=window.innerWidth||0;
+    return r.width>0&&r.height>0&&r.bottom>0&&r.right>0&&r.top<H&&r.left<W;
+  }
+  const onScreen=el=>!!el.isConnected&&visible(el);   // in the document AND (partly) inside the viewport
+  function next(){
+    for(const t of regs){
+      if(seen.has(t.id)) continue;
+      if(t.when&&!t.when()) continue;
+      const el=resolve(t.anchor); if(el&&onScreen(el)) return {t,el};
+    }
+    return null;
+  }
+  // The FIRST show waits two frames: a drawer sliding open or a toolbar settling moves the anchor right after
+  // register/check, and measuring then drew the tip off screen (browser bug 2026-11-12). Re-check after.
+  function check(){
+    if(failed||!seen||cur||shown){ unwatch(); return; }
+    if(waiting) return;
+    if(!next()){ watch(); return; }
+    waiting=true;
+    later(()=>later(()=>{ waiting=false; if(cur||shown) return; const hit=next(); if(hit) show(hit.t,hit.el); else watch(); }));
+  }
+  // A tip registered BEFORE its anchor renders (the docked note list draws after register) had no re-check
+  // until an unrelated click (browser bug 2026-11-12). While a tip is pending and none is shown, a body
+  // MutationObserver and one IntersectionObserver per resolved anchor re-check, throttled to one frame;
+  // selectors are re-resolved on every check. Both disconnect once a tip shows or nothing is pending.
+  // No observers (old WebKit) or a refused observe: click, scroll, resize and transitionend still re-check,
+  // so the tip is only late, never lost (R5 case c).
+  let mo=null, moPending=false; const ios=new Map();
+  const onSeen=()=>{ if(moPending) return; moPending=true; later(()=>{ moPending=false; check(); }); };
+  function watch(){
+    const pend=regs.filter(t=>!seen.has(t.id)); if(!pend.length){ unwatch(); return; }
+    const MO=window.MutationObserver, IO=window.IntersectionObserver;
+    if(!mo&&typeof MO==='function'&&document.body){
+      try{ mo=new MO(onSeen); mo.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style','hidden']}); }
+      catch(_){ mo=null; }   // fallback triggers above (R5 c)
+    }
+    if(typeof IO==='function') for(const t of pend){
+      const el=resolve(t.anchor); if(!el||ios.has(el)) continue;
+      try{ const io=new IO(onSeen); io.observe(el); ios.set(el,io); }
+      catch(_){ /* fallback triggers above (R5 c) */ }
+    }
+  }
+  function unwatch(){ if(mo){ mo.disconnect(); mo=null; } ios.forEach(io=>io.disconnect()); ios.clear(); }
+  // Below the anchor if it fits, else above, else the side with more room clamped inside the viewport
+  // (only an anchor taller than the screen, like the Bible's verse list, can then be overlapped).
+  // Placement is MEASURED, not assumed: with the note list docked open, chat-ui pushes every body child with
+  // `html.pac-docked>body>* {margin-left:320px}`, and a transformed ancestor would offset a fixed box the same
+  // way (browser bug 2026-11-12: the tip sat a drawer-width too far right, squeezed to a sliver). So the tip
+  // lives on <html> (outside that selector), has an explicit width, and any remaining offset of its containing
+  // block is read back from a probe position and subtracted.
+  function place(tip,el){
+    const W=window.innerWidth||0, H=window.innerHeight||0, w=Math.max(0,Math.min(MAX_W_PX,W-2*EDGE_PX));
+    tip.style.width=w+'px'; tip.style.maxWidth=w+'px'; tip.style.left=EDGE_PX+'px'; tip.style.top=EDGE_PX+'px';
+    const a=el.getBoundingClientRect(), b=tip.getBoundingClientRect(), h=b.height||0;
+    const dx=(b.left||0)-EDGE_PX, dy=(b.top||0)-EDGE_PX;          // containing-block offset (0 when none)
+    let top=a.bottom+GAP_PX;
+    if(top+h>H-EDGE_PX){ const up=a.top-GAP_PX-h; top=up>=EDGE_PX?up:(H-a.bottom>a.top?H-EDGE_PX-h:EDGE_PX); }
+    const left=Math.max(EDGE_PX,Math.min(a.left,W-EDGE_PX-w));   // clamp into [EDGE, W-EDGE-width]
+    tip.style.top=Math.round(Math.max(EDGE_PX,top)-dy)+'px'; tip.style.left=Math.round(left-dx)+'px';
+  }
+  function show(t,el){
+    const tip=document.createElement('div'); tip.className='pat-tip'; tip.setAttribute('role','status'); tip.setAttribute('data-tip',t.id);
+    const txt=document.createElement('span'); txt.textContent=t.text;
+    const x=document.createElement('button'); x.className='pat-x'; x.type='button'; x.textContent='✕'; x.setAttribute('aria-label',CLOSE);
+    tip.appendChild(txt); tip.appendChild(x); (document.documentElement||document.body).appendChild(tip);
+    place(tip,el); cur={t,el,tip,ro:observe(el)}; shown=true; unwatch();
+    tip.addEventListener('click',e=>{ if(e&&e.stopPropagation) e.stopPropagation(); dismiss(); });
+    later(()=>tip.classList.add('on'));
+  }
+  function dismiss(){
+    if(!cur) return chain;
+    const {t,tip}=cur; drop(); if(tip.parentNode) tip.parentNode.removeChild(tip);
+    seen.add(t.id);
+    const stored=listOf((prefs().get()||{})[PREF]);
+    const all=[...new Set([...stored,...seen])];
+    // A refused write leaves the tip dismissed for this open only; it shows again on a later open, which is
+    // the honest outcome (it was not remembered) and costs one more tap, not data (R5 case c).
+    chain=prefs().patch({[PREF]:all}); return chain;
+  }
+  function register(o){
+    if(!o||typeof o.id!=='string'||!o.id||typeof o.text!=='string'||!o.text||!o.anchor) throw new Error('PATips.register: id, text and anchor required');
+    if(!regs.some(r=>r.id===o.id)){
+      const t={id:o.id,anchor:o.anchor,text:o.text,when:typeof o.when==='function'?o.when:null,priority:o.priority===true};
+      const at=t.priority?regs.findIndex(r=>!r.priority):-1;   // after earlier priority tips, before the rest
+      if(at<0) regs.push(t); else regs.splice(at,0,t);
+    }
+    load().then(()=>{ if(o.priority===true&&seen&&!seen.has(o.id)) yieldTo(); later(check); });
+  }
+  // A priority tip arrived while an ordinary one is on screen: that one leaves UNSEEN (it shows on a later
+  // open) and the one-per-open slot is freed for the priority tip. A tip already shown and dismissed this
+  // open keeps the slot: the priority tip waits for the next open (one tip per open).
+  function yieldTo(){
+    if(cur&&!cur.t.priority){ const {tip}=cur; drop(); if(tip.parentNode) tip.parentNode.removeChild(tip); shown=false; }
+  }
+  function reset(){
+    if(!prefs()) return Promise.resolve({ok:false,error:'no PAAppPrefs'});
+    seen=new Set(); failed=false; shown=false;
+    chain=prefs().patch({[PREF]:[]}); return chain;
+  }
+  // The shell re-pushes prefs after the Settings dialog saves: a cleared list there shows tips again.
+  window.addEventListener('message',e=>{ const m=e&&e.data; if(!(m&&m.pa==='prefs')||!seen) return;
+    loading=null; const before=seen.size;
+    load().then(()=>{ if(seen&&seen.size<before) shown=false; later(check); }); });
+  // A shown tip is position:fixed, so it follows its anchor by hand: on scroll (capture: any scroller), resize
+  // and click. An anchor detached, hidden (its panel closed) or scrolled off screen drops the tip UNSEEN — the
+  // user never saw it by its control — so it shows again on a later check; else the tip is re-placed.
+  function follow(){
+    if(!cur) return;
+    if(!onScreen(cur.el)){ const {tip}=cur; drop(); shown=false; if(tip.parentNode) tip.parentNode.removeChild(tip); return; }
+    place(cur.tip,cur.el);
+  }
+  let pending=false;
+  const onScroll=()=>{ if(pending) return; pending=true; later(()=>{ pending=false; follow(); }); };
+  // A CSS layout change (drawer slide, toolbar settling) fires no window resize: observe the anchor AND the
+  // root, re-placing through the same one-pending-frame guard. No ResizeObserver (old WebKit): skip it quietly
+  // — scroll, click, resize and transitionend still re-place, so the tip is only late, never lost (R5 case c).
+  function observe(el){
+    const RO=window.ResizeObserver; if(typeof RO!=='function') return null;
+    try{ const ro=new RO(onScroll); ro.observe(el); if(document.documentElement) ro.observe(document.documentElement); return ro; }
+    catch(_){ return null; }   // same fallback as above: a refused observe leaves the other re-place paths (R5 c)
+  }
+  function drop(){ if(cur&&cur.ro) cur.ro.disconnect(); cur=null; }
+  if(typeof document.addEventListener==='function'){
+    document.addEventListener('transitionend',onScroll,true);   // an ancestor's slide finished: re-place
+    document.addEventListener('click',()=>{ follow(); later(check); },true);
+    document.addEventListener('scroll',onScroll,true);
+  }
+  window.addEventListener('resize',()=>{ if(cur) follow(); else later(check); });
+  window.PATips={register,check,reset,dismiss,PREF,CLOSE,
+    seen:()=>seen?[...seen]:null, current:()=>cur?cur.t.id:null, registered:()=>regs.map(r=>({id:r.id,text:r.text})), whenIdle:()=>chain};
+})();
+</script>

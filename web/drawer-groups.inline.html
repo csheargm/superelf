@@ -1,0 +1,107 @@
+<!-- PADrawerGroups — the shared drawer's list GROUPS（分组）and its jump strip（按月回溯）
+     (docs/plans/note-features.md H). Inlined by web.mjs into any page carrying the PA_DRAWER_GROUPS_UI
+     marker (chat-ui carries it, so every drawer gets it with no app code).
+     The plain list (no search text) is drawn as groups, in this order:
+       ★ Bookmarked · 收藏   — every row with pin:true, while any is (the group IS the bookmark filter)
+       Summaries · 总结      — rows with the #summary tag (the index, through the drawer's tag chips),
+                               entry.summary, or a saved summary's own title (PADrawerSummary.scopeOfLabel)
+       2026 · Nov 十一月 …   — one group per MONTH of the time the list is sorted by, newest first, the
+                               drawer's own day headers kept inside
+     Each group header is sticky and collapses on a tap. The current month and the two fixed groups
+     open by default, older months closed; a tap is remembered per group under the drawer's app prefs
+     (`noteGroups`, through the `prefs` hook the drawer passes: the app iframe is an opaque origin where
+     localStorage throws, so the same server-side per-app prefs the sort order uses carry it).
+     The JUMP STRIP under the search box lists the years and months that have notes; a tap opens that
+     month and scrolls its header into view. A search result stays FLAT (the day list as before).
+     The bookmark star（书签星）: ONE token, --pac-star, a filled amber that keeps a 3:1 contrast on the
+     row background in both themes (test/drawer-groups.test.mjs checks the ratio).
+     API: PADrawerGroups.attach({host, rows, box, items, prefs, redraw, esc, days, ts, tags}) → {html(shown,rowHtml,flat), drawn(), sync(), isOpen(key), toggle(key), jump(key)}
+       days(rows,rowHtml) is the drawer's own day-grouped renderer; ts(row) the time it sorts by; tags(row) the row's tags.
+     Driven for real by test/drawer-groups.test.mjs. -->
+<style id="pdg-style">
+:root{--pac-star:#c47f00}
+.pac-lstar{color:var(--pac-star);font-size:17px;line-height:1;vertical-align:-1px}
+.pac-lgroup{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:6px;padding:9px 12px;font-size:12.5px;font-weight:700;
+  color:var(--text,#111);background:var(--card,#fff);border-bottom:1px solid var(--line,#e6e6e6);cursor:pointer;user-select:none;-webkit-user-select:none}
+.pac-lgroup .pac-lgcaret{width:12px;color:var(--muted,#888);font-size:11px}
+.pac-lgroup .pac-lgn{margin-left:auto;font-weight:500;color:var(--muted,#888);font-size:11.5px}
+.pac-lgroup[aria-expanded="false"]{color:var(--muted,#888)}
+.pac-ljump{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;padding:7px 0 0;font-size:11.5px}.pac-ljump:empty{display:none}
+.pac-ljy{font-weight:700;color:var(--muted,#888);margin-right:2px}.pac-ljy:not(:first-child){margin-left:6px}
+.pac-ljm{font:inherit;font-size:11.5px;font-weight:600;color:var(--accent,#0a7a5a);background:none;border:1px solid var(--line,#e6e6e6);border-radius:999px;padding:1px 7px;cursor:pointer}
+</style>
+<script id="pdg-script">
+(function(){
+  if(window.PADrawerGroups) return;
+  const PINS='pins', SUMS='sums', NONE='none';   // the fixed groups' keys; a month's key is its 'YYYY-MM'; NONE = rows without a usable time
+  const TXT=Object.freeze({ pins:'★ Bookmarked · 收藏', sums:'Summaries · 总结', noDate:'No date · 无日期' });
+  const MONTHS_EN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];   // = PASummaryTitle.MONTHS (pinned equal by the test)
+  const MONTHS_ZH=['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
+  const SUMMARY_TAG='summary';      // the tag the saved summary's first line carries (PADrawerSummary.TXT.firstLine, pinned by the test)
+  const PREF='noteGroups';          // the app pref: {key: 1 (open) | 0 (closed)}, only the groups the user tapped
+  const T=()=>window.PASummaryTitle;   // the summaries' clock and title rule (web/summary-title.inline.html, on every page that has drawer-summary)
+  const now=()=>(T()&&typeof T().now==='function'?T().now():Date.now());   // one clock with the summaries: a test pins it
+  const pad2=n=>String(n).padStart(2,'0');
+  const monthKey=ms=>{ if(!(ms>0)) return NONE; const d=new Date(ms); return d.getFullYear()+'-'+pad2(d.getMonth()+1); };
+  const isMonth=key=>/^\d{4}-\d{2}$/.test(key);
+  const monthLabel=key=>{ const m=Number(key.slice(5,7))-1; return key.slice(0,4)+' · '+MONTHS_EN[m]+' '+MONTHS_ZH[m]; };
+  const labelOf=key=>key===PINS?TXT.pins:key===SUMS?TXT.sums:isMonth(key)?monthLabel(key):TXT.noDate;
+
+  const TIP='Tap ⋯ on a note, then Bookmark; bookmarked notes stay in the ★ group at the top · 点笔记上的 ⋯ 选“收藏”，收藏的笔记置于顶部 ★ 组';
+  function attach(c){
+    if(window.PATips) window.PATips.register({id:'drawer-bookmark',anchor:()=>c.host.querySelector('.pac-lmenu'),text:TIP});   // first-use tip (ADR 0030)
+    const esc=c.esc;
+    let _local={};   // taps made in this session, over the stored prefs (optimistic: the list moves before the save answers)
+    const strip=document.createElement('div'); strip.className='pac-ljump';
+    c.host.querySelector('.pac-lsearch').appendChild(strip);
+    const stored=()=>{ const p=(typeof c.prefs.get==='function'&&c.prefs.get())||{}; return (p[PREF]&&typeof p[PREF]==='object')?p[PREF]:{}; };
+    const state=()=>Object.assign({},stored(),_local);
+    const isOpen=key=>{ const st=state(); if(key in st) return !!st[key]; return key===PINS||key===SUMS||key===monthKey(now()); };
+    // A summary note: the host's own flag, the #summary tag (from the index, via the drawer's tag chips), or a saved summary's title (PASummaryTitle.scopeOfLabel).
+    const isSummary=it=>it.summary===true||(typeof c.tags==='function'&&(c.tags(it)||[]).includes(SUMMARY_TAG))||!!(T()&&typeof T().scopeOfLabel==='function'&&T().scopeOfLabel(String(it.title||''))!==null);
+    const keyOf=it=>it.pin?PINS:isSummary(it)?SUMS:monthKey(c.ts(it));
+    // Groups in list order: the two fixed ones first, then the months as the sorted rows reach them (newest first).
+    function bucket(shown){ const map=new Map();
+      for(const it of shown){ const k=keyOf(it); if(!map.has(k)) map.set(k,[]); map.get(k).push(it); }
+      const keys=[PINS,SUMS].filter(k=>map.has(k)).concat([...map.keys()].filter(k=>k!==PINS&&k!==SUMS));
+      return keys.map(k=>({key:k,rows:map.get(k)})); }
+    const head=(g,open)=>'<div class="pac-lgroup" data-g="'+esc(g.key)+'" role="button" tabindex="0" aria-expanded="'+(open?'true':'false')+'">'+
+      '<span class="pac-lgcaret">'+(open?'▾':'▸')+'</span>'+esc(labelOf(g.key))+'<span class="pac-lgn">'+g.rows.length+'</span></div>';
+    // The list html: flat (a search) = the drawer's day list; else the groups, each open one holding its rows
+    // (the months keep the day headers; the fixed groups list their rows plainly). drawn() is the order the
+    // rows came out in — group by group, closed groups left out — the order a shift-range is measured in:
+    // the pre-group sort would select rows the user cannot see between two they can.
+    let _drawn=[];
+    function html(shown,rowHtml,flat){
+      if(flat){ _drawn=shown.slice(); return c.days(shown,rowHtml); }
+      let out=''; _drawn=[];
+      for(const g of bucket(shown)){ const open=isOpen(g.key); out+=head(g,open); if(!open) continue;
+        _drawn=_drawn.concat(g.rows); out+=(g.key===PINS||g.key===SUMS)?g.rows.map(rowHtml).join(''):c.days(g.rows,rowHtml); }
+      return out; }
+    const drawn=()=>_drawn;
+    // The jump strip: every year and month with a row, newest first; hidden while the box has text.
+    function sync(){ const items=(typeof c.items==='function'&&c.items())||[];
+      if(String(c.box.value||'').trim()){ strip.innerHTML=''; return; }
+      const months=[...new Set(items.map(it=>monthKey(c.ts(it))).filter(isMonth))].sort().reverse();
+      let out='', year='';
+      for(const k of months){ const y=k.slice(0,4); if(y!==year){ year=y; out+='<span class="pac-ljy">'+esc(y)+'</span>'; }
+        out+='<button type="button" class="pac-ljm" data-g="'+esc(k)+'">'+MONTHS_EN[Number(k.slice(5,7))-1]+'</button>'; }
+      strip.innerHTML=out; }
+    // Remembered per group: the list moves at once; the save goes to the app prefs behind it. A refused save
+    // leaves the tap in effect for this session — a view state is not worth reverting under the finger — and
+    // says so once in the console (R5: the drawer's own search line is not about prefs).
+    function set(key,open){ _local[key]=open?1:0; c.redraw();
+      Promise.resolve(c.prefs.set({[PREF]:state()})).then(r=>{ if(r&&r.ok===false) console.warn('[PADrawerGroups] not saved',r.error||''); },e=>console.warn('[PADrawerGroups] not saved',e)); }
+    const toggle=key=>set(key,!isOpen(key));
+    function jump(key){ if(!isOpen(key)) set(key,true); else c.redraw();
+      const h=c.rows.querySelector&&c.rows.querySelector('.pac-lgroup[data-g="'+key+'"]'); if(h&&typeof h.scrollIntoView==='function') h.scrollIntoView({block:'start'}); }
+    // Registered BEFORE the drawer's row-click listener: a header is not a row, but the tap must not fall through.
+    c.rows.addEventListener('click',e=>{ const h=e&&e.target&&e.target.closest&&e.target.closest('.pac-lgroup'); if(!h) return;
+      if(e.stopImmediatePropagation) e.stopImmediatePropagation(); toggle(h.dataset.g); });
+    c.rows.addEventListener('keydown',e=>{ if(e.key!=='Enter'&&e.key!==' ') return; const h=e.target&&e.target.closest&&e.target.closest('.pac-lgroup'); if(!h) return; e.preventDefault(); toggle(h.dataset.g); });
+    strip.addEventListener('click',e=>{ const b=e&&e.target&&e.target.closest&&e.target.closest('.pac-ljm'); if(b) jump(b.dataset.g); });
+    return {html,drawn,sync,isOpen,toggle,jump,keyOf};
+  }
+  window.PADrawerGroups={attach,TXT,PINS,SUMS,NONE,PREF,SUMMARY_TAG,MONTHS_EN,MONTHS_ZH,monthKey,monthLabel,TIP};
+})();
+</script>

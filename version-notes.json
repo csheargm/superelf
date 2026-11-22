@@ -1,0 +1,1340 @@
+{
+  "v5.0.0": {
+    "date": "2026-10-12",
+    "features": [
+      "Journal Design with AI now answers (about 1-3 minutes): designs run with thinking off, show 'Working… m:ss' with a Cancel that stops the job on the server, and use Claude whatever model the Journal's chat is set to",
+      "Tap a design draft to enlarge it · 点按放大: full screen, sharp, on the page's own paper colour",
+      "Settings apply live: config.json is watched and reloaded without a restart; a broken edit keeps the last good settings (ADR 0011)",
+      "Background AI requests (app asks, job drafting) run with thinking off by default, so they answer faster",
+      "A daily job checks the Ollama models; a retired model leaves the model chooser, and the list is reread every time an app opens (ADR 0007)",
+      "One two-tap delete button on every app page (PATwoTap): native confirm/alert/prompt never worked inside the app sandbox (ADR 0005)",
+      "One guarded first read on every app page (PAStore): an app whose data fails to load says so instead of starting empty (ADR 0010)",
+      "REMOVED: the Telegram bot, all its commands and its config keys (telegram_bot_token, allowed_user_ids, schedules, deep_args, users[].telegram_id); briefings and reminders arrive in-app and by email (ADR 0006)",
+      "REMOVED: the test apps badminton, melody-scribe, weekend-trips and test"
+    ],
+    "fixes": [
+      "A failed read no longer starts family, productivity-hub, daily-digest, brainstorm, calendar, rental-hunt or Tasks empty — the next save could overwrite saved data",
+      "Tasks: a change made while a save is still out is saved after it, not dropped",
+      "AI designs are no longer thrown away for harmless SVG attributes such as transform-origin; anything dangerous is still rejected",
+      "Delete buttons in apps work again (confirm() is silently blocked in the app sandbox)",
+      "Retired Ollama models replaced (DeepSeek moves to v4.1 Flash, Qwen to DeepSeek Pro), and a retired model's error now says it was retired",
+      "Security: auto-memory is off on every Claude run, so an app cannot plant text the owner's own chats would load (ADR 0002)",
+      "Security: restricted AI lanes can no longer read or write the Claude CLI's home folder (~/.claude) with file tools (ADR 0012)",
+      "Security: an app's image question never reroutes to Codex; the vision lane must be a local model (ADR 0002)",
+      "Security: a settings reload never writes config.json, and an operator's own --settings always wins over superelf's defaults",
+      "A failed save says 'Data not saved', not 'Note not saved'"
+    ]
+  },
+  "v4.0.0": {
+    "date": "2026-10-11",
+    "features": [
+      "Journal stationery · 信纸: 10 original designs in the Template picker, saved per note and printed",
+      "Journal stationery: Design with AI (describe it, tweak it in words, keep versions in My templates) and From a picture (sharp background with a fade slider, or an AI redraw)",
+      "Pencil log · 发送笔迹日志: an on-device recorder of touch routing (positions and timings only, never handwriting) in the pen's colour-and-size menu",
+      "The version line shows the running build: git commit and the note component's id",
+      "Linux node: install.sh sets up a systemd user service that starts at boot; deploy.sh pulls, checks, restarts and rolls back automatically if the new server is unhealthy",
+      "Guide for running superelf in a Linux VM (or hardened WSL) on a Windows PC as an isolation layer: docs/vm-node.md",
+      "GitHub Actions CI on Linux and Windows for every push; macOS on demand",
+      "REMOVED: the daily brief (每日一报), its daily health line, calendar feed setting and the bot /brief command; every scheduled job now sends its own message",
+      "REMOVED: all email reading (IMAP fetch, ranking, body summaries); the Gmail app password is no longer used and can be revoked"
+    ],
+    "fixes": [
+      "Apple Pencil: strokes no longer vanish while an app is open — the superelf screen behind it is now inert, so iPadOS Scribble cannot take the Pencil",
+      "Apple Pencil: a Pencil that lands during a page-turn animation draws on that same touch, and a pressed Pencil that is not drawing starts a stroke at once",
+      "Apple Pencil: a palm lifting no longer ends the Pencil's stroke, a palm scroll stops when the Pencil lands, and lost capture no longer ends a stroke",
+      "Apple Pencil: a palm on the title row or toolbars can no longer start scrolling, zooming or text selection; buttons still tap",
+      "Eraser: a hovering Pencil no longer erases",
+      "Security: AI requests from apps run restricted even for the owner (no shell commands, writes only to the app's own data), and an app cannot continue the owner's own conversations",
+      "Security: the restricted agent now receives its full instructions; its system prompt was being cut at 2,000 characters",
+      "start.sh / stop.sh find the server in any checkout folder, not only one named personal_agent"
+    ]
+  },
+  "v3.8.0": {
+    "date": "2026-09-27",
+    "features": [
+      "note-ui: undo/redo buttons in text formatting toolbar",
+      "note-ui: \"disable swipe to flip page\" toggle"
+    ],
+    "fixes": []
+  },
+  "v3.7.0": {
+    "date": "2026-09-22",
+    "features": [],
+    "fixes": []
+  },
+  "v3.6.2": {
+    "date": "2026-09-21",
+    "features": [],
+    "fixes": []
+  },
+  "v3.6.1": {
+    "date": "2026-09-21",
+    "features": [],
+    "fixes": []
+  },
+  "v3.6.0": {
+    "date": "2026-09-21",
+    "features": [],
+    "fixes": []
+  },
+  "v3.5.0": {
+    "date": "2026-09-21",
+    "features": [],
+    "fixes": []
+  },
+  "v3.4.1": {
+    "date": "2026-09-21",
+    "features": [],
+    "fixes": []
+  },
+  "v3.4.0": {
+    "date": "2026-09-19",
+    "features": [],
+    "fixes": []
+  },
+  "v3.3.8": {
+    "date": "2026-09-19",
+    "features": [],
+    "fixes": []
+  },
+  "v3.3.7": {
+    "date": "2026-09-19",
+    "features": [],
+    "fixes": []
+  },
+  "v3.3.6": {
+    "date": "2026-09-19",
+    "features": [],
+    "fixes": []
+  },
+  "v3.3.5": {
+    "date": "2026-09-19",
+    "features": [],
+    "fixes": []
+  },
+  "v3.3.4": {
+    "date": "2026-09-19",
+    "features": [],
+    "fixes": []
+  },
+  "v3.3.3": {
+    "date": "2026-09-19",
+    "features": [],
+    "fixes": []
+  },
+  "v3.3.2": {
+    "date": "2026-09-18",
+    "features": [],
+    "fixes": []
+  },
+  "v3.3.1": {
+    "date": "2026-09-17",
+    "features": [],
+    "fixes": []
+  },
+  "v3.3.0": {
+    "date": "2026-09-17",
+    "features": [],
+    "fixes": []
+  },
+  "v3.2.2": {
+    "date": "2026-09-17",
+    "features": [],
+    "fixes": []
+  },
+  "v3.2.1": {
+    "date": "2026-09-17",
+    "features": [],
+    "fixes": []
+  },
+  "v3.2.0": {
+    "date": "2026-09-17",
+    "features": [],
+    "fixes": []
+  },
+  "v3.1.1": {
+    "date": "2026-09-17",
+    "features": [],
+    "fixes": []
+  },
+  "v3.1.0": {
+    "date": "2026-09-17",
+    "features": [],
+    "fixes": []
+  },
+  "v3.0.0": {
+    "date": "2026-09-17",
+    "features": [],
+    "fixes": []
+  },
+  "v2.110.1": {
+    "date": "2026-09-17",
+    "features": [],
+    "fixes": []
+  },
+  "v2.110.0": {
+    "date": "2026-09-17",
+    "features": [],
+    "fixes": []
+  },
+  "v2.109.0": {
+    "date": "2026-09-17",
+    "features": [],
+    "fixes": []
+  },
+  "v2.108.0": {
+    "date": "2026-09-17",
+    "features": [],
+    "fixes": []
+  },
+  "v2.107.0": {
+    "date": "2026-09-17",
+    "features": [],
+    "fixes": []
+  },
+  "v2.106.6": {
+    "date": "2026-09-17",
+    "features": [],
+    "fixes": []
+  },
+  "v2.106.5": {
+    "date": "2026-09-15",
+    "features": [],
+    "fixes": []
+  },
+  "v2.106.4": {
+    "date": "2026-09-15",
+    "features": [],
+    "fixes": []
+  },
+  "v2.106.3": {
+    "date": "2026-09-15",
+    "features": [],
+    "fixes": []
+  },
+  "v2.106.2": {
+    "date": "2026-09-15",
+    "features": [],
+    "fixes": []
+  },
+  "v2.106.1": {
+    "date": "2026-09-15",
+    "features": [],
+    "fixes": []
+  },
+  "v2.106.0": {
+    "date": "2026-09-15",
+    "features": [],
+    "fixes": []
+  },
+  "v2.105.4": {
+    "date": "2026-09-15",
+    "features": [],
+    "fixes": []
+  },
+  "v2.105.3": {
+    "date": "2026-09-15",
+    "features": [],
+    "fixes": []
+  },
+  "v2.105.2": {
+    "date": "2026-09-15",
+    "features": [],
+    "fixes": []
+  },
+  "v2.105.1": {
+    "date": "2026-09-15",
+    "features": [],
+    "fixes": []
+  },
+  "v2.105.0": {
+    "date": "2026-09-15",
+    "features": [],
+    "fixes": []
+  },
+  "v2.104.7": {
+    "date": "2026-09-15",
+    "features": [],
+    "fixes": []
+  },
+  "v2.104.6": {
+    "date": "2026-09-15",
+    "features": [],
+    "fixes": []
+  },
+  "v2.104.5": {
+    "date": "2026-09-15",
+    "features": [],
+    "fixes": []
+  },
+  "v2.104.4": {
+    "date": "2026-09-15",
+    "features": [],
+    "fixes": []
+  },
+  "v2.104.3": {
+    "date": "2026-09-15",
+    "features": [],
+    "fixes": []
+  },
+  "v2.104.2": {
+    "date": "2026-09-15",
+    "features": [],
+    "fixes": []
+  },
+  "v2.104.1": {
+    "date": "2026-09-15",
+    "features": [],
+    "fixes": []
+  },
+  "v2.104.0": {
+    "date": "2026-09-15",
+    "features": [],
+    "fixes": []
+  },
+  "v2.103.0": {
+    "date": "2026-09-15",
+    "features": [],
+    "fixes": []
+  },
+  "v2.102.0": {
+    "date": "2026-09-15",
+    "features": [],
+    "fixes": []
+  },
+  "v2.101.0": {
+    "date": "2026-09-15",
+    "features": [],
+    "fixes": []
+  },
+  "v2.100.0": {
+    "date": "2026-09-15",
+    "features": [],
+    "fixes": []
+  },
+  "v2.99.0": {
+    "date": "2026-09-15",
+    "features": [],
+    "fixes": []
+  },
+  "v2.98.3": {
+    "date": "2026-09-15",
+    "features": [],
+    "fixes": []
+  },
+  "v2.98.2": {
+    "date": "2026-09-15",
+    "features": [],
+    "fixes": []
+  },
+  "v2.98.1": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.98.0": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.97.1": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.97.0": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.96.8": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.96.7": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.96.6": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.96.5": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.96.4": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.96.3": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.96.2": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.96.1": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.96.0": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.95.0": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.94.1": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.94.0": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.93.0": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.92.4": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.92.3": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.92.2": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.92.1": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.92.0": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.91.0": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.90.0": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.89.1": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.89.0": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.88.3": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.88.2": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.88.1": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.88.0": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.87.3": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.87.2": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.87.1": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.87.0": {
+    "date": "2026-09-14",
+    "features": [],
+    "fixes": []
+  },
+  "v2.86.0": {
+    "date": "2026-09-12",
+    "features": [],
+    "fixes": []
+  },
+  "v2.85.2": {
+    "date": "2026-09-12",
+    "features": [],
+    "fixes": []
+  },
+  "v2.85.1": {
+    "date": "2026-09-12",
+    "features": [],
+    "fixes": []
+  },
+  "v2.85.0": {
+    "date": "2026-09-12",
+    "features": [],
+    "fixes": []
+  },
+  "v2.84.0": {
+    "date": "2026-09-12",
+    "features": [],
+    "fixes": []
+  },
+  "v2.83.4": {
+    "date": "2026-09-12",
+    "features": [],
+    "fixes": []
+  },
+  "v2.83.3": {
+    "date": "2026-09-12",
+    "features": [],
+    "fixes": []
+  },
+  "v2.83.2": {
+    "date": "2026-09-12",
+    "features": [],
+    "fixes": []
+  },
+  "v2.83.1": {
+    "date": "2026-09-12",
+    "features": [],
+    "fixes": []
+  },
+  "v2.83.0": {
+    "date": "2026-09-12",
+    "features": [],
+    "fixes": []
+  },
+  "v2.82.1": {
+    "date": "2026-09-12",
+    "features": [],
+    "fixes": []
+  },
+  "v2.82.0": {
+    "date": "2026-09-12",
+    "features": [],
+    "fixes": []
+  },
+  "v2.81.0": {
+    "date": "2026-09-12",
+    "features": [],
+    "fixes": [
+      "journal handwriting palm rejection and performance fixes"
+    ]
+  },
+  "v2.79.0": {
+    "date": "2026-09-12",
+    "features": [],
+    "fixes": []
+  },
+  "v2.78.0": {
+    "date": "2026-09-12",
+    "features": [],
+    "fixes": []
+  },
+  "v2.77.0": {
+    "date": "2026-09-12",
+    "features": [
+      "Select several chats or notes in the drawer and delete them together · 侧栏可多选对话或笔记，一次删除"
+    ],
+    "fixes": []
+  },
+  "v2.76.0": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": [
+      "Asking a follow-up in a verse's chat continues that conversation instead of starting a new one · 追问会接着原对话，不再新开",
+      "Deleting a chat no longer leaves the verse pointing at it · 删除对话后，经文不再指向已删除的对话"
+    ]
+  },
+  "v2.75.0": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.74.2": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.74.1": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.74.0": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.73.1": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.73.0": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.72.6": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.72.5": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.72.4": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.72.3": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.72.2": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.72.1": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.72.0": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.71.5": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.71.4": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.71.3": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.71.2": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.71.1": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.71.0": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.70.0": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.69.0": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.68.0": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.67.0": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.66.0": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.65.0": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.64.0": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.63.0": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.62.0": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.61.0": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.60.0": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.59.0": {
+    "date": "2026-09-11",
+    "features": [],
+    "fixes": []
+  },
+  "v2.58.1": {
+    "date": "2026-09-10",
+    "features": [],
+    "fixes": []
+  },
+  "v2.58.0": {
+    "date": "2026-09-10",
+    "features": [],
+    "fixes": []
+  },
+  "v2.57.0": {
+    "date": "2026-09-10",
+    "features": [],
+    "fixes": []
+  },
+  "v2.56.0": {
+    "date": "2026-09-10",
+    "features": [],
+    "fixes": []
+  },
+  "v2.55.0": {
+    "date": "2026-09-10",
+    "features": [],
+    "fixes": []
+  },
+  "v2.54.0": {
+    "date": "2026-09-10",
+    "features": [],
+    "fixes": []
+  },
+  "v2.53.0": {
+    "date": "2026-09-10",
+    "features": [],
+    "fixes": []
+  },
+  "v2.52.0": {
+    "date": "2026-09-10",
+    "features": [],
+    "fixes": []
+  },
+  "v2.51.0": {
+    "date": "2026-09-10",
+    "features": [],
+    "fixes": []
+  },
+  "v2.50.0": {
+    "date": "2026-09-10",
+    "features": [],
+    "fixes": []
+  },
+  "v2.49.0": {
+    "date": "2026-09-10",
+    "features": [],
+    "fixes": []
+  },
+  "v2.48.0": {
+    "date": "2026-09-10",
+    "features": [],
+    "fixes": []
+  },
+  "v2.47.0": {
+    "date": "2026-09-10",
+    "features": [],
+    "fixes": []
+  },
+  "v2.46.0": {
+    "date": "2026-09-10",
+    "features": [],
+    "fixes": []
+  },
+  "v2.45.0": {
+    "date": "2026-09-10",
+    "features": [],
+    "fixes": []
+  },
+  "v2.44.0": {
+    "date": "2026-09-11",
+    "features": [
+      "简报 · Briefings in the drawer — job results live in the shell now · 简报移入侧栏，任务结果不再藏在应用里",
+      "Running a job by hand also sends it to Telegram · 手动运行的任务会同时推送"
+    ],
+    "fixes": []
+  },
+  "v2.43.0": {
+    "date": "2026-09-10",
+    "features": [
+      "Regenerate your access token from Settings · 可在设置中重新生成访问令牌"
+    ],
+    "fixes": [
+      "Health setup explains what the QR code is for · 健康接入说明二维码用途"
+    ]
+  },
+  "v2.42.0": {
+    "date": "2026-09-10",
+    "features": [
+      "Photograph a meal in the longevity app and see what it found · 在长寿应用里拍照记录饮食"
+    ],
+    "fixes": []
+  },
+  "v2.41.0": {
+    "date": "2026-09-10",
+    "features": [
+      "Health accepts Apple Watch activity, exercise and heart data · 健康数据支持 Apple Watch 活动、运动与心率"
+    ],
+    "fixes": []
+  },
+  "v2.40.2": {
+    "date": "2026-09-10",
+    "features": [],
+    "fixes": [
+      "每日一报 reports each job once, with its latest reading · 每日一报中每个任务只出现一次"
+    ]
+  },
+  "v2.40.1": {
+    "date": "2026-09-09",
+    "features": [],
+    "fixes": [
+      "An app's instructions now apply on every model, not just the fast ones · 应用的指令对所有模型生效"
+    ]
+  },
+  "v2.40.0": {
+    "date": "2026-09-09",
+    "features": [
+      "Each job can pin its own model · 每个任务可单独指定模型"
+    ],
+    "fixes": []
+  },
+  "v2.39.0": {
+    "date": "2026-09-09",
+    "features": [
+      "Say \"every morning tell me X\" in chat and it offers to set it up · 在对话里说“每天早上…”即可创建任务"
+    ],
+    "fixes": []
+  },
+  "v2.38.0": {
+    "date": "2026-09-09",
+    "features": [
+      "Jobs show when they last SAID something, and whether it was delivered · 任务显示上次报告时间与送达状态"
+    ],
+    "fixes": []
+  },
+  "v2.37.1": {
+    "date": "2026-09-09",
+    "features": [],
+    "fixes": [
+      "Run now shows the result instead of just saying it ran · 立即运行会显示结果，而非只提示已运行"
+    ]
+  },
+  "v2.37.0": {
+    "date": "2026-09-09",
+    "features": [
+      "Describe a job in a sentence and the assistant fills it in · 用一句话描述任务，助手自动填写",
+      "Profile keeps a postcode, so local data no longer has to be asked for · 个人资料新增邮编"
+    ],
+    "fixes": []
+  },
+  "v2.36.0": {
+    "date": "2026-09-09",
+    "features": [
+      "A job can ride in 每日一报 instead of sending its own message · 任务结果可并入每日一报，不再各发一条"
+    ],
+    "fixes": []
+  },
+  "v2.35.0": {
+    "date": "2026-09-09",
+    "features": [
+      "Create and edit jobs from Settings — no file editing, no restart · 在设置里新建和编辑任务，无需改文件或重启"
+    ],
+    "fixes": []
+  },
+  "v2.34.0": {
+    "date": "2026-09-09",
+    "features": [
+      "Jobs can be added or changed as files, with no restart · 任务改为文件定义，无需重启"
+    ],
+    "fixes": [
+      "A paused job no longer shows a next run time it will not honour · 暂停的任务不再显示下次运行时间"
+    ]
+  },
+  "v2.33.0": {
+    "date": "2026-09-09",
+    "features": [
+      "Pollen readings now come from a real data source instead of a web search · 花粉数据改为直接读取数据源"
+    ],
+    "fixes": []
+  },
+  "v2.32.0": {
+    "date": "2026-09-09",
+    "features": [
+      "Pages load about 3x smaller, and a return visit downloads nothing at all · 页面体积减少约三分之二，再次打开几乎无需下载"
+    ],
+    "fixes": []
+  },
+  "v2.31.0": {
+    "date": "2026-09-09",
+    "features": [
+      "Reply timing is kept with the answer — reopen a chat and \"took 3.2s\" is still there · 回复用时随对话保存，重新打开仍可见"
+    ],
+    "fixes": [
+      "A reply that took minutes now reads \"3m 00s\" instead of \"180.0s\" · 超过一分钟的用时正确显示"
+    ]
+  },
+  "v2.30.2": {
+    "date": "2026-09-09",
+    "features": [],
+    "fixes": [
+      "A reply that arrives after a reconnect shows how long it took · 重连后的回复也显示用时"
+    ]
+  },
+  "v2.30.1": {
+    "date": "2026-09-09",
+    "features": [],
+    "fixes": [
+      "Tests read the shell as served, so the extracted settings screens are guarded again · 测试读取实际下发的界面"
+    ]
+  },
+  "v2.30.0": {
+    "date": "2026-09-09",
+    "features": [
+      "Shell composer: model picker pill + Verify toggle — choose model and request verification without leaving the chat · 主界面可切换模型并开启校验",
+      "PAChat: live elapsed timer while waiting + 'took Xs' after response · 等待时显示实时计时，回复后显示耗时",
+      "Max concurrent requests configurable from Settings · 最大并发数可在设置中调整"
+    ],
+    "fixes": [
+      "Reconnected responses (pollForResult) now show elapsed time · 断线重连的回复也显示耗时"
+    ]
+  },
+  "v2.29.2": {
+    "date": "2026-09-08",
+    "features": [],
+    "fixes": [
+      "Home now goes home — from the drawer and from inside an app · 主页按钮真正回到主页"
+    ]
+  },
+  "v2.29.1": {
+    "date": "2026-09-08",
+    "features": [],
+    "fixes": [
+      "The app shelf scrolls, so apps past the fold are reachable · 应用列表可滚动，不再被截断",
+      "Sign-in fits and centres on a phone, with readable fields · 登录框在手机上居中显示，字号可读"
+    ]
+  },
+  "v2.29.0": {
+    "date": "2026-09-08",
+    "features": [
+      "A handwritten note names itself by the time you started it, in every app · 手写笔记以创建时间命名，所有应用一致"
+    ],
+    "fixes": []
+  },
+  "v2.28.1": {
+    "date": "2026-09-08",
+    "features": [],
+    "fixes": [
+      "Opening the notes drawer never replaces your note with a blank chat · 打开抽屉不再把笔记换成空白对话"
+    ]
+  },
+  "v2.28.0": {
+    "date": "2026-09-08",
+    "features": [
+      "每日一报 now reads the day — what collides, what is free, what waits on you · 每日一报会解读日程，而非罗列"
+    ],
+    "fixes": []
+  },
+  "v2.27.1": {
+    "date": "2026-09-07",
+    "features": [],
+    "fixes": [
+      "A-/A+ tooltips now mention the long-press reset · 提示长按可恢复默认字号"
+    ]
+  },
+  "v2.27.0": {
+    "date": "2026-09-07",
+    "features": [
+      "Long-press A- or A+ to reset text size to normal · 长按 A-/A+ 恢复默认字号"
+    ],
+    "fixes": []
+  },
+  "v2.26.2": {
+    "date": "2026-09-07",
+    "features": [],
+    "fixes": [
+      "A-/A+ resizes every app, including ones whose CSS uses fixed sizes · 所有应用都能调整字号"
+    ]
+  },
+  "v2.26.1": {
+    "date": "2026-09-07",
+    "features": [],
+    "fixes": [
+      "A-/A+ now really resizes app content, not just the header · 字号按钮真正作用于应用内容"
+    ]
+  },
+  "v2.26.0": {
+    "date": "2026-09-06",
+    "features": [
+      "Release rollup: scheduled alarms, note scrolling and readable pages on phone, font size everywhere · 版本汇总"
+    ],
+    "fixes": []
+  },
+  "v2.25.0": {
+    "date": "2026-09-06",
+    "features": [
+      "Notes stay readable on iPhone — a readable page you pan, not a shrunken one · 手机上笔记不再被缩小"
+    ],
+    "fixes": []
+  },
+  "v2.24.0": {
+    "date": "2026-09-06",
+    "features": [
+      "Note pages scroll, so a tall note is no longer cut off · 笔记可上下滚动，不再被截断"
+    ],
+    "fixes": []
+  },
+  "v2.23.0": {
+    "date": "2026-09-06",
+    "features": [
+      "Main chat shows how long a reply took, with a clearer working indicator · 显示回复用时",
+      "A-/A+ now on the main chat too · 主对话也有字号按钮"
+    ],
+    "fixes": [
+      "Rental Hunt renders markdown instead of showing raw ** · 租房助手正确渲染 markdown"
+    ]
+  },
+  "v2.22.0": {
+    "date": "2026-09-06",
+    "features": [
+      "A-/A+ now resizes every app and the main chat, not just Bible · 字号设置对所有应用生效"
+    ],
+    "fixes": []
+  },
+  "v2.21.3": {
+    "date": "2026-09-06",
+    "features": [],
+    "fixes": [
+      "The notes drawer no longer covers the page you opened · 抽屉不再遮住笔记"
+    ]
+  },
+  "v2.21.2": {
+    "date": "2026-09-06",
+    "features": [],
+    "fixes": [
+      "A new chat no longer leaves the last note highlighted · 新建对话不再高亮旧笔记"
+    ]
+  },
+  "v2.21.1": {
+    "date": "2026-09-06",
+    "features": [],
+    "fixes": [
+      "Text colour now applies to what you type next · 选色后输入即为该颜色",
+      "Text sits on the ruled lines instead of floating between them · 文字对齐横线"
+    ]
+  },
+  "v2.21.0": {
+    "date": "2026-09-06",
+    "features": [
+      "Five alarm sounds, Morning Bird by default, and it rings 3 times · 五种闹钟音，默认晨鸟，响三次"
+    ],
+    "fixes": []
+  },
+  "v2.20.0": {
+    "date": "2026-09-06",
+    "features": [
+      "Alarms can ring out loud after you leave the app · 离开应用后闹钟可出声"
+    ],
+    "fixes": []
+  },
+  "v2.19.1": {
+    "date": "2026-09-06",
+    "features": [],
+    "fixes": [
+      "A blocked notification now says which fix applies · 通知被拒时会说明该怎么解决"
+    ]
+  },
+  "v2.19.0": {
+    "date": "2026-09-06",
+    "features": [
+      "Timers keep running after you leave an app — the alarm still fires · 离开应用后闹钟仍会响"
+    ],
+    "fixes": []
+  },
+  "v2.18.1": {
+    "date": "2026-09-06",
+    "features": [],
+    "fixes": [
+      "Notes/Bible no longer leak a 20s timer on every read · 修复每次读取泄漏计时器"
+    ]
+  },
+  "v2.18.0": {
+    "date": "2026-09-06",
+    "features": [
+      "A newly created app appears at the top of My Apps with a blue dot · 新建应用置顶并标记"
+    ],
+    "fixes": []
+  },
+  "v2.17.0": {
+    "date": "2026-09-06",
+    "features": [
+      "Apps can choose which model they open on · 应用可指定默认模型",
+      "Research app now has the model chooser and Verify · 研究应用支持选择模型与校验"
+    ],
+    "fixes": []
+  },
+  "v2.16.1": {
+    "date": "2026-09-05",
+    "features": [],
+    "fixes": []
+  },
+  "v2.16.0": {
+    "date": "2026-09-05",
+    "features": [
+      "My Apps sorts most-recently-opened first · 常用应用自动置顶",
+      "HTTPS over Tailscale, so the microphone works on iPad · 支持 HTTPS，iPad 可用麦克风",
+      "Voice input for the todo app · 语音记事"
+    ],
+    "fixes": [
+      "A refused sign-in now says why, instead of \"signed out\" · 登录失败会说明原因",
+      "Speech errors are readable, and a blocked mic explains the real cause · 语音错误可读",
+      "resetpin warns to stop the server first, so a password reset cannot be silently undone"
+    ]
+  },
+  "v2.15.0": {
+    "date": "2026-09-05",
+    "features": [],
+    "fixes": []
+  },
+  "v2.14.0": {
+    "date": "2026-09-05",
+    "features": [],
+    "fixes": []
+  },
+  "v2.13.1": {
+    "date": "2026-09-04",
+    "features": [],
+    "fixes": []
+  },
+  "v2.13.0": {
+    "date": "2026-09-02",
+    "features": [],
+    "fixes": []
+  },
+  "v2.12.0": {
+    "date": "2026-09-02",
+    "features": [],
+    "fixes": []
+  },
+  "v2.11.1": {
+    "date": "2026-09-02",
+    "features": [],
+    "fixes": []
+  },
+  "v2.11.0": {
+    "date": "2026-09-02",
+    "features": [],
+    "fixes": []
+  },
+  "v2.10.0": {
+    "date": "2026-09-01",
+    "features": [],
+    "fixes": []
+  },
+  "v2.9.0": {
+    "date": "2026-09-01",
+    "features": [
+      "Jobs · 任务: per-user job & reminder status — schedule, last run, honest audit-derived outcome, Run now · 立即运行",
+      "Node settings · 节点设置: owner-only whitelisted config editor — write-only secrets（密钥只写不读）, per-field validation, Apply & restart · 应用并重启"
+    ],
+    "fixes": []
+  },
+  "v2.8.0": {
+    "date": "2026-09-01",
+    "features": [],
+    "fixes": []
+  },
+  "v2.7.0": {
+    "date": "2026-09-01",
+    "features": [],
+    "fixes": []
+  },
+  "v2.6.0": {
+    "date": "2026-09-01",
+    "features": [],
+    "fixes": []
+  },
+  "v2.5.0": {
+    "date": "2026-09-01",
+    "features": [],
+    "fixes": []
+  },
+  "v2.4.0": {
+    "date": "2026-09-01",
+    "features": [],
+    "fixes": []
+  },
+  "v2.3.0": {
+    "date": "2026-09-01",
+    "features": [
+      "iOS Health ingestion · 健康数据接入: Shortcuts samples flow into the agent, with QR setup",
+      "Health analysis job produces a weekly 健康简报 (health brief)"
+    ],
+    "fixes": [
+      "Hardening fixes from the R13 review of the health pipeline"
+    ]
+  },
+  "v2.2.0": {
+    "date": "2026-08-31",
+    "features": [
+      "Verify · 校验: cross-check important answers across multiple LLMs (Phase C)",
+      "Journal 日记: photo insertion parity + auto-title from the first line",
+      "iOS Health ingestion design locked · 健康数据方案定稿 (metrics, Tailscale, weekly cadence)"
+    ],
+    "fixes": []
+  },
+  "v2.1.3": {
+    "date": "2026-08-31",
+    "features": [
+      "「Allow finger drawing」persists per device · 设备级偏好"
+    ],
+    "fixes": [
+      "Popover 弹窗: trigger indication, opens near its button, outside-tap swallowed",
+      "Finger-draw follow-ups: handwriting vs double-tap conflict, popover scroll hint",
+      "Closing a note/draw surface can close the drawer too"
+    ]
+  },
+  "v2.1.2": {
+    "date": "2026-08-31",
+    "features": [
+      "Maintenance release · 维护版本"
+    ],
+    "fixes": []
+  },
+  "v2.1.1": {
+    "date": "2026-08-31",
+    "features": [
+      "Footer shows the real app version from package.json"
+    ],
+    "fixes": [
+      "App version is read per request — a bump shows without a restart",
+      "Drawer chat row (or +new) reveals the chat surface",
+      "Stale drawer highlight after peeking at a chat from a note"
+    ]
+  },
+  "v2.1.0": {
+    "date": "2026-08-31",
+    "features": [
+      "Bible Notes & Chats merged list with date grouping and filter tabs (All / Notes / Chats)",
+      "Verse-aware note titles (e.g. Hebrews 10:19–22)",
+      "Note ⋯ menu: Rename and Delete",
+      "Finger drawing mode checkbox in Draw tool settings",
+      "Double-tap ink surface to enter text mode",
+      "Version management script (version.sh)"
+    ],
+    "fixes": [
+      "Pen strokes now uniform width — no brush pressure effect",
+      "Notes auto-save when Draw panel closes"
+    ]
+  },
+  "v2.0.0": {
+    "date": "2026-08-31",
+    "features": [
+      "Stable milestone · 稳定里程碑: app feature set frozen, development shifts to the agent",
+      "PANote 手写引擎: Notability-class shared ink/text engine for Bible, Journal, Notes & Chats",
+      "Journal 日记: entries, Timeline/Weekly views, Apple-Pencil handwriting",
+      "Chat 聊天: model chooser + multi-provider routing; Bible verse search (EN/中文)",
+      "Per-app data isolation · 数据隔离: bundles under data/<slug>/, enforced by the broker"
+    ],
+    "fixes": [
+      "iOS selection menu no longer steals Apple-Pencil strokes",
+      "Shell ⋯ menu: actions fire reliably, popups dismiss without side effects"
+    ]
+  },
+  "v1.0.0": {
+    "date": "2026-08-29",
+    "features": [],
+    "fixes": []
+  },
+  "v0.1.0": {
+    "date": "2026-08-27",
+    "features": [],
+    "fixes": []
+  },
+  "3.7.0": {
+    "features": [
+      "One-command install on Windows and macOS: install.ps1 / install.sh check Node, create config.json, create the owner, install the autostart service, and start the node",
+      "Create the owner from the terminal with node setup.mjs — no browser needed on a headless or remote node",
+      "Windows lifecycle: start.ps1 / stop.ps1 / run.ps1, with a Scheduled Task at logon AND at startup"
+    ],
+    "fixes": [
+      "Windows: the Claude and Codex CLIs are spawned without a shell, so the system prompt is no longer shredded and a member-supplied prompt can no longer reach cmd.exe",
+      "Windows: a save whose rename is briefly blocked by a virus scanner retries instead of failing",
+      "Deleting a member now reports it if their workspace could not be set aside, instead of silently leaving it for the next account with that username",
+      "An install can be copied between macOS and Windows: workspace paths in config.json are stored relative to the node",
+      "config.example.json no longer ships one machine's absolute path or a second user that provisioned a stray workspace"
+    ]
+  }
+}

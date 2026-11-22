@@ -1,0 +1,815 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#0f5240" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#0f6355" media="(prefers-color-scheme: light)">
+<title>Longevity</title>
+<style>
+html{font-size:calc(17px * var(--fs,1))}   /* A-/A+ scale, broadcast by the shell (pa:'prefs' fontScale) */
+:root{
+  --bg:#f0f2f0; --card:#fff; --text:#1a1e1c; --muted:#6b7370;
+  --line:#e0e4e2; --accent:#0f6355;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg:#0e1210; --card:#171d1b; --text:#e2e8e5; --muted:#8a9490;
+    --line:#252e2b; --accent:#4dbfa5;
+  }
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font:15px/1.55 -apple-system,system-ui,sans-serif;min-height:100vh;}
+
+/* Nav */
+nav{position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--line);display:flex;gap:0;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+nav button{flex:1;min-width:70px;padding:12px 4px 10px;border:none;background:none;color:var(--muted);font:14px/1 -apple-system,system-ui,sans-serif;cursor:pointer;border-bottom:2px solid transparent;transition:color .15s,border-color .15s;white-space:nowrap;}
+nav button.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
+nav button .icon{display:block;font-size:20px;margin-bottom:2px;}
+
+/* Main */
+main{padding:16px 14px 100px;}
+
+/* Focus card */
+.focus-card{background:var(--accent);color:#fff;border-radius:14px;padding:16px 18px;margin-bottom:20px;}
+.focus-card .label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;opacity:.8;margin-bottom:6px;}
+.focus-card .tip{font-size:16px;line-height:1.45;font-weight:500;}
+.focus-card .pillar{margin-top:8px;font-size:12px;opacity:.7;}
+
+/* Section title */
+.section-title{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:20px 0 8px;}
+
+/* Tip card */
+.tip-card{background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:8px;overflow:hidden;}
+.tip-header{display:flex;align-items:flex-start;gap:10px;padding:14px;cursor:pointer;}
+.tip-icon{font-size:22px;flex-shrink:0;line-height:1;}
+.tip-body{flex:1;}
+.tip-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:2px;}
+.tip-short{font-size:13px;color:var(--muted);line-height:1.4;}
+.tip-chevron{flex-shrink:0;color:var(--muted);font-size:18px;transition:transform .2s;line-height:1;margin-top:2px;}
+.tip-card.open .tip-chevron{transform:rotate(90deg);}
+.tip-detail{display:none;padding:0 14px 14px;border-top:1px solid var(--line);margin-top:0;}
+.tip-card.open .tip-detail{display:block;}
+.tip-detail p{font-size:14px;color:var(--text);line-height:1.55;margin-top:10px;}
+.tip-detail p+p{margin-top:8px;}
+.evidence{display:inline-block;margin-top:8px;font-size:11px;color:var(--muted);background:var(--line);border-radius:4px;padding:2px 6px;}
+
+/* 简报 · Briefings — reuses .tip-card; keeps the rendered markdown body small */
+#br-list .tip-detail h1,#br-list .tip-detail h2,#br-list .tip-detail h3{font-size:13px;margin:10px 0 2px;}
+#br-list .tip-detail ul,#br-list .tip-detail ol{padding-left:1.3em;margin:4px 0;}
+#br-list .tip-detail li,#br-list .tip-detail p{font-size:13.5px;margin:4px 0;color:var(--text);}
+.act-btn{border:1px solid var(--line);background:var(--card);color:var(--accent);border-radius:8px;padding:6px 12px;font-size:13px;margin-right:8px;cursor:pointer;}
+
+/* Tag */
+
+/* Pillars overview */
+.pillars{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px;}
+.pillar-btn{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 10px;text-align:center;cursor:pointer;transition:border-color .15s;}
+.pillar-btn:active,.pillar-btn.sel{border-color:var(--accent);background:var(--accent);color:#fff;}
+.pillar-btn .pi{font-size:28px;display:block;margin-bottom:4px;}
+.pillar-btn .pn{font-size:13px;font-weight:600;}
+.pillar-btn .ps{font-size:11px;opacity:.7;margin-top:2px;}
+
+/* AI section */
+#lv-chat{height:min(70vh,620px);border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card);}
+
+/* Principles */
+.principle{background:var(--card);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:10px 12px;margin-bottom:8px;font-size:14px;line-height:1.5;}
+.principle strong{display:block;margin-bottom:2px;font-size:13px;color:var(--accent);}
+
+/* Hidden sections */
+.section{display:none;}
+.section.active{display:block;}
+</style>
+</head>
+<body>
+
+<nav id="nav">
+  <button class="active" data-tab="home"><span class="icon">🏠</span>Home</button>
+  <button data-tab="diet"><span class="icon">🥗</span>Diet</button>
+  <button data-tab="sleep"><span class="icon">😴</span>Sleep</button>
+  <button data-tab="exercise"><span class="icon">💪</span>Move</button>
+  <button data-tab="spirit"><span class="icon">✝️</span>Spirit</button>
+  <button data-tab="ask"><span class="icon">🤖</span>Ask AI</button>
+</nav>
+
+<main>
+
+<!-- HOME -->
+<div class="section active" id="tab-home">
+  <div class="focus-card" id="daily-focus">
+    <div class="label">Today's Focus</div>
+    <div class="tip" id="focus-tip">Loading…</div>
+    <div class="pillar" id="focus-pillar"></div>
+  </div>
+
+  <!-- 简报 · Briefings — read-only reading surface (weekly 健康简报 and job briefings) -->
+  <div class="section-title" id="br-head" style="cursor:pointer">简报 · Briefings <span id="br-chev">▾</span></div>
+  <div id="br-list"><div class="tip-short" style="color:var(--muted)">Loading…</div></div>
+
+  <!-- 待批准 · Pending approvals — the approval loop（审批闭环）: proposals from
+       briefings, decided here or via the Telegram buttons (one shared queue).
+       Hidden while empty (minimalism: no dead section). -->
+  <div id="act-wrap" style="display:none">
+    <div class="section-title">待批准 · Pending Approvals</div>
+    <div id="act-list"></div>
+  </div>
+
+  <!-- 提醒 · Reminders — every approved reminder listed with its off switch
+       (Remove goes through the shell's confirm dialog). Hidden while empty. -->
+  <div id="rem-wrap" style="display:none">
+    <div class="section-title">提醒 · Reminders</div>
+    <div id="rem-list"></div>
+  </div>
+
+  <!-- 饮食 · Meals — photograph a meal, the node analyzes it. The pipeline (vision, storage,
+       retention, the weekly 健康简报 Meals section) already existed and was reachable only by
+       an iOS Shortcut; this is the in-app way in. -->
+  <div class="section-title">饮食 · Meals</div>
+  <div id="meal-box" style="border:1px solid var(--line,#333);border-radius:10px;padding:12px;margin-bottom:8px">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button id="meal-shot" style="font:inherit;padding:8px 14px;border-radius:8px;border:1px solid var(--line,#333);background:var(--card,#1b201f);color:inherit;cursor:pointer">📷 Photograph a meal · 拍照记录</button>
+      <span id="meal-msg" style="color:var(--muted);font-size:12px"></span>
+    </div>
+    <!-- No hidden <input> here any more: the picker belongs to PAPhoto (web/photo-ui.inline.html),
+         which opens the CAMERA on a phone and the file picker on a laptop. This app's own input
+         was one of the four copies of that code (R1). -->
+    <div id="meal-out" style="margin-top:10px"></div>
+    <div id="meal-recent" style="margin-top:10px"></div>
+  </div>
+
+  <div class="section-title">The Four Pillars</div>
+  <div class="pillars">
+    <div class="pillar-btn" onclick="goTab('diet')">
+      <span class="pi">🥗</span>
+      <div class="pn">Diet</div>
+      <div class="ps">What you eat</div>
+    </div>
+    <div class="pillar-btn" onclick="goTab('sleep')">
+      <span class="pi">😴</span>
+      <div class="pn">Sleep</div>
+      <div class="ps">Recovery & repair</div>
+    </div>
+    <div class="pillar-btn" onclick="goTab('exercise')">
+      <span class="pi">💪</span>
+      <div class="pn">Movement</div>
+      <div class="ps">Strength & endurance</div>
+    </div>
+    <div class="pillar-btn" onclick="goTab('spirit')">
+      <span class="pi">✝️</span>
+      <div class="pn">Spirit</div>
+      <div class="ps">Faith & meaning</div>
+    </div>
+  </div>
+
+  <div class="section-title">First Principles</div>
+  <div class="principle"><strong>Muscle = longevity currency</strong>Skeletal muscle mass predicts survival in aging more than almost any other biomarker. Build and preserve it now.</div>
+  <div class="principle"><strong>VO₂max is the strongest predictor of all-cause mortality</strong>Improving aerobic capacity from "low" to "above average" cuts risk of death in half. It is trainable at any age.</div>
+  <div class="principle"><strong>Sleep is not optional recovery — it is mandatory maintenance</strong>Memory consolidation, immune repair, metabolic reset, and emotional regulation all depend on it.</div>
+  <div class="principle"><strong>Chronic inflammation is the common thread</strong>Poor diet, poor sleep, and stress all drive inflammation. Each pillar matters because each dials it up or down.</div>
+  <div class="principle"><strong>Purpose and community extend healthspan</strong>Social isolation is as harmful as smoking 15 cigarettes/day. Meaning reduces cortisol, reduces inflammation, improves adherence to everything else.</div>
+</div>
+
+<!-- DIET -->
+<div class="section" id="tab-diet">
+  <div class="section-title">Diet — What to eat and when</div>
+  <div id="diet-tips"></div>
+</div>
+
+<!-- SLEEP -->
+<div class="section" id="tab-sleep">
+  <div class="section-title">Sleep — The master recovery tool</div>
+  <div id="sleep-tips"></div>
+</div>
+
+<!-- EXERCISE -->
+<div class="section" id="tab-exercise">
+  <div class="section-title">Movement — Strength & endurance</div>
+  <div id="exercise-tips"></div>
+</div>
+
+<!-- SPIRIT -->
+<div class="section" id="tab-spirit">
+  <div class="section-title">Spiritual Health — Faith & meaning</div>
+  <div id="spirit-tips"></div>
+</div>
+
+<!-- ASK AI -->
+<div class="section" id="tab-ask">
+  <div class="section-title">Ask your health AI</div>
+  <div id="lv-chat"></div>
+  <div class="section-title" style="margin-top:20px;">Quick prompts</div>
+  <div id="quick-prompts"></div>
+</div>
+
+</main>
+
+<!--PA_CHAT_UI-->
+<script>
+// Chat is the shared PAChat component (web/chat-ui.inline.html) — it carries its own broker.
+
+// ── Data ────────────────────────────────────────────────────────────────────
+const TIPS = {
+  diet: [
+    {
+      icon:'🥩', title:'Prioritize protein at every meal',
+      short:'Target ~1.6–2.2 g/kg body weight/day.',
+      detail:`Protein is the rate-limiting nutrient for muscle protein synthesis. Most people eat enough protein to survive but far too little to build and maintain lean mass through middle age and beyond.\n\nAim for 35–50 g per meal (not total). Good sources: eggs, fish, lean meat, Greek yogurt, cottage cheese, legumes. Spreading across meals beats a single large dose.`,
+      evidence:'RCT evidence (protein dose–MPS studies), Attia "Outlive" consensus'
+    },
+    {
+      icon:'🫐', title:'Eat the rainbow — especially dark plants',
+      short:'Polyphenols and fiber reduce inflammation.',
+      detail:`Colorful vegetables and berries supply polyphenols that activate NRF2 (cellular stress response) and feed gut microbiota that produce butyrate — the main fuel for colon cells and a regulator of systemic inflammation.\n\nTarget: ≥30 different plant foods per week. Practical: frozen berries, leafy greens, legumes, cruciferous veg (broccoli, Brussels sprouts).`,
+      evidence:'Cohort data (Tim Spector / ZOE), multiple meta-analyses on polyphenols'
+    },
+    {
+      icon:'⏰', title:'Eat within a consistent 8–12 hour window',
+      short:'Time-restricted eating supports metabolic health.',
+      detail:`Limiting your eating to an 8–12 hour window (e.g. 8 am – 6 pm or 9 am – 7 pm) aligns food intake with your circadian clock, improving insulin sensitivity and reducing late-night caloric surplus without requiring calorie counting.\n\nAvoid eating within 2–3 hours of bedtime — it directly impairs sleep quality and glucose regulation overnight.`,
+      evidence:'Panda lab TRE trials, TREAT trial (human RCT)'
+    },
+    {
+      icon:'🚫', title:'Minimize ultra-processed foods',
+      short:'UPF drives inflammation, weight gain, early mortality.',
+      detail:`Ultra-processed foods (chips, packaged snacks, sugary drinks, most fast food) are engineered to override satiety signals. Even after controlling for calories and nutrients, UPF consumption independently predicts higher all-cause mortality in large prospective cohorts.\n\nPractical rule: if a food has more than 5 ingredients and most are unrecognizable, treat it as occasional — not daily.`,
+      evidence:'NOVA classification cohort studies, Monteiro et al.'
+    },
+    {
+      icon:'🫒', title:'Make olive oil your default fat',
+      short:'Extra-virgin olive oil — the best-studied longevity fat.',
+      detail:`PREDIMED (large Spanish RCT, ~7,000 people) showed a Mediterranean diet supplemented with extra-virgin olive oil reduced major cardiovascular events by ~30% vs low-fat control.\n\nOlive oil's oleocanthal has NSAID-like anti-inflammatory properties. Use generously: drizzle on vegetables, use for low-heat cooking. Combine with fish for an omega-3 + polyphenol double hit.`,
+      evidence:'PREDIMED RCT, multiple meta-analyses'
+    },
+    {
+      icon:'🧂', title:'Manage blood sugar — not just calories',
+      short:'Glucose spikes age cells faster.',
+      detail:`Persistent postprandial glucose spikes trigger advanced glycation end-products (AGEs), oxidative stress, and insulin resistance — all accelerating biological aging.\n\nStrategies: eat protein/fat/fiber before carbohydrates in a meal ("veg first"), choose low-glycemic carbs, go for a 10–15 min walk after eating. A CGM for a 2-week trial is one of the highest-value health experiments you can run.`,
+      evidence:'Glycemic variability studies, Sonnenburg/Gardner CGM research'
+    },
+  ],
+  sleep: [
+    {
+      icon:'🕙', title:'Fix your sleep/wake time — even on weekends',
+      short:'Circadian consistency is the highest-leverage sleep hack.',
+      detail:`Your circadian clock runs on a strict ~24-hour cycle governed by light cues. Social jetlag — sleeping in on weekends — shifts your clock 1–2 hours and impairs insulin sensitivity, mood, and cognition for days.\n\nPick a consistent wake time. Anchor it with morning sunlight (10–30 min outdoor light within 60 min of waking) to set your master clock.`,
+      evidence:'Walker "Why We Sleep", Huberman circadian protocol, multiple cohort studies'
+    },
+    {
+      icon:'🌡️', title:'Cool your room to 65–68°F / 18–20°C',
+      short:'Core body temperature must drop to initiate sleep.',
+      detail:`Sleep onset requires core body temperature to drop ~1–3°F. A cool room (65–68°F) accelerates this. Warm hands and feet (via vasodilation) dissipate core heat — a warm bath 1–2h before bed paradoxically helps by pulling heat out.\n\nAvoid: electric blankets (unless turned off before sleep), sleeping with too many layers.`,
+      evidence:'Walker lab, multiple thermoregulation studies'
+    },
+    {
+      icon:'📵', title:'No screens 60–90 min before bed',
+      short:'Blue light delays melatonin onset by up to 3 hours.',
+      detail:`Artificial light — especially short-wavelength blue light from phones and laptops — suppresses melatonin and signals "daytime" to your brain. Even low-intensity overhead lighting can shift your clock.\n\nAlternatives: dim amber lighting, blue-light glasses (some evidence), paper books, podcast. If you must use a screen: night mode + lowest brightness + arm's length.`,
+      evidence:'Harvard/Czeisler blue light studies, meta-analyses'
+    },
+    {
+      icon:'☕', title:'No caffeine after 2 pm',
+      short:"Caffeine's half-life is 5–7 hours. It's still there at midnight.",
+      detail:`Caffeine's half-life varies 5–7 hours (some people 9–12 hours). A 3 pm coffee still has ~50% of its adenosine-blocking effect at 9 pm, reducing deep slow-wave sleep even when you can fall asleep fine.\n\nFor poor sleepers or those sensitive to caffeine: no caffeine after noon. Consistent morning-only caffeine also sharpens its alerting effect.`,
+      evidence:'Pharmacokinetic data, Lane caffeine sleep studies'
+    },
+    {
+      icon:'🍷', title:'Alcohol destroys sleep architecture — even 1 drink',
+      short:'It sedates but does not create restorative sleep.',
+      detail:`Alcohol suppresses REM sleep in the first half of the night and then causes rebound arousal in the second half. You may fall asleep faster, but overall sleep quality plummets — less deep sleep, more wake time, impaired memory consolidation.\n\nIf you drink socially, front-load it (happy hour, not dinner). Give at least 3 hours between last drink and bedtime.`,
+      evidence:'Alcohol meta-analyses, Walker, WHOOP & Oura user data'
+    },
+    {
+      icon:'😌', title:'Wind-down ritual signals safety to your brain',
+      short:"You can't force sleep — you can only invite it.",
+      detail:`The nervous system must shift from sympathetic (alert) to parasympathetic (rest) for sleep to occur. Predictable, calming pre-sleep rituals — reading, light stretching, gratitude journaling, prayer — train this transition.\n\nAvoid: work email, news, tense conversations, planning tomorrow's agenda within 60 minutes of bedtime. These activate the default mode network and delay sleep onset.`,
+      evidence:'Sleep hygiene RCTs, CBT-I protocols'
+    },
+  ],
+  exercise: [
+    {
+      icon:'🚴', title:'Zone 2 cardio — 150–180 min/week',
+      short:'The foundation of cardiovascular health and metabolic fitness.',
+      detail:`Zone 2 is the intensity where you can hold a conversation but it's slightly uncomfortable — roughly 60–70% max heart rate. At this intensity, mitochondria are working but not overwhelmed, triggering mitochondrial biogenesis (new mitochondria) and fat oxidation.\n\n150–180 min/week of Zone 2 is the minimum dose for meaningful metabolic benefit. Best modes: brisk walking, cycling, rowing, swimming. Works at any age — the older you are, the more important it becomes.`,
+      evidence:'Attia Z2 protocol, Seiler polarized training research'
+    },
+    {
+      icon:'🏋️', title:'Strength train 2–3×/week',
+      short:'Muscle is the organ of longevity.',
+      detail:`After age ~35, you lose 3–8% of muscle mass per decade without resistance training (sarcopenia). Loss accelerates past 60. Muscle mass predicts fall risk, metabolic rate, insulin sensitivity, and survival after cancer, surgery, and serious illness.\n\nFocus: compound movements (squat, hip hinge, push, pull). Progressive overload — add weight or reps over time. You don't need a gym: bodyweight + bands work. Frequency and consistency beat intensity.`,
+      evidence:'Extensive RCT base, meta-analyses on resistance training and mortality'
+    },
+    {
+      icon:'🏃', title:'One VO₂max session/week',
+      short:'High-intensity interval training (HIIT) raises your ceiling.',
+      detail:`VO₂max — maximum oxygen uptake — is the single strongest predictor of all-cause mortality ever measured. Moving from the bottom quartile to the top cuts mortality risk by 4×.\n\n4×4 Norwegian protocol: 4 min at 90–95% max effort, 3 min recovery, ×4. Once/week is enough to move the needle. You can substitute: hill sprints, Tabata-style cycling, stair climbs.`,
+      evidence:'Vaage & Halle VO₂max/mortality data, Norwegian 4×4 RCTs'
+    },
+    {
+      icon:'🚶', title:'Walk more — target 7,000–10,000 steps/day',
+      short:'NEAT (non-exercise activity) matters as much as formal workouts.',
+      detail:`Non-Exercise Activity Thermogenesis (NEAT) — all movement that isn't structured exercise — can account for 300–2,000 calories/day difference between individuals. Sedentary periods between workouts still drive metabolic dysfunction.\n\nPractical: walking meetings, standing desk, short walks after meals (especially after dinner — glucose response improves), park farther away. Postprandial walks of just 10 min meaningfully blunt glucose spikes.`,
+      evidence:'Bassett NEAT research, postprandial glucose walking RCTs'
+    },
+    {
+      icon:'🧘', title:'Prioritize mobility and injury prevention',
+      short:'The best workout is the one you can do consistently for decades.',
+      detail:`Flexibility and joint mobility decline with age unless trained. Injuries are the most common reason people abandon exercise habits. Hip flexor tightness (from sitting) leads to back pain; shoulder impingement comes from poor thoracic mobility.\n\nMinimum: 10 min daily mobility work — hip hinges, shoulder circles, thoracic rotations. Yoga and Pilates build this systematically. The goal: maintain the ability to train hard into your 70s and 80s.`,
+      evidence:'Consistent finding across exercise epidemiology; adherence data'
+    },
+    {
+      icon:'📏', title:'Grip strength — an underrated biomarker',
+      short:'Grip predicts cardiovascular risk and all-cause mortality.',
+      detail:`Grip strength is a proxy for total-body muscle quality and neuromuscular integrity. It predicts cardiovascular events, cognitive decline, and all-cause mortality better than blood pressure in many studies.\n\nTest: use a dynamometer or do dead hangs. Train it with: farmers carries, dead hangs, barbell work, towel pull-ups. Target: men ≥50 kg, women ≥30 kg for low mortality risk.`,
+      evidence:'Rantanen grip strength and mortality meta-analysis, UK Biobank data'
+    },
+  ],
+  spirit: [
+    {
+      icon:'🙏', title:'Daily prayer — anchoring the day in purpose',
+      short:'Structured prayer reduces cortisol and centers priorities.',
+      detail:`Faith practice is among the strongest predictors of longevity and wellbeing in epidemiological research — not because of any single mechanism, but because it integrates community, meaning, stress regulation, and moral framework simultaneously.\n\nMorning prayer (even 5–10 min) activates the prefrontal cortex and inhibits the amygdala's threat-detection — the biological equivalent of "be still and know." Evening reflection closes the loop: gratitude + surrender of what you can't control.`,
+      evidence:'Cohort studies on religious practice and mortality (Koenig, Harvard SPH)'
+    },
+    {
+      icon:'📖', title:'Scripture reading — renewing the mind',
+      short:'Regular Bible reading reshapes cognitive and emotional patterns.',
+      detail:`"Do not conform to the pattern of this world, but be transformed by the renewing of your mind." (Romans 12:2) — This is not metaphor. Repeated engagement with Scripture literally reconfigures neural patterns via synaptic plasticity, the same mechanism behind any cognitive training.\n\nA few minutes of slow, deliberate reading (lectio divina style) is more effective than speed-reading large passages. Let one verse sit. Ask: what is this saying about God? About me?`,
+      evidence:'Neuroplasticity research; spiritual formation literature (Dallas Willard)'
+    },
+    {
+      icon:'🤝', title:'Community — the longevity factor that surprises everyone',
+      short:'Strong social bonds are as protective as quitting smoking.',
+      detail:`Holt-Lunstad's landmark meta-analysis of 148 studies found social isolation increased mortality risk by 29%, comparable to smoking 15 cigarettes/day. "Blue Zone" communities — Sardinia, Okinawa, Loma Linda, Nicoya — all share strong, dense social networks.\n\nFor faith communities: church attendance predicts longevity even after controlling for health behaviors. The mechanism is partly stress buffering, partly accountability, partly shared purpose. Show up when it doesn't feel worth it.`,
+      evidence:'Holt-Lunstad meta-analysis, Blue Zones research (Buettner)'
+    },
+    {
+      icon:'🧘', title:'Sabbath rest — a biological reset',
+      short:'One full day of rest per week is not laziness — it is repair.',
+      detail:`The Sabbath principle is one of the oldest recorded health protocols — rest one day in seven. Modern biology validates it: chronic absence of recovery days elevates cortisol, impairs HRV (heart rate variability), and accelerates cellular senescence.\n\nTrue Sabbath means cessation of productive striving, not just lower output. No email, no planning, no optimization. Worship, walk, eat well, rest, enjoy people. Let your nervous system fully down-regulate.`,
+      evidence:'HRV recovery research; allostatic load literature; Pew Blue Zones data'
+    },
+    {
+      icon:'🙌', title:'Gratitude — rewiring the threat-detection system',
+      short:'Daily gratitude practice measurably improves wellbeing and sleep.',
+      detail:`Emmons & McCullough RCT: participants who wrote 3 things they were grateful for each week reported significantly higher wellbeing, more optimism, fewer physical complaints, and more exercise than controls — after just 10 weeks.\n\nFor believers: gratitude is a form of worship. "Give thanks in all circumstances." (1 Thes 5:18). Evening gratitude journaling (even 3 lines) reduces pre-sleep rumination and shortens sleep onset. Stack it with your wind-down routine.`,
+      evidence:'Emmons & McCullough 2003 RCT; Wood gratitude/sleep studies'
+    },
+    {
+      icon:'💆', title:'Forgiveness — the health practice no one talks about',
+      short:'Holding resentment chronically elevates cortisol and BP.',
+      detail:`Unforgiveness is a low-grade chronic stressor. Studies link it to elevated cortisol, higher blood pressure, impaired immune function, and worse cardiovascular outcomes. Forgiveness interventions (Luskin's model) show measurable reductions in anger, anxiety, and physical stress symptoms.\n\nForgiveness is not excusing — it is releasing your grip on a grievance for your own sake. "Forgive as the Lord forgave you." (Col 3:13). This is both spiritual command and sound medical advice.`,
+      evidence:'Luskin forgiveness studies; Witvliet cardiovascular forgiveness research'
+    },
+  ]
+};
+
+const QUICK_PROMPTS = [
+  'What should I eat for breakfast to maximize energy and blood sugar stability?',
+  'I can only sleep 6 hours tonight — what should I prioritize?',
+  'Design me a 30-minute workout I can do at home with no equipment.',
+  'How can I build a simple daily spiritual practice that fits my busy schedule?',
+  'What supplements actually have strong evidence for longevity?',
+  'How do I start intermittent fasting without losing muscle?',
+  'I feel chronically fatigued — what are the most likely causes?',
+];
+
+// ── Tabs ─────────────────────────────────────────────────────────────────────
+function goTab(name){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.querySelector(`nav button[data-tab="${name}"]`).classList.add('active');
+}
+document.querySelectorAll('nav button').forEach(btn=>{
+  btn.addEventListener('click',()=>goTab(btn.dataset.tab));
+});
+
+// ── Render tips ───────────────────────────────────────────────────────────────
+function renderTips(category, containerId){
+  const tips = TIPS[category];
+  const container = document.getElementById(containerId);
+  container.innerHTML = tips.map((t,i)=>`
+    <div class="tip-card" id="tc-${category}-${i}">
+      <div class="tip-header" onclick="toggleTip('${category}',${i})">
+        <span class="tip-icon">${t.icon}</span>
+        <div class="tip-body">
+          <div class="tip-title">${esc(t.title)}</div>
+          <div class="tip-short">${esc(t.short)}</div>
+        </div>
+        <span class="tip-chevron">›</span>
+      </div>
+      <div class="tip-detail">
+        ${t.detail.split('\n\n').map(p=>`<p>${esc(p)}</p>`).join('')}
+        <span class="evidence">Evidence: ${esc(t.evidence)}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleTip(cat, i){
+  const card = document.getElementById(`tc-${cat}-${i}`);
+  card.classList.toggle('open');
+}
+
+// ── Daily focus ───────────────────────────────────────────────────────────────
+function setDailyFocus(){
+  const allTips = [
+    ...TIPS.diet.map(t=>({...t,pillar:'Diet'})),
+    ...TIPS.sleep.map(t=>({...t,pillar:'Sleep'})),
+    ...TIPS.exercise.map(t=>({...t,pillar:'Movement'})),
+    ...TIPS.spirit.map(t=>({...t,pillar:'Spirit'})),
+  ];
+  // day-of-year for daily rotation
+  const now = new Date();
+  const start = new Date(now.getFullYear(),0,0);
+  const doy = Math.floor((now - start) / 86400000);
+  const tip = allTips[doy % allTips.length];
+  document.getElementById('focus-tip').textContent = tip.title + ' — ' + tip.short;
+  document.getElementById('focus-pillar').textContent = '📌 ' + tip.pillar;
+}
+
+// ── Quick prompts ─────────────────────────────────────────────────────────────
+function renderQuickPrompts(){
+  const el = document.getElementById('quick-prompts');
+  // Event delegation (not inline onclick): a prompt string can contain quotes/brackets
+  // that break an inline handler attribute. data-i + one listener is escape-safe.
+  el.innerHTML = QUICK_PROMPTS.map((p,i)=>`
+    <div class="tip-card" style="cursor:pointer;" data-i="${i}">
+      <div class="tip-header">
+        <div class="tip-body">
+          <div class="tip-short">${esc(p)}</div>
+        </div>
+        <span class="tip-chevron">›</span>
+      </div>
+    </div>
+  `).join('');
+  el.onclick = e => { const c = e.target.closest('.tip-card[data-i]'); if(c) aiChat.prefill(QUICK_PROMPTS[+c.dataset.i]); };
+}
+
+
+// ── AI Ask ────────────────────────────────────────────────────────────────────
+// (Ask AI now handled by the shared PAChat component; mounted in Init below.)
+
+// ── Escape ────────────────────────────────────────────────────────────────────
+function esc(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+renderTips('diet','diet-tips');
+renderTips('sleep','sleep-tips');
+renderTips('exercise','exercise-tips');
+renderTips('spirit','spirit-tips');
+setDailyFocus();
+renderQuickPrompts();
+
+// ── iPhone health import (sleep / exercise), via the shell broker ──
+// A phone Shortcut POSTs to /api/health/ingest; here we read it back and both
+// show it and feed it to the advisor. Numeric ids so we don't collide with PAChat.
+let _lid=0; const _lwait={};
+addEventListener('message',e=>{ const m=e.data; if(m&&m.pa==='res'&&typeof m.id==='number'&&_lwait[m.id]){ _lwait[m.id](m); delete _lwait[m.id]; } });
+const broker=(o)=>new Promise(r=>{ const id=++_lid; _lwait[id]=r; parent.postMessage(Object.assign({pa:'req',id},o),'*'); });
+
+/* ── 饮食 · Meals ─────────────────────────────────────────────────────────────────────────
+   Photograph a meal; the node's vision lane names what is in it and flags the few things the
+   weekly 健康简报 aggregates. Every guard (size, monthly cap, one-at-a-time, retention) lives
+   on the SERVER — this only sends the bytes, so the app cannot get past one by asking
+   differently. An unanalyzed photo is still LOGGED and says so: a silent "saved" that quietly
+   dropped the analysis would be indistinguishable from a working one. */
+const MEAL_MAX_BYTES = 6 * 1024 * 1024;   // mirrors lib/meals.mjs MAX_PHOTO_BYTES
+function mealMsg(t, bad){ const e=document.getElementById('meal-msg'); if(!e) return;
+  e.textContent=t||''; e.style.color = bad ? 'var(--danger,#e08163)' : 'var(--muted)'; }
+
+// The downscale that used to live here (a canvas resize to 1280px, 0.82 JPEG) was the ONLY
+// resize in the tree — which is why a phone photo worked in this one card and blew the cap
+// everywhere else. It is now PAPhoto.toBase64({maxEdge}), reached by every surface (R1/R3).
+// MEAL_PICK_EDGE stays local because it is a MEAL decision, not a global one: a plate has to
+// stay legible to the vision lane, and 1280 is what lib/meals.mjs's cap was sized around.
+const MEAL_PICK_EDGE = 1280;
+// Reachable only if this page were served without PA_PHOTO_UI (it arrives with PAChat, which
+// this app mounts). A button that silently does nothing is what makes an app look broken, so
+// the missing piece is NAMED (R5). Deliberately the HEADING only, not a second copy of
+// chat-ui's full sentence — same rule as PAPhoto's own `bigNoChat` (R3).
+const MEAL_NO_PHOTO = 'Photo component not loaded · 未加载照片组件';
+
+/* The record AS THE SERVER STORES IT (lib/meals.mjs, ingestLocked):
+     { id, ts, date:'YYYY-MM-DD', time:'HH:MM', slot, photo, note?,
+       analyzed:true, isFood, items:[…], flags:{carb_heavy,fried,sugary_drink,vegetables_present} }
+     | { id, ts, date, time, slot, photo, note?, analyzed:false, reason }
+   This card used to read rec.takenAt — a field the store never writes, so NO record ever
+   showed a time — and hunted TOP-LEVEL booleans for its flags, which found the record's own
+   `isFood:true` and printed "isFood" as a dietary flag while the four REAL flags, nested
+   under rec.flags, were never shown at all. A card must describe the record on disk.
+   date/time are the SERVER's local strings, deliberately not re-derived from rec.ts: slot
+   (早餐/午餐/晚餐/加餐) was decided in server-local time, so a browser in another timezone
+   would otherwise print a time that contradicts the slot beside it. */
+const MEAL_FLAG_LABELS = {   // keys pinned against lib/meals.mjs MEAL_FLAGS by test/meals-ui.test.mjs
+  carb_heavy: 'carb-heavy · 精制碳水偏多',
+  fried: 'fried · 油炸',
+  sugary_drink: 'sugary drink · 含糖饮料',
+  vegetables_present: 'vegetables · 有蔬菜',
+};
+function mealCard(rec){
+  if(!rec || typeof rec !== 'object') return '';
+  const analyzed = rec.analyzed !== false;
+  const items = (Array.isArray(rec.items) && rec.items.length) ? rec.items.join('、') : '';
+  const flags = Object.keys(MEAL_FLAG_LABELS).filter(k => rec.flags && rec.flags[k] === true);
+  // THREE distinct outcomes, never collapsed into one line: analyzed food, analyzed
+  // non-food, and not analyzed at all. A photo whose analysis failed is still LOGGED and
+  // says so — rendering it as a clean "saved" would be indistinguishable from a working
+  // analysis, and the weekly 健康简报 would then disagree with what the app showed (R14).
+  const head = !analyzed ? '⚠ logged, not analyzed · 已记录（未分析）'
+    : rec.isFood === false ? 'not food · 非食物'
+    : (items || 'nothing recognized · 未识别出食物');
+  const when = [`${rec.date||''} ${rec.time||''}`.trim(), rec.slot||''].filter(Boolean).join(' · ');
+  // esc() everywhere: items and reason are VISION-LANE output (a remote model) and the
+  // note is user text — none of it may reach innerHTML unescaped.
+  return `<div style="border:1px solid var(--line,#333);border-radius:8px;padding:10px;margin-top:8px">
+    <div style="font-size:13px">${esc(head)}</div>
+    ${flags.length?`<div style="color:var(--muted);font-size:12px;margin-top:4px">${flags.map(k=>esc(MEAL_FLAG_LABELS[k])).join(' · ')}</div>`:''}
+    ${rec.note?`<div style="color:var(--muted);font-size:12px;margin-top:4px">${esc(rec.note)}</div>`:''}
+    <div style="color:var(--muted);font-size:11px;margin-top:4px">${esc(when)}${(!analyzed&&rec.reason)?' — '+esc(String(rec.reason)):''}</div></div>`;
+}
+
+async function mealSend(file){
+  const btn=document.getElementById('meal-shot');
+  if(!file) return;
+  btn.disabled=true; mealMsg('analyzing · 分析中…');
+  document.getElementById('meal-out').innerHTML='';
+  // Read → downscale → pre-flight, all in PAPhoto. `maxBytes` is this ROUTE's own cap; PAPhoto
+  // takes the SMALLER of it and the server's published upload cap, so this card can never
+  // accept what the node will refuse, nor refuse what it would have taken. The refusal
+  // sentence is the shell's own (PAChat.failText) — it names the cap and what to do.
+  if(!window.PAPhoto){ btn.disabled=false; mealMsg(MEAL_NO_PHOTO, true); return; }
+  const enc = await window.PAPhoto.toBase64(file, { maxEdge:MEAL_PICK_EDGE, maxBytes:MEAL_MAX_BYTES, what:'Photo' });
+  if(!enc.ok){ btn.disabled=false; mealMsg(enc.text || enc.error, true); return; }
+  const r = await broker({ kind:'meal-photo', data:enc.data, name:'meal.jpg', takenAt:new Date().toISOString() });
+  btn.disabled=false;
+  // The server's own sentence, not a generic one — it distinguishes a monthly cap from a
+  // busy analyzer from an unreadable image, and the user can act on the difference.
+  if(!r || !r.ok){ mealMsg((r && (r.error || r.text)) || 'could not log that meal · 记录失败', true); return; }
+  mealMsg(r.record && r.record.analyzed === false ? 'logged, not analyzed · 已记录（未分析）' : 'logged · 已记录');
+  document.getElementById('meal-out').innerHTML = mealCard(r.record);
+  loadMeals();
+}
+
+async function loadMeals(){
+  const box=document.getElementById('meal-recent'); if(!box) return;
+  const r = await broker({ kind:'meals', days:3 });
+  if(!r || !r.ok || !Array.isArray(r.meals)){ box.innerHTML=''; return; }   // no history yet is not an error
+  if(!r.meals.length){ box.innerHTML='<div style="color:var(--muted);font-size:12px">No meals logged yet · 暂无记录</div>'; return; }
+  box.innerHTML = '<div style="color:var(--muted);font-size:11px;margin-bottom:4px">Last 3 days · 最近三天</div>'
+    + r.meals.slice(-6).reverse().map(mealCard).join('');
+}
+
+// camera:true → capture="environment" on a phone, the ordinary file picker on a laptop.
+// A CANCELLED sheet is not a failure: it leaves the card exactly as it was, with no message.
+document.getElementById('meal-shot').onclick = async () => {
+  if(!window.PAPhoto){ mealMsg(MEAL_NO_PHOTO, true); return; }
+  const picked = await window.PAPhoto.pick({ camera:true });
+  if(picked.ok) mealSend(picked.files[0]);
+};
+loadMeals();
+let HEALTH=[];
+const fmtSleep=(min)=> (min==null)?null : Math.floor(min/60)+'h'+String(Math.round(min%60)).padStart(2,'0');
+function healthLine(d){ const p=[];
+  if(d.steps!=null) p.push(Number(d.steps).toLocaleString()+' steps');
+  if(d.sleepMinutes!=null) p.push('sleep '+fmtSleep(d.sleepMinutes));
+  if(d.exerciseMinutes!=null) p.push(d.exerciseMinutes+'min exercise');
+  if(d.activeEnergyKcal!=null) p.push(d.activeEnergyKcal+' kcal');
+  if(d.restingHR!=null) p.push('rHR '+d.restingHR);
+  return p.join(' · '); }
+function healthContext(days){ return days.map(d=>d.date+': '+(healthLine(d)||'no data')).join('; '); }
+/* ── 健康数据 · Photograph an Apple Health screen ─────────────────────────────────────────
+   THE DIRECTION CHANGE (PLAN.md "CAMERA AS INPUT", 2026-09-11). This box used to tell the user
+   to "set up the Shortcut to import sleep & exercise" — a route that was never made to work and
+   that asks a family member to BUILD A SHORTCUT. Advertising it was worse than saying nothing.
+   The way in now is a photograph: open Health on the phone, take a picture of the screen, and
+   the model reads it and the conversation carries on from there.
+
+   JUDGEMENT — this reading is NOT written into health.json, unlike a glucose reading in the
+   Diabetes app. Two reasons, and neither is squeamishness:
+     · there is no app→health WRITE path at all (lib/health.mjs is fed by POST
+       /api/health/ingest, a token route built for the Shortcut), so storing would mean a new
+       route, a new broker kind and a new auth surface — a separate piece of work, not a
+       side effect of adding a camera button;
+     · health.json feeds the weekly 健康简报 AND the health jobs. A misread "12,480 steps" as
+       "1,248" entering there silently would be reported to the user as fact by three different
+       surfaces. The glucose path earns its store by making the user tick each value against the
+       photo; nothing equivalent exists here yet.
+   So the photo is stored (uploads/, by the shell) and the READING lives in the conversation and
+   in the advisor's context — visible, discussable, and never mistaken for a measurement. */
+const HEALTH_READ_PROMPT=`This is a photograph of an Apple Health screen (or another health app,
+a scale, a blood-pressure cuff or a wearable). Read out ONLY what is actually legible: the metric
+names, their values and units, and the date or period shown. List them plainly, one per line.
+Then add one short sentence on what stands out. Do not estimate, do not fill in anything that is
+not visible, and say which parts you cannot read.`;
+let HEALTH_SHOT='';            // the model's last reading of a photographed screen — context, not a measurement
+
+function healthBox(){
+  let box=document.getElementById('lv-health');
+  if(!box){ box=document.createElement('div'); box.id='lv-health';
+    box.style.cssText='margin:10px 0;padding:10px 12px;border:1px solid var(--line,#e2e2de);border-radius:10px;font-size:13px';
+    const a=document.getElementById('diet-tips'); if(a&&a.parentNode) a.parentNode.insertBefore(box,a); else document.body.insertBefore(box,document.body.firstChild); }
+  return box;
+}
+function renderHealth(days){
+  const box=healthBox();
+  const head=days.length?'iPhone health · '+esc(days[days.length-1].date):'健康数据 · Health';
+  const line=days.length?(healthLine(days[days.length-1])||'—')
+    :'No imported data · 暂无导入数据 — photograph a Health screen instead 可拍照读取';
+  box.innerHTML='<b>'+head+'</b>'
+    +'<div style="margin-top:4px">'+esc(line)+'</div>'
+    +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">'
+    +'<button id="hs-shot" style="font:inherit;font-size:13px;padding:6px 12px;border-radius:8px;border:1px solid var(--line,#333);background:var(--card,#1b201f);color:inherit;cursor:pointer">📷 Photograph a Health screen · 拍照读取</button>'
+    +'<span id="hs-msg" style="color:var(--muted);font-size:12px"></span></div>'
+    +'<div id="hs-out" style="margin-top:8px;white-space:pre-wrap"></div>';
+  document.getElementById('hs-shot').onclick=healthShot;
+  if(HEALTH_SHOT) document.getElementById('hs-out').textContent=HEALTH_SHOT;
+}
+function healthMsg(t,bad){ const e=document.getElementById('hs-msg'); if(!e) return;
+  e.textContent=t||''; e.style.color=bad?'var(--danger,#e08163)':'var(--muted)'; }
+
+async function healthShot(){
+  const btn=document.getElementById('hs-shot');
+  if(!window.PAPhoto){ healthMsg(MEAL_NO_PHOTO,true); return; }
+  // capture() = camera-first pick + 1600px downscale + the size pre-flight + upload, in one
+  // call. A CANCELLED sheet is not a failure and says nothing.
+  btn.disabled=true; healthMsg('reading · 识别中…');
+  const up=await window.PAPhoto.capture();
+  if(!up.ok){ btn.disabled=false; healthMsg(up.cancelled?'':(up.text||up.error),!up.cancelled); return; }
+  const r=await broker({kind:'ask',
+    message:HEALTH_READ_PROMPT+'\n\n[Attached file: '+(up.name||'health.jpg')+' — saved to workspace/'+up.path+'. Use the Read tool to view it.]'});
+  btn.disabled=false;
+  // R5: the shell already rendered the reason (a 401, a dead lane, a payload cap); show THAT,
+  // not a generic "failed".
+  if(!r||!r.ok||!r.text){ healthMsg((r&&(r.text||r.error))||'could not read that photo · 无法识别照片',true); return; }
+  HEALTH_SHOT=String(r.text);
+  healthMsg('read from a photo · 来自照片 — not a stored measurement 未存入记录');
+  document.getElementById('hs-out').textContent=HEALTH_SHOT;   // textContent: model output never reaches innerHTML
+}
+
+broker({kind:'health',days:7}).then(h=>{
+  HEALTH=(h&&h.ok&&Array.isArray(h.days))?h.days:[];
+  renderHealth(HEALTH);
+  // An unreadable health store is NOT "no data": it used to land in `.catch(()=>{})` — which
+  // broker() can never even reach, since it resolves the reply — and then render as an empty
+  // box forever. Say which it is (R5).
+  if(h&&h.ok===false) healthMsg((h.text||h.error||'could not read health data · 无法读取健康数据'),true);
+});
+
+// ── 简报 · Briefings — read-only list, newest first (server-sorted). Bodies
+// render through the shell's EXISTING markdown renderer (broker kind
+// 'render-md') — no renderer dependency added here.
+function renderBriefings(list){
+  const el=document.getElementById('br-list');
+  if(!list.length){ el.innerHTML='<div class="tip-short" style="color:var(--muted)">No briefings yet · 暂无简报</div>'; return; }
+  el.innerHTML=list.map(b=>`
+    <div class="tip-card" data-bid="${esc(b.id)}">
+      <div class="tip-header">
+        <div class="tip-body">
+          <div class="tip-title">${esc(b.title||b.id)}</div>
+          <div class="tip-short">${esc(new Date(b.created||0).toLocaleDateString())}${b.preview?' · '+esc(b.preview):''}</div>
+        </div>
+        <span class="tip-chevron">›</span>
+      </div>
+      <div class="tip-detail"></div>
+    </div>`).join('');
+}
+async function openBriefing(card){
+  const det=card.querySelector('.tip-detail');
+  card.classList.add('open');
+  if(det.dataset.loaded) return;
+  det.innerHTML='<p style="color:var(--muted)">Loading…</p>';
+  const r=await broker({kind:'briefing',briefingId:card.dataset.bid}); // NOT `id:` — that would clobber the broker's own correlation id
+  if(r&&r.ok&&r.briefing){
+    const md=await broker({kind:'render-md',text:String(r.briefing.body||'')});
+    det.innerHTML=(md&&md.ok&&md.html)?md.html:'<p>'+esc(String(r.briefing.body||''))+'</p>';
+    det.dataset.loaded='1';
+  } else det.innerHTML='<p style="color:var(--muted)">Could not load · 无法加载</p>'; // failure shown in place, and left unloaded so a re-tap retries (R5)
+}
+document.getElementById('br-list').addEventListener('click',e=>{
+  const card=e.target.closest('.tip-card[data-bid]'); if(!card) return;
+  if(card.classList.contains('open')) card.classList.remove('open'); else openBriefing(card);
+});
+document.getElementById('br-head').onclick=()=>{ const l=document.getElementById('br-list'); const show=l.style.display==='none'; l.style.display=show?'':'none'; document.getElementById('br-chev').textContent=show?'▾':'▸'; };
+broker({kind:'briefings'}).then(r=>{
+  if(r&&r.ok&&Array.isArray(r.briefings)) renderBriefings(r.briefings);
+  else document.getElementById('br-list').innerHTML='<div class="tip-short" style="color:var(--muted)">Could not load briefings · 简报加载失败</div>'; // honest failure state, never a fake "no briefings" (R14)
+  PANewDot.mark(document.getElementById('br-head'),'briefings-section');   // new-feature dot once the section has rendered
+});
+
+// ── 待批准 · Pending approvals — Approve/Deny via the shell broker (kind
+// 'actions' / 'action-decide' → the autonomy routes). Card HTML is a PURE
+// builder so the test harness can render it without a DOM.
+function renderActionsHtml(list){
+  return list.map(a=>`
+    <div class="tip-card" data-aid="${esc(a.id)}">
+      <div class="tip-header" style="cursor:default">
+        <div class="tip-body">
+          <div class="tip-title">${esc(a.title||a.id)}</div>
+          <div class="tip-short">${esc(a.summary||'')}</div>
+          <div class="act-status" style="margin-top:8px">
+            <button class="act-btn" data-verb="approve">Approve · 批准</button>
+            <button class="act-btn" data-verb="deny">Deny · 拒绝</button>
+          </div>
+        </div>
+      </div>
+    </div>`).join('');
+}
+function renderActions(list){
+  const wrap=document.getElementById('act-wrap');
+  if(!list.length){ wrap.style.display='none'; return; }
+  wrap.style.display='';
+  document.getElementById('act-list').innerHTML=renderActionsHtml(list);
+  PANewDot.mark(wrap.querySelector('.section-title'),'approvals-section');   // new-feature dot once the section is visible
+}
+function loadPendingActions(){
+  broker({kind:'actions'}).then(r=>{
+    if(r&&r.ok&&Array.isArray(r.actions)) renderActions(r.actions);
+    else { // R5: a failed load must LOOK failed — never identical to an empty queue
+      document.getElementById('act-wrap').style.display='';
+      document.getElementById('act-list').innerHTML='<div class="tip-short" style="color:var(--muted)">Could not load approvals · 审批队列加载失败</div>';
+    }
+  });
+}
+async function decideAction(card,verb){
+  const box=card.querySelector('.act-status');
+  box.innerHTML='<span class="tip-short">…</span>';
+  const r=await broker({kind:'action-decide',actionId:card.dataset.aid,verb}); // the shell shows its own confirm dialog before relaying
+  if(r&&r.ok&&r.action&&r.action.status){
+    const s=r.action.status;
+    const label=s==='done'?'Approved, executed · 已批准并执行'
+      :s==='failed'?'FAILED · 执行失败: '+(r.action.error||'')
+      :s==='denied'?'Denied · 已拒绝'
+      :s==='expired'?'Expired · 已过期':s;
+    box.innerHTML='<span class="tip-short">'+esc(label)+'</span>'; // outcome stays visible in place — honest, incl. executor failures (R14)
+    if(s==='done') loadRemindersList(); // a just-registered reminder appears with its Remove control
+  } else {
+    box.innerHTML='<span class="tip-short">'+esc((r&&r.error)||'Request failed · 请求失败')+'</span>'; // incl. "cancelled in shell · 已在外壳取消"
+    setTimeout(loadPendingActions,1200); // re-render the queue so the buttons come back for a retry
+  }
+}
+document.getElementById('act-list').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-verb]'); if(!b) return;
+  decideAction(b.closest('.tip-card[data-aid]'),b.dataset.verb);
+});
+loadPendingActions();
+
+// ── 提醒 · Reminders — the revocation surface. Pure card builder (harness-
+// renderable, like renderActionsHtml); Remove relays through the shell's
+// confirm dialog (broker kind 'reminder-remove').
+const DAY_NAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+function renderRemindersHtml(list){
+  return list.map(r=>`
+    <div class="tip-card" data-rid="${esc(r.id)}">
+      <div class="tip-header" style="cursor:default">
+        <div class="tip-body">
+          <div class="tip-title">${esc(r.text)}</div>
+          <div class="tip-short">${esc(r.time)}${r.day!==undefined?' · weekly '+esc(DAY_NAMES[r.day]||r.day)+' · 每周':' · daily · 每日'}</div>
+        </div>
+        <button class="act-btn" data-rem-remove>Remove · 移除</button>
+      </div>
+    </div>`).join('');
+}
+function loadRemindersList(){
+  broker({kind:'reminders'}).then(r=>{
+    const wrap=document.getElementById('rem-wrap');
+    if(!(r&&r.ok&&Array.isArray(r.reminders))){ // R5: failure shown, never a fake empty state
+      wrap.style.display='';
+      document.getElementById('rem-list').innerHTML='<div class="tip-short" style="color:var(--muted)">Could not load reminders · 提醒加载失败</div>';
+      return;
+    }
+    if(!r.reminders.length){ wrap.style.display='none'; return; }
+    wrap.style.display='';
+    document.getElementById('rem-list').innerHTML=renderRemindersHtml(r.reminders);
+    PANewDot.mark(wrap.querySelector('.section-title'),'reminders-section');   // new-feature dot once the section is visible
+  });
+}
+document.getElementById('rem-list').addEventListener('click',async e=>{
+  const b=e.target.closest('[data-rem-remove]'); if(!b) return;
+  const card=b.closest('.tip-card[data-rid]');
+  const r=await broker({kind:'reminder-remove',reminderId:card.dataset.rid}); // the shell confirms before removing
+  if(r&&r.ok) loadRemindersList();
+  else card.querySelector('.tip-short').textContent=(r&&r.error)||'Request failed · 请求失败';
+});
+loadRemindersList();
+
+const aiChat=PAChat.mount(document.getElementById('lv-chat'),{
+  persist:'longevity-chat',
+  placeholder:'Ask anything — diet, sleep, exercise, fasting…',
+  greeting:'Ask your health AI anything — diet, sleep, movement, fasting, supplements, spiritual practices.',
+  contextPrefix:(body)=>{
+    const hc = HEALTH.length ? ` The user's recent iPhone health data (sleep/exercise) — use it when relevant: ${healthContext(HEALTH)}.` : '';
+    // The photographed screen travels as what it is: a MODEL'S READING of a picture, not a
+    // measurement. Labelled in the prompt so the advisor can weigh it accordingly, and never
+    // merged into the health data above it.
+    const hs = HEALTH_SHOT ? `\n\nThe user photographed a health screen and this is what was read off it (a reading of a PHOTO, not a stored measurement — treat it as reported, and say so if it matters):\n${HEALTH_SHOT}` : '';
+    return `You are a health and longevity advisor. The user is an adult. Evidence-based, specific, actionable; grade evidence where relevant (RCT / cohort / mechanistic / speculative); keep replies to 150-250 words.${hc}${hs}\n\nThey ask: ${body}`;
+  },
+});
+aiChat.open('advisor');
+</script>
+</body>
+</html>

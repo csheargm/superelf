@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" media="(prefers-color-scheme:light)" content="#f0f4ff">
+<meta name="theme-color" media="(prefers-color-scheme:dark)" content="#0d0f1e">
+<title>代数练习</title>
+<style>
+html{font-size:calc(17px * var(--fs,1))}
+:root{
+  --bg:#f0f4ff;--card:#fff;--text:#1a1c2e;--muted:#6b7280;--line:#e2e8f0;
+  --accent:#6c63ff;--accent2:#7c3aed;
+  --ok:#16a34a;--ok-bg:#dcfce7;
+  --err:#dc2626;--err-bg:#fee2e2;
+  --hint:#0369a1;--hint-bg:#e0f2fe;
+  --sab:env(safe-area-inset-bottom,0px);--sat:env(safe-area-inset-top,0px)
+}
+@media(prefers-color-scheme:dark){:root{
+  --bg:#0d0f1e;--card:#1a1d30;--text:#e2e8f0;--muted:#94a3b8;--line:#2a2d45;
+  --accent:#a78bfa;--accent2:#8b5cf6;
+  --ok:#4ade80;--ok-bg:#052e16;
+  --err:#f87171;--err-bg:#450a0a;
+  --hint:#38bdf8;--hint-bg:#0c2440
+}}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,'PingFang SC',system-ui,sans-serif}
+body{display:flex;flex-direction:column;overflow:hidden}
+
+/* Nav */
+#nav{
+  display:flex;align-items:center;gap:10px;
+  padding:calc(10px + var(--sat)) 14px 10px;
+  background:var(--card);border-bottom:1px solid var(--line);flex-shrink:0
+}
+#nav-title{flex:1;font-size:17px;font-weight:700}
+#nav-score{font-size:13px;color:var(--muted)}
+
+/* Scroll area */
+#main{flex:1;overflow-y:auto;padding:14px 14px calc(14px + var(--sab))}
+
+/* Score strip */
+#score-bar{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  background:var(--card);border-radius:14px;padding:12px 8px;
+  margin-bottom:14px;border:1px solid var(--line)
+}
+.sc-item{text-align:center}
+.sc-n{font-size:22px;font-weight:700;line-height:1.1}
+.sc-n.ok{color:var(--ok)}
+.sc-n.streak{color:#f59e0b}
+.sc-l{font-size:11px;color:var(--muted);margin-top:2px}
+
+/* Topic tabs */
+#topics{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;scrollbar-width:none}
+#topics::-webkit-scrollbar{display:none}
+.t-btn{
+  flex-shrink:0;padding:7px 13px;border-radius:20px;
+  border:2px solid var(--line);background:var(--card);
+  color:var(--muted);font-size:13px;font-weight:500;cursor:pointer;
+  transition:all .15s
+}
+.t-btn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* Progress */
+#progress{height:4px;background:var(--line);border-radius:2px;margin-bottom:14px;overflow:hidden}
+#progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .4s}
+
+/* Problem card */
+#q-card{
+  background:var(--card);border-radius:16px;padding:18px;
+  margin-bottom:12px;border:1px solid var(--line)
+}
+#q-tag{font-size:11px;font-weight:600;color:var(--accent);letter-spacing:.5px;margin-bottom:8px;text-transform:uppercase}
+#q-text{font-size:19px;font-weight:600;line-height:1.4}
+
+/* Options grid */
+#opts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.opt{
+  padding:14px 10px;border-radius:12px;border:2px solid var(--line);
+  background:var(--card);color:var(--text);font-size:16px;font-weight:500;
+  cursor:pointer;text-align:center;transition:all .12s;line-height:1.2
+}
+.opt:active{transform:scale(.96)}
+.opt.sel{border-color:var(--accent);background:#ede9fe}
+@media(prefers-color-scheme:dark){.opt.sel{background:#2e1065}}
+.opt.ok{border-color:var(--ok);background:var(--ok-bg);color:var(--ok)}
+.opt.err{border-color:var(--err);background:var(--err-bg);color:var(--err)}
+
+/* Feedback */
+#feedback{
+  border-radius:12px;padding:13px 14px;margin-bottom:12px;
+  font-size:14px;line-height:1.5;display:none
+}
+#feedback.show{display:block}
+#feedback.fb-ok{background:var(--ok-bg);color:var(--ok)}
+#feedback.fb-err{background:var(--err-bg);color:var(--err)}
+#feedback.fb-hint{background:var(--hint-bg);color:var(--hint)}
+#fb-title{font-weight:700;font-size:15px;margin-bottom:3px}
+
+/* Buttons */
+#btn-row{display:flex;gap:10px}
+.btn{
+  flex:1;padding:13px;border-radius:12px;border:none;
+  font-size:15px;font-weight:600;cursor:pointer;transition:all .12s
+}
+.btn:active{transform:scale(.97)}
+.btn-p{background:var(--accent);color:#fff}
+.btn-s{background:var(--card);color:var(--accent);border:2px solid var(--line)}
+#btn-next{display:none}
+
+/* Celebration */
+#celeb{
+  flex:1;display:none;flex-direction:column;align-items:center;
+  justify-content:center;text-align:center;padding:24px;gap:12px
+}
+#celeb.show{display:flex}
+#celeb-icon{font-size:64px}
+#celeb-title{font-size:24px;font-weight:700}
+#celeb-sub{font-size:15px;color:var(--muted);max-width:30ch}
+#celeb-restart{
+  margin-top:8px;padding:14px 28px;border-radius:14px;
+  border:none;background:var(--accent);color:#fff;
+  font-size:16px;font-weight:600;cursor:pointer
+}
+
+/* FAB */
+#fab{
+  position:fixed;bottom:calc(20px + var(--sab));right:18px;
+  width:52px;height:52px;border-radius:50%;
+  background:var(--accent2);color:#fff;border:none;
+  font-size:22px;cursor:pointer;
+  box-shadow:0 4px 14px rgba(124,58,237,.5);
+  display:flex;align-items:center;justify-content:center
+}
+</style>
+</head>
+<body>
+
+<div id="nav">
+  <div id="nav-title">🧮 代数练习</div>
+  <div id="nav-score">六年级 · 代数基础</div>
+</div>
+
+<div id="main">
+  <div id="score-bar">
+    <div class="sc-item"><div class="sc-n ok" id="sc-ok">0</div><div class="sc-l">答对</div></div>
+    <div class="sc-item"><div class="sc-n" id="sc-total">0</div><div class="sc-l">总题数</div></div>
+    <div class="sc-item"><div class="sc-n streak" id="sc-streak">0</div><div class="sc-l">连对 🔥</div></div>
+  </div>
+
+  <div id="topics"></div>
+
+  <div id="progress"><div id="progress-fill" style="width:0%"></div></div>
+
+  <div id="q-card">
+    <div id="q-tag"></div>
+    <div id="q-text"></div>
+  </div>
+
+  <div id="opts"></div>
+
+  <div id="feedback"><div id="fb-title"></div><div id="fb-body"></div></div>
+
+  <div id="btn-row">
+    <button class="btn btn-s" id="btn-hint" onclick="doHint()">💡 提示</button>
+    <button class="btn btn-p" id="btn-next" onclick="nextQ()">下一题 →</button>
+  </div>
+</div>
+
+<div id="celeb">
+  <div id="celeb-icon">🏆</div>
+  <div id="celeb-title"></div>
+  <div id="celeb-sub"></div>
+  <button id="celeb-restart" onclick="restart()">再来一轮 🚀</button>
+</div>
+
+<button id="fab" title="问老师">🤖</button>
+
+<!--PA_CHAT_UI-->
+
+<script>
+// ── helpers ──────────────────────────────────────────────────────────────────
+function ri(a,b){return Math.floor(Math.random()*(b-a+1))+a}
+function shuffle(a){return [...a].sort(()=>Math.random()-.5)}
+
+// Format a single term like coef*varName, handling 0/1/-1 edge cases
+function term(c,v){
+  if(c===0)return '';
+  if(!v)return String(c);
+  if(c===1)return v;
+  if(c===-1)return '-'+v;
+  return c+v;
+}
+
+// Build expression string from [{c,v}] pairs
+function expr(...pairs){
+  let s='';
+  for(const {c,v} of pairs){
+    if(c===0)continue;
+    const t=term(c,v);
+    if(!s){s=t}
+    else if(c>0){s+='+'+t}
+    else{s+=t}
+  }
+  return s||'0';
+}
+
+// ── problem generators ────────────────────────────────────────────────────────
+const GEN={
+  eval(){
+    const x=ri(1,8), a=ri(1,6), b=ri(0,10);
+    const type=ri(1,3);
+    if(type===1){
+      // ax + b
+      const ans=a*x+b;
+      return{
+        tid:'eval',
+        q:`当 x = ${x} 时，求代数式的值：\n${a}x + ${b}`,
+        ans:String(ans),
+        hint:`把 x = ${x} 代入：\n${a} × ${x} + ${b}\n= ${a*x} + ${b}\n= ${ans}`
+      };
+    }else if(type===2){
+      // ax² + b
+      const ans=a*x*x+b;
+      return{
+        tid:'eval',
+        q:`当 x = ${x} 时，求代数式的值：\n${a}x² + ${b}`,
+        ans:String(ans),
+        hint:`把 x = ${x} 代入：\n${a} × ${x}² + ${b}\n= ${a} × ${x*x} + ${b}\n= ${ans}`
+      };
+    }else{
+      // a(x + b)
+      const ans=a*(x+b);
+      return{
+        tid:'eval',
+        q:`当 x = ${x} 时，求代数式的值：\n${a}(x + ${b})`,
+        ans:String(ans),
+        hint:`把 x = ${x} 代入：\n${a} × (${x} + ${b})\n= ${a} × ${x+b}\n= ${ans}`
+      };
+    }
+  },
+
+  combine(){
+    // Generate ax + by + cx + dy style, ensure result is non-trivial
+    let a,b,c,d,rx,ry;
+    do{
+      a=ri(1,6); b=ri(1,6);
+      c=(ri(1,4))*(Math.random()>.5?1:-1);
+      d=(ri(1,4))*(Math.random()>.5?1:-1);
+      rx=a+c; ry=b+d;
+    }while(rx===0||ry===0); // avoid trivial zero result
+
+    const cs=c>0?`+ ${c}x`:`- ${Math.abs(c)}x`;
+    const ds=d>0?`+ ${d}y`:`- ${Math.abs(d)}y`;
+    const ans=expr({c:rx,v:'x'},{c:ry,v:'y'});
+
+    // Wrong options: vary one coefficient by ±1 or ±2
+    const wrongs=new Set();
+    [[rx+1,ry],[rx-1,ry],[rx,ry+1],[rx,ry-1],[rx+2,ry],[rx,ry+2]].forEach(([wx,wy])=>{
+      if(wx!==rx||wy!==ry){
+        const w=expr({c:wx,v:'x'},{c:wy,v:'y'});
+        if(w!==ans&&wx!==0&&wy!==0)wrongs.add(w);
+      }
+    });
+
+    return{
+      tid:'combine',
+      q:`合并同类项，化简：\n${a}x + ${b}y ${cs} ${ds}`,
+      ans,
+      hint:`x 的同类项：${a}x ${cs} = ${rx}x\ny 的同类项：${b}y ${ds} = ${ry}y\n结果：${ans}`,
+      _wrongs:[...wrongs]
+    };
+  },
+
+  equation(){
+    // ax + b = c, integer answer x
+    const a=ri(1,5), x=ri(1,10), b=ri(0,12);
+    const c=a*x+b;
+    return{
+      tid:'equation',
+      q:`解方程，求 x 的值：\n${a}x + ${b} = ${c}`,
+      ans:String(x),
+      hint:`移项：${a}x = ${c} - ${b} = ${c-b}\n两边除以 ${a}：\nx = ${c-b} ÷ ${a} = ${x}`
+    };
+  },
+
+  expand(){
+    // a(x + b) + cx = (a+c)x + ab, ensure result clean
+    let a,b,c,rx,rc;
+    do{
+      a=ri(1,5); b=ri(1,8);
+      c=ri(1,4)*(Math.random()>.5?1:-1);
+      rx=a+c; rc=a*b;
+    }while(rx===0||rx<0);
+
+    const cs=c>0?`+ ${c}x`:`- ${Math.abs(c)}x`;
+    const ans=expr({c:rx,v:'x'},{c:rc,v:''});
+
+    const wrongs=new Set();
+    [[rx+1,rc],[rx-1,rc],[rx,rc+a],[rx+1,rc+1],[rx-1,rc-1]].forEach(([wx,wc])=>{
+      const w=expr({c:wx,v:'x'},{c:wc,v:''});
+      if(w!==ans&&wx!==0)wrongs.add(w);
+    });
+
+    return{
+      tid:'expand',
+      q:`展开括号并化简：\n${a}(x + ${b}) ${cs}`,
+      ans,
+      hint:`展开括号：${a}(x+${b}) = ${a}x + ${rc}\n合并 x 的系数：${a}x ${cs} = ${rx}x\n结果：${ans}`,
+      _wrongs:[...wrongs]
+    };
+  },
+
+  mixed(){
+    const fns=[GEN.eval,GEN.combine,GEN.equation,GEN.expand];
+    return fns[ri(0,3)]();
+  }
+};
+
+// ── wrong answer generator for number answers ─────────────────────────────────
+function numWrongs(correct){
+  const base=parseInt(correct), out=new Set();
+  shuffle([-5,-4,-3,-2,-1,1,2,3,4,5,7,8,10]).forEach(d=>{
+    const w=base+d;
+    if(w>0&&String(w)!==correct)out.add(String(w));
+  });
+  return [...out];
+}
+
+// ── state ─────────────────────────────────────────────────────────────────────
+const S={topic:'mixed',ok:0,total:0,streak:0,q:null,answered:false,chat:null};
+
+const TOPICS=[
+  {id:'mixed',   label:'🎯 混合练习'},
+  {id:'eval',    label:'🔢 代数式求值'},
+  {id:'combine', label:'📦 合并同类项'},
+  {id:'equation',label:'⚖️ 解方程'},
+  {id:'expand',  label:'🔓 去括号'},
+];
+const TOPIC_NAMES={
+  eval:'代数式求值',combine:'合并同类项',equation:'解方程',expand:'去括号'
+};
+
+// ── render ────────────────────────────────────────────────────────────────────
+function renderTabs(){
+  document.getElementById('topics').innerHTML=TOPICS.map(t=>
+    `<button class="t-btn${t.id===S.topic?' on':''}" onclick="setTopic('${t.id}')">${t.label}</button>`
+  ).join('');
+}
+
+function setTopic(id){S.topic=id;renderTabs();nextQ();}
+
+function renderQ(){
+  const q=S.q;
+  document.getElementById('q-tag').textContent=TOPIC_NAMES[q.tid];
+  document.getElementById('q-text').style.whiteSpace='pre-line';
+  document.getElementById('q-text').textContent=q.q;
+
+  // Build 4 options
+  const wrongs=(q._wrongs||[]).length>=3
+    ? q._wrongs
+    : (q.ans.match(/[a-z]/) ? q._wrongs||[] : numWrongs(q.ans));
+
+  const opts=shuffle([q.ans,...wrongs.slice(0,3)]);
+  q._opts=opts;
+
+  document.getElementById('opts').innerHTML=opts.map((o,i)=>
+    `<button class="opt" id="o${i}" onclick="pick(${i})">${o.replace(/\n/g,'<br>')}</button>`
+  ).join('');
+
+  hideFeedback();
+  document.getElementById('btn-next').style.display='none';
+  document.getElementById('btn-hint').style.display='';
+  S.answered=false;
+}
+
+function pick(idx){
+  if(S.answered)return;
+  S.answered=true;
+  S.total++;
+
+  const chosen=S.q._opts[idx];
+  const isOk=chosen===S.q.ans;
+
+  if(isOk){S.ok++;S.streak++;}else{S.streak=0;}
+  updateScore();
+
+  // Colour options
+  S.q._opts.forEach((o,i)=>{
+    const el=document.getElementById('o'+i);
+    if(o===S.q.ans){el.className='opt ok';}
+    else if(i===idx&&!isOk){el.className='opt err';}
+  });
+
+  if(isOk){
+    const msgs=['太棒了！🎉','答对了！⭐','完全正确！🌟','很厉害！💪','优秀！🏆','加油！✨'];
+    showFeedback('fb-ok',msgs[ri(0,msgs.length-1)],
+      S.streak>=3?`已连续答对 ${S.streak} 题！🔥`:'');
+  }else{
+    showFeedback('fb-err','再想想 💭',`正确答案：${S.q.ans}`);
+  }
+
+  document.getElementById('btn-next').style.display='';
+  document.getElementById('btn-hint').style.display='none';
+
+  if(S.total>0&&S.total%10===0)setTimeout(showCeleb,700);
+}
+
+function doHint(){
+  showFeedback('fb-hint','💡 提示',S.q.hint);
+}
+
+function showFeedback(cls,title,body){
+  const el=document.getElementById('feedback');
+  el.className='feedback show '+cls;
+  document.getElementById('fb-title').textContent=title;
+  document.getElementById('fb-body').style.whiteSpace='pre-line';
+  document.getElementById('fb-body').textContent=body;
+}
+function hideFeedback(){
+  document.getElementById('feedback').className='feedback';
+}
+
+function updateScore(){
+  document.getElementById('sc-ok').textContent=S.ok;
+  document.getElementById('sc-total').textContent=S.total;
+  document.getElementById('sc-streak').textContent=S.streak;
+  const pct=S.total?Math.round(S.ok/S.total*100):0;
+  document.getElementById('progress-fill').style.width=pct+'%';
+}
+
+function nextQ(){
+  S.q=GEN[S.topic]();
+  renderQ();
+}
+
+// ── celebration ───────────────────────────────────────────────────────────────
+function showCeleb(){
+  const pct=Math.round(S.ok/S.total*100);
+  let icon,title,sub;
+  if(pct>=90){icon='🏆';title='超级厉害！';sub=`正确率 ${pct}%，你是代数高手！`;}
+  else if(pct>=70){icon='⭐';title='做得不错！';sub=`正确率 ${pct}%，再努力一点就更棒了！`;}
+  else{icon='💪';title='继续加油！';sub=`正确率 ${pct}%，多练习就会进步的！`;}
+
+  document.getElementById('celeb-icon').textContent=icon;
+  document.getElementById('celeb-title').textContent=title;
+  document.getElementById('celeb-sub').textContent=`完成了 ${S.total} 题，${sub}`;
+  document.getElementById('main').style.display='none';
+  document.getElementById('celeb').className='show';
+}
+
+function restart(){
+  S.ok=S.total=S.streak=0;
+  updateScore();
+  document.getElementById('main').style.display='';
+  document.getElementById('celeb').className='';
+  nextQ();
+}
+
+// ── AI tutor via PAChat ───────────────────────────────────────────────────────
+const chat=PAChat.fullscreen({
+  defaultModel:'claude',
+  placeholder:'有不懂的题，直接问我…',
+  system:'你是一位温和耐心的数学老师，专门帮助六年级学生学代数。用简单易懂的中文解释，多举例子，鼓励学生。重点内容：代数式求值、合并同类项、去括号、一元一次方程。不要直接给答案，先引导学生思考。',
+  greeting:'你好！我是你的数学小老师 🧮\n有什么代数题不懂？直接问我！\n\n💡 也可以把题目贴过来，我来帮你一步步分析。',
+  persist:'math-algebra-chat',
+});
+document.getElementById('fab').addEventListener('click',()=>chat.open('general'));
+
+// ── init ──────────────────────────────────────────────────────────────────────
+renderTabs();
+nextQ();
+</script>
+</body>
+</html>

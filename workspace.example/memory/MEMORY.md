@@ -1,0 +1,1 @@
+- (one line per memory; the assistant appends here as it learns durable facts)

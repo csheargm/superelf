@@ -1,0 +1,276 @@
+<!-- PADrawerSummary — Ask AI period summaries（按时期总结, docs/plans/note-features.md E, option 1).
+     Inlined by web.mjs into any page carrying the PA_DRAWER_SUMMARY_UI marker (chat-ui carries it, so
+     every drawer gets it with no app code). The drawer's multi-select bar gains ONE button,
+     `Summarize · 总结`; it opens a sheet with period presets, an "include photo text" tick and ONE
+     honest confirm line (pages · characters · lane) computed from a local `note-text` ask. Nothing is
+     sent until Send is pressed; every lane sends text off the Mac and the line names the lane.
+     The turn then runs through the HOST's own Ask AI rail (hooks.run) under the scope `summary:<period>`,
+     so follow-ups continue it and it is saved like any chat. A month or shorter is one turn; a year is
+     built from month summaries: an existing month summary note (hooks.monthSummary) is reused, else the
+     month is summarised first through PAChat.complete (the same 'chat' kind), then the year turn runs
+     in the rail. The summary turn's answer is SAVED AS A NOTE as soon as it has streamed (decorate, auto-save):
+     through the host (hooks.saveNote: a NEW note per run, titled runTitleOf(period, run time)) with the first line `AI summary · AI 总结 — <titleOf(period)> #summary #ai`
+     (older notes carry the raw period id there; FIRST_LINE_RE reads both);
+     the `Save as note · 存为笔记` button under it reads Saved · 已存 and re-saves a follow-up on a tap.
+     Host hooks (listDrawer / Chat opts `summary`): run({scope,label,message}) → Promise<boolean>,
+       monthSummary(period, title) → Promise<string|null> (title = the summary note's own title),
+       saveNote({id?,title,html,period,scope,convoId,quiet?}) → Promise<{ok,id?,error?,gone?}> — without `id` creates a NEW
+       note (every run is kept, owner 2026-11-12); with the `id` its first save answered, UPDATES exactly that note
+       (re-save, follow-up), or answers {gone:true} when it was deleted; `id` is the row id (the back pill, PASummaryRefs.noteSaved).
+     The host's system slot: PADrawerSummary.SYSTEM is the ONE system line for a summary scope (chat-ui passes the
+     thread's key to opts.system(k); a host answers SYSTEM when isScope(k)). A reopened summary thread is recognised
+     by its stored label through scopeOfLabel (the inverse of titleOf), so Save as note appears on it again.
+     Titles（标题）: the period id names the scope and the note (`2026-W46`); what the user sees is
+     PASummaryTitle.titleOf(id) — "This week · 本周 Nov 9–15, 2026" (web/summary-title.inline.html, marker below).
+     Important lines and source links（重点与链接, note-features.md F): the turn asks the `important` field too, numbers
+     each note [n] with an `Important · 重点` block, and PASummaryRefs (web/summary-refs.inline.html, carried by the
+     marker below) remembers [n] → note per scope, links the [n] in a rendered answer and in the saved note, and
+     opens a tapped link through the host's onLink({id,page}) hook (summary hooks).
+     API: PADrawerSummary.attach({host, bar, picked, items, done, hooks}) → {open, choose, togglePhoto, send, cancel, state}
+          PADrawerSummary.decorate(bar, answer, {key, convo, hooks}) → button | null
+     Driven for real by test/drawer-summary.test.mjs and test/drawer-summary-review.test.mjs. -->
+<!--PA_SUMMARY_REFS_UI-->
+<!--PA_SUMMARY_TITLE_UI-->
+<!--PA_SUMMARY_IMAGES_UI-->
+<!--PA_SUMMARY_FOLLOWUP_UI-->
+<style id="pds-style">
+.pac-lbulksum{background:var(--accent,#0a7a5a);color:#fff;border:none;border-radius:8px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+.pac-lbulksum:disabled{opacity:.45;cursor:default}
+.pds-ttl{font-weight:600;font-size:15px;padding:4px 0 8px}
+.pds-p{display:block;width:100%;text-align:left;background:none;border:1px solid var(--line,#e6e6e6);border-radius:8px;padding:8px 10px;margin:4px 0;font:inherit;font-size:14px;cursor:pointer;color:inherit}
+.pds-p[aria-pressed="true"]{border-color:var(--accent,#0a7a5a);background:color-mix(in srgb,var(--accent,#0a7a5a) 12%,transparent)}
+.pds-tick{display:flex;gap:8px;align-items:center;font-size:13px;padding:8px 0}
+.pds-line{font-size:12px;color:var(--muted,#888);padding:6px 0 10px;min-height:1.6em;white-space:pre-wrap}
+.pds-btns{display:flex;gap:8px;justify-content:flex-end}
+.pds-send{background:var(--accent,#0a7a5a);color:#fff;border:none;border-radius:8px;padding:8px 14px;font:inherit;cursor:pointer}
+.pds-send:disabled{opacity:.45;cursor:default}
+.pds-x{background:none;border:none;color:var(--muted,#888);font:inherit;cursor:pointer;padding:8px}
+.pds-savenote{font-size:12px;padding:2px 8px}
+.pac-dsum{padding:4px 10px;font-size:12px;border-radius:999px;margin-right:2px}
+.pds-p:disabled{opacity:.45;cursor:default}
+</style>
+<script id="pds-script">
+(function(){
+  if(window.PADrawerSummary) return;
+  const R=()=>window.PASummaryRefs;   // present before this script runs: the marker above inlines it
+  const I=()=>window.PASummaryImages, F=()=>window.PASummaryFollowup;   // page images and the follow-up (note-features.md I): the markers above inline them
+  // ONE heading for the open to-dos (R3): the turn writes it, the node's extractor reads it (= lib/summary-followup.mjs TODO_HEADING, pinned by test).
+  const TODO_HEADING='Open to-dos · 待办';
+  // ONE prompt for every summary turn (R3): reflections first, open todos last, in the notes' language.
+  // The marked points are named by the heading the turn itself writes (PASummaryRefs.TXT.important).
+  const SUMMARY_PROMPT='Summarise these journal notes: first the reflections and what happened, grouped by theme; '+
+    'then list every open todo LAST as a list under the heading "'+TODO_HEADING+'". Answer in the language the notes are written in. '+
+    'Give the points marked '+R().TXT.important+' (highlighted or circled in the notes) more weight and keep them; after each point write the number of the note it comes from, like [2]. · '+
+    '请总结这些笔记：先按主题归纳反思与经历，最后在标题“'+TODO_HEADING+'”下列出所有未完成的待办事项。用笔记所用的语言回答。'+
+    '对标为 '+R().TXT.important+'（笔记中划了荧光笔或圈出）的内容加大权重并保留；每条要点后标注来源笔记编号，如 [2]。';
+  // ONE system line for a summary thread (R3): the hosts' verse-study / journal prompts do not apply to it.
+  const SYSTEM='You are summarising the user\'s own notes. Answer in the language the notes are written in; keep headings short. · '+
+    '你在总结用户自己的笔记。用笔记所用的语言回答，标题简短。';
+  const YEAR_NOTE='The sections below are month summaries of this year; summarise the year from them. · 以下各节是本年各月的总结，请据此总结全年。';
+  const TURN_MAX_CHARS=80000;   // one turn's text cap (a month is 10–26k measured; a Fast lane holds far less than 1 MB usefully)
+  // The period ids, the dates and the human titles live in PASummaryTitle (web/summary-title.inline.html, the marker above).
+  const T=()=>window.PASummaryTitle;
+  const SCOPE='summary:';   // = PASummaryTitle.SCOPE, pinned equal by test/summary-title.test.mjs
+  const TIP_SUMMARIZE='Summarize: an AI summary of a week, month or year; ⋯ beside it has Sort, Select, Refresh, Show hidden · 总结：AI 总结一周、一月或一年；旁边的 ⋯ 有排序、选择、刷新、显示隐藏';
+  const TIP_RUNS='Each summary run is kept as its own note; the research appears below it · 每次总结都保存为单独的笔记；研究结果显示在其下方';
+  const TXT=Object.freeze({ button:'Summarize · 总结', title:'Summarize · 总结',
+    photo:'Include photo text · 含图片文字', counting:'Counting · 统计中', nothing:'No notes in this period · 此时期没有笔记',
+    send:'Send · 发送', cancel:'Cancel · 取消', noLane:'no lane · 无通道', turns:'{n} turns · {n} 轮',
+    trimmed:'[Trimmed to {n} characters · 已截断至 {n} 字]', trimmedShort:'trimmed · 已截断',
+    line:'Send {p} pages · {c} characters to {lane} · 发送 {p} 页 · {c} 字到 {lane} (off this Mac · 离开本机)',
+    failed:'Could not read the notes · 无法读取笔记', busy:'Still answering · 正在回答中', monthFailed:'Month summary failed · 月总结失败',
+    progress:'Summarizing {m} · 正在总结 {m} ({i}/{n})', saveNote:'Save as note · 存为笔记', saved:'Saved · 已存', notSaved:'Not saved · 未保存',
+    firstLine:'AI summary · AI 总结 — {p} #summary #ai', noText:'No text to send · 没有可发送的文字',
+    pending:'{n} pending · {n} 页待转写', incomplete:'incomplete · 不完整', sendFailed:'Could not send · 无法发送 — {e}' });
+  const fill=(s,o)=>String(s).replace(/\{(\w+)\}/g,(_,k)=>String(o[k]==null?'':o[k]));
+  const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const dayOf=ts=>T().dayOf(ts), monthOf=ts=>T().monthOf(ts);
+  const tsOf=it=>Number(it&&(it.created||it.updated))||0;
+  const docRows=rows=>(rows||[]).filter(it=>it&&it.doc&&typeof it.doc.path==='string'&&it.doc.path);
+  function docsFor(key,c,now){
+    if(key==='selected'){ const rows=docRows(c.picked()).slice().sort((a,b)=>tsOf(a)-tsOf(b)); const id=rows.length?(dayOf(tsOf(rows[0]))+(rows.length>1?'..'+dayOf(tsOf(rows[rows.length-1])):'')):'selected'; return {rows,id}; }
+    const p=T().periodOf(key,now); if(!p) return {rows:[],id:key};
+    return {rows:docRows(c.items()).filter(it=>{ const t=tsOf(it); return t>=p.from&&t<p.to; }).sort((a,b)=>tsOf(a)-tsOf(b)),id:p.id};
+  }
+  // The same join the drawer's tag chips use (sameDoc): a doc without scope claims every scope of its file.
+  const sameDoc=(pg,d)=>pg.path===d.path&&(!('scope' in d)||(pg.scope||'')===(d.scope||''));
+  const pageText=(pg,photo)=>{ const s=pg.src||{}; return [s.typed,s.ink,photo?s.photo:''].filter(t=>typeof t==='string'&&t.trim()).join('\n'); };
+  // ONE regexp (R3) for the `[n]` an earlier summary turn wrote into a text that now enters a NEW numbered
+  // turn: a saved month inside a year (yearMessage; summary notes among the rows are skipped, group). Its
+  // numbers named THAT turn's notes, not this one's, so they are dropped — with the link text PASummaryRefs
+  // writes after the number (`[2] Roof · 2026-11-09`, label), which is that note's name, not the user's words.
+  // Known limit: a label without its day (the title already says it) keeps its title words in the text.
+  const REF_RE=/\s?\[\d{1,3}\](?: [^\n[\]]{1,48}? · \d{4}-\d{2}(?:-\d{2})?)?/g;
+  const stripRefs=t=>String(t||'').replace(REF_RE,'');
+  // A saved summary note: the host's flag (it.summary), titled titleOf(period) or the old raw form for some period,
+  // opening with the first line Save as note writes (the human title or, on older notes, the raw period), or tagged #summary.
+  const FIRST_LINE_RE=new RegExp('^'+TXT.firstLine.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/\\\{p\\\}/,'.+')+'$');
+  // The #summary tag counts on the FIRST line only: a note that mentions #summary in its body is still the owner's own note (a source).
+  // The tag word is drawer-groups' SUMMARY_TAG (R3), read at use time because drawer-groups registers after this file.
+  const summaryTagRe=()=>new RegExp('(^|\\s)#'+((window.PADrawerGroups&&window.PADrawerGroups.SUMMARY_TAG)||'summary')+'(?![\\w-])','i');
+  const isSummaryNote=(it,text)=>{ const first=String(text).split('\n',1)[0].trim();
+    return it.summary===true||scopeOfLabel(it.title)!==null||FIRST_LINE_RE.test(first)||summaryTagRe().test(first); };
+  // Rows → [{day, title, text, id, imp, page}], day-ordered; `chars` and `pages` count only what is sent. A saved
+  // summary note is NOT a source (owner 2026-11-11: a summary citing an older summary): it is skipped here; a year
+  // reads its months through hooks.monthSummary instead (yearPlan).
+  // (the Important block repeats lines already in `text`, so it is not counted twice). `id` is the row's
+  // own id, `imp` its important lines and `page` the first page with one (PASummaryRefs.importantOf).
+  function group(rows,pages,photo){
+    const out=[]; let chars=0, n=0;
+    for(const it of rows){ const mine=pages.filter(pg=>sameDoc(pg,it.doc)).sort((a,b)=>(a.page||0)-(b.page||0));
+      const texts=mine.map(pg=>pageText(pg,photo)).filter(Boolean); if(!texts.length) continue;
+      const text=texts.join('\n'); if(isSummaryNote(it,text)) continue; const imp=R().importantOf(mine); chars+=text.length; n+=texts.length;
+      out.push({day:dayOf(tsOf(it)),title:String(it.title||''),text,ts:tsOf(it),id:it.id,imp:imp.lines,page:imp.page}); }
+    return {groups:out,chars,pages:n};
+  }
+  function trim(text){ if(text.length<=TURN_MAX_CHARS) return {text,trimmed:false}; return {text:text.slice(0,TURN_MAX_CHARS)+'\n\n'+fill(TXT.trimmed,{n:TURN_MAX_CHARS}),trimmed:true}; }
+  // Each note is numbered [1], [2], … in order (PASummaryRefs.number) under its day; `refs` is what the
+  // numbers point at — kept on the plan and remembered under the scope by send(), for the turn actually sent.
+  function buildMessage(groups,head){ let body='', day=null; const refs=R().number(groups);
+    for(const g of groups){ if(g.day!==day){ day=g.day; body+='\n\n## '+day; } body+=R().section(g); }
+    const t=trim(body.trim()); return {message:(head||SUMMARY_PROMPT)+'\n\n'+t.text,trimmed:t.trimmed,refs}; }
+  // A year from its months: [n] is the month's SAVED summary note (the row titled titleOf(month)), so a
+  // year summary links to month notes; a month mapped on the fly has no note and no link. The month
+  // texts' own [n] are dropped (stripRefs) — they number that month's notes, not the year's.
+  const monthRow=(rows,id)=>(rows||[]).find(it=>it&&scopeOfLabel(it.title)===SCOPE+id);   // by the title's period, whatever word it was saved with
+  const yearMessage=(months,rows)=>buildMessage(months.map(m=>{ const row=monthRow(rows,m.id); return {day:m.id,title:m.id,text:stripRefs(m.text),id:row?row.id:null,imp:[],page:0}; }),SUMMARY_PROMPT+'\n'+YEAR_NOTE);
+  const lane=()=>{ const l=window.PAChat&&typeof window.PAChat.lane==='function'?window.PAChat.lane():null; return (l&&l.label)||TXT.noLane; };
+  // The scope test, the period and the ONE title text (and its inverse) are PASummaryTitle's; kept on this API for the hosts.
+  const isScope=k=>T().isScope(k), periodOfScope=k=>T().periodOfScope(k), titleOf=p=>T().titleOf(p), scopeOfLabel=l=>T().scopeOfLabel(l);
+  // The local note-text ask for the chosen rows' files; a missing component or a throw is a failure the line will say (R5).
+  async function fetchPages(paths){
+    if(!(window.PANoteText&&typeof window.PANoteText.fetch==='function')) return {ok:false,error:TXT.failed};
+    try{ return await window.PANoteText.fetch({paths,fields:['src','important']}); }catch(e){ return {ok:false,error:String((e&&e.message)||e)}; }
+  }
+  // A month or shorter: ONE turn with every page grouped by day.
+  function shortPlan(st){ const g=group(st.rows,st.pages,st.photo); const m=buildMessage(g.groups); return {turns:[{scope:SCOPE+st.id,message:m.message,refs:m.refs}],pages:g.pages,chars:g.chars,trimmed:m.trimmed,months:[]}; }
+  // A year: one map turn per month without a saved summary, then the year turn; null when the sheet moved on (`live` is the current state).
+  async function yearPlan(st,hooks,live){
+    const p={turns:[],pages:0,chars:0,trimmed:false,months:[]}; const ids=[...new Set(st.rows.map(it=>monthOf(tsOf(it))))].sort();
+    for(const id of ids){ let have=null; if(typeof hooks.monthSummary==='function'){ try{ have=await hooks.monthSummary(id,titleOf(id)); }catch(e){ have=null; } }   // R5: a saved month summary that cannot be read back is summarised again from its pages; the extra turn is counted on the line
+      if(live()!==st) return null;
+      if(typeof have==='string'&&have.trim()){ p.months.push({id,text:have.trim(),saved:true}); p.chars+=have.trim().length; continue; }
+      const g=group(st.rows.filter(it=>monthOf(tsOf(it))===id),st.pages,st.photo); if(!g.pages) continue;
+      const m=buildMessage(g.groups); p.months.push({id,text:null,message:m.message,saved:false}); p.pages+=g.pages; p.chars+=g.chars; p.trimmed=p.trimmed||m.trimmed; }
+    p.turns=p.months.filter(m=>!m.saved).map(m=>({scope:SCOPE+m.id,message:m.message})).concat([{scope:SCOPE+st.id,year:true}]);
+    return p;
+  }
+  // The month maps through PAChat.complete (the same 'chat' kind and lane), in order; '' when all are in, else the failure line (or null when the sheet moved on).
+  async function mapMonths(todo,say,st,live){
+    let i=0;
+    for(const m of todo){ i++; say(fill(TXT.progress,{m:m.id,i,n:todo.length}));
+      let r; try{ r=await window.PAChat.complete(m.message,{label:titleOf(m.id)}); }catch(e){ r={ok:false,error:String((e&&e.message)||e)}; }
+      if(live()!==st) return null;
+      if(!r||!r.ok) return TXT.monthFailed+' '+m.id+' — '+((r&&r.error)||'');
+      m.text=r.text; }
+    return '';
+  }
+  // The page images of the turn about to be sent (note-features.md I): rendered now through PASummaryImages; one
+  // failure is the send's failure (said by the caller, R5). Answers {ok, images, msg, model} — msg carries the
+  // trust-the-image sentence after the prompt when pictures ride; nothing planned = the text as it was.
+  async function withImages(st,msg,say){
+    const im=st.images||{pages:[],lane:null}, model=im.lane?im.lane.id:undefined;
+    if(!im.pages.length) return {ok:true,images:[],msg,model};
+    say(I().TXT.fetching); const f=await I().fetch(im.pages);
+    return f.ok?{ok:true,images:f.images,msg:msg.replace('\n\n',' '+I().PROMPT+'\n\n'),model}:{ok:false,error:fill(I().TXT.failed,{e:f.error}),model};
+  }
+  // The sheet: title, the six presets, the photo tick, the status line, Cancel / Send. `a` = the open sheet's handlers.
+  function buildSheet(a){
+    const ov=document.createElement('div'), box=document.createElement('div'), presets={}, els={};
+    ov.className='pac-modal pac-msheet'; box.className='pac-mbox';
+    const t=document.createElement('div'); t.className='pds-ttl'; t.textContent=TXT.title; box.appendChild(t);
+    for(const k of ['selected','week','month','lastMonth','year','lastYear']){ const b=document.createElement('button'); b.className='pds-p'; b.type='button'; b.textContent=T().TXT[k]; b.onclick=()=>a.choose(k); presets[k]=b; box.appendChild(b); }
+    const lab=document.createElement('label'); lab.className='pds-tick'; const tick=document.createElement('input'); tick.type='checkbox'; tick.checked=false; tick.onchange=()=>a.togglePhoto(!!tick.checked);
+    lab.appendChild(tick); const lt=document.createElement('span'); lt.textContent=TXT.photo; lab.appendChild(lt); box.appendChild(lab); els.tick=tick;
+    els.line=document.createElement('div'); els.line.className='pds-line'; els.line.setAttribute('role','status'); box.appendChild(els.line);
+    const btns=document.createElement('div'); btns.className='pds-btns'; els.x=document.createElement('button'); els.x.className='pds-x'; els.x.type='button'; els.x.textContent=TXT.cancel; els.x.onclick=a.cancel;
+    els.send=document.createElement('button'); els.send.className='pds-send'; els.send.type='button'; els.send.textContent=TXT.send; els.send.disabled=true; els.send.onclick=a.send;
+    btns.appendChild(els.x); btns.appendChild(els.send); box.appendChild(btns); ov.appendChild(box);
+    ov.addEventListener('click',e=>{ if(e&&e.target===ov) a.cancel(); });
+    return {ov,presets,els};
+  }
+
+  const mkButton=(into,cls)=>{ const b=document.createElement('button'); b.className=cls; b.type='button'; b.textContent=TXT.button; into.appendChild(b); return b; };
+  // The Summarize first-use tip (ADR 0030), outside attach() so attach stays inside the R4 budget.
+  function tipSummarize(anchor){ if(window.PATips) window.PATips.register({id:'journal-summarize',anchor,text:TIP_SUMMARIZE}); }
+  function attach(c){
+    if(!c||!c.bar||!c.hooks||typeof c.hooks.run!=='function') return null;   // a drawer whose host cannot run a turn offers no button
+    const now=()=>T().now();   // read at use time: a test pins the week/month/year windows
+    const btn=mkButton(c.bar,'pac-lbulksum'), hbtn=c.head?mkButton(c.head,'pac-lbulksum pac-dsum'):null;   // the bar's Summarize and the header's (owner 2026-11-11; `head` = the drawer's .pac-dhead): ONE sheet
+    let st=null;   // the open sheet's state: {key, photo, rows, id, pages, pending, truncated, plan, busy}
+    let ov=null, presets={}, els={};   // the sheet on screen, rebuilt by open()
+    const say=s=>{ els.line.textContent=s; };
+    const mark=key=>{ for(const k in presets) presets[k].setAttribute('aria-pressed',k===key?'true':'false'); };
+    R().install(c.hooks);   // the host's onLink({id,page}): a tap on a [n] link opens that note
+    function open(){ ({ov,presets,els}=buildSheet({choose,togglePhoto,cancel,send})); const n=docRows(c.picked()).length; presets.selected.textContent=T().TXT.selected+' ('+n+')'; presets.selected.disabled=!n;   // Selected greyed until rows are ticked (Select · 多选 in the ⋯ sheet)
+      st={key:null,photo:false,rows:[],id:'',pages:null,pending:0,truncated:false,plan:null,busy:false}; say(''); c.host.appendChild(ov); return choose(n?'selected':'month'); }
+    function cancel(){ st=null; if(ov.remove) ov.remove(); else if(ov.parentNode&&ov.parentNode.removeChild) ov.parentNode.removeChild(ov); }
+    // One note-text ask per preset choice; the photo tick re-plans from the same reply. A failure is said on the line and Send stays off (R5).
+    async function choose(key){
+      if(!st||st.busy) return false; const my=st; const d=docsFor(key,c,now()); Object.assign(st,{key,rows:d.rows,id:d.id,pages:null,plan:null}); mark(key); els.send.disabled=true;
+      if(!d.rows.length){ say(TXT.nothing); return false; }
+      say(TXT.counting); const r=await fetchPages([...new Set(d.rows.map(it=>it.doc.path))]);
+      if(st!==my||st.key!==key) return false;
+      if(!r.ok){ say(TXT.failed+' — '+(r.error||'')); return false; }
+      st.pages=r.pages||[]; st.pending=Math.max(0,Number(r.pending)||0); st.truncated=r.truncated===true; return plan();
+    }
+    // The plan (shortPlan / yearPlan) and the honest line from it.
+    async function plan(){
+      const p=(st.key==='year'||st.key==='lastYear')?await yearPlan(st,c.hooks,()=>st):shortPlan(st);
+      if(!p) return false; st.plan=p; st.images=I()?I().plan({pages:st.pages,rows:st.rows,key:st.key}):null;   // + the pages with important ink as pictures, and the lane that will see them (note-features.md I); a year scope gets none
+      if(!p.pages&&!p.chars){ say(TXT.noText); els.send.disabled=true; return false; }
+      let line=fill(TXT.line,{p:p.pages,c:p.chars,lane:(st.images&&st.images.lane)?st.images.lane.label:lane()})+(st.images?st.images.line:''); if(p.turns.length>1) line+=' · '+fill(TXT.turns,{n:p.turns.length}); if(p.trimmed) line+=' · '+TXT.trimmedShort;
+      if(st.pending) line+=' · '+fill(TXT.pending,{n:st.pending}); if(st.truncated) line+=' · '+TXT.incomplete;   // the reply's own honesty: pages still transcribing, a cut listing
+      say(line); els.send.disabled=!!st.busy; return true;
+    }
+    // The tick is remembered even before the pages arrive; while a send runs it is disabled and never re-plans.
+    function togglePhoto(on){ if(!st) return false; st.photo=!!on; if(els.tick) els.tick.checked=st.photo; if(!st.pages||st.busy) return false; return plan(); }
+    // Send: the pressed turn(s), nothing else. Month maps run through PAChat.complete (the same 'chat' kind and lane); the last turn is the host's rail.
+    async function send(){
+      if(!st||!st.plan||st.busy) return false; const my=st, p=st.plan; st.busy=true; els.send.disabled=true; els.tick.disabled=true;
+      const stop=line=>{ say(line); st.busy=false; els.send.disabled=false; els.tick.disabled=false; return false; };   // a failure: said, retry possible (R5)
+      const mapped=await mapMonths(p.months.filter(m=>!m.saved),say,my,()=>st); if(mapped===null) return false; if(mapped) return stop(mapped);
+      const last=p.turns[p.turns.length-1]; let msg=last.message, refs=last.refs; if(last.year){ const y=yearMessage(p.months,st.rows); msg=y.message; refs=y.refs; }
+      const w=await withImages(st,msg,say); if(st!==my) return false; if(!w.ok) return stop(w.error); msg=w.msg; R().remember(last.scope,refs);   // the page images rendered now (note-features.md I); the refs of the turn actually sent — a plan that was cancelled or re-planned leaves none
+      pendingSave.set(last.scope,msg); // its answer is saved as a note when it ends (decorate, matched by scope AND prompt); a refused turn below takes it back
+      let ok, err=''; try{ ok=await c.hooks.run({scope:last.scope,label:titleOf(st.id),message:msg,images:w.images,model:w.model}); }catch(e){ ok=false; err=String((e&&e.message)||e)||'error'; }
+      if(err||ok===false) pendingSave.delete(last.scope);
+      if(st!==my) return false;
+      if(err) return stop(fill(TXT.sendFailed,{e:err}));
+      if(ok===false) return stop(TXT.busy);   // a bare false is the host's rail refusing the turn because one is still streaming (chat-ui send())
+      cancel(); if(typeof c.done==='function') c.done(); return true;
+    }
+    btn.onclick=open; if(hbtn) hbtn.onclick=open; tipSummarize(()=>hbtn||btn);   // + its first-use tip
+    return {button:btn,open,choose,togglePhoto,send,cancel,state:()=>st,get el(){ return ov; }};
+  }
+  // Under an AI answer in a summary scope: one text button that saves the note through the host. `ctx.el` is
+  // the answer's bubble: the saved note links [n] with the refs that bubble was painted with (PASummaryRefs.refsFor).
+  // AUTO-SAVE（自动保存, owner 2026-11-11): the answer of the turn the sheet sent (pendingSave) is saved as soon as
+  // it has streamed (`ctx.fresh`: chat-ui's send path, never a replayed thread) — no tap needed; the button then
+  // reads Saved · 已存. A follow-up in the thread is not a summary and is saved only by the tap: the pending save is
+  // keyed by scope AND bound to the prompt sent (Map scope → prompt), so a turn that failed without text or was
+  // abandoned by switching threads never hands its save to the next answer in that scope. Each answer is its OWN
+  // note (titled with its run time); its later saves pass the id its first save answered. A failure is said on the button
+  // and the answer stays in the rail (R5).
+  const pendingSave=new Map();   // scope → the prompt of the turn whose answer is to be saved
+  function decorate(bar,answer,ctx){
+    const x=ctx||{}; if(!bar||!isScope(x.key)||!x.hooks||typeof x.hooks.saveNote!=='function') return null;
+    const period=periodOfScope(x.key); R().install(x.hooks); const refs=R().refsFor(x.el,x.key); const b=document.createElement('button'); b.className='pac-ab pds-savenote'; b.type='button'; b.textContent=TXT.saveNote; bar.appendChild(b);
+    let extra='', noteId=null; const title=T().runTitleOf(period,T().now());   // the follow-up block once added (note-features.md I); this run's note and title
+    const save=async(fresh)=>{ b.disabled=true;   // the first line names the period by titleOf (R3), the human title the tab shows
+      const md0=window.PANote&&typeof window.PANote.mdToHtml==='function'?window.PANote.mdToHtml(String(answer||'')):'<div>'+esc(answer)+'</div>';
+      const md=R().linkifyHtml(md0,refs);   // [n] → note links the saved note keeps (sanitizeHtml keeps the scheme)
+      const html='<div>'+esc(fill(TXT.firstLine,{p:titleOf(period)}))+'</div>'+md; const convoId=(typeof x.convo==='function'?x.convo():null)||null; let r;
+      try{ r=await x.hooks.saveNote({...(noteId==null?{}:{id:noteId}),title,html:html+extra,period,scope:x.key,convoId}); }catch(e){ r={ok:false,error:String((e&&e.message)||e)}; }
+      if(r&&r.ok&&r.id!=null) noteId=r.id;
+      if(r&&r.ok&&fresh===true&&F()) b.followup=F().run({answer,html,period,scope:x.key,title,id:noteId,convoId,hooks:x.hooks,bar}).then(f=>{ if(f&&f.ok&&f.html) extra=f.html.slice(html.length); return f; });   // ONCE, after the turn's own save: the node researches the to-dos, the block is appended to the same note
+      if(r&&r.ok){ b.textContent=TXT.saved; R().noteSaved(x.key,r.id==null?null:String(r.id)); return true; }   // the back pill's target (PASummaryRefs)
+      b.textContent=TXT.notSaved+((r&&r.gone)?' — '+F().TXT.gone:(r&&r.error)?' — '+r.error:''); b.disabled=false; return false; };   // said on the button; a retry stays possible (R5)
+    b.onclick=save;
+    if(window.PATips) window.PATips.register({id:'summary-runs-kept',anchor:()=>b,text:TIP_RUNS});   // first-use tip (ADR 0030)
+    if(x.fresh===true&&pendingSave.has(x.key)&&pendingSave.get(x.key)===x.prompt){ pendingSave.delete(x.key); b.pending=save(true); }   // the summary turn's own answer: saved now, not awaited (chat-ui's render goes on)
+    return b;
+  }
+  window.PADrawerSummary={attach,decorate,isScope,periodOfScope,scopeOfLabel,titleOf,periodOf:(k,at)=>T().periodOf(k,at),group,buildMessage,SUMMARY_PROMPT,SYSTEM,YEAR_NOTE,TURN_MAX_CHARS,SCOPE,TODO_HEADING,TXT,FIRST_LINE_RE,isSummaryNote,TIP_SUMMARIZE,TIP_RUNS};
+})();
+</script>

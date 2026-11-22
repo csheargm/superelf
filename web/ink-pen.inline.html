@@ -1,0 +1,193 @@
+<!-- PAInkPen — the pen sheet for the Bible's verse ink（经文手写的笔工具）: pen / highlighter / eraser,
+     three sizes and the pad's colour swatches, behind ONE small round button. Inlined by web.mjs into any
+     page carrying the PA_INK_PEN_UI marker (the Bible carries it after PA_INK_ANCHOR_UI).
+     Nothing of the palette is copied (R3): the colours, the tool icons and titles, the size scale and the
+     highlighter's width/alpha all come from window.PANote.palette (web/note-ui.inline.html), the same
+     table the pad's own toolbar is built from; the swatch buttons are PANote's own markup.
+     - The button APPEARS only once a Pencil (pointerType 'pen') has touched the verse list in this
+       session (PAInkAnchor's onPen), and stays: a finger-only reader never sees a control for ink.
+       Pinned to the list's bottom-right corner, above the fab and the safe area.
+     - floating:false — NO round button: the host opens the SAME sheet from its own control with
+       openSheet(control) (the Bible's top-bar "Pen · 笔", owner 2026-11-13). The sheet then drops below
+       that control, and a press outside both closes it. onToggle(open) tells the host (aria-expanded, so its
+       auto-hiding bar stays while the sheet is open).
+     - The choice {t, size, c} is a per-app pref ON THE SERVER, kept through PAAppPrefs (web/app-prefs.inline.html,
+       carried by chat-ui): the page's ONE prefs chain, shared with the drawer, which merges only this key and
+       re-sends the prompt override. Read at attach and on every shell prefs push; a choice made while a read
+       is in flight is kept (the read answers with it on top).
+     - Undo ↶ / redo ↷ (owner 2026-11-15) sit beside the round button in ONE floating cluster (.pip-cl), shown
+       with it; they call the anchor's undo()/redo() and look disabled when there is nothing to step to.
+       The cluster drags anywhere with a finger or the Pencil: a press that moves DRAG_PX is a drag, a press that
+       does not is a tap. Clamped inside the viewport and safe areas (clampPos), re-clamped on resize/rotation,
+       remembered as viewport fractions under POS_KEY, keyed by this screen's size (devKey) so each device keeps
+       its own place. The sheet opens beside the cluster wherever it is (sheetPos), always on screen.
+     Driven for real by test/ink-pen-host.test.mjs (the component inside the Bible). -->
+<style id="pip-style">
+.pip-cl{position:fixed;z-index:6;display:none;gap:6px;align-items:center;touch-action:none;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+.pip-cl.on{display:flex}
+.pip-cl.pip-drag{opacity:.85}
+.pip-btn,.pip-hb{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--line,#e2e2de);background:var(--card,#fff);box-shadow:0 3px 12px rgba(0,0,0,.2);cursor:pointer;padding:0}
+.pip-hb{width:34px;height:34px;font-size:18px;color:var(--ink,#222)}
+.pip-hb.off{opacity:.45}
+.pip-probe{position:fixed;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+.pip-sheet{position:fixed;z-index:7;display:none;flex-direction:column;gap:10px;padding:12px;border-radius:14px;
+  bottom:calc(126px + env(safe-area-inset-bottom,0px));background:var(--card,#fff);border:1px solid var(--line,#e2e2de);
+  box-shadow:0 3px 14px rgba(0,0,0,.2)}
+.pip-sheet.on{display:flex}
+.pip-sheet.pip-drop{bottom:auto}
+.pip-row{display:flex;gap:6px;justify-content:center}
+.pip-dot{display:block;border-radius:50%;background:currentColor}
+.pip-cap,.pip-msg{font-size:12px;color:var(--muted,#6b7370);text-align:center}
+.pip-msg{color:var(--danger,#c8433b)}
+.pip-msg:empty{display:none}
+</style>
+<script id="pip-script">
+(function(){
+  if(window.PAInkPen) return;
+  const TOOL_IDS=Object.freeze(['pen','highlighter','erase']);         // the subset of PANote's TOOLS the verse ink takes
+  const ZH=Object.freeze({pen:'笔',highlighter:'荧光笔',erase:'橡皮'});   // the 中文 half of each tool's label (the English is the pad's title)
+  // Three sizes, as points along the pad's pen scale (SIZE_MIN..SIZE_MAX) and fractions of its highlighter width.
+  const SIZES=Object.freeze([['thin','Thin · 细',0.1,0.6],['medium','Medium · 中',0.25,0.8],['thick','Thick · 粗',0.5,1]]);
+  const PREF_KEY='inkPen', BTN_LABEL='Pen tools · 笔工具', EDGE_PX=12, DOT_MAX=14;
+  const TIP='Pen tools: pen, highlighter, eraser, size and colour · 笔工具：笔、荧光笔、橡皮擦、粗细和颜色';
+  const NOT_SAVED='Not saved · 未保存';
+  const UNDO_LABEL='Undo · 撤销', REDO_LABEL='Redo · 重做', POS_KEY='inkPenPos', DRAG_PX=8, GAP_PX=8, POS_MAX=6;
+  const HIST_TIP='Undo · 撤销, Redo · 重做 — drag to move · 拖动可移动';
+  // ── DOM-free placement: the cluster's top-left inside the viewport minus the safe areas and EDGE_PX ──
+  function clampPos(x,y,w,h,vw,vh,ins){
+    const i=ins||{t:0,r:0,b:0,l:0}, lo=(a,s)=>a+EDGE_PX, hi=(v,b,s)=>v-b-EDGE_PX-s;
+    const cx=v=>Math.round(Math.max(lo(i.l),Math.min(v,hi(vw,i.r,w)))), cy=v=>Math.round(Math.max(lo(i.t),Math.min(v,hi(vh,i.b,h))));
+    return {x:cx(x),y:cy(y)};
+  }
+  // The sheet beside a cluster rect: above it when it fits, else below; left edges aligned, then clamped.
+  function sheetPos(c,sw,sh,vw,vh,ins){
+    const y=c.top-GAP_PX-sh>=EDGE_PX+((ins&&ins.t)||0)?c.top-GAP_PX-sh:c.bottom+GAP_PX;
+    return clampPos(c.right-sw,y,sw,sh,vw,vh,ins);
+  }
+  const devKey=(vw,vh)=>Math.min(vw,vh)+'x'+Math.max(vw,vh);   // one place per screen, kept across rotation
+  const round2=n=>Math.round(n*100)/100;
+
+  // ── DOM-free: a choice → the pen record PAInkAnchor draws with ─────────────────────────────────
+  function valid(pal,ch,fallbackC){
+    const c=ch&&typeof ch.c==='string'&&/^#[0-9a-f]{6}$/i.test(ch.c)?ch.c:fallbackC;
+    return {t:ch&&TOOL_IDS.includes(ch.t)?ch.t:'pen', size:ch&&SIZES.some(s=>s[0]===ch.size)?ch.size:SIZES[0][0], c};
+  }
+  function penOf(pal,ch){
+    const st=SIZES.find(s=>s[0]===ch.size)||SIZES[0];
+    if(ch.t==='highlighter') return {t:ch.t,c:ch.c,w:round2(pal.HILITE_W*st[3]),a:pal.HILITE_ALPHA};
+    return {t:ch.t,c:ch.c,w:round2(pal.SIZE_MIN+(pal.SIZE_MAX-pal.SIZE_MIN)*st[2])};
+  }
+  const toolLabel=(pal,id)=>{ const t=pal.TOOLS.find(x=>x[0]===id); return (t?t[2]:id)+' · '+ZH[id]; };
+  const caption=(pal,ch)=>toolLabel(pal,ch.t)+(ch.t==='erase'?'':' — '+SIZES.find(s=>s[0]===ch.size)[1]);
+
+  function el(tag,cls,title){ const e=document.createElement(tag); e.className=cls; if(title){ e.title=title; e.setAttribute('aria-label',title); } return e; }
+  function buildSheet(pal,pick){
+    const sheet=el('div','pip-sheet'), tools=el('div','pip-row'), sizes=el('div','pip-row'), grid=el('div','pan-swgrid'), cap=el('div','pip-cap'), msg=el('div','pip-msg');
+    const toolBtns=TOOL_IDS.map(id=>{ const t=pal.TOOLS.find(x=>x[0]===id), b=el('button','pan-tbtn',toolLabel(pal,id)); b.innerHTML=pal.ico(t?t[1]:id); b.onclick=()=>pick({t:id}); tools.appendChild(b); return b; });
+    const sizeBtns=SIZES.map(([id,label])=>{ const b=el('button','pan-tbtn',label), d=el('span','pip-dot'); b.appendChild(d); b.onclick=()=>pick({size:id}); sizes.appendChild(b); return {b,d,id}; });
+    grid.innerHTML=pal.swatchesHtml('color');
+    grid.onclick=e=>{ const t=e&&e.target, c=t&&t.getAttribute&&t.getAttribute('data-color'); if(c) pick({c}); };
+    for(const x of [tools,sizes,grid,cap,msg]) sheet.appendChild(x);
+    return {sheet,toolBtns,sizeBtns,grid,cap,msg};
+  }
+
+  // TODO(R4 seam): attach is over 50 lines — split cluster placement + remembered position into place(cl) beside dragger().
+  function attach(o){
+    const pal=o.palette||(window.PANote&&window.PANote.palette), anchor=o.anchor, container=o.container;
+    if(!pal) throw new Error('PAInkPen.attach: no palette (PANote.palette) — PANote must be inlined first');
+    if(!anchor||!container) throw new Error('PAInkPen.attach: anchor (PAInkAnchor control) and container required');
+    const store=o.prefs||window.PAAppPrefs;
+    if(!store) throw new Error('PAInkPen.attach: no PAAppPrefs — chat-ui (PA_APP_PREFS_UI) must be inlined first');
+    const fallbackC=anchor.pen().c;
+    let ch=valid(pal,null,fallbackC), seen=false, open=false;
+    const btn=el('button','pip-btn',BTN_LABEL), ui=buildSheet(pal,patch=>choose(patch));
+    const cl=el('div','pip-cl'), ub=el('button','pip-hb',UNDO_LABEL), rb=el('button','pip-hb',REDO_LABEL);
+    ub.innerHTML=pal.ico('undo'); rb.innerHTML=pal.ico('redo'); for(const b of [ub,rb,btn]) cl.appendChild(b);   // the pad's own undo/redo icons (R3)
+    const floating=o.floating!==false;
+    const mount=o.mount||document.body; if(floating) mount.appendChild(cl); mount.appendChild(ui.sheet);
+    const drag=floating?dragger(cl,mount,()=>savePos()):null;
+    let dropFrom=null;   // the host control the sheet was opened from (floating:false), else null
+
+    function paint(){
+      anchor.setPen(penOf(pal,ch));
+      const t=pal.TOOLS.find(x=>x[0]===ch.t); btn.innerHTML=pal.ico(t?t[1]:ch.t); btn.style.color=ch.c;
+      ui.toolBtns.forEach((b,i)=>b.classList.toggle('on',TOOL_IDS[i]===ch.t));
+      ui.sizeBtns.forEach(({b,d,id})=>{ b.classList.toggle('on',id===ch.size); const w=Math.min(DOT_MAX,penOf(pal,{t:'pen',size:id,c:ch.c}).w*2); d.style.width=d.style.height=w+'px'; d.style.color=ch.c; });
+      (ui.grid.querySelectorAll?ui.grid.querySelectorAll('.pan-sw'):[]).forEach(b=>b.classList.toggle('on',b.getAttribute('data-color')===ch.c));
+      ui.cap.textContent=caption(pal,ch);
+    }
+    function place(){   // default: the list's own right edge, so the split rail beside it is never covered; else the remembered spot
+      if(drag&&drag.placeAt(posOf())) return;
+      const r=container.getBoundingClientRect(), right=Math.max(EDGE_PX,Math.round((window.innerWidth||0)-(r.left+r.width)+EDGE_PX))+'px';
+      cl.style.right=right; ui.sheet.style.right=right;
+    }
+    function besideCluster(){ if(!drag||!drag.moved()) return; const s=ui.sheet; s.classList.add('pip-drop'); s.style.right='auto';
+      const p=sheetPos(cl.getBoundingClientRect(),s.offsetWidth||0,s.offsetHeight||0,window.innerWidth||0,window.innerHeight||0,drag.insets());
+      s.style.left=p.x+'px'; s.style.top=p.y+'px'; }
+    function syncHist(){ ub.classList.toggle('off',!anchor.canUndo()); rb.classList.toggle('off',!anchor.canRedo()); }
+    if(anchor.onHistory){ anchor.onHistory(syncHist); syncHist(); }
+    ub.onclick=()=>{ if(drag&&drag.ate()) return; anchor.undo(); }; rb.onclick=()=>{ if(drag&&drag.ate()) return; anchor.redo(); };
+    function show(){ if(seen) return; seen=true; cl.classList.add('on'); place(); }
+    function setOpen(v){ open=!!v; if(open&&!dropFrom){ place(); besideCluster(); } if(!open) dropFrom=null; ui.sheet.classList.toggle('on',open); if(open&&!dropFrom) besideCluster(); if(o.onToggle) o.onToggle(open); }
+    btn.onclick=()=>{ if(drag&&drag.ate()) return; setOpen(!open); };
+    // The remembered spot for THIS screen, as viewport fractions; null = never moved here.
+    let posMap={};
+    const posOf=()=>{ const p=posMap[devKey(window.innerWidth||0,window.innerHeight||0)]; return p&&isFinite(p.fx)&&isFinite(p.fy)?p:null; };
+    function savePos(){ const W=window.innerWidth||1, H=window.innerHeight||1, r=cl.getBoundingClientRect(), k=devKey(W,H);
+      const next=Object.assign({},posMap); delete next[k]; const keys=Object.keys(next); while(keys.length>=POS_MAX) delete next[keys.shift()];
+      next[k]={fx:round2(r.left/W*100)/100,fy:round2(r.top/H*100)/100}; posMap=next; if(open) besideCluster();
+      return store.patch({[POS_KEY]:posMap}).then(w=>{ ui.msg.textContent=w.ok?'':NOT_SAVED+' — '+w.error; return w; }); }
+    // Below the host's control, its left edge clamped inside the window (the sheet's own width measured once shown).
+    function drop(ctl){
+      const r=ctl.getBoundingClientRect(), W=window.innerWidth||0, s=ui.sheet;
+      s.classList.add('pip-drop'); s.style.right='auto'; s.style.top=Math.round(r.bottom+6)+'px';
+      const w=s.offsetWidth||0; s.style.left=Math.round(Math.max(EDGE_PX,Math.min(r.left,W-EDGE_PX-w)))+'px';
+    }
+    function openSheet(ctl){
+      if(open){ setOpen(false); return false; }
+      dropFrom=ctl||null; setOpen(true); if(dropFrom) drop(dropFrom); return true;
+    }
+    if(!floating&&typeof document.addEventListener==='function') document.addEventListener('pointerdown',e=>{
+      const t=e&&e.target; if(!open||!dropFrom||ui.sheet.contains(t)||dropFrom.contains(t)) return; setOpen(false); },true);
+
+    // Server-side prefs. A failed READ leaves the session default (the pen still draws; nothing is lost and
+    // the next prefs push re-reads); a failed WRITE is shown in the sheet (R5) and the choice stays for the session.
+    function read(){ return store.read().then(r=>{ if(r.ok&&r.prefs[PREF_KEY]){ ch=valid(pal,r.prefs[PREF_KEY],fallbackC); paint(); }
+      const pm=r.ok&&r.prefs[POS_KEY]; if(pm&&typeof pm==='object'&&!Array.isArray(pm)&&(!drag||!drag.active())){ posMap=pm; if(seen) place(); } return r; }); }
+    function save(){ return store.patch({[PREF_KEY]:Object.assign({},ch)}).then(w=>{ ui.msg.textContent=w.ok?'':NOT_SAVED+' — '+w.error; return w; }); }
+    function choose(patch){ ch=valid(pal,Object.assign({},ch,patch),fallbackC); paint(); return save(); }
+
+    if(floating) anchor.onPen(show);
+    // First-use tip (ADR 0030): beside the round button once it shows, or beside the host's own control.
+    if(window.PATips) window.PATips.register({id:'bible-pen',anchor:floating?()=>btn:(o.tipAnchor||(()=>btn)),text:TIP});
+    if(window.PATips&&floating) window.PATips.register({id:'bible-pen-history',anchor:()=>ub,text:HIST_TIP,when:()=>seen});
+    window.addEventListener('message',e=>{ const m=e&&e.data; if(m&&m.pa==='prefs') read(); });
+    window.addEventListener('resize',()=>{ if(seen) place(); if(open&&dropFrom) drop(dropFrom); else if(open) besideCluster(); });   // rotation: the dropped sheet follows its control
+    paint(); read();
+    return { button:floating?btn:null, cluster:floating?cl:null, undoButton:ub, redoButton:rb, place, sheet:ui.sheet, ui, choice:()=>Object.assign({},ch), choose, isShown:()=>seen, isOpen:()=>open, setOpen, openSheet, read, whenIdle:()=>store.whenIdle() };
+  }
+  // ── Drag: any pointer (finger or Pencil) pressed on the cluster; DRAG_PX of travel makes it a drag, and
+  //    the click that follows a drag is eaten (ate()). placeAt(fractions) puts it at a remembered spot.
+  function dragger(cl,mount,onDrop){
+    let st=null, eat=false, movedOnce=false;
+    const probe=document.createElement('div'); probe.className='pip-probe'; mount.appendChild(probe);
+    const insets=()=>{ const cs=window.getComputedStyle?window.getComputedStyle(probe):null, n=v=>parseFloat(v)||0;
+      return cs?{t:n(cs.paddingTop),r:n(cs.paddingRight),b:n(cs.paddingBottom),l:n(cs.paddingLeft)}:{t:0,r:0,b:0,l:0}; };
+    function put(x,y){ const r=cl.getBoundingClientRect(), p=clampPos(x,y,r.width,r.height,window.innerWidth||0,window.innerHeight||0,insets());
+      cl.style.right='auto'; cl.style.bottom='auto'; cl.style.left=p.x+'px'; cl.style.top=p.y+'px'; movedOnce=true; }
+    cl.addEventListener('pointerdown',e=>{ if(st) return; eat=false; const r=cl.getBoundingClientRect(); st={id:e.pointerId,x:e.clientX,y:e.clientY,ox:r.left,oy:r.top,on:false};
+ });   // no capture yet: a tap's click must still reach the button under it
+    window.addEventListener('pointermove',e=>{ if(!st||e.pointerId!==st.id) return; const dx=e.clientX-st.x, dy=e.clientY-st.y;
+      if(!st.on&&Math.hypot(dx,dy)<DRAG_PX) return; if(!st.on){ st.on=true; cl.classList.add('pip-drag'); try{ cl.setPointerCapture(e.pointerId); }catch(_){ /* best-effort: the window listeners still follow the pointer */ } } if(e.preventDefault) e.preventDefault(); put(st.ox+dx,st.oy+dy); },{passive:false});
+    const end=e=>{ if(!st||e.pointerId!==st.id) return; const was=st.on; st=null; cl.classList.remove('pip-drag');
+      if(was){ eat=true; onDrop(); }   /* eat stays until the click (iOS sends it a task later) or the next press */ };
+    window.addEventListener('pointerup',end); window.addEventListener('pointercancel',e=>{ if(st&&e.pointerId===st.id&&st.on){ end(e); } else if(st&&e.pointerId===st.id) st=null; });
+    return { insets, moved:()=>movedOnce, active:()=>!!(st&&st.on),
+      ate:()=>{ if(!eat) return false; eat=false; return true; },
+      placeAt:p=>{ if(!p&&!movedOnce) return false; if(p) put(p.fx*(window.innerWidth||0),p.fy*(window.innerHeight||0)); else { const r=cl.getBoundingClientRect(); put(r.left,r.top); } return true; } };
+  }
+  window.PAInkPen={TIP,HIST_TIP,UNDO_LABEL,REDO_LABEL,POS_KEY,DRAG_PX,clampPos,sheetPos,devKey,attach,penOf,valid,caption,SIZES,TOOL_IDS,PREF_KEY,BTN_LABEL,NOT_SAVED};
+})();
+</script>

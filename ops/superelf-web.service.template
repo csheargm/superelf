@@ -1,0 +1,43 @@
+# systemd USER service for web.mjs · Linux 服务模板
+#
+# This file is a TEMPLATE. install.sh substitutes the three __PLACEHOLDERS__ and writes the result to
+# ~/.config/systemd/user/superelf-web.service. Do not install this file as-is.
+#
+# Why it exists: on Linux install.sh used to print "Not macOS — skipping launchd", then run start.sh,
+# which only knew launchctl (absent on Linux) and so never started web.mjs — and the installer still
+# ended with "superelf runs at boot from now on". This is the Linux owner of web.mjs, the systemd
+# counterpart of ops/com.superelf.web.plist.template.
+#
+# Restart=always, not on-failure, and that is deliberate: POST /api/admin/restart exits with code 0
+# (web.mjs), so a supervisor that only restarts on FAILURE would treat Restart as "it meant to stop"
+# and leave the node down. launchd's KeepAlive true and Windows' run.ps1 loop exist for the same
+# reason. StartLimitIntervalSec=0 goes with it: systemd's default gives up after 5 starts in 10s,
+# which a crash loop reaches — and an unattended box must keep trying, as launchd does.
+#
+# A USER unit, not a system one: the agent runs as you, with your Claude/Codex sign-in in your home
+# directory, never as root. It starts at boot only with LINGER on (loginctl enable-linger), which
+# install.sh sets up; without linger it starts at login and dies at logout.
+#
+# No After=/Wants=network-online.target: that target exists only in the SYSTEM manager, and a user
+# unit cannot order itself after a system unit. web.mjs does not need the network to start — it
+# binds port 8787 on 127.0.0.1 (config bind_host) and reaches the internet only per request.
+#
+# PATH must be spelled out. A user service does not get a login shell, so nvm's shims and
+# ~/.local/bin are absent — and `claude` (and `codex`) must be on PATH or every agent turn fails.
+#
+# Logs go to the journal: `journalctl --user -u superelf-web`. Nothing in the app reads a log file
+# (the macOS ~/Library/Logs/superelf.log is for people, not code), so there is no file to keep.
+[Unit]
+Description=superelf web (web.mjs, port 8787)
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=__ROOT__
+Environment="PATH=__PATH__"
+ExecStart="__NODE__" "__ROOT__/web.mjs"
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

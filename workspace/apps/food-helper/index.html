@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" media="(prefers-color-scheme:light)" content="#fdf6ee">
+<meta name="theme-color" media="(prefers-color-scheme:dark)" content="#141210">
+<title>Food Help 厨房助手</title>
+<style>
+html{font-size:calc(17px * var(--fs,1))}
+:root{--bg:#fdf6ee;--card:#fff;--text:#1c1a17;--muted:#7a7060;--line:#e8dfd0;--accent:#c47a2b;--green:#3a7a50;--sab:env(safe-area-inset-bottom,0px);--sat:env(safe-area-inset-top,0px)}
+@media(prefers-color-scheme:dark){:root{--bg:#141210;--card:#1e1a16;--text:#ede8e0;--muted:#9a9080;--line:#2e2820;--accent:#e0983c;--green:#5aab72}}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:-apple-system,system-ui,sans-serif;line-height:1.5}
+body{display:flex;flex-direction:column}
+#nav{display:flex;align-items:center;gap:8px;padding:calc(10px + var(--sat)) 14px 10px;border-bottom:1px solid var(--line);background:var(--card);flex-shrink:0}
+#nav-title{flex:1;font-size:17px;font-weight:700}
+#home{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:28px;text-align:center}
+#home .icon{font-size:54px}
+#home h2{font-size:20px;font-weight:700}
+#home p{color:var(--muted);font-size:15px;max-width:32ch}
+.chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:340px}
+.chip{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:7px 14px;font-size:13px;color:var(--text);cursor:pointer;transition:background .15s}
+.chip:active{background:var(--line)}
+#start{background:var(--accent);color:#fff;border:none;border-radius:12px;padding:13px 28px;font-size:16px;font-weight:600;cursor:pointer;margin-top:4px}
+#start:active{filter:brightness(.92)}
+.hint{color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+
+<div id="nav">
+  <div id="nav-title">🍳 Food Help 厨房助手</div>
+  <!--PA_SETTINGS_UI-->
+</div>
+
+<div id="home">
+  <div class="icon">🍳</div>
+  <h2>What's your food problem?</h2>
+  <p>Ask anything — recipes, substitutions, fixes, what to cook with what you have.</p>
+  <div class="chips">
+    <div class="chip" data-q="What can I make with chicken, garlic, and lemons?">🐔 Use what I have</div>
+    <div class="chip" data-q="I need a substitute for heavy cream in a sauce.">🔄 Substitution</div>
+    <div class="chip" data-q="My sauce broke — how do I fix it?">🆘 Fix a disaster</div>
+    <div class="chip" data-q="Quick high-protein dinner, 30 minutes or less.">⚡ Fast dinner idea</div>
+    <div class="chip" data-q="How do I meal prep lunches for the week?">📦 Meal prep</div>
+    <div class="chip" data-q="What's a good way to use up leftover rice?">♻️ Use leftovers</div>
+  </div>
+  <button id="start">Ask · 提问</button>
+  <div class="hint">Past chats in the drawer · 历史在抽屉</div>
+</div>
+
+<!--PA_CHAT_UI-->
+
+<script>
+const DEFAULT_SYSTEM = `You are a practical food and cooking assistant.
+
+When someone describes ingredients they have, suggest 2–3 specific recipes they can make right now — name the dish, list what extra (if anything) they need, and give a brief method.
+
+When someone asks for a substitution, give the ratio and any technique change required.
+
+When something has gone wrong (broken sauce, over-salted dish, burnt crust), diagnose and fix it step by step.
+
+Keep answers short and phone-readable: short paragraphs or numbered steps, no giant tables. Use temperature in both °F and °C. Prefer techniques that work in a standard home kitchen.`;
+
+const chat = PAChat.fullscreen({
+  defaultModel: 'claude',
+  placeholder: 'What ingredients do you have? What went wrong?',
+  system: DEFAULT_SYSTEM,
+  greeting: '🍳 What\'s the food problem? Tell me what you have or what went wrong.',
+  getLabel: () => 'Food Help',
+  persist: 'food-helper-chats',
+  onClose: () => { document.getElementById('home').style.display = 'flex'; },
+  onShow:  () => { document.getElementById('home').style.display = 'none'; },
+});
+
+PASettings.attach({
+  host: document.getElementById('nav'),
+  appPrompt: DEFAULT_SYSTEM,
+});
+
+document.getElementById('start').addEventListener('click', () => chat.open('general'));
+
+document.querySelectorAll('.chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    chat.open('general', { seed: chip.dataset.q });
+  });
+});
+</script>
+</body>
+</html>

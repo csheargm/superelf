@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tasks</title>
+<style>
+html{font-size:calc(17px * var(--fs,1))}   /* A-/A+ scale, broadcast by the shell (pa:'prefs' fontScale) */
+:root{ --bg:#f4f4f2; --card:#fff; --text:#1c1e1d; --muted:#6b7370; --line:#e2e2de; --accent:#0f6355; --danger:#983d24; }
+@media (prefers-color-scheme:dark){ :root{ --bg:#111514; --card:#1b201f; --text:#e5e8e6; --muted:#8f9894; --line:#2a302e; --accent:#57c2ac; --danger:#e08163; } }
+*{ box-sizing:border-box; margin:0; }
+body{ background:var(--bg); color:var(--text); font:16px/1.5 -apple-system,system-ui,sans-serif; padding:12px 12px 80px; }
+h2{ font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:18px 0 6px; }
+.item{ background:var(--card); border:1px solid var(--line); border-radius:8px; padding:10px 10px; margin-bottom:6px; display:flex; gap:10px; align-items:flex-start; }
+.item.done .label{ opacity:.5; text-decoration:line-through; }
+.cb{ flex-shrink:0; width:22px; height:22px; border:2px solid var(--line); border-radius:5px; cursor:pointer; display:flex; align-items:center; justify-content:center; background:none; font-size:13px; color:var(--accent); transition:border-color .15s; }
+.cb.checked{ border-color:var(--accent); background:var(--accent); color:#fff; }
+.label{ flex:1; cursor:pointer; word-break:break-word; }
+.edit-row{ display:flex; gap:6px; width:100%; }
+.edit-row textarea{ flex:1; font:inherit; font-size:14px; padding:6px 8px; border:1px solid var(--accent); border-radius:6px; background:var(--bg); color:var(--text); resize:vertical; min-height:60px; }
+.edit-row .btns{ display:flex; flex-direction:column; gap:4px; }
+.btn{ font:inherit; font-size:13px; padding:5px 10px; border-radius:6px; cursor:pointer; border:none; }
+.btn.save{ background:var(--accent); color:#fff; }
+.btn.cancel{ background:none; border:1px solid var(--line); color:var(--muted); }
+.btn.del{ background:none; border:1px solid var(--danger); color:var(--danger); }
+#add-bar{ position:fixed; bottom:0; left:0; right:0; display:flex; gap:8px; padding:10px 12px; background:var(--bg); border-top:1px solid var(--line); }
+#add-bar input{ flex:1; font:inherit; font-size:14px; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--text); }
+#add-bar button{ background:var(--accent); color:#fff; border:none; border-radius:8px; padding:0 14px; font:inherit; font-size:14px; cursor:pointer; }
+#add-bar :disabled{ opacity:.5; cursor:default; }
+#status{ font-size:12px; color:var(--muted); text-align:center; margin:8px 0 0; min-height:18px; }
+</style>
+</head>
+<body>
+<div id="root">Loading…</div>
+<div id="status"></div>
+<div id="add-bar">
+  <input id="add-input" placeholder="Add task…" autocomplete="off" disabled>
+  <button id="add-btn" disabled>Add</button>
+</div>
+
+<script>
+let _id=0; const _waiting={};
+window.addEventListener('message',(e)=>{ const m=e.data; if(m&&m.pa==='res'&&_waiting[m.id]){ _waiting[m.id](m); delete _waiting[m.id]; } });
+function paSaveData(path,data){ return new Promise((res)=>{ const id=++_id; _waiting[id]=res; parent.postMessage({pa:'req',id,kind:'save-data',path,data},'*'); }); }
+const esc=(s)=>String(s).replace(/[&<>]/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+// State: array of {type:'section',text} | {type:'task',done,text,sectionIdx} | {type:'blank'}
+// Also keep raw "other lines" (non-task, non-heading) preserved
+let lines=[]; // raw parsed lines: {kind:'heading'|'task'|'other', raw, done?, text?}
+let editingIdx=null;
+let saving=false;
+let again=false;                     // the list changed while a save was out: save it once more after
+const SAVED_CLEAR_MS=2000;           // how long "Saved ✓" stays; a failure stays until the next save
+let clearTimer=0;                    // the pending clear of a "Saved ✓"; a later save cancels it
+
+function setStatus(msg){ document.getElementById('status').textContent=msg; }
+
+// The list, through the one guarded first read (PAStore, ADR 0010). Only the shell's 'not-found' is a
+// first run; any other failed read refuses every save, and so does a save made before the read is
+// back, so an empty list can never be written over the real one. tasks.md is markdown: it is read as
+// text and saved as text, through save-data, which writes an app's own .md as sent (ADR 0014). No agent
+// run, so a save takes one round trip and leaves the page in the tap that made the change.
+const tasksFile=PAStore.file('tasks.md',{
+  parse:(text)=>text,
+  shape:(d)=>(typeof d==='string'?'':'no text'),
+  unreadable:(why)=>'Tasks unreadable · 任务无法读取 ('+why+')',
+  failed:(text)=>'Could not load tasks · 任务未能读取: '+text,
+});
+
+function parseLines(src){
+  return src.split('\n').map(l=>{
+    const h=/^(##\s+.*)/.exec(l);
+    if(h) return {kind:'heading', raw:l, text:l.replace(/^##\s+/,'')};
+    const t=/^- \[( |x)\]\s+(.*)/.exec(l);
+    if(t) return {kind:'task', raw:l, done:t[1]==='x', text:t[2]};
+    return {kind:'other', raw:l};
+  });
+}
+
+function toMarkdown(){
+  return lines.map(l=>{
+    if(l.kind==='task') return `- [${l.done?'x':' '}] ${l.text}`;
+    return l.raw;
+  }).join('\n');
+}
+
+// The app's FACE（应用面孔）— what the home tile shows without opening this app.
+// meta.json declares `"face": {"label":"open"}`; this writes the value beside it. It is a plain
+// count of the state already in memory, written through the ordinary auto-namespaced save-data
+// path, so it costs one small file write and never a model call — the shelf reads it on every
+// home view. See ../../superelf.md, "App faces".
+function openCount(){ return lines.filter(l=>l.kind==='task'&&!l.done).length; }
+function writeFace(){
+  // Deliberately not awaited and its failure deliberately not shown (R5): the face is an extra
+  // on someone else's screen, and a tile that stays plain IS the whole visible consequence.
+  // Surfacing it here would put "face save failed" over a task edit that succeeded — a message
+  // about the wrong thing, which is the exact failure this codebase keeps writing tests about.
+  paSaveData('face.json',{value:String(openCount()),ts:Date.now()}).catch(()=>{});
+}
+
+async function save(){
+  clearTimeout(clearTimer);          // an earlier success must not wipe what this save says
+  // One save at a time. A change made while one is out is not dropped: that save, once back, sends the
+  // list again as it is THEN, so any number of changes meanwhile cost one more save.
+  if(saving){ again=true; setStatus('Saving…'); return; }
+  // Only for a save PAStore will send: a list that was never read has no count to put on the tile.
+  if(tasksFile.loaded){ setStatus('Saving…'); writeFace(); }   // every change to the list changes the count
+  saving=true;
+  const why=await tasksFile.save(toMarkdown());
+  saving=false;
+  if(again){ again=false; return save(); }   // the save sent last carries every change, so only its answer is shown
+  setStatus(why||'Saved ✓');            // a refusal, or the shell's sentence for a failed save
+  if(!why) clearTimer=setTimeout(()=>setStatus(''),SAVED_CLEAR_MS);
+}
+
+function findSectionForTask(idx){
+  // walk backwards to find the last heading
+  for(let i=idx-1;i>=0;i--){ if(lines[i].kind==='heading') return lines[i].text; }
+  return '';
+}
+
+function getSectionNames(){
+  return [...new Set(lines.filter(l=>l.kind==='heading').map(l=>l.text))];
+}
+
+function render(){
+  const root=document.getElementById('root');
+  let html='';
+  lines.forEach((l,i)=>{
+    if(l.kind==='heading'){ html+=`<h2>${esc(l.text)}</h2>`; return; }
+    if(l.kind==='other'){ return; }
+    // task
+    const done=l.done;
+    html+=`<div class="item${done?' done':''}" data-i="${i}">`;
+    if(editingIdx===i){
+      html+=`<div class="edit-row" style="width:100%">
+        <textarea id="edit-ta-${i}">${esc(l.text)}</textarea>
+        <div class="btns">
+          <button class="btn save" onclick="saveEdit(${i})">Save</button>
+          <button class="btn cancel" onclick="cancelEdit()">Cancel</button>
+          <button class="btn del" onclick="deleteTask(${i})">Del</button>
+        </div>
+      </div>`;
+    } else {
+      html+=`<button class="cb${done?' checked':''}" onclick="toggleDone(${i})">${done?'✓':''}</button>`;
+      html+=`<div class="label" onclick="startEdit(${i})">${esc(l.text)}</div>`;
+    }
+    html+='</div>';
+  });
+  root.innerHTML=html||'No tasks found.';
+  if(editingIdx!==null){
+    const ta=document.getElementById('edit-ta-'+editingIdx);
+    if(ta){ ta.focus(); ta.selectionStart=ta.value.length; }
+  }
+}
+
+function toggleDone(i){
+  lines[i].done=!lines[i].done;
+  render();
+  save();
+}
+
+function startEdit(i){
+  editingIdx=i;
+  render();
+}
+
+function cancelEdit(){
+  editingIdx=null;
+  render();
+}
+
+function saveEdit(i){
+  const ta=document.getElementById('edit-ta-'+i);
+  if(!ta) return;
+  lines[i].text=ta.value.trim()||lines[i].text;
+  editingIdx=null;
+  render();
+  save();
+}
+
+function deleteTask(i){
+  lines.splice(i,1);
+  editingIdx=null;
+  render();
+  save();
+}
+
+// Add task — appends to last section. The bar sits outside #root, so it starts disabled and is
+// switched on only once the list is read (or there is none yet); a save from it is refused until then.
+document.getElementById('add-btn').onclick=addTask;
+document.getElementById('add-input').addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); addTask(); }});
+
+function addTask(){
+  const inp=document.getElementById('add-input');
+  const text=inp.value.trim(); if(!text) return;
+  inp.value='';
+  // Find last heading index; insert after it (or at the last task in that section)
+  let insertAt=lines.length;
+  for(let i=lines.length-1;i>=0;i--){
+    if(lines[i].kind==='heading'||lines[i].kind==='task'){ insertAt=i+1; break; }
+  }
+  // Skip blank "other" lines at end
+  lines.splice(insertAt,0,{kind:'task',done:false,text,raw:''});
+  render();
+  save();
+}
+
+(async()=>{
+  const r=await tasksFile.load();
+  document.getElementById('add-btn').disabled=document.getElementById('add-input').disabled=!tasksFile.loaded;
+  if(r.state==='failed'){ document.getElementById('root').textContent=r.text; return; }   // saves say it too
+  lines=r.state==='ok'?parseLines(r.value):[];                                           // 'first': no tasks.md yet
+  render();
+  // Also on load, not only on save: tasks.md is edited by the assistant and by hand too, so a
+  // face written only by this app's own saves would go stale the moment anything else touched
+  // the file — and a stale face is the one failure mode faces are not allowed to have.
+  writeFace();
+})();
+</script>
+</body>
+</html>

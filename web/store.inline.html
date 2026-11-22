@@ -1,0 +1,93 @@
+<script>
+// PAStore — an app's data file, read before anything may save over it（先读后存）.
+// No app carries its marker: web.mjs (sendAppHtml) puts PA_STORE_UI ahead of the first script of
+// EVERY served app page, right after PATwoTap (ADR 0005, ADR 0010), so every app has it at top level.
+// Seven hand-written copies of this guard existed (dd2dac9, b0c82aa); this is the one.
+//
+// THE RULE. The shell answers a read as {ok,text}, and a missing file as code 'not-found'
+// (web/index.html relayCall). ONLY 'not-found' is a first run. Any other failed read, and a file
+// that does not parse or has the wrong shape, is reported and REFUSES saves: the app's state is
+// still empty or default, and its next save would replace the user's real file with it. Saves are
+// refused while the first read is in flight, too. The refusal is inside save(), so no app can skip it.
+//
+//   const f = PAStore.file('family-data.json', {
+//     shape: (d) => (Array.isArray(d && d.members) ? '' : 'no members list'),  // '' = right shape, else why not
+//     unreadable: (why) => 'Family file unreadable · 家庭文件无法读取 (' + why + ')',
+//     failed: (text) => text,           // the app's words around the shell's sentence (default: as is)
+//     loading: 'Still loading · 加载中', // the app's words for "not read yet" (this is the default)
+//   });
+//   One more, for a file that is not JSON (Tasks' markdown list, ADR 0010 "Tasks", ADR 0014):
+//     parse: (text) => text,            // the read's text → the value shape() checks (default JSON.parse)
+//   await f.load()     → {state:'ok', value} | {state:'first'} | {state:'failed', text}
+//   await f.save(data) → '' once saved, otherwise why not: the refusal, or the shell's failure sentence
+//                        (r.text; a failure the shell did not word reads 'Save failed · 保存失败: ' + r.error)
+//   f.loaded, f.error  → the last read's outcome, for an app that gates a button or a list on it
+// `path` and `data` go to the broker as given (kind 'data', and 'save-data' with what 'data'). load() may be called again
+// (Daily Digest's 刷新 retries a failed read); until a read succeeds, the last failure is what save says.
+// `var`, and kept if already present, so the page has one instance even if the marker appears twice.
+// Unit-tested by test/store.test.mjs; each app's flow by test/app-read-guard*.test.mjs.
+var PAStore = PAStore || (function () {
+  'use strict';
+  const LOADING = 'Still loading · 加载中';
+  const NOT_SAVED = ' — not saved · 未保存';
+  // A failure the shell did not word. The real shell always adds `text` (web/index.html relayFail),
+  // and so does the test relay, which runs it: this is defence for a reply without one. A save says
+  // what failed around it — Daily Digest's words, the one app that had any — and neither may come
+  // back empty: '' from save() means saved, and a read with no reason must still refuse saves, not
+  // count as loaded (R14).
+  const NO_READ_REASON = 'Not loaded · 未加载';
+  const SAVE_FAILED = 'Save failed · 保存失败: ';
+
+  // An isolated broker, as every component has: string ids ('pas1'…) never match an app's numeric
+  // ids, so neither listener answers the other's request.
+  let seq = 0;
+  const waiting = {};
+  addEventListener('message', (e) => {
+    const m = e && e.data;
+    if (m && m.pa === 'res' && waiting[m.id]) { const done = waiting[m.id]; delete waiting[m.id]; done(m); }
+  });
+  const ask = (o) => new Promise((res) => {
+    const id = 'pas' + (++seq);
+    waiting[id] = res;
+    parent.postMessage(Object.assign({ pa: 'req', id }, o), '*');
+  });
+
+  // what:'data' names the payload for the shell's failure sentence. Without it the broker's default
+  // for save-data is 'note' (right for a PANote notebook), and a failed family-member or task save
+  // read "Note not saved · 未保存". 'data' is the neutral key of RELAY_NOUNS in web/index.html.
+  function file(path, { shape = () => '', parse = JSON.parse,
+    unreadable = (why) => why, failed = (text) => text, loading = LOADING } = {}) {
+    let loaded = false, error = '';
+
+    function outcome(r) {
+      if (!r.ok) return r.code === 'not-found' ? { state: 'first' } : { state: 'failed', text: failed(r.text || r.error || NO_READ_REASON) };
+      try {
+        const value = parse(r.text);
+        const why = shape(value);
+        return why ? { state: 'failed', text: unreadable(why) } : { state: 'ok', value };
+      } catch (e) { return { state: 'failed', text: unreadable(e.message) }; }
+    }
+
+    // `loaded` flips here, one microtask before the caller assigns the value it returns. No task can
+    // run between the two, so no save can see `loaded` with the app's state still unset.
+    async function load() {
+      const out = outcome(await ask({ kind: 'data', path }));
+      error = out.text || '';
+      loaded = !error;
+      return out;
+    }
+
+    async function save(data) {
+      if (!loaded) return (error || loading) + NOT_SAVED;
+      const r = await ask({ kind: 'save-data', what: 'data', path, data });
+      return r.ok ? '' : (r.text || SAVE_FAILED + (r.error || r.code || '?'));
+    }
+
+    return { load, save, get loaded() { return loaded; }, get error() { return error; } };
+  }
+
+  // `ask` is exported for the other shared components (PANote.search): one postMessage round-trip
+  // on every app page, not a copy per component (R3).
+  return { file, ask };
+})();
+</script>

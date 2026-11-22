@@ -1,0 +1,207 @@
+<!-- PAStationeryCost · 信纸绘制成本 — the RENDER-COST budget of the stationery trust boundary, split out of
+     stationery-sanitize (R4), which carries it ABOVE its own script and calls limitsWhy() and costWhy(). It carries
+     its readers, stationery-geometry, the same way. Why: a 2 KB SVG that passes the allow-list can still hold the
+     page's main thread for a minute. -->
+<!--PA_STATIONERY_GEOMETRY-->
+<script>
+window.PAStationeryCost=(function(){
+  'use strict';
+  // ── The page and the budgets (R3: one source each) ────────────────────────────────────────
+  // The page, CSS whitespace, 'none' and the readers live in stationery-geometry (carried above, run first).
+  const GEO=window.PAStationeryGeometry, {PAGE_W,PAGE_H,WS,NONE,attr,viewBoxOf,inherits,dashOf,widthOf,ownStretch,geomOf}=GEO;
+  // Render cost, measured in Chromium at the on-screen page (1640 device px): a full-page element ~0.25-0.5 ms,
+  // one see-through layer ~2.4 ms, one full-page effect pass (a mask, one filter step, one turbulence octave)
+  // ~15-30 ms. So a layer is priced at LAYER_COST elements and a pass at PASS_COST, and MAX_COST bounds the
+  // WORST design that gets through at ~2.5 s (figures: test/stationery-sanitize-cost.test.mjs, ADR 0003).
+  const MAX_COST=5000, PASS_COST=100, LAYER_COST=10;   // elements + passes x PASS_COST + layers x LAYER_COST + paint, every <use>/url(#id) expanded
+  // PAINT (ADR 0003 amendment 3): what a shape adds for HOW it is painted and for its outline. Measured at 1640 px:
+  // a whole-page gradient up to 16.2 ms (16 uneven stops); a whole-page pattern ~22 ms, whatever its tile; a shape in
+  // a tile 0.5 ms, 1.9 ms see-through; a dash up to 5.9 us per device row of its stroke (at least 2); an outline up
+  // to 4 us a segment and 0.38 ns per (edges on a row)^2 x rows (a 4,000-edge filled zigzag: 12.8 s). At ~0.3 ms
+  // a unit, the largest such design that gets through takes about 1.5 s or less.
+  const GRAD_COST=55;                           // a gradient over the whole page; a smaller shape pays its share of the page
+  const TILE_COST=6;                            // on top of its own 1: every shape drawn inside a pattern tile
+  const DASH_ROWS=45;                           // one unit per 45 dash-rows: a dash pays max(2, its device rows) / DASH_ROWS
+  const FILL_SEG=0.002, STROKE_SEG=0.02;         // each segment of a filled outline (0.6 us) and of a stroked one (6 us)
+  const GEOM_PAIRS=650000;                      // one unit per 650,000 (row crossings)^2 x device rows: 0.46 ns each
+  const DEV=1640/PAGE_W, H_DEV=PAGE_H*DEV, PAGE_AREA=PAGE_W*PAGE_H;   // device px per CSS px where measured
+  const FREE_SEGS=8, FREE_PAIRS=20*20*H_DEV;     // what a shape's own 1 covers: 8 segments, and 20 crossings on every row
+  // of the page (20^2 x 2,122 = ~849,000 pairs, ~0.39 ms); a 1-wide stroked rounded rect over the page uses ~315,000
+  const MAX_REF_DEPTH=16;                       // <use>/url(#id) hops along any one path
+  const MAX_FILTER_STEPS=8, MAX_OCTAVES=8;      // per <filter>; per feTurbulence
+  const MAX_FILTER_REGION=2;                    // a filter's width/height, in bounding boxes (default 1.2)
+  const MAX_STOPS=16;                           // per gradient: with uneven offsets each stop adds to every pixel (R13 round 1)
+  // ── What a design costs to draw ─────────────────────────────────────────────────────────
+  // Every <use href> AND every url(#id) is a reference: the target is drawn again for each one.
+  const REF_URL=/url\(\s*#([A-Za-z_][A-Za-z0-9_.-]*)\s*\)/g;
+  // A reference to one of these is an extra off-screen pass (a many-shape clip-path is drawn as a mask).
+  // Keyed by an element name. ELEMENTS already admits only listed names; no prototype all the same.
+  const EFFECT=Object.assign(Object.create(null),{mask:1,filter:1,pattern:1,clipPath:1});
+  const RESOURCE=Object.assign(Object.create(null),{mask:1,clipPath:1,pattern:1}); // drawn once PER reference: may not hold an effect itself
+  // A paint server's KIND (0 none, 1 solid, 2 gradient, 3 pattern). It is paid for by every shape that paints
+  // with it, never where url(#id) is written, so a <g fill="url(#p)"> lends a cost to each shape it fills.
+  const SERVER=Object.assign(Object.create(null),{linearGradient:2,radialGradient:2,pattern:3});
+  // A SEE-THROUGH LAYER: Chromium folds opacity < 1 into the paint ONLY on a shape with one paint (fill only, or
+  // fill="none" + stroke). Any other element with opacity < 1 is drawn off-screen, then blended (48 full-page rects
+  // x 95 <use> with fill AND stroke: 12.5 s; fill only 1.35 s; 40 nested <g opacity> round one rect x 115: 12.2 s).
+  // Paint is INHERITED (a lent stroke: 11.7 s), so it goes down every path as bits: 1 fill, 2 stroke. Only 'none'
+  // stops a paint, in CSS whitespace only (WS): "&#160;none" is not 'none' to Chromium (black, 11.6 s).
+  const SHAPES=Object.assign(Object.create(null),{path:1,rect:1,circle:1,ellipse:1,line:1,polyline:1,polygon:1});   // element names, as EFFECT
+  const GROUPS=Object.assign(Object.create(null),{g:1,svg:1,use:1});
+  const paintOf=(n,up)=>{ const f=attr(n,'fill'), s=attr(n,'stroke');
+    return (f==null?up&1:NONE.test(f)?0:1)|(s==null?up&2:NONE.test(s)?0:2); };
+  const seeThrough=(n)=>{ const o=attr(n,'opacity'); return o!=null&&!(Number(o)>=1); };
+  const layered=(n,p)=>seeThrough(n)&&(GROUPS[n.name]||SHAPES[n.name]&&(p===3||attr(n,'vector-effect')!=null));
+  const frac=(v,d)=>v==null?d:/%$/.test(v.trim())?parseFloat(v)/100:Number(v);
+  // The kind an own fill or stroke paints with: -1 inherited, 0 none, else at least solid. Chromium ignores a
+  // value it cannot read ("x", "", "context-fill") and paints the inherited one, so in `down` every own value
+  // but none also counts what is inherited: an over-count for a plain colour, never an under-count (R13
+  // round 1). A url(#id) to a missing or other element is solid.
+  function kindOf(v,ids){
+    if(inherits(v)) return -1; if(NONE.test(v)) return 0;
+    let k=1; for(const m of v.matchAll(REF_URL)){ const t=ids.get(m[1]), s=t&&SERVER[t.name]; if(s>k) k=s; }
+    return k;
+  }
+  // ── Inherited values, as the MOST each can be along ANY path that draws the element: fill and stroke kinds, stroke
+  //    width and dashes come down the tree and through <use>; a url(#id) target takes them from its own ancestors ──
+  function links(n,ids,K){
+    let r=K.get(n); if(r) return r;
+    r=n.kids.map(k=>[k,0]);
+    for(const [k,v] of n.attrs){
+      if(k==='href'){ const t=ids.get(v.slice(1)); if(t) r.push([t,1]); continue; }
+      for(const m of v.matchAll(REF_URL)){ const t=ids.get(m[1]); if(t) r.push([t,2]); } }
+    K.set(n,r); return r;
+  }
+  function props(root,ids,K){
+    const order=[], seen=new Map([[root,1]]), st=[[root,0]];   // post-order over every reference: 1 open, 2 done
+    while(st.length){ const f=st[st.length-1], E=links(f[0],ids,K);
+      if(f[1]<E.length){ const t=E[f[1]++][0], s=seen.get(t); if(s===1) return {loop:true}; if(!s){ seen.set(t,1); st.push([t,0]); } }
+      else { seen.set(f[0],2); order.push(f[0]); st.pop(); } }
+    const O=new Map(), P=down(order,root,ids,K,O); if(!(P instanceof Map)) return P;
+    // A pattern's tile is drawn in the space of each shape that PAINTS with it, which can be stretched below the
+    // element that names url(#p) (a fill lent to a scaled child: R13 round 2). So every pattern takes the largest
+    // stretch of any shape that paints with a pattern (none is in a tile: the nested rule) and passes it on. A
+    // stretch only grows, so each value it reaches is the larger of its first-pass input and what comes down.
+    let seed=0; for(const [n,v] of P) if(SHAPES[n.name]&&(v.fk===3||v.sk===3)&&v.sc>seed) seed=v.sc;
+    if(!(seed>1)) return P;
+    const reach=new Set(), st2=[...ids.values()].filter((t)=>t.name==='pattern'), inc=new Map();
+    while(st2.length){ const n=st2.pop(); if(reach.has(n)) continue; reach.add(n); for(const [t] of links(n,ids,K)) st2.push(t); }
+    for(let i=order.length-1;i>=0;i--){ const n=order[i]; if(!reach.has(n)) continue; const v=P.get(n);
+      let s=Math.max(v.in,inc.get(n)||0); if(n.name==='pattern') s=Math.max(s,seed); v.sc=s*O.get(n)[4];
+      for(const [t] of links(n,ids,K)) inc.set(t,Math.max(inc.get(t)||0,v.sc)); }
+    return P;
+  }
+  // One pass down the reference order: each element's values from all that lead to it. O caches its own values.
+  function down(order,root,ids,K,O){
+    const P=new Map(), up=new Map([[root,{fk:1,sk:0,sw:1,dash:0,sc:1,tile:false}]]);   // the root fills black by default
+    const max=(a,b)=>a>b?a:b, pick=(own,inh)=>own>=0?own:inh, paint=(own,inh)=>own<0?inh:own&&max(own,inh);
+    for(let i=order.length-1;i>=0;i--){ const n=order[i], u=up.get(n);
+      let o=O.get(n); if(!o){ o=[kindOf(attr(n,'fill'),ids),kindOf(attr(n,'stroke'),ids),widthOf(attr(n,'stroke-width')),dashOf(attr(n,'stroke-dasharray')),ownStretch(n,root)]; O.set(n,o); }
+      const v={fk:paint(o[0],u.fk), sk:paint(o[1],u.sk), sw:pick(o[2],u.sw), dash:pick(o[3],u.dash), sc:u.sc*o[4], in:u.sc, tile:u.tile};
+      // a pattern painted inside a pattern tile is a pattern inside a pattern: the nested rule, also when inherited
+      if(v.tile&&SHAPES[n.name]&&(v.fk===3||v.sk===3)) return {nested:true};
+      P.set(n,v);
+      for(const [t,kind] of links(n,ids,K)){ let w=up.get(t); if(!w){ w={fk:0,sk:0,sw:0,dash:0,sc:0,tile:false}; up.set(t,w); }
+        w.sc=max(w.sc,v.sc); if(kind===2) continue;
+        w.fk=max(w.fk,v.fk); w.sk=max(w.sk,v.sk); w.sw=max(w.sw,v.sw); w.dash=max(w.dash,v.dash); w.tile=w.tile||v.tile||n.name==='pattern'; } }
+    return P;
+  }
+  // ── What drawing shape n adds to its own 1, with paint bits p: each paint server it paints with (a gradient
+  //    its share of the page, a pattern a pass and the most costly tile), its outline, its dashes, its tile ──
+  function drawPrice(n,p,P,G){
+    const v=P.get(n), g=geomOf(n,G), s=v.sc*DEV;
+    const area=(e)=>{ const A=(g.w+4*e)*(g.h+4*e)*v.sc*v.sc/PAGE_AREA; return A<1?A:1; };   // a stroke can reach 2 widths out (miter)
+    // The outline: each segment, and the sum over device rows of (edges on the row)^2, bounded by (edges that can
+    // cross one scanline, x) x (the rows all edges span: their length, at most a page each, plus one per edge),
+    // beyond what the shape's own 1 already covers (FREE_*: a stroked rounded rect over the whole page)
+    const outline=(x,l,k,each)=>{ const r=l*s, q=x*((r<k*H_DEV?r:k*H_DEV)+k);   // x crossings, l length, k edges
+      return Math.max(0,g.segs-FREE_SEGS)*each+Math.max(0,q-FREE_PAIRS)/GEOM_PAIRS; };
+    const server=(k,e)=>k===2?GRAD_COST*area(e):k===3?PASS_COST+P.tile:0;
+    let c=v.tile?TILE_COST:0;
+    if(p&1) c+=server(v.fk,0)+outline(g.cross,g.len,g.lines,FILL_SEG);
+    if(p&2){ c+=server(v.sk,v.sw)+outline(2*g.cross+2*g.segs,2*g.len+4*v.sw*g.segs,2*g.lines+16*g.segs,STROKE_SEG);   // both sides; a join or cap each, 2 widths out
+      if(v.dash>0){ const ve=attr(n,'vector-effect')!=null, rows=v.sw*DEV*(ve?1:v.sc);   // non-scaling-stroke: page-px width, stretched path
+        c+=g.len*v.dash*(ve?v.sc:1)*Math.max(2,rows<H_DEV?rows:H_DEV)/DASH_ROWS; } }
+    return c;
+  }
+  // Each edge is [target, its paint, kind 0 kid | 1 <use> | 2 url(#id)]. A kid and a <use> target inherit
+  // this element's paint; a url(#id) target (mask, pattern, gradient) inherits from its OWN ancestors (doc).
+  function edgesOf(n,p,ids,doc,K){ return links(n,ids,K).map(([t,kind])=>[t,kind===2?doc.get(t):paintOf(t,p),kind]); }
+  function docPaint(root){
+    const doc=new Map([[root,paintOf(root,1)]]), todo=[root];   // 1: fill paints black by default, stroke is none
+    while(todo.length){ const n=todo.pop(); for(const k of n.kids){ doc.set(k,paintOf(k,doc.get(n))); todo.push(k); } }
+    return doc;
+  }
+  // A <filter>'s own rules; '' when fine. Its passes: each step once, a turbulence once per octave, scaled by its region.
+  function filterWhy(n){
+    if(n.kids.length>MAX_FILTER_STEPS) return 'a filter has more than '+MAX_FILTER_STEPS+' steps';
+    const x=frac(attr(n,'x'),-0.1), y=frac(attr(n,'y'),-0.1), w=frac(attr(n,'width'),1.2), h=frac(attr(n,'height'),1.2);
+    if(![x,y,w,h].every(isFinite)||Math.abs(x)>1||Math.abs(y)>1||!(w<=MAX_FILTER_REGION&&h<=MAX_FILTER_REGION)) return 'filter region too large';
+    return '';
+  }
+  // An element's own limits; '' when fine: a turbulence's octaves (WebKit does not clamp them), a filter's steps and region, a
+  // gradient's stops (uneven, each adds to every pixel: 4,000 on 22 full-page rects 42 s; 16 ~16 ms). SIZES, not dangers (stationery-simplify LIMIT_STEPS).
+  const octOver=(v)=>v!=null&&!(+v>=0&&+v<=MAX_OCTAVES), stopsOf=(n)=>n.kids.filter((k)=>k.name==='stop');
+  function limitsWhy(n){
+    if(octOver(attr(n,'numOctaves'))) return 'numOctaves above '+MAX_OCTAVES;
+    if(n.name==='filter') return filterWhy(n);
+    if(SERVER[n.name]===2&&stopsOf(n).length>MAX_STOPS) return 'a gradient has more than '+MAX_STOPS+' stops';
+    return '';
+  }
+  // A clip-path pays one pass PER SHAPE: Chromium unions its shapes for every element it clips.
+  function filterPasses(n){
+    let steps=0; for(const k of n.kids) steps+=k.name==='feTurbulence'?Math.max(1,+(attr(k,'numOctaves')||1)):1;
+    return Math.ceil(steps*Math.max(1,frac(attr(n,'width'),1.2)*frac(attr(n,'height'),1.2)));
+  }
+  // n drawn with paint p (its own fill and stroke, inherited where it sets none).
+  function combine(n,p,edges,got,P,G){
+    const r={size:1,passes:0,layers:layered(n,p)?1:0,paint:SHAPES[n.name]?drawPrice(n,p,P,G):0,fx:false,depth:0,nested:false};
+    for(const [t,tp,kind] of edges){ const c=got(t,tp);
+      r.fx=r.fx||c.fx; r.nested=r.nested||c.nested; r.depth=Math.max(r.depth,c.depth+(kind?1:0));
+      // A gradient or pattern is not drawn where url(#id) names it: each shape that paints with it pays, in
+      // drawPrice. So the edge adds no size, pass, layer or paint here; it still counts for depth, loops and nesting.
+      if(kind===2&&SERVER[t.name]){ r.fx=r.fx||!!EFFECT[t.name]; continue; }
+      r.size+=c.size; r.passes+=c.passes; r.layers+=c.layers; r.paint+=c.paint;
+      if(!kind){ if(RESOURCE[n.name]&&c.fx) r.nested=true; continue; }
+      if(EFFECT[t.name]){ r.fx=true; r.passes+=t.name==='filter'?filterPasses(t):t.name==='clipPath'?Math.max(1,c.size-1):1; } }
+    return r;
+  }
+  const total=(m)=>m.size+m.passes*PASS_COST+m.layers*LAYER_COST+m.paint;
+  // The whole tree's cost with every reference expanded. ITERATIVE (an explicit stack): a long
+  // <use> chain must be a rejection, never a RangeError. Memoised per (element, paint), so a doubling
+  // chain (the "billion laughs" of SVG) is measured in linear time; a cycle is reported as a loop.
+  // Each pattern is measured first: a shape painted with a pattern pays for the most costly tile (P.tile).
+  function measure(root,ids){
+    const K=new Map(), G=new Map(), P=props(root,ids,K); if(!(P instanceof Map)) return P;
+    const memo=new Map(), open=new Set(), doc=docPaint(root);
+    const got=(n,p)=>(memo.get(n)||[])[p];
+    const walk=(start)=>{ const todo=[[start,doc.get(start)]];
+      while(todo.length){
+        const f=todo[todo.length-1], [n,p]=f;
+        if(got(n,p)){ todo.pop(); continue; }
+        const E=f[2]||(f[2]=edgesOf(n,p,ids,doc,K));   // built once per frame, read on both visits
+        if(open.has(n)){ open.delete(n); if(!memo.has(n)) memo.set(n,[]); memo.get(n)[p]=combine(n,p,E,got,P,G); todo.pop(); continue; }
+        open.add(n);
+        for(const [d,dp] of E){ if(open.has(d)) return {loop:true}; if(!got(d,dp)) todo.push([d,dp]); }
+      }
+      return got(start,doc.get(start)); };
+    P.tile=0;
+    for(const t of ids.values()) if(t.name==='pattern'){ const m=walk(t); if(m.loop) return m; P.tile=Math.max(P.tile,total(m)); }
+    return walk(root);
+  }
+  // -> {why, cost}: why is '' when the design may be drawn; cost is the total (NaN for a loop or a nesting), shown
+  // in sanitize()'s result so a test can read a price, not only a verdict (R13 round 3, R14).
+  function costWhy(root,ids){
+    const m=measure(root,ids);
+    const r=(why)=>({why,cost:m.loop||m.nested?NaN:total(m)});
+    if(m.loop) return r('<use> or url(#id) loops back on itself');
+    if(m.nested) return r('a mask, clip-path or pattern may not itself use a mask, clip-path, filter or pattern');
+    if(m.depth>MAX_REF_DEPTH) return r('references nest more than '+MAX_REF_DEPTH+' deep');
+    if(!(total(m)<=MAX_COST)) return Object.assign(r('too costly to draw — expands too far (expansion bomb), or too many masks, filters, see-through layers (opacity on a group, or on a shape with fill and stroke), gradient or pattern fills, dashes, or outlines with many edges'),{over:true});   // over: the budget, and nothing else (simplify)
+    return r('');
+  }
+  // stationery-simplify reads the element kinds, the readers and the limits from here (R3: one source each)
+  return { PAGE_W, PAGE_H, WS, REF_URL, MAX_COST, PASS_COST, LAYER_COST, viewBoxOf, limitsWhy, costWhy, SHAPES, GROUPS, SERVER, frac, seeThrough, stopsOf, octOver,
+    LIMITS:{filterSteps:MAX_FILTER_STEPS,octaves:MAX_OCTAVES,refDepth:MAX_REF_DEPTH,filterRegion:MAX_FILTER_REGION,gradientStops:MAX_STOPS} };
+})();
+</script>

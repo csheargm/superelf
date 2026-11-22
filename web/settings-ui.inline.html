@@ -1,0 +1,300 @@
+<!-- ─────────────────────────────────────────────────────────────────────────────────────────
+     PASettings — the ⚙ an app puts in its OWN header, and the panel behind it.
+     Inlined at serve time by web.mjs into any app page carrying the marker
+
+       PA_SETTINGS_UI                     (the HTML-comment marker, once in <body>)
+
+     written here WITHOUT the comment delimiters: the literal form would close this header early AND
+     be replaced by this file's own content at serve time (web.mjs replaces every occurrence).
+
+     WHAT IT SHOWS
+       · the app's PREFERENCES as JSON — the app defines the shape, this only edits the text;
+       · the app-level SYSTEM PROMPT: the effective text, where it came from (your override /
+         this node's default / the app's own), and a box to override it for yourself.
+
+     WHERE IT ALL LIVES — SERVER-SIDE, on the user's profile
+     Nothing here touches a storage API. An app runs sandboxed (allow-scripts, no
+     allow-same-origin) and the CSP has no 'self', so localStorage, sessionStorage, IndexedDB and
+     cookies ALL throw SecurityError at an opaque origin (verified 2026-09-02, see
+     note-ui.inline.html:2284-2290). Reads and writes go through the SHELL broker
+     (kind: app-settings / set-app-settings), which scopes them to this app and forwards them to
+     PUT /api/profile — the same store appOrder, systemPrompts, appModels and appPrefs use (R3).
+     The app never sees the rest of the profile: the shell hands back only this app's slice.
+
+     WHY A COMPONENT AND NOT PER-APP UI
+     "Used in more than one place" is the whole test. Every app wants the same two things behind
+     the same ⚙, and a panel copied per app is four panels to fix when the save contract changes.
+────────────────────────────────────────────────────────────────────────────────────────── -->
+<style id="pag-style">
+/* z-index is LITERAL, never var(): test/app-load.test.mjs reads these rules statically and a
+   var() reads as "unresolved", which its ladder check scores as 0 and passes vacuously.
+   70 sits ABOVE .pac-fs/.pan-fs (50) and .pac-drawerhost (60) — settings opened over a chat or a
+   drawer must be on top of it — and BELOW .pac-lb (1000) and .pa-notice (2000), because a save
+   failure has to be readable over this panel. */
+.pag-ov{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.42);display:none;
+  align-items:center;justify-content:center;padding:16px}
+.pag-ov.on{display:flex}
+.pag-dlg{background:var(--card,#fff);color:var(--text,#111);border-radius:14px;width:100%;
+  max-width:560px;max-height:100%;display:flex;flex-direction:column;overflow:hidden;
+  box-shadow:0 10px 40px rgba(0,0,0,.3)}
+.pag-hd{display:flex;align-items:center;gap:8px;padding:10px 12px;flex-shrink:0;
+  border-bottom:1px solid var(--line,#e2e2de);font-weight:600;font-size:15px}
+.pag-hd-t{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The scroll container, not the dialog: a long system prompt must not push the buttons off. */
+.pag-bd{flex:1 1 auto;min-height:0;overflow-y:auto;padding:12px;display:flex;
+  flex-direction:column;gap:14px}
+.pag-ft{display:flex;align-items:center;gap:8px;padding:10px 12px;flex-shrink:0;
+  border-top:1px solid var(--line,#e2e2de)}
+.pag-sec{display:flex;flex-direction:column;gap:6px}
+.pag-lbl{font-size:12px;font-weight:600;color:var(--muted,#6b7370)}
+.pag-hint{font-size:11px;color:var(--muted,#6b7370);line-height:1.45}
+/* The EFFECTIVE prompt, read-only: what the model is actually being told right now. It is a
+   separate box from the override so "what is in force" and "what I am changing" are never the
+   same field — editing one used to silently redefine the other. */
+.pag-eff{font:inherit;font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-word;
+  background:var(--bg,#f6f6f4);border:1px solid var(--line,#e2e2de);border-radius:8px;
+  padding:8px;max-height:9em;overflow-y:auto}
+.pag-src{font-size:11px;color:var(--muted,#6b7370)}
+.pag-ta{font:inherit;font-size:13px;line-height:1.5;width:100%;box-sizing:border-box;
+  background:var(--card,#fff);color:var(--text,#111);border:1px solid var(--line,#e2e2de);
+  border-radius:8px;padding:8px;resize:vertical;min-height:4em}
+.pag-ta.pag-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;min-height:9em}
+.pag-ta.pag-bad{border-color:#c0392b}
+/* One message line for BOTH the JSON parse error and the save failure. Two separate surfaces
+   meant a parse error could sit under a stale "saved" and neither contradicted the other (R5). */
+.pag-msg{flex:1;font-size:12px;line-height:1.4;min-height:1.4em;color:var(--muted,#6b7370)}
+.pag-msg.pag-err{color:#c0392b}
+.pag-btn{font:inherit;font-size:13px;padding:7px 12px;border-radius:8px;cursor:pointer;
+  border:1px solid var(--line,#e2e2de);background:var(--card,#fff);color:var(--text,#111);flex-shrink:0}
+.pag-btn:disabled{opacity:.5;cursor:default}
+.pag-btn.pag-go{background:var(--accent,#0f6355);border-color:var(--accent,#0f6355);color:#fff}
+.pag-btn:focus-visible,.pag-gear:focus-visible{outline:2px solid var(--accent,#0f6355);outline-offset:1px}
+/* The ⚙ itself. `font:inherit` + no background so it inherits whatever the host header uses for
+   its own buttons — the Bible's #nav .ch-btn, another app's something else. Unobtrusive by
+   construction rather than by a colour chosen here that would clash in the next app. */
+.pag-gear{font:inherit;background:none;border:0;padding:3px 6px;border-radius:6px;cursor:pointer;
+  color:inherit;opacity:.75;line-height:1}
+.pag-gear:hover{opacity:1}
+</style>
+<script>
+(function(){
+  if(window.PASettings) return;                    // idempotent: safe if the marker appears twice
+
+  // ── the shell bridge ────────────────────────────────────────────────────────────────────
+  // Its own request ids, prefixed 'pag', for the same reason PAChat prefixes 'pac': an app's
+  // own broker numbers its requests, and a collision would hand one component another's reply.
+  var _cid=0, _wait={};
+  window.addEventListener('message',function(e){
+    var m=e.data; if(m&&m.pa==='res'&&_wait[m.id]){ var f=_wait[m.id]; delete _wait[m.id]; f(m); }
+  });
+  function req(o){
+    return new Promise(function(res){
+      var id='pag'+(++_cid); _wait[id]=res;
+      // No shell (opened standalone, or a harness): report it rather than hanging for ever on a
+      // promise nothing will ever settle (R5).
+      try{ parent.postMessage(Object.assign({pa:'req',id:id},o),'*'); }
+      catch(err){ delete _wait[id]; res({ok:false,error:'no shell · 无法连接外壳'}); }
+    });
+  }
+
+  var TXT={
+    title:'Settings · 设置',
+    gear:'Settings · 设置',
+    prefs:'Preferences (JSON) · 偏好设置',
+    prefsHint:'This app’s own settings, stored on your account · 保存在你的账号上',
+    prompt:'App system prompt · 应用系统提示',
+    effective:'In force now · 当前生效',
+    override:'Your override · 你的覆盖设置',
+    overrideHint:'Leave blank to use the default above · 留空则使用上面的默认值',
+    save:'Save · 保存', cancel:'Cancel · 取消',
+    saving:'Saving… · 保存中…', saved:'Saved · 已保存',
+    badJson:'Not valid JSON · JSON 格式无效: ',
+    notObj:'Preferences must be a JSON object · 偏好必须是 JSON 对象',
+    loadFail:'Could not load settings · 无法加载设置: ',
+    saveFail:'Not saved · 未保存: '
+  };
+  // Where the prompt in force came from. The app's OWN prompt is the one it sends with each
+  // turn; naming the source is the difference between "why is it answering like that" and a
+  // box of text with no provenance.
+  var SRC={ profile:'your override · 你的覆盖设置', config:'this node’s default · 本节点默认',
+            app:'the app’s own · 应用自带', none:'none · 无' };
+
+  // Text is set with textContent, never the markup-parsing alternative: every string that lands
+  // in this panel — a system prompt, a preferences blob, a failure reason — is user- or
+  // app-supplied, so parsing it as markup would be an injection seam. The alternative is not
+  // NAMED on a code line on purpose: test/app-settings.test.mjs forbids it in the source, and
+  // that test's stripComments() only drops whole comment LINES, so a trailing mention would read
+  // as a violation of the very rule it is explaining.
+  function el(tag,cls,text){
+    var n=document.createElement(tag);
+    if(cls) n.className=cls;
+    if(text!=null) n.textContent=text;
+    return n;
+  }
+
+  window.PASettings={
+    available:true,
+    TXT:TXT,
+    // Put a ⚙ into the app's own header. Returns {el, open, close} — `el` so a host can style or
+    // reposition it, open() so a host can offer its own way in as well.
+    attach:function(opts){ return Gear(opts||{}); }
+  };
+
+  function Gear(o){
+    if(!o.host) throw new Error('PASettings.attach: no host — a settings button with nowhere to sit would never be reachable');
+    var gear=el('button','pag-gear','⚙');
+    gear.type='button';
+    gear.title=o.label||TXT.gear; gear.setAttribute('aria-label',o.label||TXT.gear);
+    o.host.appendChild(gear);
+
+    var ov=el('div','pag-ov'), dlg=el('div','pag-dlg');
+    dlg.setAttribute('role','dialog'); dlg.setAttribute('aria-modal','true');
+    var hd=el('div','pag-hd'), hdt=el('span','pag-hd-t',o.title||TXT.title);
+    hd.appendChild(hdt);
+    var bd=el('div','pag-bd');
+
+    // ── the app's system prompt: what is in force, then the box that changes it ──
+    var pSec=el('div','pag-sec');
+    pSec.appendChild(el('div','pag-lbl',TXT.prompt));
+    var effLbl=el('div','pag-hint',TXT.effective);   // caption, NOT .pag-src — the provenance
+                                                    // line below is the only .pag-src, so tests
+                                                    // and CSS both address exactly one thing
+    var eff=el('div','pag-eff','');
+    var src=el('div','pag-src','');
+    pSec.appendChild(effLbl); pSec.appendChild(eff); pSec.appendChild(src);
+    pSec.appendChild(el('div','pag-lbl',TXT.override));
+    var pTa=el('textarea','pag-ta'); pTa.rows=3;
+    pSec.appendChild(pTa);
+    pSec.appendChild(el('div','pag-hint',TXT.overrideHint));
+
+    // ── the app's own preferences, as JSON ──
+    var jSec=el('div','pag-sec');
+    jSec.appendChild(el('div','pag-lbl',TXT.prefs));
+    var jTa=el('textarea','pag-ta pag-mono'); jTa.rows=8;
+    jSec.appendChild(jTa);
+    jSec.appendChild(el('div','pag-hint',TXT.prefsHint));
+
+    // Tick-box rows FIRST (PASettingsRows, settings-rows.inline.html): booleans kept in step with the JSON box.
+    var rows=window.PASettingsRows?window.PASettingsRows.mount(bd,jTa):null;   // TODO(R4 seam): this file is at budget
+    bd.appendChild(pSec); bd.appendChild(jSec);
+    // Extra sections: app-specific fields beyond the system prompt and prefs.
+    // Each entry: {label, hint?, getValue(), onCommit(value) -> Promise<{ok}>}.
+    var _extras=[];
+    if(Array.isArray(o.extras)) o.extras.forEach(function(x){
+      if(!x||!x.label) return;
+      var xSec=el('div','pag-sec');
+      xSec.appendChild(el('div','pag-lbl',x.label));
+      var xTa=x.readout?el('div','pag-eff'):el('textarea','pag-ta'); if(!x.readout) xTa.rows=3;   // readout: a line the sheet SHOWS (a device readout), never a box it saves
+      xSec.appendChild(xTa);
+      if(x.hint) xSec.appendChild(el('div','pag-hint',x.hint));
+      bd.appendChild(xSec);
+      _extras.push({ta:xTa,getValue:x.getValue,onCommit:x.readout?null:x.onCommit,readout:!!x.readout});
+    });
+    var ft=el('div','pag-ft'), msg=el('div','pag-msg',''),
+        cancel=el('button','pag-btn',TXT.cancel), save=el('button','pag-btn pag-go',TXT.save);
+    cancel.type='button'; save.type='button';
+    ft.appendChild(msg); ft.appendChild(cancel); ft.appendChild(save);
+    dlg.appendChild(hd); dlg.appendChild(bd); dlg.appendChild(ft);
+    ov.appendChild(dlg); document.body.appendChild(ov);
+
+    var open=false, busy=false;
+    function say(text,bad){
+      msg.textContent=text||'';
+      msg.classList.toggle('pag-err',!!bad);          // classList, never className=: assigning
+    }                                                 // the whole string wipes the state classes
+    function setBusy(on){
+      busy=!!on; save.disabled=busy; cancel.disabled=busy;
+    }
+
+    // Parse the JSON box ONCE, here, so the "is this valid" question has one answer that both
+    // the message line and the save path read. Returns {ok,value} or {ok:false,error}.
+    function readPrefs(){
+      var t=jTa.value.trim();
+      if(!t) return {ok:true,value:{}};               // an emptied box means "no preferences"
+      var v;
+      try{ v=JSON.parse(t); }
+      catch(e){ return {ok:false,error:TXT.badJson+((e&&e.message)||'')}; }
+      if(!v||typeof v!=='object'||Array.isArray(v)) return {ok:false,error:TXT.notObj};
+      return {ok:true,value:v};
+    }
+    // Live feedback while typing: a JSON error found only on Save is found after the user has
+    // stopped looking at the thing that caused it.
+    jTa.addEventListener('input',function(){
+      var r=readPrefs();
+      jTa.classList.toggle('pag-bad',!r.ok);
+      say(r.ok?'':r.error,!r.ok);
+    });
+
+    function paint(d){
+      var p=(d&&d.systemPrompt)||{};
+      eff.textContent=p.effective||'';
+      src.textContent=SRC[p.source]||SRC.none;
+      pTa.value=p.override||'';
+      var pr=(d&&d.prefs&&typeof d.prefs==='object')?d.prefs:{};
+      jTa.value=Object.keys(pr).length?JSON.stringify(pr,null,2):'';
+      jTa.classList.remove('pag-bad'); if(rows) rows.sync();
+      _extras.forEach(function(x){ if(!x.getValue) return; if(x.readout) x.ta.textContent=x.getValue(); else x.ta.value=x.getValue(); });
+      say('');
+    }
+
+    async function show(){
+      if(open) return;
+      open=true; ov.classList.add('on');
+      document.addEventListener('keydown',onKey);
+      setBusy(true); say('');                         // the boxes are empty until the read lands
+      // appPrompt: the app's OWN system prompt, which only the app knows. The shell completes
+      // the precedence chain with it (override -> node default -> the app's own), so the panel
+      // can say "the app's own" instead of showing an empty box for a prompt that IS in force.
+      var r=await req({kind:'app-settings',appPrompt:o.appPrompt||''});
+      setBusy(false);
+      // A panel that opens on nothing looks like an app with no settings. Say what failed (R5).
+      if(!r||!r.ok){ paint({}); say(TXT.loadFail+((r&&(r.text||r.error))||'unknown'),true); return; }
+      paint(r);
+    }
+    function hide(){
+      if(!open) return;
+      open=false; ov.classList.remove('on');
+      document.removeEventListener('keydown',onKey);
+    }
+    // Escape closes — but never mid-save, which would hide the surface the failure is about to
+    // be reported on.
+    function onKey(e){ if(e.key==='Escape'&&!busy) hide(); }
+
+    async function commit(){
+      if(busy) return;
+      var pr=readPrefs();
+      if(!pr.ok){ jTa.classList.add('pag-bad'); say(pr.error,true); return; }
+      setBusy(true); say(TXT.saving);
+      var r=await req({kind:'set-app-settings',prefs:pr.value,systemPrompt:pTa.value,appPrompt:o.appPrompt||''});
+      setBusy(false);
+      // The write is the only thing that makes this durable, so a failure closes nothing and
+      // keeps every edit on screen to retry (R5).
+      if(!r||!r.ok){ say(TXT.saveFail+((r&&(r.text||r.error))||'unknown'),true); return; }
+      // Extra sections: save each one; abort on the first failure (R5).
+      for(var i=0;i<_extras.length;i++){
+        var x=_extras[i];
+        if(!x.onCommit) continue;
+        setBusy(true);
+        var xr=await x.onCommit(x.ta.value.trim());
+        setBusy(false);
+        if(!xr||!xr.ok){ say(TXT.saveFail+((xr&&(xr.text||xr.error))||'unknown'),true); return; }
+      }
+      say(TXT.saved);
+      // Repaint from what the SERVER now holds: the effective prompt and its source change when
+      // an override is added or cleared, and re-deriving them here would be a second rule.
+      if(r.settings) paint(r.settings);
+      if(o.onSave) o.onSave(r.settings||null);
+      hide();
+    }
+
+    gear.onclick=function(){ show(); };
+    cancel.onclick=function(){ if(!busy) hide(); };
+    save.onclick=function(){ commit(); };
+    // Click the backdrop to dismiss, as the app's other overlays do; a click inside the dialog must not.
+    ov.addEventListener('click',function(e){ if(e.target===ov&&!busy) hide(); });
+
+    return { el:gear, open:show, close:hide, isOpen:function(){ return open; } };
+  }
+})();
+</script>
+<!--PA_SETTINGS_ROWS-->
