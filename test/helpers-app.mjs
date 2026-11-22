@@ -88,6 +88,7 @@ const VERSE_MARKS = read('web', 'verse-marks.inline.html');
 // PAInkAnchor (web/ink-anchor.inline.html): the Bible carries its marker too; it needs PANote.ink.
 const INK_ANCHOR_MARKER = '<!--PA_INK_ANCHOR_UI-->';
 const INK_ANCHOR = read('web', 'ink-anchor.inline.html');
+const INK_FRAME = read('web', 'ink-frame.inline.html');   // PAInkFrame: inlined in front of PAInkAnchor (its marker heads that file)
 // PAInkPen (web/ink-pen.inline.html): the verse ink's pen sheet, after PAInkAnchor; it reads PANote.palette.
 const INK_PEN_MARKER = '<!--PA_INK_PEN_UI-->';
 const INK_PEN = read('web', 'ink-pen.inline.html');
@@ -542,7 +543,7 @@ function runApp(appKey, relay, exports, { clampTimers = false, mutate = null, vi
   }
   if (APP_SRC[appKey].includes(INK_ANCHOR_MARKER) && !globals.PAInkAnchor) {
     // eslint-disable-next-line no-new-func
-    new Function('window', 'document', 'setTimeout', scriptOf(INK_ANCHOR))(sandbox.window, sandbox.document, sandbox.setTimeout);
+    new Function('window', 'document', 'setTimeout', scriptOf(INK_FRAME) + '\n' + scriptOf(INK_ANCHOR))(sandbox.window, sandbox.document, sandbox.setTimeout);
     sandbox.PAInkAnchor = sandbox.window.PAInkAnchor;
   }
   if (APP_SRC[appKey].includes(INK_PEN_MARKER) && !globals.PAInkPen) {

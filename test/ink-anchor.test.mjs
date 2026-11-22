@@ -193,7 +193,10 @@ test('re-anchor: the word wraps to the next row → the ink follows; the font gr
   dom.flush();
   let r = wordRect(), at = I.placements()[0].at;
   assert.equal(r.height, 2 * RH, 'the word now spans two rows');
-  assert.deepEqual(at, { ox: r.left + 1 * (r.width / g.w), oy: r.top + RH * 0.75 * (r.width / g.w), s: r.width / g.w }, 'placed on the wrapped word');
+  // REGRESSION (owner, Romans 7, 2026-11-22): the union box of a wrapped word is the whole column wide, and
+  // scaling by it blew the stroke up (a 1-letter anchor → 50x on the iPhone). The run keeps the word's own
+  // width, so the ink stays its size and sits at the word's FIRST row.
+  assert.deepEqual(at, { ox: dom.charRect(v16.en, 11).left + 1, oy: r.top + RH * 0.75, s: 1 }, 'placed on the wrapped word, unscaled');
   // narrower still: 11 columns → "loved" (11..16) sits whole on row 1 — the ink moves down a row with it
   dom.L.width = 11 * CW + 2 * PADL; dom.fire('w:orientationchange', dom.ev('orientationchange')); dom.flush();
   r = wordRect(); at = I.placements()[0].at;
@@ -318,7 +321,8 @@ test('web.mjs registers PAInkAnchor then its pen sheet, then PAAppPrefs (only la
   assert.ok(at > 0, 'ink-anchor is registered');
   assert.equal(files[at + 1], 'ink-pen.inline.html', 'the pen sheet, appended right after it (the registry rule)');
   assert.equal(files[at + 2], 'app-prefs.inline.html', 'the page\'s one prefs chain, appended after it');
-  assert.deepEqual(files.slice(-6), ['settings-rows.inline.html', 'tips.inline.html', 'pane-chrome.inline.html', 'app-bar.inline.html', 'bar-handle.css', 'reading-history.inline.html'], 'the ⚙ tick-box rows, PATips, PAPaneChrome, PAAppBar, then PAReadingHistory, appended last since');
+  assert.deepEqual(files.slice(-7), ['settings-rows.inline.html', 'tips.inline.html', 'pane-chrome.inline.html', 'app-bar.inline.html', 'bar-handle.css', 'reading-history.inline.html', 'ink-frame.inline.html'], 'the ⚙ tick-box rows, PATips, PAPaneChrome, PAAppBar, PAReadingHistory, then PAInkFrame, appended last since');
+  assert.ok(files.indexOf('ink-frame.inline.html') > at, 'PAInkFrame after PAInkAnchor: its marker is inside ink-anchor, so the in-order loop finds it only then');
   assert.ok(files.indexOf('note-ui.inline.html') < files.indexOf('ink-anchor.inline.html'));
   assert.match(ENGINE, /ink:Object\.freeze\(\{drawStroke,drawFlat,segTo,segWidth,guardInk,MAX_CANVAS_PX,HILITE_ALPHA\}\)/, 'PANote.ink');
   for (const sym of ['function drawStroke', 'function drawFlat', 'function segTo', 'const segWidth', 'function guardInk']) assert.equal(ENGINE.split(sym).length, 2, `${sym} is defined once`);

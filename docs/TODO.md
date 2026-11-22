@@ -3,6 +3,17 @@
 Problems found while doing an asked-for task, not needed for that task. One line each; the task
 that found it in brackets. Pick from here; do not open a side session per item.
 
+## Verse ink: handwriting frame leftovers (GPT review 2026-11-22, web/ink-frame.inline.html)
+
+- Writing more onto a line whose handwriting is already shrunk to fit (a phone) and running past its
+  right edge re-shrinks the whole block on lift, so the new stroke lands a little left of where it was
+  drawn. Fix: solve the stroke's frame offset against the post-commit scale.
+- Old records: erasing the last whole-line stroke next to old letter-pieces sends those pieces back to
+  their word anchors (they no longer classify as writing).
+- Two short underlines drawn within 1.5 s and under 16 px apart count as writing (no shape test).
+- Old letter-pieces that reached into the Chinese line (3 of 316 strokes in Romans 7) sit on that
+  line's frame, not the English line's, so on another width they part from the sentence.
+
 ## First-use tips · 首次提示
 - The 8 tips are pinned at source level and the component runs for real in test/tips.test.mjs; no
   host-level fake-DOM run of each tip on the Journal/Bible pages yet, and none seen in a browser

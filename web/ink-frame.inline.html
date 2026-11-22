@@ -1,0 +1,144 @@
+<!-- PAInkFrame — handwriting stays whole on every screen width（手写在任何屏宽上保持完整）. Pure geometry for
+     web/ink-anchor.inline.html, inlined in front of it (its marker sits at the top of that file).
+     WHY: ink-anchor pinned EACH stroke to the words under it. A handwritten sentence is dozens of strokes,
+     so its pieces were pinned to dozens of different printed words; on a screen where the verse wraps
+     differently each piece followed its own word and the sentence came apart (owner, Romans 7:6, written
+     on the 11" iPad, unreadable on the 12.9" and the iPhone, 2026-11-22).
+     A LINE-FRAME group instead stores its place from the verse LINE's top-left:
+       {verse, lang, frame:'line', fx, fy, fw, strokes}   fw = the text column's width when written
+     Every line-frame group of a line moves with that line as ONE block, so the writing keeps its shape.
+     The block is never enlarged and is shrunk (uniformly, all groups of the line by the same factor) only
+     when it would run past the column: a sentence written across an iPad fits a phone's narrower column.
+     Honest limit: the printed text re-wraps and the block does not, so on another width writing that sat
+     between two printed lines can overlap them; it is never scattered or blown up.
+     Ink written before this (one record per stroke, pinned to words) is READ as line frames when it is
+     handwriting: a stroke pinned to the whole line (it covered no character), and a small stroke pinned
+     to a few characters next to such a stroke. Its place on the line is measured on a hidden copy of the
+     line at the width it was written at. Nothing is rewritten until the owner writes or erases.
+     Driven by test/ink-frame.test.mjs. -->
+<script id="pif-script">
+(function(){
+  if(window.PAInkFrame) return;
+  const BURST_MS=1500;   // a stroke started this soon after the last one, on the same line, is the same writing
+  const NEAR=16;         // px: and it starts this close to the last stroke's box (two quick underlines on two words are not writing)
+  const SMALL=60;        // px: a stroke this small either way is a piece of a letter, not a mark around a word
+  const NEIGHBOR=2;      // an old letter-piece joins the writing when a whole-line piece is this near in the list
+  // ── Moved here unchanged from ink-anchor (R4 split): the stroke box, the scrub eraser, a group's extent.
+  function bboxOf(pts){
+    let l=Infinity,t=Infinity,r=-Infinity,b=-Infinity;
+    for(const p of pts){ if(p.x<l)l=p.x; if(p.x>r)r=p.x; if(p.y<t)t=p.y; if(p.y>b)b=p.y; }
+    return {l,t,r,b};
+  }
+  // ── Scrub-out eraser: a stroke that goes back and forth over one spot (SCRUB.turns reversals in x
+  //    and a path SCRUB.density times longer than its box's diagonal). An underline turns 0 times, a
+  //    circle once, a "w" three; a scrub many. ERASE_HIT px: how near a scrub point must pass a
+  //    group's placed point to take that group.
+  const SCRUB=Object.freeze({turns:4,density:3,minPts:8}), ERASE_HIT=12;
+  function isScrub(pts,opt){
+    const t=Object.assign({},SCRUB,opt||{}); if(pts.length<t.minPts) return false;
+    const b=bboxOf(pts), diag=Math.hypot(b.r-b.l,b.b-b.t)||1; let len=0,turns=0,dir=0;
+    for(let i=1;i<pts.length;i++){ const dx=pts[i].x-pts[i-1].x; len+=Math.hypot(dx,pts[i].y-pts[i-1].y); const d=dx>0?1:dx<0?-1:0; if(d&&dir&&d!==dir) turns++; if(d) dir=d; }
+    return turns>=t.turns&&len/diag>=t.density;
+  }
+  // The groups a scrub crosses, given where each group draws now ({g,at}); a group with no place is never hit.
+  function hitGroups(pts,placed,hit){
+    const h2=(hit||ERASE_HIT)**2, out=[];
+    for(const {g,at} of placed){ if(!at) continue;
+      const touched=g.strokes.some(s=>s.p.some(p=>{ const x=at.ox+p[0]*at.s, y=at.oy+p[1]*at.s; return pts.some(q=>(q.x-x)**2+(q.y-y)**2<h2); }));
+      if(touched) out.push(g); }
+    return out;
+  }
+  // A group's own extent (px at scale 1): the stroke points plus the pen width, for stacking in the bucket.
+  function extentOf(g){ let w=0,h=0; for(const s of g.strokes) for(const p of s.p){ if(p[0]+s.w>w) w=p[0]+s.w; if(p[1]+s.w>h) h=p[1]+s.w; } return {w:Math.max(1,w),h:Math.max(1,h)}; }
+  const isLine=g=>!!(g&&g.frame==='line');
+  const sameLine=(a,b)=>!!(a&&b&&a.verse===b.verse&&a.lang===b.lang);
+  const isSmall=(ext)=>ext.w<=SMALL&&ext.h<=SMALL;
+
+  // Which old (word-pinned) groups are handwriting. `wholeOf(g)`: the group was pinned to its whole line.
+  function handwriting(groups,wholeOf,extentOf){
+    // Only SMALL pieces: a big stroke pinned to the whole line (a circle round the verse, a bracket) is a
+    // mark on that line and keeps following it as before — on the owner's 7:5 a red circle shrank with
+    // the writing beside it when it was counted in.
+    // A highlight is a mark on its words, never writing.
+    const small=groups.map(g=>isSmall(extentOf(g))&&g.strokes.every(st=>st.t!=='highlighter')), whole=groups.map((g,i)=>small[i]&&!isLine(g)&&g.verse!=null&&!!wholeOf(g));
+    return groups.map((g,i)=>{
+      if(isLine(g)||g.verse==null||!small[i]) return isLine(g);
+      if(whole[i]) return true;
+      for(let k=1;k<=NEIGHBOR;k++) if((whole[i-k]&&sameLine(groups[i-k],g))||(whole[i+k]&&sameLine(groups[i+k],g))) return true;
+      return false;
+    });
+  }
+  // The column width an old line's writing was made at: the widest whole-line record on that line
+  // (its width is the line's width as wrapped then). None → null (the caller measures at today's width).
+  function writtenWidth(groups,g,wholeOf){
+    let w=0; for(const x of groups) if(sameLine(x,g)&&!isLine(x)&&wholeOf(x)&&x.w>w) w=x.w;
+    return w>0?w:null;
+  }
+  // Every line-frame item of ONE line placed: {fx,fy,ext} in, {ox,oy,s} out, all sharing one scale.
+  // `line`: the line's top-left now; `colW`: the column's width now.
+  function placeLine(line,colW,items){
+    let right=0; for(const it of items) right=Math.max(right,it.fx+it.ext.w);
+    const s=right>0&&colW>0?Math.min(1,colW/right):1;
+    return items.map(it=>({ox:line.left+it.fx*s,oy:line.top+it.fy*s,s}));
+  }
+  // A new stroke joins the writing in progress: same line, started soon after, both pieces small, and
+  // drawn right beside the last one (boxes {l,t,r,b} in the list's px).
+  const gap=(a,b)=>Math.max(0,a.l-b.r,b.l-a.r,a.t-b.b,b.t-a.b);
+  function joinsBurst(prev,now,g,ext,box){
+    return !!(prev&&prev.g&&now-prev.t<=BURST_MS&&sameLine(prev.g,g)&&isSmall(prev.ext)&&isSmall(ext)&&gap(prev.box,box)<=NEAR);
+  }
+  // A group's place on its line's frame: a line-frame record's own; an old whole-line record's offset
+  // (it was measured from the line's top-left); an old letter-piece's characters measured on a copy of
+  // the line at the width it was written at, plus its offset. null: cannot be measured.
+  function frameOf(g,groups,el,env){
+    if(isLine(g)) return {fx:g.fx,fy:g.fy};
+    if(env.wholeOf(g,el)) return {fx:g.dx,fy:g.dy};
+    const r=env.measureAt(el,writtenWidth(groups,g,x=>env.wholeOf(x,el)),g.charStart,g.charEnd,g.w);   // g.w: the box its offset was taken from
+    return r?{fx:r.left+g.dx,fy:r.top+g.dy}:null;
+  }
+  // The width a group's frame was measured at (null: it needs none). Part of the memo key: erasing the
+  // record that supplied it re-measures, instead of keeping a place measured at a width now unknown.
+  function measuredAt(g,groups,el,env){ return isLine(g)||env.wholeOf(g,el)?null:writtenWidth(groups,g,x=>env.wholeOf(x,el));
+  }
+  // Where every handwriting group draws now: Map group → {ox,oy,s}. A group whose line is gone is left
+  // out (the caller buckets it). env: {lineEl(n,lang), local(rect), colW(lineRect), measureAt(el,w,s,e),
+  // wholeOf(g,el), extentOf(g), memo: WeakMap} — memo keeps an old record's measured frame with the
+  // width it was measured at (records are never mutated; a changed width re-measures).
+  function places(groups,env){
+    const hand=handwriting(groups,g=>{ const el=env.lineEl(g.verse,g.lang); return !!el&&env.wholeOf(g,el); },env.extentOf);
+    const lines=new Map(), out=new Map();
+    groups.forEach((g,i)=>{
+      if(!isLine(g)&&!hand[i]) return;
+      const el=env.lineEl(g.verse,g.lang); if(!el) return;
+      const w=measuredAt(g,groups,el,env), m=env.memo.get(g);
+      const f=m&&m.w===w?m.f:frameOf(g,groups,el,env); if(!m||m.w!==w) env.memo.set(g,{w,f}); if(!f) return;
+      const k=g.verse+'|'+g.lang; if(!lines.has(k)) lines.set(k,{el,items:[]});
+      lines.get(k).items.push({g,fx:f.fx,fy:f.fy,ext:env.extentOf(g)});
+    });
+    for(const {el,items} of lines.values()){ const r=env.local(el.getBoundingClientRect()); placeLine(r,env.colW(r),items).forEach((at,i)=>out.set(items[i].g,at)); }
+    return out;
+  }
+  // A group re-expressed on its line's frame, from where it draws now (`at`) and the line's scale `s`:
+  // used for a new stroke (at = the pen's own px, s of the writing already there) and for the word-pinned
+  // first stroke of a burst once the second stroke shows it was writing.
+  function toLine(g,at,line,s,colW){
+    const k=at.s/s;
+    return {verse:g.verse,lang:g.lang,frame:'line',fx:Math.round((at.ox-line.left)/s*100)/100,fy:Math.round((at.oy-line.top)/s*100)/100,fw:Math.round(colW*100)/100,
+      strokes:g.strokes.map(st=>Object.assign({},st,{w:Math.round(st.w*k*100)/100,p:st.p.map(p=>[Math.round(p[0]*k*100)/100,Math.round(p[1]*k*100)/100,p[2]])}))};
+  }
+  // The DOM side of places(), built once per attached list. colW: the text column now (the list less the
+  // line's inset on both sides); wholeOf: the record was pinned to its whole line; measureAt: a range's
+  // run on a hidden copy of the line at width w (null w: today's line), relative to the line's top-left.
+  function env(o){
+    const colW=lr=>Math.max(1,(o.container.clientWidth||o.container.getBoundingClientRect().width)-2*lr.left);
+    const wholeOf=(g,el)=>{ const t=o.measurer(el).text, r=o.trimRange(t,{start:0,end:t.length}); return g.charStart===r.start&&g.charEnd===r.end; };
+    function measureAt(el,w,s,e,gw){
+      const c=w?el.cloneNode(true):el; if(w){ c.style.cssText='position:absolute;visibility:hidden;left:0;top:0;width:'+w+'px'; el.parentNode.appendChild(c); }
+      try{ const r=o.measurer(c).anchorRect(s,e,gw), cr=c.getBoundingClientRect(); return r&&r.width>0?{left:r.left-cr.left,top:r.top-cr.top}:null; }
+      finally{ if(w) c.parentNode.removeChild(c); }
+    }
+    return {lineEl:o.lineEl,local:o.local,colW,measureAt,wholeOf,extentOf,memo:new WeakMap()};
+  }
+  window.PAInkFrame={env,NEAR,isSmall,bboxOf,isScrub,hitGroups,extentOf,SCRUB,ERASE_HIT,BURST_MS,SMALL,NEIGHBOR,isLine,sameLine,handwriting,writtenWidth,placeLine,joinsBurst,frameOf,places,toLine};
+})();
+</script>
