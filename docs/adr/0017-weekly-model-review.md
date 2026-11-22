@@ -211,3 +211,15 @@ Status: accepted · 2026-10-17 · amends ADR 0007 decision 4 · decision 8 (the 
   - test/model-review-route.test.mjs: the real server, the Jobs rows, Run now, a grading failure;
   - updated: test/model-health.test.mjs, test/model-retired.test.mjs, test/config.test.mjs,
     test/jobstatus.test.mjs.
+
+## Amendment (2026-11-22): nodes that call ollama.com directly
+
+A node whose `ollama_url` is `https://ollama.com` (the VM and demo nodes, docs/demo-node.md) has no
+local daemon, and the ollama.com API takes bare names (`gpt-oss:120b`, no `:cloud` / `-cloud`). The
+review had two faults there: it always suffixed catalog names (so every newcomer answered "not
+found", every configured bare lane was re-tested as a newcomer, and a picked one would have been
+written to `chat_models` with a name ollama.com rejects), and its calls sent no API key (401).
+Now `lib/model-health.mjs` `isDirectCloud(url)` decides the name form in ONE place: `laneModel(name,
+url)` builds a newcomer's model string, and `catalogName(model, url)` treats `x` and `x:cloud` as the
+same model on such a node. The review's calls carry web.mjs `ollamaAuth()`, as the daily model check
+already did. A local daemon is unchanged. Test: test/model-review-direct-cloud.test.mjs.

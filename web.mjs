@@ -282,7 +282,7 @@ const JOBS = {
   // runLane: the Claude and Codex lanes measured as the chat runs them (ADR 0017 decision 10).
   // The review is owner-only and never an app's turn, so its grader and its Claude lane resolve as
   // the owner's composer lane (agentArgs with REVIEW_ORIGIN) — not raw cfg.*_args (test/agent-confinement).
-  ...modelReviewJobs({ cfg, root: ROOT, healthFile: () => modelHealth.file, userDirs: () => cfg.users.map(wsDir),
+  ...modelReviewJobs({ cfg, root: ROOT, healthFile: () => modelHealth.file, userDirs: () => cfg.users.map(wsDir), auth: () => ollamaAuth(),
     ask: ({ args, prompt, user, timeoutMs }) => enqueue(() => runAgent(prompt, agentArgs(user, args, REVIEW_ORIGIN), wsDir(user), timeoutMs)),
     runLane: (a) => laneRunner({ cfg, wsDir, enqueue, runClaude, runCodex, claudeArgs: (user) => agentArgs(user, cfg.claude_args, REVIEW_ORIGIN) })(a) }),
 };
