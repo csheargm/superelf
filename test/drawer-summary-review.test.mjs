@@ -60,7 +60,7 @@ test('the photo tick is remembered before the pages arrive, and is dead (no re-p
   assert.equal(D.api().togglePhoto(true), false, 'no pages yet: nothing to plan');
   assert.equal(D.api().state().photo, true, 'but the choice is kept');
   release(); await opening;
-  assert.equal(D.line(), '发送 1 页 · 10 字到 Claude · Send 1 pages · 10 characters to Claude (离开本机 · off this Mac)', 'planned with the photo text the tick asked for before the reply');
+  assert.equal(D.line(), '发送 1 页 · 10 字到 Claude · Send 1 page · 10 characters to Claude (离开本机 · off this Mac)', 'planned with the photo text the tick asked for before the reply; "1 page", never "1 pages" (F3-10)');
   let done; const S = await drawer({ run: () => new Promise((r) => { done = r; }) });
   await S.api().open(); await S.api().togglePhoto(true);
   const sending = S.api().send(); await tick(2);
@@ -74,7 +74,7 @@ test('the confirm line says the reply\'s own pending pages and a cut listing (ne
   const D = await drawer({ fetch: async () => ({ ok: true, pages: PAGES, pending: 2, truncated: true }) });
   await D.api().open();
   assert.equal(D.api().state().pending, 2); assert.equal(D.api().state().truncated, true);
-  assert.equal(D.line(), '发送 1 页 · 4 字到 Claude · Send 1 pages · 4 characters to Claude (离开本机 · off this Mac) · 2 页待转写 · 2 pending · 不完整 · incomplete');
+  assert.equal(D.line(), '发送 1 页 · 4 字到 Claude · Send 1 page · 4 characters to Claude (离开本机 · off this Mac) · 2 页待转写 · 2 pending · 不完整 · incomplete');
   await D.api().togglePhoto(true);
   assert.match(D.line(), / · 2 页待转写 · 2 pending · 不完整 · incomplete$/, 'the photo re-plan keeps the reply\'s honesty');
   const P = await drawer({ fetch: async () => ({ ok: true, pages: PAGES, pending: 0, truncated: false }) });

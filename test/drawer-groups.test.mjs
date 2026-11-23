@@ -167,7 +167,7 @@ test('Summarize · 总结 in the header opens the same sheet as the bar\'s, with
   const sheet = D.d.el.children.filter((k) => /^pac-modal pac-msheet/.test(k.className)).pop();
   assert.ok(sheet, 'the summary sheet opened in the drawer host');
   const sel = sheet.children[0].children.find((k) => k.className === 'pds-p');
-  assert.equal(sel.textContent, '已选 · Selected (0)'); assert.equal(sel.disabled, true, 'greyed: nothing ticked');
+  assert.equal(sel.textContent, '已选 · Selected', 'no "(0)" beside a line that sends a page (F3-10)'); assert.equal(sel.disabled, true, 'greyed: nothing ticked');
   assert.equal(sheet.children[0].children.filter((k) => k.className === 'pds-p').some((k) => k['@aria-pressed'] === 'true' && k.textContent.includes('This month')), true, 'the month preset is the one chosen instead');
   const N = await drawer();
   assert.deepEqual(N.el('.pac-dhead').children, [], 'no hooks, no header button');

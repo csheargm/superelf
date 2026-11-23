@@ -34,7 +34,7 @@ for (const app of ['notes (template)', 'notes (live)']) {
       const F = loadFollowup(win, { createElement: mkEl });
       const r = await F.run({ answer: SUMMARY, html, period: '2026-W46', scope: 'summary:2026-W46', title: '本周 · This week Nov 9–15, 2026', id: saved.id, convoId: 'c-1', hooks: A.SUMMARY_HOOKS, bar: mkEl('div') });
       assert.equal(asks.length, 1, 'one broker ask'); assert.equal(r.ok, true, JSON.stringify(r));
-      assert.equal(r.status, '已添加跟进 · Follow-up added — 1 项待办 · 1 to-dos');
+      assert.equal(r.status, '已添加跟进 · Follow-up added — 1 项待办 · 1 to-do');
       const onDisk = JSON.parse(fs.readFileSync(h.file('entry-' + saved.id + '.json'), 'utf8')).pages[0].pageHtml;
       assert.ok(onDisk.startsWith(html) && onDisk.includes('<h3>' + FOLLOWUP_HEADING + '</h3>') && onDisk.includes('fasting research') && onDisk.includes('16:8'), 'the block is in the saved note');
       await settle();
