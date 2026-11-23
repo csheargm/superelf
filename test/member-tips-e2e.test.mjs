@@ -47,6 +47,7 @@ test('a new member sees the first-use tip, and one tap dismisses it for good; th
   const id = await frame.evaluate(() => document.querySelector('.pat-tip').dataset.tip);
   await frame.click('.pat-tip');
   await frame.waitForFunction((t) => (window.PATips.seen() || []).includes(t) || [...(window.PATips.seen() || [])].includes(t), id);
+  await frame.evaluate(() => window.PATips.whenIdle());   // the seen write reached the server before the tab closes
   await ctx.close();
   ({ ctx, frame } = await openNotes(session, 'mara'));
   await frame.waitForTimeout(2500);
