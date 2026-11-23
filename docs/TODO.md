@@ -662,3 +662,11 @@ Without it they now FAIL (R14), not pass as `# pass 0 / # fail 0`. To run them:
 - F5-14: owner's starter apps (incl. Diabetes) shown to members by default; confirm intended.
 - F2-08/F3-INK (ink workflows): Pencil tip shown on phone/over chat; a stray mouse dot became ink.
 - test/family-settings-e2e.test.mjs sets up accounts unlike real sign-up; rewrite. Settings not run on webkit/iPad Safari.
+
+## From the integration GPT review (2026-11-23), not fixed in that round
+- Notes delete: the live file is replaced before `.bak` is removed (lib/appdata.mjs); a crash between leaves old text, and restore could bring a tombstoned note back. Make the cleanup recoverable.
+- Stop (F4-3): Research and GPT (Codex) turns and the job resolver get no cancel signal; the demo allowlist (lib/demo.mjs) rejects `/api/chat/stop`, so demo Stop shows an error. Bind Stop to the running turn's own convo and pass cancel through every provider, or hide Stop where it cannot work.
+- Demo guest ask (F1-8): the question is not kept across the sign-in link (new tab / reload). Save it as a draft and restore it after sign-in; extend demo-guest-ask-e2e through the callback.
+- Family Apps (F4-6): a shelf app hides every member app with the same slug, even from another author. Match by source account + slug; add a same-slug, different-author control.
+- Direct links (F2-11): `/app/shared/...` (the shelf) opened in a tab still serves a bare page; add the shelf case to the redirect, with a browser test.
+- Test honesty: bible-reader-e2e direct-link test injects a token (skips the real sign-in handoff); chat-stop asserts the stream ended, not that the process died; setup-modal Escape test uses a synthetic event.
