@@ -524,7 +524,8 @@ async function loadFamily(){
   let list=[]; try{ list=await (await api('/api/admin/users')).json(); }catch{}
   box.innerHTML='<b>Family accounts</b>'+list.map(u=>
     `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)">
-      <span style="flex:1">${esc(u.name)} <small style="color:var(--muted)">${u.role}${u.age!=null?' · age '+u.age:''}</small></span>
+      <span style="flex:1">${esc(u.name)} <small style="color:var(--muted)">${u.status==='pending'?'等待批准 · Waiting for approval':u.role}${u.age!=null?' · age '+u.age:''}</small></span>
+      ${u.status==='pending'?`<button class="primary" data-approve="${esc(u.id)}">批准 · Approve</button>`:''}
       ${u.id!=='owner'?`<button class="plain" data-pw="${esc(u.id)}">重设密码 · Reset password</button><button class="plain" data-del="${esc(u.id)}">×</button>`:''}
     </div>`).join('')+
     `<div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px">
@@ -535,6 +536,13 @@ async function loadFamily(){
       <button class="primary" id="addU" style="padding:6px">Add member</button>
     </div>`;
   box.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{ if(confirm('Remove '+b.dataset.del+"? (their data stays on disk)")){ await api('/api/admin/users/'+b.dataset.del,{method:'DELETE'}); loadFamily(); } });
+  // Self sign-ups wait for the owner (cfg.require_approval); this is the owner's only way to let them in (F5-3).
+  box.querySelectorAll('[data-approve]').forEach(b=>b.onclick=async(e)=>{
+    e.preventDefault();
+    const g=await relayJson(api('/api/admin/users/'+b.dataset.approve+'/approve',{method:'POST'}),'data');
+    if(!g.ok){ alert(g.text); return; }
+    loadFamily();
+  });
   box.querySelectorAll('[data-pw]').forEach(b=>b.onclick=async(e)=>{
     e.preventDefault();
     const pw=prompt(`给 ${b.dataset.pw} 设新密码（至少 8 位），对方会被登出 · New password for ${b.dataset.pw} (8+ characters); they will be signed out:`,'');

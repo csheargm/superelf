@@ -7,10 +7,16 @@ import { skip, chromium } from './helpers-note-link.mjs';
 import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, OWNER_TOKEN } from './helpers-web.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
 
+// A self sign-up waiting for approval (POST /api/register writes the same record; it is closed
+// until the owner has a password, so the record is seeded here).
+const ZOE_TOKEN = 'zoe-token-0123456789abcdefghijkl';
 let port, root, web, browser;
 before(async () => {
   if (skip) return;
-  port = await freePort(); root = mkWebRoot({ port }); web = startWeb(root); await waitReady(port);
+  port = await freePort(); root = mkWebRoot({ port, extraConfig: { users: [
+    { id: 'owner', name: 'Owner', role: 'owner', token: OWNER_TOKEN, workspace: 'workspace' },
+    { id: 'zoe', name: 'Zoe', role: 'member', token: ZOE_TOKEN, workspace: 'workspace-zoe', status: 'pending' },
+  ] } }); web = startWeb(root); await waitReady(port);
   browser = await chromium.launch();
 });
 after(async () => { if (browser) await browser.close(); if (web) await stopWeb(web); if (root) rmTemp(root); });
@@ -57,5 +63,18 @@ test('F5-2: the per-member button resets the password, and the new one signs in'
     assert.match(dialogs[1].message, /^已/, 'a 中文-first confirmation');
     const login = await fetch(`http://127.0.0.1:${port}/api/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'leo', password: 'leo-reset-pass-9' }) });
     assert.equal(login.status, 200, 'the new password signs Leo in');
+  } finally { await ctx.close(); }
+});
+
+test('F5-3: a self-signed-up account shows as waiting, and Approve lets it sign in', { skip, timeout: 60000 }, async () => {
+  const login = () => fetch(`http://127.0.0.1:${port}/api/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: ZOE_TOKEN }) });
+  assert.notEqual((await login()).status, 200, 'CONTROL: no sign-in before approval');
+  const { ctx, page } = await openSettings();
+  try {
+    const row = page.locator('#family div', { has: page.locator('[data-approve="zoe"]') });
+    assert.match(await row.innerText(), /等待批准/, 'the owner sees she is waiting, 中文 first');
+    await page.click('[data-approve="zoe"]');
+    await page.waitForFunction(() => !document.querySelector('[data-approve="zoe"]'));
+    assert.equal((await login()).status, 200, 'approved: she signs in');
   } finally { await ctx.close(); }
 });
