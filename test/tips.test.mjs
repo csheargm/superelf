@@ -312,7 +312,7 @@ test('priority: a priority tip shows ahead of older unseen tips, even one alread
 });
 
 test('priority: the app bar registers its Home tip with priority', () => {
-  assert.ok(read('web/app-bar.inline.html').includes("PATips.register({id:'app-own-bar',anchor:()=>home,text:TIP,priority:true})"));
+  assert.ok(read('web/app-bar.inline.html').includes("PATips.register({id:'app-own-bar',anchor:()=>home,text:TIP,priority:true,dismissOnUse:true})"));
 });
 
 // R3 review 2026-11-13: a priority tip registering AFTER an ordinary tip was shown and dismissed this open
@@ -330,4 +330,19 @@ test('priority: after a tip was dismissed this open, a late priority tip waits f
   q.T.register({ id: 'home', anchor: anchorAt(300), text: '主页 · Home', priority: true });
   await flush();
   assert.equal(q.T.current(), 'home', 'it shows on the next open');
+});
+
+// F2-07 (owner 2026-11-23): the app-bar tip leaves at the first interaction anywhere, remembered for good.
+test('dismissOnUse: the first press or key on the page dismisses it and stores it seen; an ordinary tip stays (control)', async () => {
+  for (const ev of ['pointerdown', 'keydown']) {
+    const p = page(meWith());
+    p.T.register({ id: 'bar', anchor: anchorAt(100), text: '栏 · Bar', dismissOnUse: true });
+    await flush(); assert.equal(p.T.current(), 'bar');
+    p.fireDoc(ev); await p.T.whenIdle();
+    assert.equal(p.T.current(), null, `${ev}: gone`); assert.deepEqual(p.T.seen(), ['bar'], `${ev}: remembered`);
+  }
+  const q = page(meWith());
+  q.T.register({ id: 'plain', anchor: anchorAt(100), text: '普通 · Plain' });
+  await flush(); q.fireDoc('pointerdown');
+  assert.equal(q.T.current(), 'plain', 'without the flag a page press leaves the tip');
 });

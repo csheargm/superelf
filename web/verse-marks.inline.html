@@ -36,10 +36,10 @@ mark.pvm.pvm-hl-pink{background:rgba(255,120,160,.36)}
   const COLORS=Object.freeze(['yellow','green','pink']);   // the three swatches; the store carries the NAME
   const KINDS=Object.freeze({hl:'hl',ul:'ul'});
   const LANGS=Object.freeze({en:'.ven',zh:'.vzh'});        // the host's text lines, by language
-  // User-facing text, English then 中文 (the repo's PANote.SEARCH_TXT style). `chip` is what the
+  // User-facing text, 中文 · English (the repo's PANote.SEARCH_TXT style). `chip` is what the
   // host's ☰ list row shows for a mark-only verse, so it is exported here and nowhere else (R3).
   const TXT=Object.freeze({ mark:'高亮 · Highlight', underline:'下划线 · Underline', remove:'移除 · Remove',
-    chip:'Highlight 高亮', orphan:'经文已更新 · text changed', color:{yellow:'黄 · Yellow',green:'绿 · Green',pink:'粉 · Pink'} });
+    chip:'高亮 · Highlight', orphan:'经文已更新 · text changed', color:{yellow:'黄 · Yellow',green:'绿 · Green',pink:'粉 · Pink'} });
   const keyOf=n=>'v'+n;
   const isRange=m=>!!(m&&typeof m.quote==='string'&&m.quote.length&&Number.isInteger(m.start)&&Number.isInteger(m.end));
   const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));

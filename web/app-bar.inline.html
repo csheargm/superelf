@@ -12,6 +12,8 @@
          keepOpen   () => true while a menu/sheet/pane from the bar is open: never hide then
      GESTURES (owner 2026-11-13, ADR 0035 + 0036): a finger swipe up / forward scroll hides at once; a finger pull down (also an overscroll
      pull at the top) or the top handle shows it; shown, it hides itself after IDLE_MS with no action.
+     TOUCH ONLY (owner 2026-11-23, F2-06): it hides by itself (idle, forward scroll) only while the reader is
+     on touch; after a mouse / trackpad input (or on a hover device that has not been touched) it stays.
      All listeners passive, no preventDefault; a Pencil (pointerType 'pen' / touchType 'stylus') never pulls.
      Driven by test/app-bar.test.mjs (no browser) and test/app-own-bar-e2e.test.mjs (Playwright). -->
 <style id="paab-style">
@@ -37,8 +39,10 @@
   // it restarts the clock, and keepOpen holds it. A finger pull of PULL_PX down, or a scroll up past it, shows it.
   const IDLE_MS=4000, PULL_PX=24, USER_SCROLL_MS=1000;
   const NARROW_MQ='(max-width:600px)';   // the phone breakpoint every app page here uses
+  const TOUCH_MQ='(hover:none)';          // a phone / iPad with no mouse: touch until a mouse is used
+  const touchFirst=()=>{ try{ return matchMedia(TOUCH_MQ).matches; }catch(_){ return false; /* no matchMedia: assume a mouse, the bar stays */ } };
   const TIP='主页和字号在这里；几秒后自动隐藏，下拉或点顶部把手返回 · Home and text size live here now — the bar hides after a few seconds; pull down or tap the top handle to bring it back';
-  const S={cfg:null,on:false,bar:null,hidden:false,handle:null,idle:0,lastY:0,mark:0,t0:null,pen:false,ptrs:new Set(),touches:0,held:false,inputAt:0};
+  const S={cfg:null,on:false,touch:false,bar:null,hidden:false,handle:null,idle:0,lastY:0,mark:0,t0:null,pen:false,ptrs:new Set(),touches:0,held:false,inputAt:0};
   const el=(v)=>typeof v==='function'?v():v;
   const post=(type,d)=>{ try{ parent.postMessage({pa:'shell',type,d:d||0},'*'); }
     catch(_){ /* no parent (page opened on its own): nothing to tell, and nothing was drawn */ } };
@@ -61,7 +65,7 @@
   // pointercancel the moment native scrolling takes the touch while the finger is still on the glass.
   const isDown=()=>S.ptrs.size>0||S.touches>0;
   function onIdle(){
-    S.idle=0; if(S.hidden) return;
+    S.idle=0; if(S.hidden||!S.touch) return;   // a mouse reader keeps the bar (F2-06): no clock to re-arm
     if(isDown()||keepOpen()) return arm();
     setHidden(true);
   }
@@ -119,7 +123,7 @@
     const sc=el(c.scroller);
     if(sc){ S.lastY=sc.scrollTop; sc.addEventListener('scroll',()=>onScroll(sc),{passive:true}); }
     bindPull();
-    if(window.PATips) window.PATips.register({id:'app-own-bar',anchor:()=>home,text:TIP,priority:true});   // first-use tip (ADR 0030); first: Home moved
+    if(window.PATips) window.PATips.register({id:'app-own-bar',anchor:()=>home,text:TIP,priority:true,dismissOnUse:true});   // F2-07: gone at the first tap   // first-use tip (ADR 0030); first: Home moved
     setHidden(false);   // shown on open, on the idle clock
     post('ready');
   }
@@ -130,14 +134,14 @@
     const y=sc.scrollTop, d=y-S.lastY; S.lastY=y;
     S.mark=(d<0)===(S.mark<0)?S.mark+d:d;
     if(S.mark<-PULL_PX){ S.mark=0; setHidden(false); }
-    else if(S.mark>PULL_PX){ S.mark=0; if(S.touches>0||Date.now()-S.inputAt<USER_SCROLL_MS) setHidden(true); }
+    else if(S.mark>PULL_PX){ S.mark=0; if(S.touch&&(S.touches>0||Date.now()-S.inputAt<USER_SCROLL_MS)) setHidden(true); }
   }
   // A finger pulled down PULL_PX (more down than across) shows the bar — also at the very top, where
   // nothing scrolls. Passive capture listeners: a stroke or a scroll is never taken, only watched.
   function bindPull(){
     const o={passive:true,capture:true};
     // Touch pointers are counted by the touch events below, not here (pointercancel ≠ finger lifted).
-    addEventListener('pointerdown',(e)=>{ S.pen=e.pointerType==='pen'; if(e.pointerType!=='touch') S.ptrs.add(e.pointerId); },o);
+    addEventListener('pointerdown',(e)=>{ S.pen=e.pointerType==='pen'; S.touch=e.pointerType!=='mouse'; if(e.pointerType!=='touch') S.ptrs.add(e.pointerId); },o);
     for(const ev of ['pointerup','lostpointercapture']) addEventListener(ev,(e)=>{ S.ptrs.delete(e.pointerId); },o);
     addEventListener('pointercancel',(e)=>{ if(e.pointerType!=='touch') S.ptrs.delete(e.pointerId); },o);
     // A mouse released outside the frame sends no pointerup here: a move with no button down ends it.
@@ -146,7 +150,7 @@
     addEventListener('blur',clearDown);
     document.addEventListener('visibilitychange',()=>{ if(document.hidden) clearDown(); });
     addEventListener('touchstart',(e)=>{
-      S.touches=e.touches?e.touches.length:S.touches+1;
+      S.touches=e.touches?e.touches.length:S.touches+1; S.touch=true;
       const t=e.touches&&e.touches[0];
       S.t0=(e.touches.length===1&&t&&t.touchType!=='stylus'&&!S.pen)?{x:t.clientX,y:t.clientY}:null; },o);
     addEventListener('touchmove',(e)=>{
@@ -158,14 +162,15 @@
     },o);
     for(const ev of ['touchend','touchcancel']) addEventListener(ev,(e)=>{ S.t0=null; S.touches=e.touches?e.touches.length:0; },o);
     // Desktop: a wheel / trackpad scroll up is the same "pull down" (also over a page that cannot scroll).
-    addEventListener('wheel',(e)=>{ S.inputAt=Date.now(); if(e.deltaY<-PULL_PX/2) setHidden(false); else if(e.deltaY>PULL_PX/2) setHidden(true); },o);
+    // A wheel is a mouse / trackpad: the reader is not on touch now, so it only ever shows (F2-06).
+    addEventListener('wheel',(e)=>{ S.inputAt=Date.now(); S.touch=false; if(e.deltaY<-PULL_PX/2) setHidden(false); },o);
     addEventListener('keydown',()=>{ S.inputAt=Date.now(); },o);
   }
   addEventListener('message',(e)=>{
     const m=e.data; if(!m||m.pa!=='prefs'||e.source!==parent) return;
     if(Array.isArray(m.fsTitles)) S.titles=m.fsTitles;
     if(m.ownBar!==true||S.on) return;
-    S.on=true; if(S.cfg) mount();
+    S.on=true; S.touch=touchFirst(); if(S.cfg) mount();
   });
   function attach(cfg){ if(!cfg||!cfg.bar) throw new Error('PAAppBar.attach: bar required'); S.cfg=cfg; if(S.on) mount(); }
   // hold(true): keep the bar shown until hold(false) — for a host flow that must not have the page move.

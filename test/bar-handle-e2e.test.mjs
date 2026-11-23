@@ -104,6 +104,8 @@ test('Bible + Journal: their handle is 120x28; a handle-shown bar stays past the
 
 // Runs BEFORE the pen test: that one dismisses the tip, and tipsSeen lives on this throwaway server.
 test('Bible: the app-bar "Home and text size" tip shows first, ahead of the older unseen tips', { skip, timeout: 60000 }, async () => {
+  { const first = await open('bible', IPAD, bibleReady);   // the earlier tests' taps dismissed it for good (dismissOnUse, F2-07): start fresh
+    try { await first.frame.evaluate(() => PATips.reset()); } finally { await first.ctx.close(); } }
   const { ctx, frame } = await open('bible', IPAD, bibleReady);
   try {
     assert.ok((await frame.evaluate(() => PATips.registered().map((r) => r.id))).length > 1, 'control: other tips are waiting too');

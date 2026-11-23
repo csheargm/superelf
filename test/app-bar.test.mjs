@@ -32,12 +32,12 @@ function fakeClock() {
       if (!next) break; due.delete(next[0]); now = next[1].at; next[1].f(); } now = end; } };
 }
 function document_hidden(docL) { docL.__doc.hidden = true; (docL.visibilitychange || []).forEach((f) => f({})); }
-function run({ scroller } = {}) {
+function run({ scroller, hoverNone = true } = {}) {
   const docL = {}, winL = {}, clock = fakeClock();
   const body = fakeEl('body');
   const document = { body, activeElement: null, createElement: fakeEl, addEventListener(t, f) { (docL[t] ||= []).push(f); } };
   docL.__doc = document;
-  const win = { document, getComputedStyle: () => ({ position: 'static' }), matchMedia: () => ({ matches: false, addEventListener() {} }),
+  const win = { document, getComputedStyle: () => ({ position: 'static' }), matchMedia: (q) => ({ matches: q === '(hover:none)' ? hoverNone : false, addEventListener() {} }),
     addEventListener(t, f, o) { (winL[t] ||= []).push(f); (win.opts ||= {})[t] = o; }, setTimeout: clock.setTimeout, clearTimeout: clock.clearTimeout };
   win.parent = { postMessage() {} }; win.window = win;
   vm.runInNewContext(SCRIPT, win);
@@ -77,14 +77,14 @@ test('idle: shown on open, hides itself after IDLE_MS; keepOpen holds it and it 
   assert.equal(win.PAAppBar.state().hidden, true, 'hides once the menu is gone');
 });
 
-test('a mouse released outside the frame (no pointerup) is cleared by a buttonless move', () => {
+test('a pointer released outside the frame (no pointerup) is cleared by a buttonless move (pen: a mouse never idles the bar, F2-06)', () => {
   const { win, clock, emit } = run();
   const ms = win.PAAppBar.IDLE_MS;
-  emit('pointerdown', { pointerType: 'mouse', pointerId: 7 }); clock.advance(ms * 3);
+  emit('pointerdown', { pointerType: 'pen', pointerId: 7 }); clock.advance(ms * 3);
   assert.equal(win.PAAppBar.state().hidden, false, 'held while down');
-  emit('pointermove', { pointerType: 'mouse', pointerId: 7, buttons: 1 }); clock.advance(ms + 10);
+  emit('pointermove', { pointerType: 'pen', pointerId: 7, buttons: 1 }); clock.advance(ms + 10);
   assert.equal(win.PAAppBar.state().hidden, false, 'a drag with the button still down keeps it');
-  emit('pointermove', { pointerType: 'mouse', pointerId: 7, buttons: 0 }); clock.advance(ms + 10);
+  emit('pointermove', { pointerType: 'pen', pointerId: 7, buttons: 0 }); clock.advance(ms + 10);
   assert.equal(win.PAAppBar.state().hidden, true, 'idle hide resumes after the lost pointerup');
 });
 
@@ -95,14 +95,14 @@ test('never hides mid-stroke (a pointer is down), however long; only a real end 
   assert.equal(win.PAAppBar.state().hidden, false, 'held through a 40 s Pencil stroke (no retry cap)');
   emit('pointerup', { pointerType: 'pen', pointerId: 2 }); clock.advance(ms + 10);
   assert.equal(win.PAAppBar.state().hidden, true, 'hides after the stroke');
-  win.PAAppBar.show(); emit('pointerdown', { pointerType: 'mouse', pointerId: 1 }); clock.advance(ms * 5);
+  win.PAAppBar.show(); emit('pointerdown', { pointerType: 'pen', pointerId: 1 }); clock.advance(ms * 5);
   assert.equal(win.PAAppBar.state().hidden, false, 'still down: held');
   emit('blur', {}); clock.advance(ms + 10);
   assert.equal(win.PAAppBar.state().hidden, true, 'a lost pointerup is cleared by blur');
   win.PAAppBar.show(); emit('pointerdown', { pointerType: 'pen', pointerId: 3 });
   emit('lostpointercapture', { pointerType: 'pen', pointerId: 3 }); clock.advance(ms + 10);
   assert.equal(win.PAAppBar.state().hidden, true, 'lostpointercapture ends it');
-  win.PAAppBar.show(); emit('pointerdown', { pointerType: 'mouse', pointerId: 4 });
+  win.PAAppBar.show(); emit('pointerdown', { pointerType: 'pen', pointerId: 4 });
   document_hidden(docL); clock.advance(ms + 10);
   assert.equal(win.PAAppBar.state().hidden, true, 'visibilitychange to hidden clears it');
 });
@@ -180,10 +180,10 @@ test('Apple Pencil never pulls the bar (pointerType pen, touchType stylus); list
   assert.doesNotMatch(SCRIPT, /preventDefault\(/, 'the component never prevents default');
 });
 
-test('wheel down hides, wheel up shows (desktop); no page-touch hide or handle "stays" state left', () => {
+test('wheel up shows; wheel down never hides (a wheel is a mouse, F2-06); no page-touch hide or handle "stays" state left', () => {
   const { win, emit } = run();
-  emit('wheel', { deltaY: 40 }); assert.equal(win.PAAppBar.state().hidden, true, 'wheel down hides');
-  emit('wheel', { deltaY: -40 }); assert.equal(win.PAAppBar.state().hidden, false, 'wheel up shows');
+  win.PAAppBar.hide(); emit('wheel', { deltaY: -40 }); assert.equal(win.PAAppBar.state().hidden, false, 'wheel up shows');
+  emit('wheel', { deltaY: 40 }); assert.equal(win.PAAppBar.state().hidden, false, 'wheel down: the bar stays for a mouse reader');
   assert.doesNotMatch(SCRIPT, /SCROLL_HIDE_PX|touchHides|byHandle/, 'no page-touch hide left');
 });
 
@@ -233,4 +233,27 @@ test('R3: ONE handle size for the shell and PAAppBar (web/bar-handle.css), inlin
   assert.match(shell, /#barpeek\{[^}]*width:var\(--pa-handle-w\); height:var\(--pa-handle-h\)/);
   assert.match(read('lib/shellhtml.mjs'), /\['\/\* PA_BAR_HANDLE_CSS \*\/', 'bar-handle\.css'\]/);
   assert.match(read('web.mjs'), /marker: '\/\* PA_BAR_HANDLE_CSS \*\/', file: 'bar-handle\.css'/);
+});
+
+// F2-06 (owner 2026-11-23): the bar hides by itself only on touch while reading — never for a mouse.
+test('F2-06: a desktop (hover) reader: the bar never idles away and a mouse-driven scroll never hides it', () => {
+  const sc = fakeEl('div'); sc.scrollTop = 0;
+  const { win, clock, emit } = run({ scroller: sc, hoverNone: false });
+  clock.advance(win.PAAppBar.IDLE_MS * 3); assert.equal(win.PAAppBar.state().hidden, false, 'no idle hide on a hover device');
+  emit('keydown', {}); sc.scrollTop = 300; (sc.listeners.scroll || []).forEach((f) => f());
+  assert.equal(win.PAAppBar.state().hidden, false, 'a keyboard / wheel scroll forward does not hide it');
+});
+test('F2-06: touch hides (idle), a mouse click switches it off, the next touch switches it back on', () => {
+  const { win, clock, emit, drag } = run();
+  clock.advance(win.PAAppBar.IDLE_MS + 10); assert.equal(win.PAAppBar.state().hidden, true, 'control: touch device idles away');
+  win.PAAppBar.show(); emit('pointerdown', { pointerType: 'mouse', pointerId: 9 }); emit('pointerup', { pointerType: 'mouse', pointerId: 9 });
+  clock.advance(win.PAAppBar.IDLE_MS * 3); assert.equal(win.PAAppBar.state().hidden, false, 'after a mouse input it stays');
+  drag(300, 320); clock.advance(win.PAAppBar.IDLE_MS + 10);
+  assert.equal(win.PAAppBar.state().hidden, false, 'a touch re-arms nothing until the clock restarts');
+  win.PAAppBar.show(); clock.advance(win.PAAppBar.IDLE_MS + 10);
+  assert.equal(win.PAAppBar.state().hidden, true, 'touch again: it idles away');
+});
+test('F2-06: the Bible keeps the bar while a verse or words are selected (both copies)', () => {
+  for (const f of ['workspace/apps/bible/index.html', 'workspace.example/apps/bible/index.html'])
+    assert.match(read(f), /keepOpen:\(\)=>INK_PEN\.isOpen\(\)\|\|barPaneUp\(\)\|\|markVerses\(\)\.length>0\|\|/, f);
 });

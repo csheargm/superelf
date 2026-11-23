@@ -180,7 +180,8 @@ test('both Bible copies carry the marker, the hook, the fab entry, the chip and 
     assert.match(src, /const VM=PAVerseMarks\.attach\(\{\n  container:document\.getElementById\('verses'\),\n  store:\{ get:\(\)=>\(ANN\.marks\|\|\(ANN\.marks=\{\}\)\), set:async\(next\)=>\{ ANN\.marks=next; return saveAnn\(\); \} \},/, `${app}: the store is ANN.marks through saveAnn`);
     assert.match(src, /ANN\.marks=migrateKeys\(o\.marks\|\|\{\}\);/, `${app}: read back on load, or the next stroke deletes them`);
     assert.match(src, /for\(const src of \[ANN\.notes,ANN\.draws,ANN\.chat,ANN\.marks,ANN\.ink\]\)/, `${app}: the dots count marks (and the anchored ink)`);
-    assert.match(src, /chip:n\.marks\?PAVerseMarks\.TXT\.chip:undefined,/, `${app}: any row with marks shows the chip`);
+    assert.match(src, /const rowChip=\(n\)=>\(n\.marks&&!n\.hasDraws&&!n\.hasText\)\?PAVerseMarks\.TXT\.chip:undefined;/, `${app}: only a mark-only row is a Highlight row (F2-12)`);
+    assert.match(src, /chip:rowChip\(n\),/, `${app}: the row carries it`);
     assert.match(src, /if\(!n\.hasDraws&&!n\.hasText\) delete \(obj\.marks\|\|\{\}\)\[n\.verseKey\]; delete \(obj\.titles\|\|\{\}\)/, `${app}: delete drops the marks only for a mark-only row`);
     assert.match(src, /&&await loadAnn\(\)\)\{ renderDots\(\); VM\.render\(\); INK\.load\(ANN\.ink\); \}/, `${app}: a re-read of the open chapter repaints the marks and reloads the ink`);
     assert.match(src, /PAVerseMarks\.armControl\(document\.getElementById\('top-mark'\)\)\.onclick=/, `${app}: the Mark control keeps the selection through its tap`);

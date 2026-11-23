@@ -1172,7 +1172,7 @@
         let convos=[]; try{ const r=await req({kind:'app-convos'}); convos=(r&&r.ok&&r.convos)||[]; }catch{ convos=[]; }   // R5: empty on failure → drawer shows "Nothing here yet"
         let aug=[]; if(opts.listAugment){ try{ aug=(await opts.listAugment())||[]; }catch{ aug=[]; } }   // R5: an augment failure never blanks the chat list
         const out=[];
-        for(const n of aug) out.push({ id:n.id, icon:'✏️', title:n.title, preview:n.preview, chip:'Note', updated:n.updated||0, created:n.created||0, ai:!!n.ai, tab:'notes', doc:n.doc, pin:!!n.pin,
+        for(const n of aug) out.push({ id:n.id, icon:'✏️', title:n.title, preview:n.preview, chip:n.chip||'Note', updated:n.updated||0, created:n.created||0, ai:!!n.ai, tab:'notes', doc:n.doc, pin:!!n.pin,
           onOpen:n.onClick, onRename:n.onRename, onDelete:n.onDelete, onDeleteAi:n.onDeleteAi, onPin:n.onPin });   // note rows: open + rename/delete/delete-chat come from the augment entry
         for(const c of convos) out.push({ id:c.id, icon:'🤖', title:c.title||'Chat', preview:c.preview, chip:c.label, updated:c.updated||0, tab:'chats',
           // open WITHOUT closing the drawer — but first make the chat surface visible (onShow):
