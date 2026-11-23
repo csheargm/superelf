@@ -78,11 +78,13 @@ jobs:
         # slack): ink-enclosure-e2e.test.mjs, 9 Playwright checks that skip on CI by PA_E2E_SKIP.
         # 2026-11-23: EVERY OS +6 (ubuntu 98, windows 180): fix/morning's new Playwright checks (demo
         # limit screen 3, demo app sign-out 1, removed member 1, family labels 1), skipped on CI by PA_E2E_SKIP.
+        # 2026-11-23: windows +1 (181): test/auth.test.mjs read-only-folder sweep test skips on Windows
+        # (no POSIX file modes there); measured 181 in run 45247410656.
         include:
           - os: ubuntu-latest
             max_skipped: 98
           - os: windows-latest
-            max_skipped: 180
+            max_skipped: 181
     env:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED
