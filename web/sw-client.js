@@ -20,6 +20,7 @@ const SW_OFFLINE_CONFIG_URL='/api/offline-config';   // lib/offline.mjs OFFLINE_
 const SW_ROUTE_SRC='src', SW_ROUTE_SRCDOC='srcdoc';
 const SW_UID_KEY='pa_uid';                   // localStorage: who signed in last, for a boot with no node (ensureToken)
 const SW_APPS_KEY='pa_apps';                 // localStorage: the app list from the last online load (loadApps)
+const SW_FAMILY_KEY='pa_family';             // localStorage: {uid, name, apps} — the header name and Family Apps from the last online load (F5-7)
 const SW_OPEN_FAILED_TXT='无法打开 · Could not open';
 const swAppUrl=(uid,slug)=>`/app/${encodeURIComponent(uid)}/${encodeURIComponent(slug)}/`;
 // The build id inside the footer line '<app name> · v<semver>+N · <build>' (web/update.js reads the same line).
@@ -85,7 +86,9 @@ async function swPrefetch(d,ctx,uid){
   const {status}=ctx;
   if(status.worker!=='ready'||!uid) return status.bible='skipped';
   let cfg; try{ cfg=await d.fetchJson(SW_OFFLINE_CONFIG_URL); }catch(err){ status.bible='no-config'; status.error=String(err&&err.message||err); return status.bible; }
-  for(const slug of cfg.apps||[]){ try{ await d.fetchText(swAppUrl(uid,slug)); }catch(err){ status.error=String(err&&err.message||err); } }   // a missing app page is not a reason to skip the corpus; the error is kept
+  // apps: this user's own copies; shelf_apps: the family shelf's (the node lists only what exists, F4-4).
+  const pages=[...(cfg.apps||[]).map((slug)=>swAppUrl(uid,slug)),...(cfg.shelf_apps||[]).map((slug)=>swAppUrl('shared',slug))];
+  for(const url of pages){ try{ await d.fetchText(url); }catch(err){ status.error=String(err&&err.message||err); } }   // a missing app page is not a reason to skip the corpus; the error is kept
   if(cfg.bible_prefetch===false) return status.bible='off';
   const st=await ctx.ask({kind:SW_BIBLE_STATUS_KIND},SW_BIBLE_STATUS_KIND);
   if(st&&st.done) return status.bible='done';

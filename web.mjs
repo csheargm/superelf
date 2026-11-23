@@ -12,7 +12,9 @@ import { injectDemoBoot } from './lib/demo-boot.mjs';
 import { makeSigninGate, authConfig } from './lib/demo-auth.mjs';
 import { makeDemoRoutes } from './lib/demo-routes.mjs';
 import { loadConfig, configPath, fastLaneGuard, GUARD_DEFAULT_SURFACE, agentCapabilities, appContract, REPLY_LANGUAGE_RULE, OVERRIDABLE_PROMPT_MAX } from './lib/config.mjs';
-import { runClaude, killChild } from './lib/runner.mjs';
+import { runClaude } from './lib/runner.mjs';
+import { agentAllowed, lanesFor, memberLane, NO_PLAIN_LANE_TEXT } from './lib/member-lanes.mjs';
+import { cancelOnClose, createTurnCancel, createTurnStops } from './lib/turn-stop.mjs';
 import { watchConfig } from './lib/config-watch.mjs';
 import { oneShotBaseArgs, oneShotModel, yieldSettings } from './lib/one-shot.mjs';
 import { safeJoin, slugOk, tokenOk, dataContentType, readBody, writeFileAtomic, renameWithRetry, decodeBase64Strict, bodyErrorResponse, BODY_LIMITS } from './lib/webutil.mjs';
@@ -23,7 +25,7 @@ import { readJsonState, readJsonForUpdate, FILE_OK, FILE_ABSENT, FILE_UNREADABLE
 // 2026-09-02: app data (handwriting notebooks!) inherited the 64KB default,
 // five real notes hit it, one lost a page of Apple Pencil strokes.
 import { saveAppData, restoreAppData, appDataFile, noLinkOnTheWay, APP_DATA_DIR, UPLOADS_DIR } from './lib/appdata.mjs';
-import { loadProfile, loadProfileForUpdate, saveProfile, ageFromYear, sanitizeHealthThresholds, effectiveHealthThresholds, emailOk } from './lib/users.mjs';
+import { loadProfile, loadProfileForUpdate, saveProfile, displayName, ageFromYear, sanitizeHealthThresholds, effectiveHealthThresholds, emailOk } from './lib/users.mjs';
 import { promote, rollback, unshare, listShared, fork, copyNoLinks, LINKED_SOURCE, FORK_REFUSED } from './lib/sharedapps.mjs';
 import { getChapter, bibleSearchWire, BIBLE_DATA_DIR } from './lib/bible.mjs';
 import { listBriefings, getBriefing, saveBriefing, pruneBriefings, pendingActions, runJob } from './lib/autonomy.mjs';
@@ -53,7 +55,7 @@ import { hashPassword, verifyPassword, makeAudit, readAudit, ACCOUNT_REMOVED_BOD
 import { notifyBriefingEmail } from './lib/notify.mjs';
 import { readShell } from './lib/shellhtml.mjs';
 import { makeBuildId, BUILD_MARKER, readRevision } from './lib/buildid.mjs';
-import { SW_PATH, OFFLINE_CONFIG_PATH, bibleIndex, withCspMeta, APP_CSP } from './lib/offline.mjs';
+import { SW_PATH, SW_PROBE_PATH, OFFLINE_CONFIG_PATH, offlineAppsFor, bibleIndex, withCspMeta, APP_CSP } from './lib/offline.mjs';
 import { corsHeaders } from './lib/local-origin.mjs';
 import { loadJobs as loadJobFiles, saveJob, deleteJob, validateJob } from './lib/jobs/store.mjs';
 import { readJobPrefs, setJobEnabled, applyJobPrefs, heldOff, builtinsFor } from './lib/jobs/prefs.mjs';
@@ -498,7 +500,7 @@ function provisionWorkspace(rec) {
   if (!existingProfile) saveProfile(rec.workspace, { name: rec.name, role: rec.role, birthYear: rec.birthYear || null, about: '', prefs: '' });
 }
 
-function publicUser(u) { const p = loadProfile(u.workspace) || {}; return { id: u.id, name: p.name || u.name, role: u.role, status: u.status || 'active', hasPin: !!u.passHash, birthYear: p.birthYear ?? u.birthYear ?? null, age: ageFromYear(p.birthYear ?? u.birthYear, thisYear()) }; }
+function publicUser(u) { const p = loadProfile(u.workspace) || {}; return { id: u.id, name: displayName(u), role: u.role, agent: agentAllowed(u), status: u.status || 'active', hasPin: !!u.passHash, birthYear: p.birthYear ?? u.birthYear ?? null, age: ageFromYear(p.birthYear ?? u.birthYear, thisYear()) }; }
 
 if (!cfg.web_token) {
   cfg.web_token = crypto.randomBytes(24).toString('base64url');
@@ -948,6 +950,9 @@ async function reloadConfig({ keepAccounts = false } = {}) {
   cfg.sessions = sessions;
 }
 
+// The shelf as people see it: sharedBy is the sharer's name, not their account id (F5-9).
+const shelfWithNames = () => listShared(SHARED).map((a) => ({ ...a, sharedBy: a.sharedBy ? displayName(cfg.userById.get(a.sharedBy)) : '' }));
+function appTitleOf(dir) { try { const m = JSON.parse(fs.readFileSync(path.join(dir, 'meta.json'), 'utf8')); return String((m && m.title) || path.basename(dir)); } catch { return path.basename(dir); } }   // no meta: the folder name is all there is (R5: deliberate)
 function listFamilyApps() {
   const result = [];
   for (const u of cfg.users) {
@@ -960,8 +965,7 @@ function listFamilyApps() {
         let meta = {};
         try { const m = JSON.parse(fs.readFileSync(path.join(dir, d.name, 'meta.json'), 'utf8')); if (m && typeof m === 'object') meta = m; } catch {}
         if (!meta.shared) return;
-        const prof = loadProfile(u.workspace) || {};
-        result.push({ uid: u.id, slug: d.name, title: String(meta.title || d.name), desc: String(meta.desc || ''), author: prof.name || u.name });
+        result.push({ uid: u.id, slug: d.name, title: String(meta.title || d.name), desc: String(meta.desc || ''), author: displayName(u) });
       });
   }
   return result;
@@ -1041,15 +1045,8 @@ const CHAT_CANCELLED = Object.freeze({ ok: false, text: '已取消 · Cancelled'
 // studio gave up after 5 min and the server ran on — retries piled up three claude processes
 // holding every enqueue slot. A CONVERSATION turn is never stopped here: the composer's
 // pollForResult relies on the server finishing a turn whose stream dropped.
-function cancelOnClose(res) {
-  const ac = new AbortController();
-  let child = null;
-  res.on('close', () => { if (!res.writableEnded) ac.abort(); });
-  ac.signal.addEventListener('abort', () => { if (child) killChild(child); }, { once: true });
-  // Forgotten once it exits, so a late cancel never signals a pid the OS may have reused.
-  const onChild = (c) => { child = c; c.once('close', () => { if (child === c) child = null; }); };
-  return { signal: ac.signal, onChild };
-}
+// cancelOnClose and the composer's Stop registry live in lib/turn-stop.mjs (F4-3).
+const turnStops = createTurnStops();
 
 // Stream an Ollama chat completion, re-emitting tokens via onDelta. Text-only and
 // stateless (we pass recent history each call) — the composer's fast lane.
@@ -1220,11 +1217,16 @@ async function chat(req, res, user, body) {
   const convoId = typeof b.convoId === 'string' ? b.convoId : '';
   // Installed BEFORE the lock: a oneShot caller that leaves while queued fires 'close' before the
   // lock frees, and a listener added after it would never hear it (the queued turn then ran anyway).
-  const cancel = b.oneShot === true ? cancelOnClose(res) : null;
-  return withConvoTurn(convoLocks, { userId: user.id, convoId, onQueued: () => {
+  // A conversation turn gets a handle too, fired only by an explicit Stop (POST /api/chat/stop).
+  let unstop = null;
+  const cancel = b.oneShot === true ? cancelOnClose(res)
+    : { ...createTurnCancel(), nameConvo: (id) => { unstop = turnStops.register(user.id, id, cancel); } };
+  try {
+    return await withConvoTurn(convoLocks, { userId: user.id, convoId, onQueued: () => {
     res.writeHead(200, CHAT_HEAD); res.flushHeaders?.();
     res.write(JSON.stringify({ type: 'status', text: QUEUED_TURN_TEXT }) + '\n');
   } }, (hold) => chatTurn(req, res, user, b, hold, cancel));
+  } finally { if (unstop) unstop(); }
 }
 
 async function chatTurn(req, res, user, body, hold, cancel = null) {
@@ -1279,6 +1281,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
   if (!res.headersSent) { res.writeHead(200, CHAT_HEAD); res.flushHeaders?.(); }   // a queued turn opened it already
   const alive = () => !res.writableEnded && !res.destroyed;
   const line = (o) => { if (alive()) res.write(JSON.stringify(o) + '\n'); };
+  if (cancel && cancel.nameConvo) cancel.nameConvo(convo.id);   // a conversation turn: the composer's Stop can name it now
   line({ type: 'convo', id: convo.id, title: convo.title, ...(replaced ? { replaced: true, requested: String(convoId).slice(0, 64) } : {}) });
   const beat = setInterval(() => line({ type: 'ping' }), 20000); // keep iOS Safari from aborting on idle
   // ── Chat → job ─────────────────────────────────────────────────────────────────────────
@@ -1291,7 +1294,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
   // same paused-by-default rule the editor and the resolver already follow.
   // `origin.fromApp`, not `app`: an app request whose slug is forged empty still carries the
   // relay's header, and must not reach this resolver in the owner's unrestricted lane.
-  if (!origin.fromApp && looksLikeJob(message).job) {
+  if (!origin.fromApp && agentAllowed(user) && looksLikeJob(message).job) {   // the resolver runs the agent CLI (F4-2)
     try {
       const prof = loadProfile(wsDir(user)) || {};
       const out = await resolvePrompt(message, {
@@ -1326,6 +1329,10 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
   let { lane: chosen, status: laneStatus } = pickChatLane({
     chatModels: cfg.chat_models, model: oneShot ? oneShotModel(cfg, model) : model, hasImage, visionDefault: cfg.vision_default,
     confined: agentConfined(user, origin), gone: modelHealth.gone() });
+  // F4-2: a member the owner has not opted in never reaches an agent lane (lib/member-lanes.mjs).
+  const ml = memberLane(user, chosen, cfg.chat_models, (m) => laneServed(m, modelHealth.gone()));
+  if (ml.status) laneStatus = ml.status;
+  chosen = ml.lane;
   if (laneStatus) line({ type: 'status', text: laneStatus });
   let fellBack = false;   // lib/chat-outcome.mjs: ONE retry on the agent lane for an app turn a fast lane left blank
   try {
@@ -1333,7 +1340,8 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
     const appsBefore = snapshotApps(appsDir(user));   // lib/app-postcheck.mjs: scan only what this turn writes
     // TODO(R4 seam): the retry loop and the lane dispatch inside it leave chat() together (see the seam named below).
     for (;;) {
-    if (chosen && chosen.provider === 'ollama') {
+    if (ml.blocked) r = { ok: false, text: NO_PLAIN_LANE_TEXT };   // no plain lane for this member: said, never the agent
+    else if (chosen && chosen.provider === 'ollama') {
       // Fast lane: text-only Ollama model. Stateless, so send recent history for context.
       // Global honesty guard + the app's own directive (e.g. the Bible app's "reply in Chinese
       // with English keywords") — as SYSTEM messages so fast-lane models actually follow the
@@ -1359,9 +1367,9 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
           history[history.length - 1].images = b64;   // the last turn is always the just-pushed user message (message validated non-blank at entry)
         }
       }
-      const text = await streamOllama({ url: cfg.ollama_url, model: chosen.model, messages: history,
-        onDelta: (t) => line({ type: 'delta', text: t }) });
-      r = { ok: true, text };
+      const text = await streamOllama({ url: cfg.ollama_url, model: chosen.model, messages: history, signal: cancel ? cancel.signal : undefined,
+        onDelta: (t) => line({ type: 'delta', text: t }) }).catch((e) => { if (cancel && cancel.signal.aborted) return null; throw e; });   // a Stop is not an error (F4-3)
+      r = text === null ? CHAT_CANCELLED : { ok: true, text };
     } else if (chosen && chosen.provider === 'research') {
       // Research lane（联网研究）: Tavily finds → Firecrawl reads → the configured fast
       // lane reasons over ONLY the fetched excerpts (lib/research.mjs; deps injected
@@ -1389,7 +1397,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
       // LIVE cfg on every turn, so a config.json edit applies to the next one (docs/adr/0011).
       const baseArgs = oneShot ? oneShotBaseArgs(tierArgs, cfg.one_shot_args, memberArgsOf(user, origin)) : tierArgs;
       const extraArgs = agentArgs(user, baseArgs, origin);   // owner's own chat: unrestricted. an app's turn or a member's: no skip-permissions.
-      const cancelled = () => !!cancel && cancel.signal.aborted;   // chat() installs it for oneShot only: a conversation turn is never stopped
+      const cancelled = () => !!cancel && cancel.signal.aborted;   // a oneShot caller that left, or the composer's explicit Stop (lib/turn-stop.mjs)
         // The SAME resolved skill the fast lanes get (profile override → config → built-in).
         // It was resolved only inside the ollama branch, so an app's directive applied on one
         // lane and vanished on another — the same question answered two ways.
@@ -1428,8 +1436,8 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
       r = await enqueue(async () => {
         if (cancelled()) return CHAT_CANCELLED;   // still queued when its caller left: never spawn
         let x = await runClaude({ ...opts, prompt: histPrompt });
-        // Only a conversation turn resumes, and it is never cancelled, so no retry follows a cancel.
-        if (!x.ok && opts.resumeId && /No conversation found/i.test(x.text || '')) x = await runClaude({ ...opts, resumeId: null, prompt: histPrompt });
+        // No retry after a Stop: the killed child's error is not a dead session.
+        if (!x.ok && !cancelled() && opts.resumeId && /No conversation found/i.test(x.text || '')) x = await runClaude({ ...opts, resumeId: null, prompt: histPrompt });
         return x;
       });
       // A killed child "answers" with its raw stream-json so far — never store that as a reply.
@@ -1450,7 +1458,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
       // conversation turn resumes the session it had (or none) and its history block carries these turns.
       if (r.sessionId && !oneShot) convo.sessionId = r.sessionId;
     }
-    if (!isBlankAnswer(r) || !shouldFallBackToAgent({ lane: chosen, fromApp: origin.fromApp, alreadyFellBack: fellBack })) break;
+    if (!isBlankAnswer(r) || !agentAllowed(user) || !shouldFallBackToAgent({ lane: chosen, fromApp: origin.fromApp, alreadyFellBack: fellBack })) break;
     console.log(chatTurnLogLine({ app: tag, lane: chosen, ok: false, textLen: 0, ms: Date.now() - startedAt, code: 'empty' }));
     line({ type: 'status', text: fallbackStatusText(chosen) });
     chosen = null; fellBack = true;   // null = the Claude agent lane (PA_CHAT_LANE); confined exactly as any app turn there
@@ -1467,7 +1475,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
     const appWarn = blank ? '' : appBuildWarnings(appsDir(user), appsBefore);
     if (appWarn) { r = { ...r, text: `${r.text}\n\n${appWarn}` }; line({ type: 'status', text: appWarn }); }
     // by: the lane that ACTUALLY answered (a confined turn's GPT pick runs on Claude), shown under the answer.
-    const by = chosen ? chosen.label : 'Claude';
+    const by = ml.blocked ? '' : chosen ? chosen.label : 'Claude';
     const mdMsg = { role: 'md', text: r.text || '', ms: turnMs, by, ...(blank ? { failed: true } : {}) };
     convo.messages.push(mdMsg);
     // Over the cap the oldest turns are ARCHIVED beside the conversation, never
@@ -1485,7 +1493,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
     }
     // Multi-LLM assessment ("Verify · 校验"): detached — the stream ends now, results
     // attach to this turn (mdMsg.assess) and the app polls the existing convo GET.
-    if (assess) line({ type: 'assess', ...startAssess(user, convo, mdMsg, message, chosen ? chosen.id : 'claude', app, system, origin) });
+    if (assess && agentAllowed(user)) line({ type: 'assess', ...startAssess(user, convo, mdMsg, message, chosen ? chosen.id : 'claude', app, system, origin) });
     line({ type: 'done', ok: r.ok, text: blank ? '' : (r.text || ''), by });
   } catch (e) {
     console.log(chatTurnLogLine({ app: tag, lane: chosen, ok: false, textLen: 0, ms: Date.now() - startedAt, code: e.code || e.status || e.name, fellBack }));
@@ -1696,6 +1704,7 @@ const server = http.createServer(async (req, res) => {
       return sendFile(res, f, { type, extra });
     }
 
+    if (p === SW_PROBE_PATH) { res.writeHead(204); return res.end(); }   // only the worker answers it; the node's empty 204 is the silence the probe waits out — no 401/404 noise per load (F4-4)
     const user = userFor(req);
     if (!user) return send(res, 401, 'application/json', cfg.sessions.wasRemoved(bearerOf(req), Date.now()) ? ACCOUNT_REMOVED_BODY : '{"error":"bad token"}');
 
@@ -1738,12 +1747,14 @@ const server = http.createServer(async (req, res) => {
       try { return send(res, 200, 'application/json', JSON.stringify(getChapter(BIBLE_DATA, url.searchParams.get('book'), url.searchParams.get('chapter')))); }
       catch (e) { return send(res, 400, 'application/json', JSON.stringify({ error: e.message })); }
     }
-    if (req.method === 'GET' && p === OFFLINE_CONFIG_PATH) return send(res, 200, 'application/json', JSON.stringify({ ...cfg.offline, local_origin: cfg.local_origin, bible: bibleIndex(BIBLE_DATA) }));   // read at use time: a config reload changes the cap with no restart
+    if (req.method === 'GET' && p === OFFLINE_CONFIG_PATH) return send(res, 200, 'application/json', JSON.stringify({ ...cfg.offline, ...offlineAppsFor(cfg.offline.apps, appsDir(user), demoOn(cfg) ? null : SHARED), local_origin: cfg.local_origin, bible: bibleIndex(BIBLE_DATA) }));   // read at use time: a config reload changes the cap with no restart
     // A demo visitor's record name is a placeholder ("Member · 会员"): the header shows only a name they set themselves.
     // TODO(R4): web.mjs is over budget; split the small GET routes (ping, bible, family-apps) into lib/.
     if (req.method === 'GET' && p === '/api/ping') return send(res, 200, 'application/json', JSON.stringify({ ok: true, uid: user.id, name: user.demo ? ownName(user) : user.name, role: user.role }),
       demoOn(cfg) ? undefined : { 'set-cookie': appPageCookie(req, bearerOf(req)) });   // carries the session to the app iframe's navigation (lib/app-page-access.mjs)
-    if (req.method === 'GET' && p === '/api/family-apps') return send(res, 200, 'application/json', JSON.stringify(listFamilyApps()));
+    // Each app is listed once (F4-6): your own apps are in "My apps", and an app on the family shelf is under the shelf.
+    if (req.method === 'GET' && p === '/api/family-apps') { const shelf = new Set(demoOn(cfg) ? [] : listShared(SHARED).map((a) => a.name));
+      return send(res, 200, 'application/json', JSON.stringify(listFamilyApps().filter((a) => a.uid !== user.id && !shelf.has(a.slug)))); }
     if (req.method === 'PATCH' && p.endsWith('/share') && p.startsWith('/api/apps/')) {
       const slug = p.slice('/api/apps/'.length, -'/share'.length);
       if (!slugOk(slug)) return send(res, 400, 'application/json', '{"error":"bad name"}');
@@ -1766,7 +1777,7 @@ const server = http.createServer(async (req, res) => {
       const links = openUrlApps();   // own apps only: a shelf or family app never opens links
       const own = listApps(user).map((a) => ({ ...a, uid: user.id, links: links.has(a.name) }));
       const ownNames = new Set(own.map((a) => a.name));
-      const promoted = demoOn(cfg) ? [] : listShared(SHARED).map((a) => ({ ...a, uid: 'shared' }));   // demo: workspace.example apps only
+      const promoted = demoOn(cfg) ? [] : shelfWithNames().map((a) => ({ ...a, uid: 'shared' }));   // demo: workspace.example apps only
       const promotedNames = new Set(promoted.map((a) => a.name));
       const family = listFamilyApps()
         .filter((a) => a.uid !== user.id && !ownNames.has(a.slug) && !promotedNames.has(a.slug))
@@ -2077,7 +2088,7 @@ const server = http.createServer(async (req, res) => {
     // Models offered in the composer's chooser (id + label only; server maps id → provider/model).
     // A lane gone from Ollama (lib/model-health.mjs) is not offered — the scheduled model-check
     // and any gone answer a turn meets keep this list current without a config edit or a restart.
-    if (req.method === 'GET' && p === '/api/models') { const gone = modelHealth.gone(); return send(res, 200, 'application/json', JSON.stringify((cfg.chat_models || []).filter((m) => laneServed(m, gone)).map((m) => ({ id: m.id, label: m.label, group: m.group || '', provider: m.provider || '', vision: m.provider === 'claude' || m.provider === 'codex' || m.id === cfg.vision_default })))); }   // vision: the summary sheet says whether page images will be seen (note-features.md I)
+    if (req.method === 'GET' && p === '/api/models') { const gone = modelHealth.gone(); return send(res, 200, 'application/json', JSON.stringify(lanesFor(user, cfg.chat_models || []).filter((m) => laneServed(m, gone)).map((m) => ({ id: m.id, label: m.label, group: m.group || '', provider: m.provider || '', vision: m.provider === 'claude' || m.provider === 'codex' || m.id === cfg.vision_default })))); }   // vision: the summary sheet says whether page images will be seen (note-features.md I)
 
     // Health metrics — the iPhone Shortcut POSTs a day's data here; apps read them
     // back. v1 (flat day row) and v2 (schema:"health.v2" samples) share the endpoint
@@ -2530,10 +2541,11 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, 'application/json', JSON.stringify(cfg.users.map((u) => {
           const dir = appsDir(u);
           const apps = fs.existsSync(dir) ? fs.readdirSync(dir).filter((n) => slugOk(n) && fs.existsSync(path.join(dir, n, 'index.html'))) : [];
-          return { user: u.id, name: u.name, apps };
+          const titles = Object.fromEntries(apps.map((n) => [n, appTitleOf(path.join(dir, n))]));   // the list shows titles, never slugs (F5-9)
+          return { user: u.id, name: displayName(u), apps, titles };
         }).filter((x) => x.apps.length)));
       }
-      if (req.method === 'GET' && p === '/api/admin/shared') return send(res, 200, 'application/json', JSON.stringify(listShared(SHARED)));
+      if (req.method === 'GET' && p === '/api/admin/shared') return send(res, 200, 'application/json', JSON.stringify(shelfWithNames()));
       if (req.method === 'POST' && p === '/api/admin/share') {
         const { from, slug } = await readBody(req, BODY_LIMITS.control);
         const src = cfg.userById.get(String(from || ''));
@@ -2628,6 +2640,7 @@ const server = http.createServer(async (req, res) => {
           const prof = loadProfileForUpdate(target.workspace, { name: target.name }); // read-before-write: never rebuild a member's profile from a failed read
           if (typeof b.name === 'string' && b.name.trim()) { prof.name = b.name.trim().slice(0, 60); target.name = prof.name; }
           if (b.birthYear !== undefined) { prof.birthYear = Number(b.birthYear) || null; target.birthYear = prof.birthYear; }
+          if (typeof b.agent === 'boolean') target.agent = b.agent;   // "AI 工具 · Agent tools" opt-in (F4-2, lib/member-lanes.mjs)
           if (b.role) {
             const owners = cfg.users.filter((u) => u.role === 'owner').length;
             const wouldRemoveLastOwner = target.role === 'owner' && b.role !== 'owner' && owners === 1;
@@ -2724,6 +2737,8 @@ const server = http.createServer(async (req, res) => {
     // rejection and the request simply HUNG: no status, no body, no timeout.
     // The same invisible-failure shape as the defect it was added to report.
     if (req.method === 'POST' && p === '/api/chat') { await chat(req, res, user, await readBody(req, BODY_LIMITS.chat)); return; }
+    if (req.method === 'POST' && p === '/api/chat/stop') { const b = (await readBody(req, BODY_LIMITS.control)) || {};   // the composer's Stop · 停止 (F4-3)
+      return send(res, 200, 'application/json', JSON.stringify({ ok: true, stopped: typeof b.convoId === 'string' && turnStops.stop(user.id, b.convoId) })); }
     // /api/ask is APP-ONLY: its one caller is the shell broker's 'ask' kind. So it is confined
     // whoever is signed in, marker or not — the relay's header is still sent, and checked by
     // test/app-agent-confinement.test.mjs, but this route does not depend on it.

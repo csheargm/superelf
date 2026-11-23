@@ -111,7 +111,7 @@ import fs from 'node:fs';let s='';process.stdin.on('data',d=>s+=d).on('end',()=>
 // The owner and one member — exported so a file that needs one more account extends THIS list (R3).
 export const LANE_USERS = Object.freeze([
   { id: 'owner', name: 'Owner', role: 'owner', token: OWNER_TOKEN, workspace: 'workspace' },
-  { id: 'kid', name: 'Kid', role: 'member', token: MEMBER_TOKEN, workspace: 'workspace-kid' },
+  { id: 'kid', name: 'Kid', role: 'member', token: MEMBER_TOKEN, workspace: 'workspace-kid', agent: true },   // opted in to agent tools (F4-2), so the confined agent lane is what runs
 ]);
 // The four lanes that matter (ollama points nowhere: no test may depend
 // on it), and a panel of two agent-capable lanes.

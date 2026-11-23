@@ -47,6 +47,7 @@ function load() {
     relayBodyBytes: (b) => b.length, took: () => '', renderMd: (t) => t, addTook() {}, restoreComposer() {},
     relayHttpFail() {}, relayText: () => '', relayNetFail() {}, pollForResult() {}, renderJobDraft() {},
     setInterval: () => 0, clearInterval() {},
+    turnsRunning: 0, paintSendBtn() {},   // the Stop button (F4-3) sits outside the extracted Send section
   };
   const names = Object.keys(env);
   // convoId lives in the shell's scope; setConvo writes it, as the real one does.
