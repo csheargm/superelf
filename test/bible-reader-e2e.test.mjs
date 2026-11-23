@@ -156,3 +156,23 @@ test('F2-03: a finger swipe left turns to the next chapter, right goes back; a v
     assert.deepEqual(await where(frame), start, 'a vertical drag scrolls, it never turns the page');
   } finally { await ctx.close(); }
 });
+
+// Triage 2026-11-23 item 7: each Bible open logged four 404s ("Failed to load resource") for data that
+// does not exist yet — general.json, notes/<book>-<ch>.json and both .bak. Now none. CONTROL (R14): the
+// same reads DID happen (answered 204), so a pass is not the reads being skipped.
+test('opening the Bible on a fresh account logs no 404 for absent data files', { skip, timeout: 60000 }, async () => {
+  fs.rmSync(path.join(root, 'workspace', 'data', 'bible'), { recursive: true, force: true });
+  const ctx = await browser.newContext({ viewport: { width: 1100, height: 850 } });
+  await ctx.addInitScript((t) => { try { localStorage.setItem('pa_session', t); } catch { /* the sandboxed app frame has no storage */ } }, OWNER_TOKEN);
+  const page = await ctx.newPage(); const bad = [], absent = [];
+  page.on('response', (r) => { const u = r.url(); if (!u.includes('/api/data/')) return; if (r.status() >= 400) bad.push(`${r.status()} ${u}`); if (r.status() === 204) absent.push(u); });
+  await page.goto(`http://127.0.0.1:${port}/`);
+  await page.waitForFunction(() => typeof openApp === 'function' && document.querySelector('#dot.ok'));
+  await page.evaluate(() => openApp(UID, 'bible', 'bible'));
+  let frame = null;
+  for (let i = 0; i < 200 && !frame; i++) { frame = page.frames().find((f) => f.url().includes('/app/owner/bible/')) || null; if (!frame) await page.waitForTimeout(50); }
+  await frame.waitForFunction(ready); await page.waitForTimeout(800);
+  assert.deepEqual(bad, [], 'no 4xx/5xx data reads');
+  assert.ok(absent.some((u) => /general\.json\.bak\?/.test(u)), `CONTROL: the .bak probe ran and was answered 204: ${absent.join(' ')}`);
+  await ctx.close();
+});

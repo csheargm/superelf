@@ -92,7 +92,7 @@ function makeSync(d){
 const PASync=makeSync({
   db:PAOffline.db, uid:()=>UID, now:()=>Date.now(),
   reachable:()=>PAOrigin.reachable(),   // /api/build on the public name, else the home name with the same build (web/offline-origin.js): never from a cache
-  read:(slug,path)=>relayCall('/api/data/'+offDataPath(slug,path).split('/').map(encodeURIComponent).join('/'),undefined,'text','text'),
+  read:(slug,path)=>relayCall(dataReadUrl(offDataPath(slug,path)),undefined,'text','text'),
   post:(slug,path,text)=>relayCall('/api/save-data',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({path:offDataPath(slug,path),data:text})},'raw'),
   merge:mergeOffline, state:PAOffline.syncState,
   onTrigger:(fn)=>{

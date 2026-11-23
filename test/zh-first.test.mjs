@@ -101,3 +101,14 @@ test('every bilingual pair in the shipped UI reads 中文 first', () => {
   }
   assert.deepEqual(found, [], `English-first pairs (write them "中文 · English"):\n${found.join('\n')}`);
 });
+
+// The shell composer placeholder is the first text a user reads (triage 2026-11-23). A bilingual
+// placeholder="EN · 中文" is already caught above (an attribute value is a "..." literal). KNOWN LIMIT:
+// English-ONLY placeholders are not scanned — many app inputs ("e.g. 95", "Add task…") are English
+// only by design today; this pins the shell's one.
+test('the shell composer placeholder reads 中文 first', () => {
+  const html = fs.readFileSync(path.join(ROOT, 'web', 'index.html'), 'utf8');
+  const ph = html.match(/<input id="box"[^>]*placeholder="([^"]*)"/)?.[1];
+  assert.ok(ph, 'the #box input has a placeholder');
+  assert.match(ph, /^[一-鿿]/, `starts with Chinese: ${ph}`);
+});

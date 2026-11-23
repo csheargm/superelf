@@ -1,10 +1,8 @@
 // The top-centre bar handle (web/bar-handle.css, 120x28; owner 2026-11-13 "longer and thicker, easy to tap")
 // in a REAL browser (R6), on a throwaway root with every shipped workspace app:
 //   1. the shell's #barpeek and PAAppBar's .paab-handle both measure 120x28, top-centre;
-//   2. growing the shell's handle from 64x16 to 120x28 covers NO new app control (button / link / field,
-//      sampled across the box inside the app frame) at 375px or iPad 1024px. Two apps with a full-width TAB
-//      row at the very top (longevity, productivity-hub) already had their centre tab under the old 64x16;
-//      that pre-existing overlap is listed, not hidden: the growth must not add to it;
+//   2. the shell's handle covers NO app control (button / link / field, sampled across the box inside the
+//      app frame) at 375px or iPad 1024px, nor Journal's header with a long title: it has its own strip;
 //   3. a handle-shown Bible / Journal bar stays past the old 2.5 s timer, then idles away (ADR 0035);
 //   4. the Bible's top-bar "笔 · Pen" opens the pen sheet, keeps the bar out while open, and a colour / size
 //      choice changes the pen the verse ink draws with;
@@ -20,7 +18,6 @@ import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, OWNER_TOKEN } from '
 
 const APPS = fs.readdirSync(path.join(ROOT, 'workspace', 'apps')).filter((d) => fs.existsSync(path.join(ROOT, 'workspace', 'apps', d, 'index.html')));
 const OWNBAR = new Set(APPS.filter((d) => { try { return JSON.parse(fs.readFileSync(path.join(ROOT, 'workspace', 'apps', d, 'meta.json'), 'utf8')).ownBar === true; } catch { return false; /* no meta.json: not an own-bar app */ } }));
-const OLD_W = 64, OLD_H = 16;   // the handle before 2026-11-13, for the "no new overlap" comparison
 const SETTLE_MS = 1500, OLD_TIMER_MS = 2500, PHONE = { width: 375, height: 812 }, IPAD = { width: 1024, height: 768 };
 let port, web, browser;
 before(async () => {
@@ -53,8 +50,8 @@ async function open(slug, viewport, ready = () => document.readyState === 'compl
 }
 const box = (loc) => loc.evaluate((e) => { const r = e.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height, cx: r.left + r.width / 2 }; });
 
-test('the shell handle is 120x28 top-centre and covers no app control at 375px or iPad width', { skip, timeout: 600000 }, async () => {
-  const hits = [], preexisting = [];
+test('the shell handle is 120x28 top-centre and covers NO app control at 375px or iPad width', { skip, timeout: 600000 }, async () => {
+  const hits = [];
   assert.deepEqual([...OWNBAR].sort(), ['bible', 'notes'], 'control: the two own-bar apps are the ones skipped');
   for (const viewport of [PHONE, IPAD]) for (const slug of APPS.filter((a) => !OWNBAR.has(a))) {
     const { ctx, page, frame } = await open(slug, viewport);
@@ -63,24 +60,44 @@ test('the shell handle is 120x28 top-centre and covers no app control at 375px o
       const h = await box(page.locator('#barpeek'));
       assert.deepEqual([Math.round(h.w), Math.round(h.h)], [120, 28], `${slug}: the shell handle is 120x28`);
       assert.ok(Math.abs(h.cx - viewport.width / 2) <= 1, `${slug}: centred`);
-      const fr = await box(page.locator('#fr'));
-      const under = (b) => frame.evaluate(({ x0, y0, w, h }) => {
-        const out = new Set();
-        for (let x = x0; x <= x0 + w; x += 6) for (let y = Math.max(0, y0); y <= y0 + h; y += 4)
-          for (const e of document.elementsFromPoint(x, y)) { const c = e.closest('button,a[href],input,select,textarea,[role="button"]'); if (c && getComputedStyle(c).visibility !== 'hidden') out.add((c.id || c.className || c.tagName) + ''); }
-        return [...out];
-      }, b);
-      const now = await under({ x0: h.x - fr.x, y0: h.y - fr.y, w: h.w, h: h.h });
-      const old = await under({ x0: h.cx - OLD_W / 2 - fr.x, y0: h.y - fr.y, w: OLD_W, h: OLD_H });
-      if (old.length) preexisting.push(`${slug}@${viewport.width}`);
-      const added = now.filter((x) => !old.includes(x));
-      if (added.length) hits.push(`${slug}@${viewport.width}: ${added.join(', ')}`);
+      const now = await controlsUnder(page, frame, h);
+      if (now.length) hits.push(`${slug}@${viewport.width}: ${now.join(', ')}`);
     } finally { await ctx.close(); }
   }
-  assert.deepEqual(hits, [], 'the bigger handle covers no app control the old one did not');
-  assert.deepEqual(preexisting.sort(), ['longevity@1024', 'longevity@375', 'productivity-hub@1024', 'productivity-hub@375'],
-    'the known pre-existing overlap (a top tab row) — a change here means re-measuring');
+  // Triage 2026-11-23: church@375 and the longevity / productivity-hub tab rows sat under it. The
+  // handle now has its own strip (web/index.html #frame.peek): the app starts below it, whatever the app.
+  assert.deepEqual(hits, [], 'no app control under the shell handle');
 });
+
+// Journal with a long title, as the shell shows it before (or without) its own bar: the ⋯ / Text
+// buttons of its top row sat under the shell handle at 375 and 820, so a click opened the bar.
+test('Journal (shell handle shown): a long title leaves no header control under the handle', { skip, timeout: 120000 }, async () => {
+  const hits = [];
+  for (const viewport of [PHONE, { width: 820, height: 1180 }, { width: 1280, height: 800 }]) {
+    const { ctx, page, frame } = await open('notes', viewport, () => !!document.querySelector('.pan-top'));
+    try {
+      await page.evaluate(() => document.querySelector('#frame').classList.remove('ownbar'));   // the shell-handle case
+      await frame.evaluate(() => { document.querySelector('.pan-htitle').textContent = 'A very long note title that goes on and on and on'; });
+      await page.waitForFunction(() => document.querySelector('#fr').getBoundingClientRect().top >= document.querySelector('#barpeek').getBoundingClientRect().bottom);   // the strip has laid out
+      await page.waitForTimeout(300);   // the app's own resize handling
+      const h = await box(page.locator('#barpeek'));
+      assert.ok(h.w > 0, 'CONTROL: the shell handle is shown');
+      const now = await controlsUnder(page, frame, h);
+      if (now.length) hits.push(`notes@${viewport.width}: ${now.join(', ')}`);
+    } finally { await ctx.close(); }
+  }
+  assert.deepEqual(hits, []);
+});
+
+async function controlsUnder(page, frame, h) {
+  const fr = await box(page.locator('#fr'));
+  return frame.evaluate(({ x0, y0, w, h: hh }) => {
+    const out = new Set();
+    for (let x = x0; x < x0 + w; x += 6) for (let y = Math.max(0, y0); y < y0 + hh; y += 4)   // half-open box: the edge pixel below is not under it
+      for (const e of document.elementsFromPoint(x, y)) { const c = e.closest('button,a[href],input,select,textarea,[role="button"]'); if (c && getComputedStyle(c).visibility !== 'hidden') out.add((c.id || c.className || c.tagName) + ''); }
+    return [...out];
+  }, { x0: h.x - fr.x, y0: h.y - fr.y, w: h.w, h: h.h });
+}
 
 const bibleReady = () => document.querySelector('#nav .paab-home') && document.querySelectorAll('.verse').length > 5;
 // ADR 0035: a handle-shown bar is on the same idle clock as any shown bar — up past the old 2.5 s timer,

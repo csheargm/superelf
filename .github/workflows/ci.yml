@@ -83,11 +83,15 @@ jobs:
         # 2026-11-23: EVERY OS +30 (ubuntu 128, windows 211; measured 128 and 211 in run 45262355037):
         # overnight triage merge's new Playwright e2e files (bible reader, notes polish, chat stop,
         # family offline, member tips, ...), skipped on CI by PA_E2E_SKIP; fail 0 on both.
+        # 2026-11-23: EVERY OS +1 (ubuntu 129, windows 212): shell-placeholder-e2e.test.mjs (1 Playwright check).
+        # 2026-11-23: EVERY OS +1 (ubuntu 130, windows 213): family-offline-e2e service-worker-on offline check.
+        # 2026-11-23: EVERY OS +1 (ubuntu 131, windows 214): bible-reader-e2e no-404 check.
+        # 2026-11-23: EVERY OS +1 (ubuntu 132, windows 215): note-link-e2e range-end check.
         include:
           - os: ubuntu-latest
-            max_skipped: 128
+            max_skipped: 132
           - os: windows-latest
-            max_skipped: 211
+            max_skipped: 215
     env:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED

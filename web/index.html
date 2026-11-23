@@ -98,7 +98,7 @@ form#f{ position:fixed; left:0; right:0; bottom:0; display:flex; flex-direction:
 .chip button{ background:none; border:none; cursor:pointer; color:var(--muted); font-size:15px; padding:0 2px; line-height:1; flex-shrink:0; }
 form#f > *{ pointer-events:auto; }
 #frow{ display:flex; gap:4px; align-items:center; background:var(--card); border:1px solid var(--line); border-radius:999px; padding:4px 4px 4px 6px; box-shadow:0 2px 12px rgba(0,0,0,.25); }
-#box{ flex:1; font:inherit; padding:8px 8px; border:none; border-radius:999px; background:transparent; color:var(--text); outline:none; }
+#box{ flex:1; min-width:0; text-overflow:ellipsis; font:inherit; padding:8px 8px; border:none; border-radius:999px; background:transparent; color:var(--text); outline:none; }
 .ibtn{ background:none; border:none; border-radius:999px; padding:7px 10px; font-size:18px; cursor:pointer; color:var(--muted); line-height:1; flex-shrink:0; }
 @keyframes pa-spin{ to{ transform:rotate(-360deg); } }
 #reload.spin{ animation:pa-spin .8s linear infinite; color:var(--accent); pointer-events:none; }
@@ -133,7 +133,11 @@ button.plain{ background:none; border:1px solid var(--line); border-radius:8px; 
    across all 19 apps, 11 anchor chrome to the top or bottom edge, always full-width rows whose
    CONTROLS sit at the left and right ends — the centre of that row is title text. A grabber there
    shadows letters, never a button. Anything wider, or in a corner, lands on one. */
-#frame.peek{ padding-top:env(safe-area-inset-top,0px); }
+/* The handle's own STRIP (triage 2026-11-23): the app starts below the handle, so no app control can
+   ever sit under it — whatever the app draws at its top (church's row at 375px, the longevity /
+   productivity-hub tab rows, Journal's header with a long title). 28px, not the old 43px bar row. */
+#frame.peek{ padding-top:calc(env(safe-area-inset-top,0px) + var(--pa-handle-h)); }
+#frame.peek.ownbar{ padding-top:env(safe-area-inset-top,0px); }   /* an own-bar app shows no shell handle */
 /* The notch inset moves to the FRAME here, so the iframe still clears the camera once the bar is
    no longer the thing holding that space. The bar drops its own copy or it would count twice. */
 #frame.peek .bar{ position:absolute; top:0; left:0; right:0; z-index:6; background:var(--bg);
@@ -141,7 +145,7 @@ button.plain{ background:none; border:1px solid var(--line); border-radius:8px; 
 #frame.peek.barin .bar{ transform:translateY(0); }
 /* -101%, not -100%: the bar's own bottom border is outside its box and a 1px line parked at the
    top of every app reads as a rendering fault. */
-#barpeek{ display:none; position:absolute; top:0; left:50%; transform:translateX(-50%); z-index:7;
+#barpeek{ display:none; position:absolute; top:env(safe-area-inset-top,0px); left:50%; transform:translateX(-50%); z-index:7;
   width:var(--pa-handle-w); height:var(--pa-handle-h); align-items:center; justify-content:center; cursor:pointer;
   background:none; border:0; padding:0; -webkit-tap-highlight-color:transparent;
   transition:opacity .18s ease; }
@@ -340,7 +344,7 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
   <div class="pac-pills"><button class="pac-model" id="shellModel" type="button" style="display:none"></button><button class="pac-vfy" id="shellVfy" type="button" style="display:none">校验 · ☐ Verify</button></div>
   <div id="frow">
     <button class="ibtn" id="plus" type="button" title="Attach">+</button>
-    <input id="box" placeholder="Ask, or: create an app that…" autocomplete="off">
+    <input id="box" placeholder="提问，或：创建一个应用… · Ask, or: create an app that…" autocomplete="off">
     <button class="primary" id="send" type="button" title="发送 · Send" aria-label="发送 · Send">↑</button>
   </div>
 </form>
@@ -1428,9 +1432,14 @@ function relayBadPath(){ return {ok:false,code:'bad-request',error:'路径无效
 //   'none' → {ok:true} · 'text' → {ok:true,[key||'text']} · 'json' → {ok:true,[key||'data']}
 //   'blob' → {ok:true,blob} (never postMessage'd — the caller converts it first)
 //   'raw'  → the server's own JSON verbatim (save-data telemetry, /api/ask)
+// An app-data read that may find no file yet asks with ?absent=empty and gets 204, not a 404 console
+// error; it means exactly what the 404 meant. R3: equals DATA_ABSENT_QUERY in lib/appdata.mjs (test/data-absent).
+const DATA_ABSENT_QUERY='absent=empty';
+const dataReadUrl=(rel)=>'/api/data/'+rel.split('/').map(encodeURIComponent).join('/')+'?'+DATA_ABSENT_QUERY;
 async function relayCall(url,opt,as,key){
   let r;
   try{ r=await api(url,opt); }catch(err){ return relayNetFail(err,'request'); }
+  if(r.status===204&&url.endsWith('?'+DATA_ABSENT_QUERY)) return {ok:false,code:'not-found',status:404,error:RELAY_NOT_FOUND};
   if(!r.ok) return await relayHttpFail(r);
   try{
     if(as==='none') return {ok:true};
@@ -1898,7 +1907,7 @@ window.addEventListener('message',async(e)=>{
       // it answers a code, never a bare "not found" (see RELAY-CORE above).
       if(typeof m.path!=='string'||m.path.includes('..')) return reply(relayBadPath());
       // Offline-first: the node first, the on-device mirror when the network fails (web/offline-client.js). TODO(R4 seam): the broker to its own file.
-      reply(await PAOffline.read(appSlug,m.path,()=>relayCall('/api/data/'+appData(m.path).split('/').map(encodeURIComponent).join('/'),undefined,'text','text')));
+      reply(await PAOffline.read(appSlug,m.path,()=>relayCall(dataReadUrl(appData(m.path)),undefined,'text','text')));
     } else if(m.kind==='attach-url'){
       // Return an uploaded attachment as a data URL so a sandboxed app can re-display it on
       // reload (apps can't fetch; blob URLs don't cross origins). Same source as renderAtts.

@@ -22,7 +22,10 @@ after(teardown);
 
 test('select a word, Link, type an address, Apply: the note on disk holds the link — and after a reload too', { skip, timeout: 90000 }, async () => {
   const ctx = await newContext(); const page = await ctx.newPage();
-  const errors = []; page.on('pageerror', (e) => errors.push(String(e)));
+  // WebKit reports each fetch a reload cuts off as a page error ("Fetch API cannot load … due to
+  // access control checks"): that is the navigation, not the app. Only those, only during the reload, are set aside.
+  const errors = []; let reloading = false;
+  page.on('pageerror', (e) => { if (!(reloading && /^Fetch API cannot load .*\/api\/\S+ due to access control checks\.$/.test(String(e)))) errors.push(String(e)); });
   let frame = await openJournal(page);
   await textMode(frame);
   await frame.locator('.pan-textlayer').click();
@@ -40,8 +43,8 @@ test('select a word, Link, type an address, Apply: the note on disk holds the li
   await onDisk((h) => h.includes(`Visit ${SAVED} today`), 'the sanitized link on disk');
   await indexed();
 
-  await page.reload();
-  frame = await openJournal(page);
+  reloading = true; await page.reload();
+  frame = await openJournal(page); reloading = false;
   assert.ok((await layerHtml(frame)).includes(SAVED), 'the link survives a reload, with target/rel');
 
   // Read state: a mostly-text note reopens in Text (editing), so leave it the way a user does —
@@ -94,6 +97,31 @@ test('on a phone the address strip fits the screen, though the docked bar is a s
   assert.equal(await linking(frame), true, `the strip opened (flash: "${await flashText(frame)}")`);
   const boxes = await frame.evaluate(() => ['.pan-linkurl', '.pan-linkok', '.pan-linkx'].map((s) => { const b = document.querySelector(s).getBoundingClientRect(); return [s, b.left, b.right, b.width]; }));
   for (const [s, l, r, w] of boxes) assert.ok(l >= 0 && r <= 390 && w > 20, `${s} is on screen (${l.toFixed(0)}..${r.toFixed(0)})`);
+  await ctx.close();
+});
+
+test('a selection that starts at the end of the text before a link: the link only if the range ends in it', { skip, timeout: 60000 }, async () => {
+  // WebKit starts a selection over a link at the END of "Visit ". Such a range is the link only when
+  // it also ends inside it; one that runs on into " today" is a NEW link over that text, not an edit.
+  const ctx = await newContext(); const page = await ctx.newPage();
+  const frame = await openJournal(page);
+  await textMode(frame);
+  await page.waitForTimeout(200);                                            // T mode's own caret-to-end lands first
+  const form = async (endIn, endAt) => {
+    await frame.evaluate(([endIn, endAt]) => { const tl = document.querySelector('.pan-textlayer'); tl.focus();
+      const a = tl.querySelector('a'), before = a.previousSibling, end = endIn === 'link' ? a.firstChild : a.nextSibling;
+      const r = document.createRange(); r.setStart(before, before.length); r.setEnd(end, endAt === 'end' ? end.length : endAt);
+      getSelection().removeAllRanges(); getSelection().addRange(r); }, [endIn, endAt]);
+    await frame.locator('.pan-flink').click();
+    assert.equal(await linking(frame), true, `the strip opened (flash: "${await flashText(frame)}")`);
+    const out = [await frame.locator('.pan-linkurl').inputValue(), await frame.locator('.pan-linkrm').isVisible()];
+    await page.keyboard.press('Escape');
+    return out;
+  };
+  assert.deepEqual(await form('link', 'end'), [TARGET, true], 'start before, end at the link\'s end: edit that link');
+  assert.deepEqual(await form('link', 3), [TARGET, true], 'start before, end inside the link: edit that link');
+  assert.deepEqual(await form('after', 'end'), ['', false], 'runs on into " today": a new link, not the old one');
+  assert.ok((await layerHtml(frame)).includes(`Visit ${SAVED} today`), 'nothing changed');
   await ctx.close();
 });
 

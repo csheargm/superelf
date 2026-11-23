@@ -47,7 +47,11 @@ test('Activity log opens a dialog: 中文 · English labels, names, local date a
   assert.match(text, /任务失败 · Job failed · Mom/);
   assert.match(text, /失败 · Briefing email failed/);
   assert.match(text, /登录 · Sign-in/);
-  assert.match(text, /Nov 22, 2026, 08:12 PM/, 'local (Los Angeles) date and time, not UTC');
+  // Engines join date and time differently (Chromium "Nov 22, 2026, 08:12 PM", WebKit "… 2026 at
+  // 08:12 PM"): assert the parsed parts, not the joiner. 08:12 PM is Los Angeles; UTC would be 04:12 AM Nov 23.
+  const when = text.match(/Nov (\d+), (\d{4})(?:,| at) (\d{2}):(\d{2}) (AM|PM)/);
+  assert.ok(when, `a local date and time in the log: ${text}`);
+  assert.deepEqual(when.slice(1), ['22', '2026', '08', '12', 'PM'], 'local (Los Angeles) date and time, not UTC');
   assert.doesNotMatch(text, /job-failed|owner\b/);
   await page.click('#activityClose');
   assert.equal(await page.evaluate(() => document.querySelector('#activityLog').open), false);

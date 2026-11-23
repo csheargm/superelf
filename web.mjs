@@ -24,7 +24,7 @@ import { readJsonState, readJsonForUpdate, FILE_OK, FILE_ABSENT, FILE_UNREADABLE
 // lib/webutil.mjs) — readBody has no default any more. DATA-LOSS SCAR,
 // 2026-09-02: app data (handwriting notebooks!) inherited the 64KB default,
 // five real notes hit it, one lost a page of Apple Pencil strokes.
-import { saveAppData, restoreAppData, appDataFile, noLinkOnTheWay, APP_DATA_DIR, UPLOADS_DIR } from './lib/appdata.mjs';
+import { saveAppData, restoreAppData, appDataFile, noLinkOnTheWay, APP_DATA_DIR, UPLOADS_DIR, DATA_ABSENT_QUERY } from './lib/appdata.mjs';
 import { loadProfile, loadProfileForUpdate, saveProfile, displayName, ageFromYear, sanitizeHealthThresholds, effectiveHealthThresholds, emailOk } from './lib/users.mjs';
 import { promote, rollback, unshare, listShared, fork, copyNoLinks, LINKED_SOURCE, FORK_REFUSED } from './lib/sharedapps.mjs';
 import { getChapter, bibleSearchWire, BIBLE_DATA_DIR } from './lib/bible.mjs';
@@ -1887,6 +1887,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && p.startsWith('/api/data/')) {
       const f = safeJoin(wsDir(user), p.slice('/api/data/'.length));
       if (!f) return send(res, 400, 'text/plain', 'bad path');
+      if (url.search === `?${DATA_ABSENT_QUERY}` && !fs.existsSync(f)) return send(res, 204, 'text/plain', '');   // an expected-maybe-absent read (lib/appdata.mjs)
       return sendFile(res, f); // inert content types + nosniff via dataContentType
     }
     if (req.method === 'POST' && p === '/api/upload') {
