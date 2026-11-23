@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { ENGINE, SHELL, APP_SRC, between, stripComments, startHarness, runApp, until, settle } from './helpers-app.mjs';
 
 const E = stripComments(ENGINE);
-const LABEL = 'Open AI notes with the note · 打开笔记时显示 AI 对话';
+const LABEL = '打开笔记时显示 AI 对话 · Open AI notes with the note';
 
 test('shell: openAi is the app\'s account pref, pushed with the pad prefs and again after a Settings save; no device key', () => {
   assert.doesNotMatch(SHELL, /pa_openai/, 'the device key is gone (R1): a device that had it follows the account now');

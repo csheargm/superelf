@@ -39,8 +39,8 @@ test('req posts {pa:req, id, kind, …data} to the parent and resolves with the 
   const p = PA.req('data', { path: 'starred.json' });
   assert.deepEqual(sent, [{ pa: 'req', id: 'pa1', kind: 'data', path: 'starred.json', origin: '*' }]);
   reply('other', { ok: true, text: 'not mine' });
-  reply('pa1', { ok: false, code: 'not-found', error: 'not found', text: 'Not found · 未找到' });
-  assert.deepEqual(await p, { pa: 'res', id: 'pa1', ok: false, code: 'not-found', error: 'not found', text: 'Not found · 未找到' });
+  reply('pa1', { ok: false, code: 'not-found', error: 'not found', text: '未找到 · Not found' });
+  assert.deepEqual(await p, { pa: 'res', id: 'pa1', ok: false, code: 'not-found', error: 'not found', text: '未找到 · Not found' });
 });
 
 test('two requests in flight resolve each with its own reply, in any order; a reply with no waiter is ignored', async () => {

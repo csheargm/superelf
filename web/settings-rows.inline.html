@@ -20,13 +20,13 @@
 (function(){
   if(window.PASettingsRows) return;
   const ROWS=[
-    { key:'openAi', label:'Open AI notes with the note · 打开笔记时显示 AI 对话',
-      hint:'Off: a note opens alone; ✨ opens its AI · 关闭时笔记单独打开；✨ 打开 AI',
+    { key:'openAi', label:'打开笔记时显示 AI 对话 · Open AI notes with the note',
+      hint:'关闭时笔记单独打开；✨ 打开 AI · Off: a note opens alone; ✨ opens its AI',
       when:()=>!!(window.PANote&&typeof window.PANote.prefs==='function'),
-      tip:'New: open a note together with its AI notes · 新功能：打开笔记时一并显示 AI 对话' },
+      tip:'新功能：打开笔记时一并显示 AI 对话 · New: open a note together with its AI notes' },
   ];
   // "Show tips again": removes tipsSeen from the box, so Save brings the first-use tips back (ADR 0030).
-  const RESET={ key:'tipsSeen', label:'Show tips again · 重新显示提示', done:'Tips will show again after Save · 保存后将重新显示提示', when:()=>!!window.PATips };
+  const RESET={ key:'tipsSeen', label:'重新显示提示 · Show tips again', done:'保存后将重新显示提示 · Tips will show again after Save', when:()=>!!window.PATips };
   function el(tag,cls,text){ const n=document.createElement(tag); if(cls) n.className=cls; if(text!=null) n.textContent=text; return n; }
   // The box's JSON as an object, or null when it is not one (the dialog reports why).
   function parse(t){

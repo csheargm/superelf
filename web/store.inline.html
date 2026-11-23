@@ -12,15 +12,15 @@
 //
 //   const f = PAStore.file('family-data.json', {
 //     shape: (d) => (Array.isArray(d && d.members) ? '' : 'no members list'),  // '' = right shape, else why not
-//     unreadable: (why) => 'Family file unreadable · 家庭文件无法读取 (' + why + ')',
+//     unreadable: (why) => '家庭文件无法读取 · Family file unreadable (' + why + ')',
 //     failed: (text) => text,           // the app's words around the shell's sentence (default: as is)
-//     loading: 'Still loading · 加载中', // the app's words for "not read yet" (this is the default)
+//     loading: '加载中 · Still loading', // the app's words for "not read yet" (this is the default)
 //   });
 //   One more, for a file that is not JSON (Tasks' markdown list, ADR 0010 "Tasks", ADR 0014):
 //     parse: (text) => text,            // the read's text → the value shape() checks (default JSON.parse)
 //   await f.load()     → {state:'ok', value} | {state:'first'} | {state:'failed', text}
 //   await f.save(data) → '' once saved, otherwise why not: the refusal, or the shell's failure sentence
-//                        (r.text; a failure the shell did not word reads 'Save failed · 保存失败: ' + r.error)
+//                        (r.text; a failure the shell did not word reads '保存失败 · Save failed: ' + r.error)
 //   f.loaded, f.error  → the last read's outcome, for an app that gates a button or a list on it
 // `path` and `data` go to the broker as given (kind 'data', and 'save-data' with what 'data'). load() may be called again
 // (Daily Digest's 刷新 retries a failed read); until a read succeeds, the last failure is what save says.
@@ -28,15 +28,15 @@
 // Unit-tested by test/store.test.mjs; each app's flow by test/app-read-guard*.test.mjs.
 var PAStore = PAStore || (function () {
   'use strict';
-  const LOADING = 'Still loading · 加载中';
-  const NOT_SAVED = ' — not saved · 未保存';
+  const LOADING = '加载中 · Still loading';
+  const NOT_SAVED = ' — 未保存 · not saved';
   // A failure the shell did not word. The real shell always adds `text` (web/index.html relayFail),
   // and so does the test relay, which runs it: this is defence for a reply without one. A save says
   // what failed around it — Daily Digest's words, the one app that had any — and neither may come
   // back empty: '' from save() means saved, and a read with no reason must still refuse saves, not
   // count as loaded (R14).
-  const NO_READ_REASON = 'Not loaded · 未加载';
-  const SAVE_FAILED = 'Save failed · 保存失败: ';
+  const NO_READ_REASON = '未加载 · Not loaded';
+  const SAVE_FAILED = '保存失败 · Save failed: ';
 
   // An isolated broker, as every component has: string ids ('pas1'…) never match an app's numeric
   // ids, so neither listener answers the other's request.
@@ -54,7 +54,7 @@ var PAStore = PAStore || (function () {
 
   // what:'data' names the payload for the shell's failure sentence. Without it the broker's default
   // for save-data is 'note' (right for a PANote notebook), and a failed family-member or task save
-  // read "Note not saved · 未保存". 'data' is the neutral key of RELAY_NOUNS in web/index.html.
+  // read "未保存 · Note not saved". 'data' is the neutral key of RELAY_NOUNS in web/index.html.
   function file(path, { shape = () => '', parse = JSON.parse,
     unreadable = (why) => why, failed = (text) => text, loading = LOADING } = {}) {
     let loaded = false, error = '';

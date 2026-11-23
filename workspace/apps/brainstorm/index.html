@@ -168,7 +168,7 @@ function paChat(msg,cid,onEv){return new Promise(r=>{const id=++_id;_wait[id]=(m
 // replace every saved session.
 const sessionsFile=PAStore.file('sessions.json',{
   shape:d=>Array.isArray(d)?'':'not a session list',
-  unreadable:why=>'Sessions file unreadable · 记录文件无法读取 ('+why+')',
+  unreadable:why=>'记录文件无法读取 · Sessions file unreadable ('+why+')',
 });
 let sessions=[], cur=null, busy=false;
 const $=id=>document.getElementById(id);

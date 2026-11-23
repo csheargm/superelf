@@ -36,7 +36,7 @@ test('a first press asks and does not act; a second press acts and disarms', () 
   const { T } = boot();
   const b = button('Delete');
   assert.equal(T.press(b), false, 'one tap only asks');
-  assert.equal(b.textContent, 'Delete? · 删除?');
+  assert.equal(b.textContent, '删除? · Delete?');
   assert.ok(asking(b), 'with the class every app styles as asking');
   assert.equal(T.press(b), true, 'the second tap acts');
   assert.equal(b.textContent, 'Delete', 'and the button is back to its own label');
@@ -58,8 +58,8 @@ test('an ask lapses after the window, and a lapsed ask does not count', () => {
 test('label and window are the caller\'s; the restored text is the button\'s own', () => {
   const { T, advance } = boot();
   const b = button('✕');
-  T.press(b, { label: 'Reset all data? · 清空所有数据?', ms: 4000 });
-  assert.equal(b.textContent, 'Reset all data? · 清空所有数据?');
+  T.press(b, { label: '清空所有数据? · Reset all data?', ms: 4000 });
+  assert.equal(b.textContent, '清空所有数据? · Reset all data?');
   advance(3000);
   assert.ok(asking(b), 'a longer window is honoured');
   advance(1000);
@@ -139,7 +139,7 @@ test('no app or component spells its own "Delete?" label — they read PATwoTap.
   const found = [...committedApps(), ...components].flatMap(({ slug, html }) =>
     codeOnly(html).split('\n').filter((l) => OWN_LABEL.test(l)).map((l) => `${slug}: ${l.trim()}`));
   assert.deepEqual(found, []);
-  assert.match(fs.readFileSync(path.join(ROOT, 'web', 'two-tap.inline.html'), 'utf8'), /const LABEL = 'Delete\? · 删除\?';/,
+  assert.match(fs.readFileSync(path.join(ROOT, 'web', 'two-tap.inline.html'), 'utf8'), /const LABEL = '删除\? · Delete\?';/,
     'the one spelling lives in the component');
 });
 

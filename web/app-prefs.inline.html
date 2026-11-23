@@ -18,13 +18,13 @@
 (function(){
   if(window.PAAppPrefs) return;
   const DEFAULT_TIMEOUT_MS=20000;   // when PANote (SAVE_TIMEOUT_MS) is not on the page
-  const NO_REPLY='no reply · 无响应';
+  const NO_REPLY='无响应 · no reply';
   // Own ids ('pap…'), so no other broker on the window ever takes these replies.
   let n=0; const wait={};
   window.addEventListener('message',e=>{ const m=e&&e.data; if(m&&m.pa==='res'&&wait[m.id]){ const f=wait[m.id]; delete wait[m.id]; f(m); } });
   const req=o=>new Promise(res=>{ const id='pap'+(++n);
     const ms=(window.PANote&&window.PANote.SAVE_TIMEOUT_MS)||DEFAULT_TIMEOUT_MS;
-    const t=setTimeout(()=>{ delete wait[id]; res({ok:false,error:'timed out · 超时'}); },ms);
+    const t=setTimeout(()=>{ delete wait[id]; res({ok:false,error:'超时 · timed out'}); },ms);
     wait[id]=m=>{ clearTimeout(t); res(m); };
     parent.postMessage(Object.assign({pa:'req',id},o),'*'); });
 

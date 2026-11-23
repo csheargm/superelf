@@ -14,8 +14,8 @@ const read = (f) => fs.readFileSync(path.join(ROOT, 'web', f), 'utf8');
 const WEB = fs.readFileSync(path.join(ROOT, 'web.mjs'), 'utf8');
 const SETTINGS = read('settings-ui.inline.html'), ROWS = read('settings-rows.inline.html');
 const jsOf = (src) => /<script[^>]*>([\s\S]*?)<\/script>/.exec(src)[1];
-const LABEL = 'Open AI notes with the note · 打开笔记时显示 AI 对话';
-const HINT = 'Off: a note opens alone; ✨ opens its AI · 关闭时笔记单独打开；✨ 打开 AI';
+const LABEL = '打开笔记时显示 AI 对话 · Open AI notes with the note';
+const HINT = '关闭时笔记单独打开；✨ 打开 AI · Off: a note opens alone; ✨ opens its AI';
 const tick = () => new Promise((r) => queueMicrotask(r));
 
 function mkDom() {

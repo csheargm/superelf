@@ -26,7 +26,7 @@ import { settle } from './helpers-timing.mjs';
 
 const PINK = svg('<rect width="816" height="1056" fill="#fffaf2"/><circle cx="60" cy="60" r="30" fill="#f2b8c6"/>');
 const BLUE = svg('<rect width="816" height="1056" fill="#fffaf2"/><circle cx="60" cy="60" r="30" fill="#1e90ff"/>');
-const ZOOM_HINT = 'Tap to enlarge · 点按放大';
+const ZOOM_HINT = '点按放大 · Tap to enlarge';
 const PAGE_W = 816, PAGE_H = 1056;
 // A data URL from the fake encoder -> {w, h, color of the draft drawn into it}.
 const traced = (url) => { const m = /^data:image\/png;w=(\d+);h=(\d+);corner=[^;]+;of=(.*)$/.exec(url); assert.ok(m, `an encoded raster: ${url.slice(0, 60)}`);
@@ -37,7 +37,7 @@ const studio = (t, mutate, win, opts) => { const s = mountStudio(mutate, undefin
 const withSpy = (t, win = {}, mutate, opts) => { const shown = [];
   return { ...studio(t, mutate, { PAChat: { lightbox: (u) => shown.push(u) }, ...win }, opts), shown }; };
 const design = async (s, text = PINK) => { s.btn('✨').click(); s.btn('Design ·').click(); s.pending.at(-1).res({ ok: true, text, convoId: 'c1' }); await settle(); };
-const tweak = (s) => { s.host.querySelectorAll('input').find((i) => String(i.placeholder).startsWith('What to change')).value = 'bluer'; s.btn('Tweak ·').click(); };
+const tweak = (s) => { s.host.querySelectorAll('input').find((i) => String(i.placeholder).includes('What to change')).value = 'bluer'; s.btn('Tweak ·').click(); };
 
 test('tap the draft preview: ONE lightbox, the CURRENT draft, rasterized at screen width — not the 120 px preview', async (t) => {
   for (const [innerWidth, devicePixelRatio, w] of [[390, 3, 1170], [1440, 2, 2 * PAGE_W]]) {   // a phone; a wide screen hits the 2-page cap

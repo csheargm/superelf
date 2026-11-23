@@ -47,11 +47,11 @@ window.PAPrint = (function(){
   // asking for more than that is a corrupt extent rather than a long note.
   const MAX_SHEETS_PER_PAGE=8;
   const TXT={
-    nothing:'Nothing to print · 没有可打印的内容',
-    blocked:'The print window could not open · 无法打开打印窗口',
-    noPhoto:'Some photos could not be loaded and printed as empty boxes · 部分图片未能加载',
-    lowRes:'Printed at reduced resolution (page too tall) · 页面过长，已降低分辨率',
-    lightInk:'Very light ink will not show on white paper · 浅色墨迹在白纸上看不见',
+    nothing:'没有可打印的内容 · Nothing to print',
+    blocked:'无法打开打印窗口 · The print window could not open',
+    noPhoto:'部分图片未能加载 · Some photos could not be loaded and printed as empty boxes',
+    lowRes:'页面过长，已降低分辨率 · Printed at reduced resolution (page too tall)',
+    lightInk:'浅色墨迹在白纸上看不见 · Very light ink will not show on white paper',
   };
   // Ink-only printing puts the note on WHITE instead of its own paper tint: on screen the tint
   // separates the page from the app, on paper it is a full-bleed colour wash over every sheet.

@@ -81,8 +81,8 @@ test('A2 — a read that FAILED blocks the write, and no save-data is ever sent'
   // arrive at this app as `catch { allScans = [] }` and the next save wrote that emptiness back.
   for (const bad of [
     { ok: false, code: 'relay-error', error: 'relay failed' },
-    { ok: false, code: 'unauthorized', text: 'Signed out · 登录已过期' },
-    { ok: false, code: 'timeout', error: 'no answer from the app shell · 外壳无响应' },
+    { ok: false, code: 'unauthorized', text: '登录已过期 · Signed out' },
+    { ok: false, code: 'timeout', error: '外壳无响应 · no answer from the app shell' },
     { ok: true, text: '{not json' },
     { ok: true, text: JSON.stringify({ readings: 'nope', a1c: [] }) },
     { ok: true, text: JSON.stringify([1, 2, 3]) },
@@ -107,7 +107,7 @@ test('A3 — a good read unblocks and persists; persist() reports a refused writ
   let mode = 'ok';
   const s = mkStore((kind) => {
     if (kind === 'data') return okReply(GOOD);
-    return mode === 'ok' ? { ok: true } : { ok: false, text: 'Note too large · 笔记过长 (max 4 MB)' };
+    return mode === 'ok' ? { ok: true } : { ok: false, text: '笔记过长 (max 4 MB) · Note too large' };
   });
   const v = await s.storeRead(s.DATA_PATH, { readings: [], a1c: [] }, s.dbShapeOk);
   assert.equal(v.readings.length, 1, 'the stored readings come back');
@@ -116,7 +116,7 @@ test('A3 — a good read unblocks and persists; persist() reports a refused writ
   assert.equal(s.msg.textContent, '', 'and clears the banner');
   mode = 'refused';
   assert.equal(await s.persist(), false, 'a refused write reports FALSE — never a silent success');
-  assert.match(s.msg.textContent, /Not saved · 未保存 — Note too large/,
+  assert.match(s.msg.textContent, /未保存 · Not saved — 笔记过长 \(max 4 MB\) · Note too large/,
     "and shows the SHELL'S own sentence, not a generic one");
 });
 
@@ -124,9 +124,9 @@ test('A4 — an empty file is absent, and a standing block is not cleared by an 
   const s = mkStore((kind) => (kind === 'data' ? okReply('   ') : { ok: true }));
   assert.deepEqual(await s.storeRead(s.DATA_PATH, { readings: [], a1c: [] }, s.dbShapeOk), { readings: [], a1c: [] });
   assert.equal(s.blockedPaths.size, 0, 'an empty file really is no content');
-  s.blockedPaths.set('scans.json', 'scans unreadable · 无法读取');
+  s.blockedPaths.set('scans.json', '无法读取 · scans unreadable');
   s.storeMsg('');
-  assert.equal(s.msg.textContent, 'scans unreadable · 无法读取',
+  assert.equal(s.msg.textContent, '无法读取 · scans unreadable',
     'clearing the message must not hide a store that is STILL blocked');
 });
 
@@ -278,7 +278,7 @@ test('D2 — a time the photo did not contain is MARKED, never fabricated', () =
   assert.equal(rows[2].ts, Date.parse('2026-09-11T08:00:00Z'));
   assert.equal(rows[0].ts, null, 'and no timestamp is minted inside the parser');
   // The renderers must SHOW that, or the flag is decoration.
-  assert.match(SRC, /const whenTxt=\(r\)=>\(r&&r\.tsGuessed\)\?'time not in the photo · 照片中无时间':fmtDt\(r\.ts\)/,
+  assert.match(SRC, /const whenTxt=\(r\)=>\(r&&r\.tsGuessed\)\?'照片中无时间 · time not in the photo':fmtDt\(r\.ts\)/,
     'the history and status rows print the absence instead of a precise clock time');
   assert.match(SRC, /<div class="r-time">\$\{whenTxt\(r\)\}<\/div>/, 'history uses it');
   assert.match(SRC, /r\.tsGuessed\?whenTxt\(r\)/, 'and so does the headline card');
@@ -326,8 +326,8 @@ test('D5 — an uncertain reading is UNTICKED by default and says why', () => {
   const [, high, low] = items.innerHTML.split('<div class="ext-item');
   assert.ok(items.innerHTML.includes('id="ec0" checked'), 'the confident reading is pre-ticked — speed matters');
   assert.equal(/id="ec1"\s+checked/.test(items.innerHTML), false, 'the uncertain one is NOT');
-  assert.match(items.innerHTML, /uncertain reading · 识别不确定/, 'and it says so, bilingually');
-  assert.match(items.innerHTML, /no time in the photo · 照片中无时间/, 'a missing time is shown as missing');
+  assert.match(items.innerHTML, /识别不确定 · uncertain reading/, 'and it says so, bilingually');
+  assert.match(items.innerHTML, /照片中无时间 · no time in the photo/, 'a missing time is shown as missing');
   assert.equal(high.includes('lowc'), false);
   assert.ok(low.includes('lowc'), 'the uncertain row is marked in the markup too, not only in prose');
 });

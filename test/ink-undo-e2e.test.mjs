@@ -56,7 +56,7 @@ const penDrag = (frame, dx, dy) => frame.evaluate(([ddx, ddy]) => {
   b.dispatchEvent(ev('pointerup', x0 + ddx, y0 + ddy));
 }, [dx, dy]);
 const rectOf = (frame, sel) => frame.evaluate((s) => { const r = document.querySelector(s).getBoundingClientRect(); return { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) }; }, sel);
-const hist = (frame) => frame.evaluate(() => [INK.groups().length, ...['Undo', 'Redo'].map((t) => document.querySelector(`.pip-hb[title^="${t}"]`).classList.contains('off'))]);
+const hist = (frame) => frame.evaluate(() => [INK.groups().length, ...['Undo', 'Redo'].map((t) => document.querySelector(`.pip-hb[title*="${t}"]`).classList.contains('off'))]);
 
 test('Bible: ↶ ↷ beside the pen button undo and redo Pencil ink; the cluster drags anywhere, stays on screen, and is remembered', { skip, timeout: 180000 }, async () => {
   for (const viewport of [IPAD, PHONE]) {
@@ -67,9 +67,9 @@ test('Bible: ↶ ↷ beside the pen button undo and redo Pencil ink; the cluster
       await stroke(frame, 0); await stroke(frame, 1);
       await frame.waitForFunction(() => document.querySelector('.pip-cl.on'));
       assert.deepEqual(await hist(frame), [2, false, true], 'two strokes: undo on, redo off');
-      await frame.locator('.pip-hb[title^="Undo"]').click();
+      await frame.locator('.pip-hb[title*="Undo"]').click();
       assert.deepEqual(await hist(frame), [1, false, false], 'undo took the last stroke');
-      await frame.locator('.pip-hb[title^="Redo"]').click();
+      await frame.locator('.pip-hb[title*="Redo"]').click();
       assert.deepEqual(await hist(frame), [2, false, true], 'redo put it back');
       const c0 = await rectOf(frame, '.pip-cl');
       assert.ok(c0.x + c0.w <= viewport.width && c0.y + c0.h <= viewport.height, 'starts on screen, bottom right');
@@ -116,6 +116,6 @@ test('Bible: the undo/redo/drag first-use tip shows beside ↶ once the cluster 
     await frame.waitForFunction(() => document.querySelector('.pip-cl.on'));
     await frame.waitForFunction(() => PATips.current() === 'bible-pen-history');
     const text = await frame.evaluate(() => document.querySelector('.pat-tip').textContent);
-    assert.match(text, /Undo · 撤销, Redo · 重做 — drag to move · 拖动可移动/);
+    assert.match(text, /撤销 · Undo，重做 · Redo — 拖动可移动 · drag to move/);
   } finally { await ctx.close(); }
 });

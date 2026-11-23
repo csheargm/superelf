@@ -173,7 +173,7 @@ test('a design that loads LATER (My templates) re-pads the text: the picker\'s c
 });
 
 // ── The real component's renderer ──────────────────────────────────────────────────────────
-const TPL = { id: 'dots', name: 'Dots · 圆点', group: 'stationery', audience: 'any', dark: false,
+const TPL = { id: 'dots', name: '圆点 · Dots', group: 'stationery', audience: 'any', dark: false,
   safe: { x: 100, y: 100, w: 600, h: 300 }, lines: { gap: 100, top: 150, color: '#cccccc' },
   svg: svg('<rect width="816" height="1056" fill="#fff8f0"/><circle cx="40" cy="40" r="20" fill="#e0a0a0"/>') };
 

@@ -32,7 +32,7 @@ test('note-text relays to /api/note-text with the FRAME\'s slug; paths repeat, s
 });
 
 test('a server failure reaches the app with a code and a rendered sentence', async () => {
-  const S = await stand(() => ({ status: 500, body: { ok: false, error: 'note text unavailable · 笔记文本不可用', code: 'text_failed' } }));
+  const S = await stand(() => ({ status: 500, body: { ok: false, error: '笔记文本不可用 · note text unavailable', code: 'text_failed' } }));
   try {
     const B = loadShellBroker(S.base, { app: 'notes' });
     const r = await new Promise((done) => B.route({ id: 9, kind: 'note-text', paths: ['x.json'] }, done));
@@ -70,8 +70,8 @@ test('PANoteText.fetch goes through PAStore.ask and resolves an outcome, never a
   assert.deepEqual(asked, [{ kind: 'note-text', paths: ['entry-1.json'], scope: 'v16', fields: ['src', 'labels'] }], 'the broker kind, non-string paths dropped');
   assert.deepEqual(await P.fetch({ fields: ['tags'] }), { ok: true, pages: PAGES, truncated: false, pending: 2, ocr: 'building', reason: '' });
   assert.deepEqual(asked[1], { kind: 'note-text', fields: ['tags'] }, 'no paths, no scope: neither key is sent (any file, any scope)');
-  const F = loadText({ ask: async () => ({ ok: false, code: 'server-error', text: 'Note text failed · 笔记文本失败 (500)' }) });
-  assert.deepEqual(await F.fetch({}), { ok: false, error: 'Note text failed · 笔记文本失败 (500)', code: 'server-error' }, 'the shell\'s sentence is kept');
+  const F = loadText({ ask: async () => ({ ok: false, code: 'server-error', text: '笔记文本失败 (500) · Note text failed' }) });
+  assert.deepEqual(await F.fetch({}), { ok: false, error: '笔记文本失败 (500) · Note text failed', code: 'server-error' }, 'the shell\'s sentence is kept');
   const N = loadText(undefined);
   const none = await N.fetch({});
   assert.equal(none.ok, false); assert.equal(none.code, 'no-broker'); assert.equal(none.error, N.TXT.unavailable);

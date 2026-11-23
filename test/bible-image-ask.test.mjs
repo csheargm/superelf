@@ -24,8 +24,8 @@ test('split view: the rail chat is opened and used', async () => {
   assert.deepEqual(r.log.slice(0, 4), ['rail open', 'expand chat', 'rail open k1', 'rail attach uploads/p.jpg']);
 });
 test('a refused attach or a busy chat says so (R5)', async () => {
-  let r = run({ attachOk: false }); await r.ask({ path: 'x' }); assert.match(r.log.at(-1), /^notice Could not attach/);
-  r = run({ sendOk: false }); await r.ask({ path: 'x' }); assert.match(r.log.at(-1), /^notice Still answering/);
+  let r = run({ attachOk: false }); await r.ask({ path: 'x' }); assert.match(r.log.at(-1), /^notice 无法附加图片 · Could not attach/);
+  r = run({ sendOk: false }); await r.ask({ path: 'x' }); assert.match(r.log.at(-1), /^notice 正在回答中 · Still answering/);
 });
 test('GPT 2026-11-15: the prompt reference is taken before the open await', async () => {
   const log = []; let ref = 'Romans 6:15', key = 'k1';
@@ -39,7 +39,7 @@ test('GPT round 6: an open superseded by a verse change does not send the pictur
   const chat = { open: async () => { key = 'k2'; }, attach: () => { log.push('attach'); return true; }, send: async () => { log.push('send'); } };
   const ctx = { aiChat: chat, railChat: chat, splitOn: () => false, scopeKey: () => key, scopeRef: () => 'Romans 6:15', rail: {}, annNotice: (t) => log.push('notice ' + t), NOTES_LIST_KEY: 'n', bookIdx: 44, chapter: 6 };
   vm.runInNewContext(code.replace('const IMAGE_ASK_PROMPT', 'var IMAGE_ASK_PROMPT') + ';this.ask=askAboutImage;', ctx);
-  await ctx.ask({ path: 'p' }); assert.deepEqual(log, ['notice Selection changed · 选择已改变 — ask again']);
+  await ctx.ask({ path: 'p' }); assert.deepEqual(log, ['notice 选择已改变 · Selection changed — 请重新提问 · ask again']);
 });
 test('GPT round 7: a chat open superseded from the drawer (open() → false) does not send', async () => {
   const log = [];

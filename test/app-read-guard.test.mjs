@@ -48,7 +48,7 @@ for (const [why, prep, said] of unreadable(FAMILY_FILE, TWO)) {
     assert.equal(writesTo(h, FAMILY_FILE), 0, 'no save was sent over the unread file');
     assert.equal(fileText(h, FAMILY_FILE), before);
     assert.doesNotMatch(shown, EMPTY_FAMILY, 'a failed read is not shown as an empty family');
-    assert.match(text(app, 'status'), said || /^Family file unreadable/, 'the reason is on screen');
+    assert.match(text(app, 'status'), said || /^家庭文件无法读取 · Family file unreadable/, 'the reason is on screen');
     assert.equal(app.els['add-btn']?.disabled, true, '+ Add stays off');
   }));
 }
@@ -116,8 +116,8 @@ for (const dir of ['workspace/apps', 'shared-apps']) {
       await refusedOrSent(app, h, HUB_FILE);
       assert.equal(writesTo(h, HUB_FILE), 0, 'no save was sent over the unread file');
       assert.equal(fileText(h, HUB_FILE), before);
-      assert.match(text(app, 'status'), /\S.* — not saved/, 'the reason is on screen');
-      assert.match(text(app, 'status'), said || /^Data file unreadable/, 'in the shell\'s words when the read failed');
+      assert.match(text(app, 'status'), /\S.* — 未保存 · not saved/, 'the reason is on screen');
+      assert.match(text(app, 'status'), said || (dir === 'shared-apps' ? /^Data file unreadable · 数据文件无法读取/ : /^数据文件无法读取 · Data file unreadable/), 'in the shell\'s words when the read failed');
     }));
   }
 
@@ -129,7 +129,7 @@ for (const dir of ['workspace/apps', 'shared-apps']) {
     await pickFile(app, JSON.stringify({ tasks: [{ id: 7, text: 'Imported task', done: false }] }));
     await until(() => text(app, 'data-msg') !== '', 'the import reports');
     assert.equal(writesTo(h, HUB_FILE), 0, 'no save was sent over the unread file');
-    assert.equal(text(app, 'data-msg'), 'Import not saved · 导入未保存');
+    assert.equal(text(app, 'data-msg'), dir === 'shared-apps' ? 'Import not saved · 导入未保存' : '导入未保存 · Import not saved');   // shared-apps: the shelf snapshot keeps its words until promoted
     assert.equal(fileText(h, HUB_FILE), HUB_SAVED);
   }));
 

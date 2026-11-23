@@ -336,7 +336,7 @@ const RELMAP={spouse:{label:'Spouse/Partner',bg:'var(--tag-spouse)',c:'var(--tag
 // failed or unreadable read `members` is still empty, and saving it would replace the real family.
 const familyFile=PAStore.file('family-data.json',{
   shape:d=>Array.isArray(d&&d.members)?'':'no members list',
-  unreadable:why=>'Family file unreadable · 家庭文件无法读取 ('+why+')',
+  unreadable:why=>'家庭文件无法读取 · Family file unreadable ('+why+')',
 });
 function setStatus(t){document.getElementById('status').textContent=t;}
 

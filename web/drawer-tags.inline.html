@@ -11,7 +11,7 @@
      already lives in the node (lib/note-match.mjs) — so the box shows what is active and clearing it
      goes back. A LONG-PRESS on a strip chip hides that tag from the strip (remembered in the app
      prefs `hiddenTags`, through the `prefs` hook the drawer passes — the app iframe is an opaque origin
-     where localStorage throws); the drawer's ⋯ menu offers `Show hidden · 显示隐藏` while any is hidden (menu()).
+     where localStorage throws); the drawer's ⋯ menu offers `显示隐藏 · Show hidden` while any is hidden (menu()).
      Bookmarks（书签）are the drawer's own: ★ before the title (--pac-star) and the Bookmarked group
      (web/drawer-groups.inline.html) — the strip carries no ★ chip (one way only, R3).
      API: PADrawerTags.attach({host, rows, box, items, sameDoc, search, redraw, prefs}) → {chips(row), tagsOf(row), refresh(), sync(), menu(), hide(tag), hidden()}.
@@ -27,8 +27,8 @@
   const STRIP_TOP=8;         // most-used tags under the empty box
   const LONG_PRESS_MS=500;   // a held strip chip hides its tag
   const PREF='hiddenTags';   // the app pref: the tags hidden from the strip, in the order they were hidden
-  const TXT=Object.freeze({ showHidden:'Show hidden · 显示隐藏' });
-  const TIP='Tap a #tag to find its notes; hold a tag to hide it · 点按 #标签 查找相关笔记；长按可隐藏该标签';
+  const TXT=Object.freeze({ showHidden:'显示隐藏 · Show hidden' });
+  const TIP='点按 #标签 查找相关笔记；长按可隐藏该标签 · Tap a #tag to find its notes; hold a tag to hide it';
   const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const chip=t=>'<button type="button" class="pac-ltag" data-tag="'+esc(t)+'">#'+esc(t)+'</button>';
   const list=a=>Array.isArray(a)?a.filter(t=>typeof t==='string'&&t):[];

@@ -15,7 +15,7 @@ import { rmTemp } from './helpers-tmp.mjs';
 import { DEMO_SIGNIN, DEMO_SIGNIN_BAD, DEMO_BLOCKED, AUTH_HEADER, sbUserId, makeSupabaseVerifier, makeSigninGate } from '../lib/demo-auth.mjs';
 import { SIGNIN_LABELS } from '../lib/demo-boot.mjs';
 import { DEMO_COOKIE, DEMO_DELETE_PATH } from '../lib/demo.mjs';
-const NOTICE = 'AI answers come from third-party cloud models · 第三方云端模型 <b>';
+const NOTICE = '第三方云端模型 · AI answers come from third-party cloud models <b>';
 
 const REPO = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const KID = 'test-kid';

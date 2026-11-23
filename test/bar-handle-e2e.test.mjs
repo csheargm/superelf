@@ -6,7 +6,7 @@
 //      row at the very top (longevity, productivity-hub) already had their centre tab under the old 64x16;
 //      that pre-existing overlap is listed, not hidden: the growth must not add to it;
 //   3. a handle-shown Bible / Journal bar stays past the old 2.5 s timer, then idles away (ADR 0035);
-//   4. the Bible's top-bar "Pen · 笔" opens the pen sheet, keeps the bar out while open, and a colour / size
+//   4. the Bible's top-bar "笔 · Pen" opens the pen sheet, keeps the bar out while open, and a colour / size
 //      choice changes the pen the verse ink draws with;
 //   5. the app bar's "Home and text size" tip shows FIRST, ahead of older unseen tips.
 // Without Playwright and its browser the file FAILS, unless PA_E2E_SKIP=1 (see test/helpers-note-link.mjs).
@@ -130,9 +130,9 @@ test('Bible: the floating round pen button (shown once a Pencil touches the vers
       await frame.waitForFunction(() => document.querySelector('.pip-sheet.on'));
       const sb = await box(frame.locator('.pip-sheet'));
       assert.ok(sb.x >= 0 && sb.x + sb.w <= viewport.width + 1 && sb.y >= 0, 'the sheet is on screen');
-      await frame.locator('.pip-sheet .pan-tbtn[title="Thin · 细"]').click();   // a known start: the choice persists per app
+      await frame.locator('.pip-sheet .pan-tbtn[title="细 · Thin"]').click();   // a known start: the choice persists per app
       const before = await frame.evaluate(() => INK.pen());
-      await frame.locator('.pip-sheet .pan-tbtn[title="Thick · 粗"]').click();
+      await frame.locator('.pip-sheet .pan-tbtn[title="粗 · Thick"]').click();
       const sw = frame.locator('.pip-sheet .pan-sw').nth(5); const c = await sw.getAttribute('data-color');
       await sw.click();
       const after_ = await frame.evaluate(() => INK.pen());

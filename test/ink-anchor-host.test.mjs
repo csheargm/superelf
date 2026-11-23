@@ -81,8 +81,8 @@ test('READOUT: one line, English then 中文, from the numbers it is given', () 
     'Device 设备: 834×1194 px · dpr 2 · A 1.25 · text 652px · ink 笔迹 3 · orphan 孤立 1');
   assert.equal(M.READOUT({ w: 1366, h: 1024, dpr: 2, fs: 1, textW: 1366, n: 0, orphans: 0 }),
     'Device 设备: 1366×1024 px · dpr 2 · A 1 · text 1366px · ink 笔迹 0 · orphan 孤立 0');
-  assert.equal(M.READOUT_LABEL, 'Device readout · 设备读数');
-  assert.match(COMPONENT, /READOUT_LABEL='Device readout · 设备读数'/, 'the label lives in the component once; the hosts read it from there');
+  assert.equal(M.READOUT_LABEL, '设备读数 · Device readout');
+  assert.match(COMPONENT, /READOUT_LABEL='设备读数 · Device readout'/, 'the label lives in the component once; the hosts read it from there');
 });
 
 for (const app of ['bible (template)', 'bible (live)']) {
@@ -94,7 +94,7 @@ for (const app of ['bible (template)', 'bible (live)']) {
       const A = runApp(app, h.relay, ['INK', 'INK_READOUT', 'renderVerses'], { clampTimers: true, globals: { PAInkAnchor } });
       await until(() => A.els.get('verses').innerHTML.includes('Could not load'), 'boot (the harness serves no corpus)');
       assert.ok(A.INK && A.INK.canvas, 'mounted at boot');
-      assert.equal(A.INK_READOUT.label, 'Device readout · 设备读数'); assert.equal(A.INK_READOUT.readout, true);
+      assert.equal(A.INK_READOUT.label, '设备读数 · Device readout'); assert.equal(A.INK_READOUT.readout, true);
       assert.equal(A.INK_READOUT.getValue(), 'Device 设备: 400×600 px · dpr 2 · A 1 · text 400px · ink 笔迹 0 · orphan 孤立 0', 'the ⚙ entry reads the overlay\'s own line');
       const v16 = dom.addVerse(...VERSES[0]);
       A.renderVerses([{ n: 16, en: VERSES[0][1], zh: VERSES[0][2] }]);

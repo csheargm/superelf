@@ -150,7 +150,7 @@ test('long-press on a strip chip hides the tag (prefs hiddenTags, no search); th
   const pref = D.sent.filter((m) => m.kind === 'set-app-settings').pop();
   assert.deepEqual(pref && pref.prefs, { hiddenTags: ['todo'] }, 'remembered in the app prefs through the drawer\'s prefs hook (set-app-settings carries the merged object)');
   const labels = await pickMore(D.d, 'Show hidden');
-  assert.ok(labels.includes('Show hidden · 显示隐藏 (1)'), labels.join(' | '));
+  assert.ok(labels.includes('显示隐藏 · Show hidden (1)'), labels.join(' | '));
   assert.deepEqual(chipsOf(D.strip().innerHTML), before, 'shown again');
   assert.deepEqual(D.sent.filter((m) => m.kind === 'set-app-settings').pop().prefs, { hiddenTags: [] });
 });

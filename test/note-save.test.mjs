@@ -53,7 +53,7 @@ const CAP = BODY_LIMITS.appData;
 // a fake pass (R14).
 const SHAPES = {
   legacy: { code: 400, type: 'text/plain', body: 'error' },
-  json: { code: 500, type: 'application/json', body: JSON.stringify({ ok: false, error: 'save failed · 保存失败', code: 'write_failed' }) },
+  json: { code: 500, type: 'application/json', body: JSON.stringify({ ok: false, error: '保存失败 · save failed', code: 'write_failed' }) },
 };
 
 // ── Extract the DOM-free save core out of the engine and run the REAL code ──
@@ -196,7 +196,7 @@ test('harness fidelity: the extracted save core is real code, not a stub', () =>
   assert.equal(typeof G.makeSaveGuard, 'function');
   assert.equal(typeof G.census, 'function');
   assert.deepEqual(G.SAVE_RETRY_MS[0] > 0, true);
-  assert.match(G.SAVE_TXT.retry, /Not saved · 未保存/, 'the banner text is bilingual');
+  assert.match(G.SAVE_TXT.retry, /未保存 · Not saved/, 'the banner text is bilingual');
   assert.equal(G.outcomeOf(undefined).ok, false, 'a fire-and-forget closure returning undefined counts as FAILURE');
   assert.equal(G.outcomeOf({ ok: true }).ok, true);
 });
@@ -221,7 +221,7 @@ test(`mid-session failure (${shapeName} server reply): strokes keep accumulating
     pad.draw(1, 0);
     const r = await pad.guard.flush();
     assert.equal(r.ok, false, 'the failure is RETURNED, not swallowed');
-    assert.match(pad.banner(), /Not saved · 未保存/, 'a visible bilingual banner appears');
+    assert.match(pad.banner(), /未保存 · Not saved/, 'a visible bilingual banner appears');
 
     // The user keeps writing through the outage. Nothing is dropped from memory, and the last
     // good file on disk is untouched. ROUND 4: there is no second store to absorb it — the
@@ -233,7 +233,7 @@ test(`mid-session failure (${shapeName} server reply): strokes keep accumulating
     await pad.guard.flush();
     assert.equal(strokesOf(pad.nb), 10, 'in-memory notebook keeps every stroke drawn during the outage');
     assert.equal(strokesOf(pad.disk()), 2, 'the last CONFIRMED file is left intact');
-    assert.match(pad.banner(), /Not saved · 未保存/, 'the banner is still up — it does not self-clear');
+    assert.match(pad.banner(), /未保存 · Not saved/, 'the banner is still up — it does not self-clear');
 
     // A retry is armed with backoff (not a busy loop).
     assert.ok(clock.pending().some((j) => G.SAVE_RETRY_MS.includes(j.ms)), 'a backoff retry is scheduled');
@@ -331,7 +331,7 @@ test('partial-save guard: an emptier notebook is REFUSED and the good file survi
     assert.match(r.error, /笔迹变少|refused/, 'and says why, bilingually');
     assert.equal(state.writes['entry-d.json'], before, 'the real file was never even asked to change');
     assert.equal(strokesOf(pad.disk()), 6, 'the good file on disk is untouched');
-    assert.match(pad.banner(), /Not saved · 未保存/, 'and the user is told');
+    assert.match(pad.banner(), /未保存 · Not saved/, 'and the user is told');
 
     // A notebook with no pages at all — the `null` / `{}` degenerate write — is refused too.
     pad.nb.pages = []; pad.guard.touch();
@@ -367,7 +367,7 @@ test('an oversize notebook fails LOUDLY instead of freezing the note (the origin
     while (JSON.stringify(pad.nb).length < 70 * 1024) pad.draw(4, 0);
     const r = await pad.guard.flush();
     assert.equal(r.ok, false, 'the 413/400 is seen, not discarded');
-    assert.match(pad.banner(), /Not saved · 未保存/, 'the banner is the thing that was missing in the incident');
+    assert.match(pad.banner(), /未保存 · Not saved/, 'the banner is the thing that was missing in the incident');
     assert.equal(strokesOf(pad.disk()), 1, 'the last good file is intact — the note is frozen, but visibly so');
     assert.ok(strokesOf(pad.nb) > 1, 'and nothing was dropped from memory');
     // Raising the cap (what the stop-gap commit did) lets the queued retry drain the backlog.
@@ -409,7 +409,7 @@ test('a carried-over failure is not hidden by the next note saving fine', async 
     state.fault = { shape: SHAPES.legacy, only: 'entry-h.json' };
     pad.draw(2, 0);
     await pad.guard.flush();
-    assert.match(pad.banner(), /Not saved · 未保存/);
+    assert.match(pad.banner(), /未保存 · Not saved/);
 
     state.fault = null;
     pad.guard.reset();                                          // what reload() does on a note switch
@@ -452,7 +452,7 @@ test('TOTAL outage: nothing lands — this documents the honest limit', async (t
     // What IS true, and is the whole point: nothing is lost while the pad is open, the user is
     // told, and recovery is automatic the moment the store returns.
     assert.equal(strokesOf(pad.nb), 9, 'every stroke is still in memory');
-    assert.match(pad.banner(), /Not saved · 未保存/, 'and the user has been told, continuously');
+    assert.match(pad.banner(), /未保存 · Not saved/, 'and the user has been told, continuously');
     state.fault = null;
     await clock.fire();
     assert.equal(strokesOf(pad.disk()), 9, 'the queued retry drains the whole backlog on recovery');
@@ -527,7 +527,7 @@ test('both apps return save outcomes and check them', () => {
   assert.ok(entries.length >= 1, 'CONTROL: there is a notes source to check, so this cannot pass empty');
   for (const [rel, src] of entries) {
     assert.match(src, /res\(PANote\.saveOutcome\(m\)\)/, `${rel}: paSave resolves an OUTCOME`);
-    assert.match(src, /save timed out · 保存超时/, `${rel}: paSave has a deadline — a reply that never comes is a failure`);
+    assert.match(src, /保存超时 · save timed out/, `${rel}: paSave has a deadline — a reply that never comes is a failure`);
     // The helper was renamed paSave -> DATA.write when the apps grew a read-failure gate (round 2);
     // both spellings are accepted, and what is pinned is unchanged: the content write is awaited
     // and CONFIRMED before the drawer's timestamp/preview describe it.
@@ -574,7 +574,7 @@ test('a successful RE-READ does not retire a save failure it did not cover', asy
     state.fault = { shape: SHAPES.json, only: 'entry-r.json' };
     pad.draw(5, 0);
     assert.equal((await pad.guard.flush()).ok, false, 'the next write is rejected');
-    assert.match(pad.banner(), /Not saved · 未保存/, 'and the banner is up');
+    assert.match(pad.banner(), /未保存 · Not saved/, 'and the banner is up');
     const attempts = pad.guard.state().attempt;
     assert.ok(attempts > 0, 'with a retry ladder running');
 
@@ -583,7 +583,7 @@ test('a successful RE-READ does not retire a save failure it did not cover', asy
     const stored = onDisk(dir, 'entry-r.json');
     assert.equal(strokesOf(stored), 2, 'the store really is behind the pad');
     pad.guard.seed(pad.nb, false);                     // replaced:false — memory was kept
-    assert.match(pad.banner(), /Not saved · 未保存/, 'the failure report SURVIVES the successful read');
+    assert.match(pad.banner(), /未保存 · Not saved/, 'the failure report SURVIVES the successful read');
     assert.equal(pad.guard.state().failed !== false, true, 'and so does the failed state');
     assert.equal(pad.guard.state().unsaved, true, 'the pad still knows the work is unconfirmed');
 

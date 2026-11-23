@@ -41,7 +41,7 @@ test('longevity template: briefings section uses the broker kinds + existing ren
   assert.match(html, /kind:'briefings'/, 'list via the shell broker');
   assert.match(html, /kind:'briefing',briefingId:/, 'detail via the shell broker (briefingId, never a clobbering `id`)');
   assert.match(html, /kind:'render-md'/, 'body rendered by the shell\'s existing markdown renderer');
-  assert.match(html, /No briefings yet · 暂无简报/, 'bilingual empty state');
+  assert.match(html, /暂无简报 · No briefings yet/, 'bilingual empty state');
   assert.ok(!/<script[^>]+src=/.test(html), 'sandbox CSP forbids external scripts — no renderer dependency may be added');
 });
 
@@ -51,7 +51,7 @@ test('live-instance parity: the workspace copy carries the same briefings sectio
   const live = path.join(ROOT, 'workspace', 'apps', 'longevity', 'index.html');
   if (!fs.existsSync(live)) return; // fresh checkout: no instance — template-only is correct
   const html = fs.readFileSync(live, 'utf8');
-  for (const marker of ["kind:'briefings'", "kind:'briefing',briefingId:", 'No briefings yet · 暂无简报']) {
+  for (const marker of ["kind:'briefings'", "kind:'briefing',briefingId:", '暂无简报 · No briefings yet']) {
     assert.ok(html.includes(marker), `live longevity app missing: ${marker}`);
   }
 });

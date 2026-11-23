@@ -24,8 +24,8 @@ for (const app of ['bible (template)', 'bible (live)']) {
   test(`${app}: markup — Note and Ask AI in the top bar, not in #fab; Highlight label`, () => {
     const src = APP_SRC[app];
     const nav = src.slice(src.indexOf('<div id="nav">'), src.indexOf('<div id="daily-banner">'));
-    assert.match(nav, /id="top-note"[^>]*>Note · 笔记</);
-    assert.match(nav, /id="top-ai"[^>]*>Ask AI · 问一问</);
+    assert.match(nav, /id="top-note"[^>]*>笔记 · Note</);
+    assert.match(nav, /id="top-ai"[^>]*>问一问 · Ask AI</);
     assert.match(nav, /id="top-mark" data-short="高亮" disabled><\/button><button class="top-pane" id="top-note"/, 'Highlight sits first, disabled until a selection; no Pen in the bar — the pen is the floating round button (owner 2026-11-13)');
     assert.doesNotMatch(src, /id="fab/, 'no bottom bar markup at all (owner 2026-11-13)');
     assert.doesNotMatch(src, /getElementById\('fab-(note|ai)'\)/, 'no handler left on a removed control');
@@ -86,9 +86,9 @@ for (const app of ['bible (template)', 'bible (live)']) {
       await A.TOP.chat.onclick();
       assert.equal(rail.isCollapsed('chat'), false, 'with a selection a tap acts, it never closes');
       assert.deepEqual(PATips.regs.map((r) => r.id), ['bible-top-panes', 'bible-highlight', 'bible-history']);
-      assert.match(PATips.regs[2].text, /history.* · .*阅读历史/, 'the history tip (anchored to Search)');
+      assert.match(PATips.regs[2].text, /阅读历史在搜索里 · Your reading history is in Search/, 'the history tip (anchored to Search)');
       assert.equal(PATips.regs[0].anchor(), A.TOP.note);
-      assert.match(PATips.regs[0].text, / · .*面板/); assert.match(PATips.regs[1].text, /highlight.* · .*高亮/);
+      assert.match(PATips.regs[0].text, /面板.* · /); assert.match(PATips.regs[1].text, /高亮.* · .*highlight/);
       A.stopPads();
     } finally { await h.stop(); }
   });

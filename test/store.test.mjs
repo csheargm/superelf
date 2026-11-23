@@ -19,11 +19,11 @@ import { boot as bootApp, srcOf, withHarness, writesTo } from './helpers-sandbox
 
 const HELPER = scriptOf(fs.readFileSync(path.join(ROOT, 'web', 'store.inline.html'), 'utf8'));
 const MARKER = '<!--PA_STORE_UI-->';
-const NOT_SAVED = ' — not saved · 未保存';
+const NOT_SAVED = ' — 未保存 · not saved';
 const FAMILY = { shape: (d) => (Array.isArray(d && d.members) ? '' : 'no members list'), unreadable: (why) => `Family unreadable (${why})` };
 // The shell's failure replies (web/index.html relayCall + relayFail): every one but 'not-found'.
 const FAILURES = ['unauthorized', 'server-error', 'network', 'too-large', 'bad-request', 'relay-error'];
-const failure = (code) => ({ ok: false, code, error: `${code} error`, text: `The ${code} sentence · 句子` });
+const failure = (code) => ({ ok: false, code, error: `${code} error`, text: `句子 · The ${code} sentence` });
 
 // The component alone, with the shell played by `answer(request)`: an object replies, a promise
 // replies when it settles. Every 'message' listener hears every reply, as in a browser.
@@ -69,24 +69,24 @@ test("every other failed read is reported in the shell's words, and refuses save
   for (const code of FAILURES) {
     const { S, saves } = boot((m) => (m.kind === 'data' ? failure(code) : { ok: true }));
     const f = S.file('family-data.json', FAMILY);
-    assert.deepEqual(plain(await f.load()), { state: 'failed', text: `The ${code} sentence · 句子` }, code);
+    assert.deepEqual(plain(await f.load()), { state: 'failed', text: `句子 · The ${code} sentence` }, code);
     assert.equal(f.loaded, false, `${code}: not loaded`);
-    assert.equal(f.error, `The ${code} sentence · 句子`);
-    assert.equal(await f.save({ members: [] }), `The ${code} sentence · 句子${NOT_SAVED}`, `${code}: the save says why`);
+    assert.equal(f.error, `句子 · The ${code} sentence`);
+    assert.equal(await f.save({ members: [] }), `句子 · The ${code} sentence${NOT_SAVED}`, `${code}: the save says why`);
     assert.equal(saves().length, 0, `${code}: and is never sent — the empty family would replace the real one`);
   }
 });
 
 test('a failed read with no sentence uses the bare error, and one with no words at all still refuses', async () => {
-  const bare = boot(() => ({ ok: false, code: 'server-error', error: 'server error · 服务器错误' }));
+  const bare = boot(() => ({ ok: false, code: 'server-error', error: '服务器错误 · server error' }));
   const f = bare.S.file('a.json');
-  assert.equal(plain(await f.load()).text, 'server error · 服务器错误');
+  assert.equal(plain(await f.load()).text, '服务器错误 · server error');
   // R14: a failure must never count as loaded because it came without words.
   const mute = boot(() => ({ ok: false, code: 'server-error' }));
   const g = mute.S.file('a.json');
   assert.equal(plain(await g.load()).state, 'failed');
   assert.equal(g.loaded, false);
-  assert.match(await g.save('x'), /\S — not saved/);
+  assert.match(await g.save('x'), /\S — 未保存 · not saved/);
   assert.equal(mute.saves().length, 0);
 });
 
@@ -98,7 +98,7 @@ test("a file that does not parse, or has the wrong shape, is unreadable in the a
     assert.equal(r.state, 'failed', text);
     assert.match(r.text, /^Family unreadable \(.+\)$/, `${text}: the app's sentence`);
     assert.match(r.text.slice('Family unreadable ('.length, -1), why, `${text}: around the reason`);
-    assert.match(await f.save('x'), /^Family unreadable .* — not saved · 未保存$/);
+    assert.match(await f.save('x'), /^Family unreadable .* — 未保存 · not saved$/);
     assert.equal(saves().length, 0, `${text}: no save over a file that was there but unreadable`);
   }
   // With no shape, any JSON is the right shape; with no wording, the reason is the sentence.
@@ -112,9 +112,9 @@ test("a save before the read, or while it is in flight, is refused in the app's 
   const { promise: held, resolve: release } = deferred();
   const { S, saves } = boot((m) => (m.kind === 'data' ? held.then(() => ({ ok: true, text: '{"members":[]}' })) : { ok: true }));
   const f = S.file('family-data.json', FAMILY);
-  assert.equal(await f.save('x'), 'Still loading · 加载中' + NOT_SAVED, 'before load() is even called');
+  assert.equal(await f.save('x'), '加载中 · Still loading' + NOT_SAVED, 'before load() is even called');
   const loading = f.load();
-  assert.equal(await f.save('x'), 'Still loading · 加载中' + NOT_SAVED, 'while the read is in flight');
+  assert.equal(await f.save('x'), '加载中 · Still loading' + NOT_SAVED, 'while the read is in flight');
   const own = S.file('topics.json', { loading: '加载中…' });
   assert.equal(await own.save('x'), '加载中…' + NOT_SAVED, "an app's own words for it");
   assert.equal(saves().length, 0);
@@ -125,15 +125,15 @@ test("a save before the read, or while it is in flight, is refused in the app's 
 });
 
 test("a failed save answers the shell's sentence, and never '' — '' means saved", async () => {
-  let answer = { ok: false, code: 'server-error', error: 'server error · 服务器错误', text: 'Data not saved · 未保存 — server error' };
+  let answer = { ok: false, code: 'server-error', error: '服务器错误 · server error', text: 'Data not saved · 未保存 — server error' };
   const { S } = boot((m) => (m.kind === 'data' ? { ok: false, code: 'not-found' } : answer));
   const f = S.file('a.json');
   await f.load();
   assert.equal(await f.save('x'), 'Data not saved · 未保存 — server error');
-  answer = { ok: false, code: 'server-error', error: 'server error · 服务器错误' };
-  assert.equal(await f.save('x'), 'Save failed · 保存失败: server error · 服务器错误', 'a failure the shell did not word');
+  answer = { ok: false, code: 'server-error', error: '服务器错误 · server error' };
+  assert.equal(await f.save('x'), '保存失败 · Save failed: 服务器错误 · server error', 'a failure the shell did not word');
   answer = { ok: false, code: 'too-large' };
-  assert.equal(await f.save('x'), 'Save failed · 保存失败: too-large', 'nor even explained');
+  assert.equal(await f.save('x'), '保存失败 · Save failed: too-large', 'nor even explained');
   answer = { ok: true };
   assert.equal(await f.save('x'), '');
 });
@@ -146,7 +146,7 @@ test("a file that is not JSON is read by the app's parse, and its shape still de
   const none = boot(() => ({ ok: true }));
   const f = none.S.file('tasks.md', MD);
   assert.deepEqual(plain(await f.load()), { state: 'failed', text: 'no text' }, 'a reply with no text is not an empty list');
-  assert.match(await f.save('x'), /^no text — not saved/);
+  assert.match(await f.save('x'), /^no text — 未保存 · not saved/);
   assert.equal(none.sent.filter((m) => m.kind !== 'data').length, 0, 'nothing is sent');
 });
 
@@ -155,9 +155,9 @@ test('a markdown file is saved as its text, through save-data, behind the same g
   const { S, sent } = boot((m) => (m.kind === 'data' ? read : { ok: true }));
   const writes = () => sent.filter((m) => m.kind !== 'data');
   const f = S.file('tasks.md', MD);
-  assert.equal(await f.save('- [ ] a'), 'Still loading · 加载中' + NOT_SAVED, 'before the read');
+  assert.equal(await f.save('- [ ] a'), '加载中 · Still loading' + NOT_SAVED, 'before the read');
   await f.load();
-  assert.equal(await f.save('- [ ] a'), `The server-error sentence · 句子${NOT_SAVED}`, 'after a failed read');
+  assert.equal(await f.save('- [ ] a'), `句子 · The server-error sentence${NOT_SAVED}`, 'after a failed read');
   assert.equal(writes().length, 0, 'never sent: the one task would replace the list');
   read = { ok: false, code: 'not-found' };
   await f.load();
@@ -169,8 +169,8 @@ test('a markdown file is saved as its text, through save-data, behind the same g
 test("an app's words wrap a failed read; the refusal repeats them", async () => {
   const { S } = boot(() => failure('server-error'));
   const f = S.file('topics.json', { failed: (t) => `Topics not loaded: ${t}`, loading: '加载中…' });
-  assert.equal(plain(await f.load()).text, 'Topics not loaded: The server-error sentence · 句子');
-  assert.equal(await f.save('x'), 'Topics not loaded: The server-error sentence · 句子' + NOT_SAVED);
+  assert.equal(plain(await f.load()).text, 'Topics not loaded: 句子 · The server-error sentence');
+  assert.equal(await f.save('x'), 'Topics not loaded: 句子 · The server-error sentence' + NOT_SAVED);
 });
 
 test('load can be retried: until a read succeeds, the last failure is what a save says', async () => {
@@ -186,7 +186,7 @@ test('load can be retried: until a read succeeds, the last failure is what a sav
   fail = false;
   const retry = f.load();
   await settle();
-  assert.equal(await f.save('x'), 'The network sentence · 句子' + NOT_SAVED, 'during the retry the last reason stands');
+  assert.equal(await f.save('x'), '句子 · The network sentence' + NOT_SAVED, 'during the retry the last reason stands');
   release();
   assert.deepEqual(plain(await retry), { state: 'ok', value: [] });
   assert.equal(f.loaded, true);
@@ -199,7 +199,7 @@ test('files are independent: one that failed never blocks one that loaded', asyn
   const { S, saves } = boot((m) => (m.kind !== 'data' ? { ok: true } : m.path === 'posts.json' ? failure('server-error') : { ok: false, code: 'not-found' }));
   const posts = S.file('posts.json'), prayers = S.file('prayers.json');
   await posts.load(); await prayers.load();
-  assert.match(await posts.save({ posts: [] }), / — not saved/);
+  assert.match(await posts.save({ posts: [] }), / — 未保存 · not saved/);
   assert.equal(await prayers.save({ prayers: [] }), '');
   assert.deepEqual(saves().map((m) => m.path), ['prayers.json']);
 });
@@ -246,13 +246,13 @@ test("no committed app hand-writes the guarded first read: only Allergy compares
 // anything would save over a file it could not use, and the read-guard suites only feed them
 // files that do not parse. Run as served, against the real relay (helpers-sandbox-app.mjs).
 const SHAPES = [
-  ['workspace/apps', 'family', 'family-data.json', 'familyFile', 'Family file unreadable · 家庭文件无法读取 (no members list)'],
-  ['workspace/apps', 'productivity-hub', 'productivity-hub.json', 'hubFile', 'Data file unreadable · 数据文件无法读取 (not a saved state)'],
-  ['shared-apps', 'productivity-hub', 'productivity-hub.json', 'hubFile', 'Data file unreadable · 数据文件无法读取 (not a saved state)'],
+  ['workspace/apps', 'family', 'family-data.json', 'familyFile', '家庭文件无法读取 · Family file unreadable (no members list)'],
+  ['workspace/apps', 'productivity-hub', 'productivity-hub.json', 'hubFile', '数据文件无法读取 · Data file unreadable (not a saved state)'],
+  ['shared-apps', 'productivity-hub', 'productivity-hub.json', 'hubFile', 'Data file unreadable · 数据文件无法读取 (not a saved state)'],   // the shelf snapshot, until promoted
   ['workspace/apps', 'daily-digest', 'data/daily-digest/topics.json', 'topicsFile', '主题未能读取 · Topics not loaded: not a topic list'],
-  ['workspace/apps', 'brainstorm', 'sessions.json', 'sessionsFile', 'Sessions file unreadable · 记录文件无法读取 (not a session list)'],
-  ['workspace/apps', 'calendar', 'calendar-notes.json', 'notesFile', 'Notes file unreadable · 笔记文件无法读取 (not a notes map)'],
-  ['workspace/apps', 'rental-hunt', 'rental-hunt-history.json', 'historyFile', 'Search history unreadable · 搜索记录无法读取 (not a history list)',
+  ['workspace/apps', 'brainstorm', 'sessions.json', 'sessionsFile', '记录文件无法读取 · Sessions file unreadable (not a session list)'],
+  ['workspace/apps', 'calendar', 'calendar-notes.json', 'notesFile', '笔记文件无法读取 · Notes file unreadable (not a notes map)'],
+  ['workspace/apps', 'rental-hunt', 'rental-hunt-history.json', 'historyFile', '搜索记录无法读取 · Search history unreadable (not a history list)',
     { PAChat: { fullscreen: () => ({ open() {}, send() {}, newChat() {} }) } }],
 ];
 for (const [dir, slug, file, handle, says, extra] of SHAPES) {

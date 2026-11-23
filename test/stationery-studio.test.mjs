@@ -82,7 +82,7 @@ test('a malicious AI reply is REJECTED with a reason, and no markup is handed ba
     const { ST } = studio(); const f = fakeAi(answer('Sure!\n' + bad));
     const r = await ST.design(f.ai, 'anything');
     assert.equal(r.ok, false, `${what} must be rejected`);
-    assert.match(r.reason, /^Rejected · 已拒绝 — /, what);
+    assert.match(r.reason, /^已拒绝 · Rejected — /, what);
     assert.equal(r.svg, undefined, `${what}: nothing drawable comes back`);
     assert.doesNotMatch(r.reason, /evil\.example|alert|postMessage/, `${what}: the reason names the rule, not the payload`);
   }
@@ -90,7 +90,7 @@ test('a malicious AI reply is REJECTED with a reason, and no markup is handed ba
 test('no answer, an AI failure, or a thrown channel is a named failure — never an empty success', async () => {
   const { ST } = studio();
   assert.match((await ST.design(fakeAi(answer('I would rather not.')).ai, 'x')).reason, /no <svg>/);
-  assert.match((await ST.design(fakeAi({ ok: false, error: 'Signed out · 登录已过期' }).ai, 'x')).reason, /Signed out/);
+  assert.match((await ST.design(fakeAi({ ok: false, error: '登录已过期 · Signed out' }).ai, 'x')).reason, /Signed out/);
   assert.match((await ST.design(async () => { throw new Error('socket'); }, 'x')).reason, /AI request failed .* socket/);
 });
 test('MUTATION: without the sanitize() call in run(), the malicious replies would be accepted', async () => {
@@ -180,12 +180,12 @@ test('an opaque photo becomes a high-quality JPEG; an opaque PNG screenshot stay
 test('importPicture steps down ONLY when the cap refuses, and stops on any other failure', async () => {
   const doc = fakeCanvasDoc(); const photo = fakePhoto({ cap: 10 });   // every encoded file is "too large"
   const { ST } = studio({ document: doc, photo });
-  const tries = []; const r = await ST.importPicture(async (f) => { tries.push(f); return { ok: false, code: 'too-large', text: 'Photo too large · 照片过大' }; },
+  const tries = []; const r = await ST.importPicture(async (f) => { tries.push(f); return { ok: false, code: 'too-large', text: '照片过大 · Photo too large' }; },
     { name: 'p.png', type: 'image/png', w: 3000, h: 4000 });
   assert.equal(r.ok, false); assert.match(r.reason, /Photo too large/);
   assert.deepEqual(doc.made.map((c) => c.encodedAt[0]), [2550, 2040, 1632], 'full size first, then 80%, then 64%');
   const doc2 = fakeCanvasDoc(); const { ST: ST2 } = studio({ document: doc2 });
-  const r2 = await ST2.importPicture(async () => ({ ok: false, text: 'Signed out · 登录已过期' }), { name: 'p.png', type: 'image/png', w: 900, h: 1200 });
+  const r2 = await ST2.importPicture(async () => ({ ok: false, text: '登录已过期 · Signed out' }), { name: 'p.png', type: 'image/png', w: 900, h: 1200 });
   assert.match(r2.reason, /Signed out/); assert.equal(doc2.made.length, 1, 'shrinking cannot fix a sign-in');
 });
 test('recreate: the picture goes to the AI as an ATTACHMENT, flattened, and the answer is sanitized', async () => {
@@ -245,19 +245,19 @@ test('PAChat.complete: the chat kind, the answer accumulated, attachments and la
   const { complete, posted } = loadComplete((m, send) => {
     send({ ev: { type: 'convo', id: 'cv9' } }); send({ ev: { type: 'delta', text: '<svg viewBox="0 0 816 1056">' } });
     send({ ev: { type: 'delta', text: '</svg>' } }); send({ ev: { type: 'done', ok: true, text: '' } }); send({ done: true }); });
-  const r = await complete('design it', { label: 'Stationery · 信纸', attachments: [{ name: 'p.jpg', path: 'uploads/p.jpg' }], convoId: 'old' });
+  const r = await complete('design it', { label: '信纸 · Stationery', attachments: [{ name: 'p.jpg', path: 'uploads/p.jpg' }], convoId: 'old' });
   assert.deepEqual(r, { ok: true, text: '<svg viewBox="0 0 816 1056"></svg>', error: '', convoId: 'cv9' });
   assert.equal(posted[0].kind, 'chat'); assert.equal(posted[0].message, 'design it'); assert.equal(posted[0].convoId, 'old');
-  assert.deepEqual(posted[0].attachments, [{ name: 'p.jpg', path: 'uploads/p.jpg' }]); assert.equal(posted[0].label, 'Stationery · 信纸');
+  assert.deepEqual(posted[0].attachments, [{ name: 'p.jpg', path: 'uploads/p.jpg' }]); assert.equal(posted[0].label, '信纸 · Stationery');
 });
 test('PAChat.complete: the final text wins over working-out; a relay failure is NEVER text', async () => {
   const fin = loadComplete((m, send) => { send({ ev: { type: 'delta', text: 'thinking… <svg viewBox="0 0 1 1"></svg>' } });
     send({ ev: { type: 'done', ok: true, text: 'FINAL' } }); send({ done: true }); });
   assert.equal((await fin.complete('x')).text, 'FINAL');
   // The relay's own failure envelope: a ⚠ delta, then done carrying ok:false and the sentence.
-  const fail = loadComplete((m, send) => { send({ ev: { type: 'delta', text: '\n\n⚠ Signed out · 登录已过期' } });
-    send({ done: true, ok: false, code: 'unauthorized', text: 'Signed out · 登录已过期' }); });
-  assert.deepEqual(await fail.complete('x'), { ok: false, text: '', error: 'Signed out · 登录已过期', convoId: null });
+  const fail = loadComplete((m, send) => { send({ ev: { type: 'delta', text: '\n\n⚠ 登录已过期 · Signed out' } });
+    send({ done: true, ok: false, code: 'unauthorized', text: '登录已过期 · Signed out' }); });
+  assert.deepEqual(await fail.complete('x'), { ok: false, text: '', error: '登录已过期 · Signed out', convoId: null });
   const lane = loadComplete((m, send) => { send({ ev: { type: 'done', ok: false, text: 'lane crashed' } }); send({ done: true }); });
   assert.equal((await lane.complete('x')).error, 'lane crashed');
   const empty = loadComplete((m, send) => send({ done: true }));

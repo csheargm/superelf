@@ -184,7 +184,7 @@ test('pages still being transcribed are said under the box with the count; an in
   let pending = 12;
   const D = await drawer(async () => ({ ok: true, hits: [hit('entry-2.json', 'ink', 'Saturday pollen moderate')], truncated: false, pending, ocr: 'ready' }));
   await D.type('pollen'); await tick(SETTLE_MS);
-  assert.equal(D.msg(), 'Transcribing 12 pages · 正在识别 12 页', 'the count fills {n} in both languages');
+  assert.equal(D.msg(), '正在识别 12 页 · Transcribing 12 pages', 'the count fills {n} in both languages');
   assert.deepEqual(ids(D.rows()), ['b']);
   assert.match(D.rows(), /pac-lchip pac-lwhere">Ink 手写</, 'an ink hit says so');
   pending = 0;
@@ -244,7 +244,7 @@ test('a pending reply is re-asked once after the refresh interval with the same 
   const D = await drawer(async () => ({ ok: true, hits, pending, ocr: 'ready' }), null, { PA_SEARCH_REFRESH_MS: REFRESH });
   await D.type('pollen'); await tick(SETTLE_MS);
   assert.deepEqual(D.calls, ['pollen']);
-  assert.equal(D.msg(), 'Transcribing 2 pages · 正在识别 2 页');
+  assert.equal(D.msg(), '正在识别 2 页 · Transcribing 2 pages');
   pending = 0; hits = [hit('entry-2.json', 'ink', 'Saturday pollen moderate')];   // the queue finished meanwhile
   await tick(REFRESH + 60);
   assert.deepEqual(D.calls, ['pollen', 'pollen'], 'asked once more, the same text');

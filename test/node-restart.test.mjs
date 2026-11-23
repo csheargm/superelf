@@ -1,10 +1,10 @@
-// The Settings "Apply & restart · 应用并重启" button.
+// The Settings "应用并重启 · Apply & restart" button.
 //
 // SCAR: it swallowed the POST result. `api` is a bare fetch, so a 401 (signed out — what a
 // NEW ORIGIN gives you, e.g. the first visit over the Tailscale https address) or a 403
 // (member, not owner) never threw and the catch was never reached. The UI announced
-// "restarting · 重启中…", polled '/', got 200 back from the server that had never gone
-// down, and settled on "restarted · 已重启". A refused request read as a completed one —
+// "重启中… · restarting", polled '/', got 200 back from the server that had never gone
+// down, and settled on "已重启 · restarted". A refused request read as a completed one —
 // R14's vacuous success, on the one control whose whole job is to change process state.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -47,7 +47,7 @@ test('FUNCTIONAL: a 401 from that route renders a real sentence, not silence', a
 });
 
 test('a successful restart still announces itself and polls for recovery', () => {
-  assert.match(FN, /restarting · 重启中…/, 'the progress message survives');
-  assert.match(FN, /restarted · 已重启/, 'and the recovery message');
-  assert.match(FN, /still down — check the node · 未恢复，请检查节点/, 'and the timeout message');
+  assert.match(FN, /重启中… · restarting/, 'the progress message survives');
+  assert.match(FN, /已重启 · restarted/, 'and the recovery message');
+  assert.match(FN, /未恢复，请检查节点 · still down — check the node/, 'and the timeout message');
 });

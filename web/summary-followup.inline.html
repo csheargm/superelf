@@ -17,9 +17,9 @@
 <script id="psf-script">
 (function(){
   if(window.PASummaryFollowup) return;
-  const TXT=Object.freeze({ researching:'Researching to-dos · 正在研究待办', added:'Follow-up added · 已添加跟进 — {n} to-dos · {n} 项待办',
-    partial:'Follow-up added (partial) · 已添加跟进（部分失败）— {n} to-dos · {n} 项待办', none:'No open to-dos · 没有待办',
-    failed:'Follow-up failed · 跟进失败 — {e}', notSaved:'Follow-up not saved · 跟进未保存 — {e}', noBroker:'no broker · 无通道', gone:'its summary note was deleted · 该总结笔记已删除', via:' — via {lane} · 经 {lane}' });
+  const TXT=Object.freeze({ researching:'正在研究待办 · Researching to-dos', added:'已添加跟进 · Follow-up added — {n} 项待办 · {n} to-dos',
+    partial:'已添加跟进（部分失败） · Follow-up added (partial) — {n} 项待办 · {n} to-dos', none:'没有待办 · No open to-dos',
+    failed:'跟进失败 · Follow-up failed — {e}', notSaved:'跟进未保存 · Follow-up not saved — {e}', noBroker:'无通道 · no broker', gone:'该总结笔记已删除 · its summary note was deleted', via:' — 经 {lane} · via {lane}' });
   const fill=(s,o)=>String(s).replace(/\{(\w+)\}/g,(_,k)=>String(o[k]==null?'':o[k]));
   const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const md=t=>window.PANote&&typeof window.PANote.mdToHtml==='function'?window.PANote.mdToHtml(String(t||'')):'<div>'+esc(t)+'</div>';
@@ -38,9 +38,9 @@
     say(TXT.researching);
     if(!(window.PAStore&&typeof window.PAStore.ask==='function')) return {ok:false,status:say(fill(TXT.failed,{e:TXT.noBroker}))};
     let r; try{ r=await window.PAStore.ask({kind:'summary-followup',text:String(x.answer||'')}); }catch(e){ r={ok:false,error:String((e&&e.message)||e)}; }
-    if(!r||!r.ok||typeof r.text!=='string') return {ok:false,status:say(fill(TXT.failed,{e:(r&&(r.error||r.text))||'no answer · 无回答'}))};
+    if(!r||!r.ok||typeof r.text!=='string') return {ok:false,status:say(fill(TXT.failed,{e:(r&&(r.error||r.text))||'无回答 · no answer'}))};
     const n=Array.isArray(r.items)?r.items.length:0; if(!n||!r.text.trim()) return {ok:true,status:say(TXT.none)};
-    if(x.id==null) return {ok:false,status:say(fill(TXT.notSaved,{e:'no note id · 无笔记'}))};   // never a new note: the follow-up belongs to its run
+    if(x.id==null) return {ok:false,status:say(fill(TXT.notSaved,{e:'无笔记 · no note id'}))};   // never a new note: the follow-up belongs to its run
     const html=String(x.html||'')+block(r); let s;
     try{ s=await x.hooks.saveNote({id:x.id,title:x.title,html,period:x.period,scope:x.scope,convoId:x.convoId||null,quiet:true}); }catch(e){ s={ok:false,error:String((e&&e.message)||e)}; }
     if(!s||!s.ok) return {ok:false,status:say(fill(TXT.notSaved,{e:(s&&s.gone)?TXT.gone:(s&&s.error)||''})),html};

@@ -130,7 +130,7 @@ main{padding:16px 14px 100px;}
   <div class="section-title">饮食 · Meals</div>
   <div id="meal-box" style="border:1px solid var(--line,#333);border-radius:10px;padding:12px;margin-bottom:8px">
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <button id="meal-shot" style="font:inherit;padding:8px 14px;border-radius:8px;border:1px solid var(--line,#333);background:var(--card,#1b201f);color:inherit;cursor:pointer">📷 Photograph a meal · 拍照记录</button>
+      <button id="meal-shot" style="font:inherit;padding:8px 14px;border-radius:8px;border:1px solid var(--line,#333);background:var(--card,#1b201f);color:inherit;cursor:pointer">拍照记录 · 📷 Photograph a meal</button>
       <span id="meal-msg" style="color:var(--muted);font-size:12px"></span>
     </div>
     <!-- No hidden <input> here any more: the picker belongs to PAPhoto (web/photo-ui.inline.html),
@@ -491,7 +491,7 @@ const MEAL_PICK_EDGE = 1280;
 // this app mounts). A button that silently does nothing is what makes an app look broken, so
 // the missing piece is NAMED (R5). Deliberately the HEADING only, not a second copy of
 // chat-ui's full sentence — same rule as PAPhoto's own `bigNoChat` (R3).
-const MEAL_NO_PHOTO = 'Photo component not loaded · 未加载照片组件';
+const MEAL_NO_PHOTO = '未加载照片组件 · Photo component not loaded';
 
 /* The record AS THE SERVER STORES IT (lib/meals.mjs, ingestLocked):
      { id, ts, date:'YYYY-MM-DD', time:'HH:MM', slot, photo, note?,
@@ -505,10 +505,10 @@ const MEAL_NO_PHOTO = 'Photo component not loaded · 未加载照片组件';
    (早餐/午餐/晚餐/加餐) was decided in server-local time, so a browser in another timezone
    would otherwise print a time that contradicts the slot beside it. */
 const MEAL_FLAG_LABELS = {   // keys pinned against lib/meals.mjs MEAL_FLAGS by test/meals-ui.test.mjs
-  carb_heavy: 'carb-heavy · 精制碳水偏多',
-  fried: 'fried · 油炸',
-  sugary_drink: 'sugary drink · 含糖饮料',
-  vegetables_present: 'vegetables · 有蔬菜',
+  carb_heavy: '精制碳水偏多 · carb-heavy',
+  fried: '油炸 · fried',
+  sugary_drink: '含糖饮料 · sugary drink',
+  vegetables_present: '有蔬菜 · vegetables',
 };
 function mealCard(rec){
   if(!rec || typeof rec !== 'object') return '';
@@ -519,9 +519,9 @@ function mealCard(rec){
   // non-food, and not analyzed at all. A photo whose analysis failed is still LOGGED and
   // says so — rendering it as a clean "saved" would be indistinguishable from a working
   // analysis, and the weekly 健康简报 would then disagree with what the app showed (R14).
-  const head = !analyzed ? '⚠ logged, not analyzed · 已记录（未分析）'
-    : rec.isFood === false ? 'not food · 非食物'
-    : (items || 'nothing recognized · 未识别出食物');
+  const head = !analyzed ? '⚠ 已记录（未分析） · logged, not analyzed'
+    : rec.isFood === false ? '非食物 · not food'
+    : (items || '未识别出食物 · nothing recognized');
   const when = [`${rec.date||''} ${rec.time||''}`.trim(), rec.slot||''].filter(Boolean).join(' · ');
   // esc() everywhere: items and reason are VISION-LANE output (a remote model) and the
   // note is user text — none of it may reach innerHTML unescaped.
@@ -535,7 +535,7 @@ function mealCard(rec){
 async function mealSend(file){
   const btn=document.getElementById('meal-shot');
   if(!file) return;
-  btn.disabled=true; mealMsg('analyzing · 分析中…');
+  btn.disabled=true; mealMsg('分析中… · analyzing');
   document.getElementById('meal-out').innerHTML='';
   // Read → downscale → pre-flight, all in PAPhoto. `maxBytes` is this ROUTE's own cap; PAPhoto
   // takes the SMALLER of it and the server's published upload cap, so this card can never
@@ -548,8 +548,8 @@ async function mealSend(file){
   btn.disabled=false;
   // The server's own sentence, not a generic one — it distinguishes a monthly cap from a
   // busy analyzer from an unreadable image, and the user can act on the difference.
-  if(!r || !r.ok){ mealMsg((r && (r.error || r.text)) || 'could not log that meal · 记录失败', true); return; }
-  mealMsg(r.record && r.record.analyzed === false ? 'logged, not analyzed · 已记录（未分析）' : 'logged · 已记录');
+  if(!r || !r.ok){ mealMsg((r && (r.error || r.text)) || '记录失败 · could not log that meal', true); return; }
+  mealMsg(r.record && r.record.analyzed === false ? '已记录（未分析） · logged, not analyzed' : '已记录 · logged');
   document.getElementById('meal-out').innerHTML = mealCard(r.record);
   loadMeals();
 }
@@ -558,8 +558,8 @@ async function loadMeals(){
   const box=document.getElementById('meal-recent'); if(!box) return;
   const r = await broker({ kind:'meals', days:3 });
   if(!r || !r.ok || !Array.isArray(r.meals)){ box.innerHTML=''; return; }   // no history yet is not an error
-  if(!r.meals.length){ box.innerHTML='<div style="color:var(--muted);font-size:12px">No meals logged yet · 暂无记录</div>'; return; }
-  box.innerHTML = '<div style="color:var(--muted);font-size:11px;margin-bottom:4px">Last 3 days · 最近三天</div>'
+  if(!r.meals.length){ box.innerHTML='<div style="color:var(--muted);font-size:12px">暂无记录 · No meals logged yet</div>'; return; }
+  box.innerHTML = '<div style="color:var(--muted);font-size:11px;margin-bottom:4px">最近三天 · Last 3 days</div>'
     + r.meals.slice(-6).reverse().map(mealCard).join('');
 }
 
@@ -618,11 +618,11 @@ function renderHealth(days){
   const box=healthBox();
   const head=days.length?'iPhone health · '+esc(days[days.length-1].date):'健康数据 · Health';
   const line=days.length?(healthLine(days[days.length-1])||'—')
-    :'No imported data · 暂无导入数据 — photograph a Health screen instead 可拍照读取';
+    :'暂无导入数据 · No imported data — photograph a Health screen instead 可拍照读取';
   box.innerHTML='<b>'+head+'</b>'
     +'<div style="margin-top:4px">'+esc(line)+'</div>'
     +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">'
-    +'<button id="hs-shot" style="font:inherit;font-size:13px;padding:6px 12px;border-radius:8px;border:1px solid var(--line,#333);background:var(--card,#1b201f);color:inherit;cursor:pointer">📷 Photograph a Health screen · 拍照读取</button>'
+    +'<button id="hs-shot" style="font:inherit;font-size:13px;padding:6px 12px;border-radius:8px;border:1px solid var(--line,#333);background:var(--card,#1b201f);color:inherit;cursor:pointer">拍照读取 · 📷 Photograph a Health screen</button>'
     +'<span id="hs-msg" style="color:var(--muted);font-size:12px"></span></div>'
     +'<div id="hs-out" style="margin-top:8px;white-space:pre-wrap"></div>';
   document.getElementById('hs-shot').onclick=healthShot;
@@ -636,7 +636,7 @@ async function healthShot(){
   if(!window.PAPhoto){ healthMsg(MEAL_NO_PHOTO,true); return; }
   // capture() = camera-first pick + 1600px downscale + the size pre-flight + upload, in one
   // call. A CANCELLED sheet is not a failure and says nothing.
-  btn.disabled=true; healthMsg('reading · 识别中…');
+  btn.disabled=true; healthMsg('识别中… · reading');
   const up=await window.PAPhoto.capture();
   if(!up.ok){ btn.disabled=false; healthMsg(up.cancelled?'':(up.text||up.error),!up.cancelled); return; }
   const r=await broker({kind:'ask',
@@ -644,9 +644,9 @@ async function healthShot(){
   btn.disabled=false;
   // R5: the shell already rendered the reason (a 401, a dead lane, a payload cap); show THAT,
   // not a generic "failed".
-  if(!r||!r.ok||!r.text){ healthMsg((r&&(r.text||r.error))||'could not read that photo · 无法识别照片',true); return; }
+  if(!r||!r.ok||!r.text){ healthMsg((r&&(r.text||r.error))||'无法识别照片 · could not read that photo',true); return; }
   HEALTH_SHOT=String(r.text);
-  healthMsg('read from a photo · 来自照片 — not a stored measurement 未存入记录');
+  healthMsg('来自照片 · read from a photo — not a stored measurement 未存入记录');
   document.getElementById('hs-out').textContent=HEALTH_SHOT;   // textContent: model output never reaches innerHTML
 }
 
@@ -656,7 +656,7 @@ broker({kind:'health',days:7}).then(h=>{
   // An unreadable health store is NOT "no data": it used to land in `.catch(()=>{})` — which
   // broker() can never even reach, since it resolves the reply — and then render as an empty
   // box forever. Say which it is (R5).
-  if(h&&h.ok===false) healthMsg((h.text||h.error||'could not read health data · 无法读取健康数据'),true);
+  if(h&&h.ok===false) healthMsg((h.text||h.error||'无法读取健康数据 · could not read health data'),true);
 });
 
 // ── 简报 · Briefings — read-only list, newest first (server-sorted). Bodies
@@ -664,7 +664,7 @@ broker({kind:'health',days:7}).then(h=>{
 // 'render-md') — no renderer dependency added here.
 function renderBriefings(list){
   const el=document.getElementById('br-list');
-  if(!list.length){ el.innerHTML='<div class="tip-short" style="color:var(--muted)">No briefings yet · 暂无简报</div>'; return; }
+  if(!list.length){ el.innerHTML='<div class="tip-short" style="color:var(--muted)">暂无简报 · No briefings yet</div>'; return; }
   el.innerHTML=list.map(b=>`
     <div class="tip-card" data-bid="${esc(b.id)}">
       <div class="tip-header">
@@ -687,7 +687,7 @@ async function openBriefing(card){
     const md=await broker({kind:'render-md',text:String(r.briefing.body||'')});
     det.innerHTML=(md&&md.ok&&md.html)?md.html:'<p>'+esc(String(r.briefing.body||''))+'</p>';
     det.dataset.loaded='1';
-  } else det.innerHTML='<p style="color:var(--muted)">Could not load · 无法加载</p>'; // failure shown in place, and left unloaded so a re-tap retries (R5)
+  } else det.innerHTML='<p style="color:var(--muted)">无法加载 · Could not load</p>'; // failure shown in place, and left unloaded so a re-tap retries (R5)
 }
 document.getElementById('br-list').addEventListener('click',e=>{
   const card=e.target.closest('.tip-card[data-bid]'); if(!card) return;
@@ -696,7 +696,7 @@ document.getElementById('br-list').addEventListener('click',e=>{
 document.getElementById('br-head').onclick=()=>{ const l=document.getElementById('br-list'); const show=l.style.display==='none'; l.style.display=show?'':'none'; document.getElementById('br-chev').textContent=show?'▾':'▸'; };
 broker({kind:'briefings'}).then(r=>{
   if(r&&r.ok&&Array.isArray(r.briefings)) renderBriefings(r.briefings);
-  else document.getElementById('br-list').innerHTML='<div class="tip-short" style="color:var(--muted)">Could not load briefings · 简报加载失败</div>'; // honest failure state, never a fake "no briefings" (R14)
+  else document.getElementById('br-list').innerHTML='<div class="tip-short" style="color:var(--muted)">简报加载失败 · Could not load briefings</div>'; // honest failure state, never a fake "no briefings" (R14)
   PANewDot.mark(document.getElementById('br-head'),'briefings-section');   // new-feature dot once the section has rendered
 });
 
@@ -711,8 +711,8 @@ function renderActionsHtml(list){
           <div class="tip-title">${esc(a.title||a.id)}</div>
           <div class="tip-short">${esc(a.summary||'')}</div>
           <div class="act-status" style="margin-top:8px">
-            <button class="act-btn" data-verb="approve">Approve · 批准</button>
-            <button class="act-btn" data-verb="deny">Deny · 拒绝</button>
+            <button class="act-btn" data-verb="approve">批准 · Approve</button>
+            <button class="act-btn" data-verb="deny">拒绝 · Deny</button>
           </div>
         </div>
       </div>
@@ -730,7 +730,7 @@ function loadPendingActions(){
     if(r&&r.ok&&Array.isArray(r.actions)) renderActions(r.actions);
     else { // R5: a failed load must LOOK failed — never identical to an empty queue
       document.getElementById('act-wrap').style.display='';
-      document.getElementById('act-list').innerHTML='<div class="tip-short" style="color:var(--muted)">Could not load approvals · 审批队列加载失败</div>';
+      document.getElementById('act-list').innerHTML='<div class="tip-short" style="color:var(--muted)">审批队列加载失败 · Could not load approvals</div>';
     }
   });
 }
@@ -740,14 +740,14 @@ async function decideAction(card,verb){
   const r=await broker({kind:'action-decide',actionId:card.dataset.aid,verb}); // the shell shows its own confirm dialog before relaying
   if(r&&r.ok&&r.action&&r.action.status){
     const s=r.action.status;
-    const label=s==='done'?'Approved, executed · 已批准并执行'
-      :s==='failed'?'FAILED · 执行失败: '+(r.action.error||'')
-      :s==='denied'?'Denied · 已拒绝'
-      :s==='expired'?'Expired · 已过期':s;
+    const label=s==='done'?'已批准并执行 · Approved, executed'
+      :s==='failed'?'执行失败 · FAILED: '+(r.action.error||'')
+      :s==='denied'?'已拒绝 · Denied'
+      :s==='expired'?'已过期 · Expired':s;
     box.innerHTML='<span class="tip-short">'+esc(label)+'</span>'; // outcome stays visible in place — honest, incl. executor failures (R14)
     if(s==='done') loadRemindersList(); // a just-registered reminder appears with its Remove control
   } else {
-    box.innerHTML='<span class="tip-short">'+esc((r&&r.error)||'Request failed · 请求失败')+'</span>'; // incl. "cancelled in shell · 已在外壳取消"
+    box.innerHTML='<span class="tip-short">'+esc((r&&r.error)||'请求失败 · Request failed')+'</span>'; // incl. "已在外壳取消 · cancelled in shell"
     setTimeout(loadPendingActions,1200); // re-render the queue so the buttons come back for a retry
   }
 }
@@ -769,7 +769,7 @@ function renderRemindersHtml(list){
           <div class="tip-title">${esc(r.text)}</div>
           <div class="tip-short">${esc(r.time)}${r.day!==undefined?' · weekly '+esc(DAY_NAMES[r.day]||r.day)+' · 每周':' · daily · 每日'}</div>
         </div>
-        <button class="act-btn" data-rem-remove>Remove · 移除</button>
+        <button class="act-btn" data-rem-remove>移除 · Remove</button>
       </div>
     </div>`).join('');
 }
@@ -778,7 +778,7 @@ function loadRemindersList(){
     const wrap=document.getElementById('rem-wrap');
     if(!(r&&r.ok&&Array.isArray(r.reminders))){ // R5: failure shown, never a fake empty state
       wrap.style.display='';
-      document.getElementById('rem-list').innerHTML='<div class="tip-short" style="color:var(--muted)">Could not load reminders · 提醒加载失败</div>';
+      document.getElementById('rem-list').innerHTML='<div class="tip-short" style="color:var(--muted)">提醒加载失败 · Could not load reminders</div>';
       return;
     }
     if(!r.reminders.length){ wrap.style.display='none'; return; }
@@ -792,7 +792,7 @@ document.getElementById('rem-list').addEventListener('click',async e=>{
   const card=b.closest('.tip-card[data-rid]');
   const r=await broker({kind:'reminder-remove',reminderId:card.dataset.rid}); // the shell confirms before removing
   if(r&&r.ok) loadRemindersList();
-  else card.querySelector('.tip-short').textContent=(r&&r.error)||'Request failed · 请求失败';
+  else card.querySelector('.tip-short').textContent=(r&&r.error)||'请求失败 · Request failed';
 });
 loadRemindersList();
 

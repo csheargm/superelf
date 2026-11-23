@@ -48,8 +48,8 @@ test('number + section: notes are [1], [2], … in order; a group with important
   assert.equal(S.TITLE_MAX, 40);
   assert.equal(S.label({ n: 2, id: 's', title: '2026-10', day: '2026-10' }), '[2] 2026-10'); assert.equal(S.label({ n: 4, title: '', day: '' }), '[4]');
   assert.equal(S.section(groups[0]), '\n\n### [1] Rent\npaid');
-  assert.equal(S.section(groups[1]), '\n\n### [2] Roof\nImportant · 重点:\n- call\n- fix\nrain', 'the block, bilingual heading, one line per point, before the body');
-  assert.equal(S.TXT.important, 'Important · 重点', 'the one name of the marked points: the block heading (with a colon) and the prompt');
+  assert.equal(S.section(groups[1]), '\n\n### [2] Roof\n重点 · Important:\n- call\n- fix\nrain', 'the block, bilingual heading, one line per point, before the body');
+  assert.equal(S.TXT.important, '重点 · Important', 'the one name of the marked points: the block heading (with a colon) and the prompt');
 });
 
 test('refs are remembered per summary scope; linkifyHtml turns [n] into note links only for known numbers, outside tags, never inside an existing <a>', () => {
@@ -95,7 +95,7 @@ test('the back pill: a tap on a link shows ONE fixed pill that returns to the su
   // A tap in PANote's own path (no element): the last saved summary is the way back.
   assert.equal(S.open('?note=a&page=1'), true); await flush();
   assert.equal(body.kids.length, 1); const pill = body.kids[0];
-  assert.equal(pill.className, 'psr-back'); assert.equal(pill.textContent, '← Back to summary · 返回总结'); assert.equal(pill.type, 'button');
+  assert.equal(pill.className, 'psr-back'); assert.equal(pill.textContent, '← 返回总结 · Back to summary'); assert.equal(pill.type, 'button');
   assert.equal(pill.classList.contains('show'), true); assert.equal(S.backTarget(), 'n-oct');
   // A tap inside a bubble enhance painted under the November scope: November's note.
   S.remember('summary:2026-11', [{ n: 1, id: 'b', page: 0, title: 'Rent', day: '2026-11-02' }]);
@@ -199,7 +199,7 @@ test('label: the day is left out when the title already says it (m/d, ISO, month
   assert.equal(S.label({ n: 4, title: 'Nov 9 walk', day: '2026-11-09' }), '[4] Nov 9 walk');
   assert.equal(S.label({ n: 4, title: 'Nov 19 walk', day: '2026-11-09' }), '[4] Nov 19 walk · 2026-11-09', 'CONTROL: Nov 19 is not Nov 9');
   assert.equal(S.label({ n: 5, title: '2026-10', day: '2026-10' }), '[5] 2026-10', 'a month ref says it once');
-  assert.equal(S.label({ n: 6, title: 'Summary · 总结 2026-W46', day: '2026-11-11' }), '[6] This week · 本周 Nov 9–15, 2026', 'an old raw summary title shows the human title, no day');
-  assert.equal(S.label({ n: 7, title: 'This week · 本周 Nov 9–15, 2026', day: '2026-11-11' }), '[7] This week · 本周 Nov 9–15, 2026');
+  assert.equal(S.label({ n: 6, title: 'Summary · 总结 2026-W46', day: '2026-11-11' }), '[6] 本周 · This week Nov 9–15, 2026', 'an old raw summary title shows the human title, no day');
+  assert.equal(S.label({ n: 7, title: '本周 · This week Nov 9–15, 2026', day: '2026-11-11' }), '[7] 本周 · This week Nov 9–15, 2026');
   assert.equal(S.titleHasDate('Oct 2026 plan', '2026-10'), true); assert.equal(S.titleHasDate('Roof', 'bad'), false);
 });

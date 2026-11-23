@@ -169,7 +169,7 @@ test('every bundled design passes the sanitizer at the 12 KB cap, and none was r
   const ids = D.list().map((t) => t.id);
   assert.equal(new Set(ids).size, ids.length, 'ids are unique');
   for (const t of D.list()) {
-    assert.match(t.name, / · .*[一-鿿]/, `${t.id}: bilingual 'English · 中文' name`);
+    assert.match(t.name, /^[^A-Za-z]*[一-鿿][^·]* · [A-Za-z]/, `${t.id}: bilingual '中文 · English' name`);
     assert.ok(t.safe.w >= 300 && t.safe.h >= 300, `${t.id}: a real writing area`);
     assert.equal(t.dark, false);
     if (t.audience === 'teen') assert.doesNotMatch(t.svg, /<text\b/, `${t.id}: no pre-printed text for a teen`);

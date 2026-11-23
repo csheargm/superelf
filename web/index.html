@@ -301,7 +301,7 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
 <body>
 <div id="backdrop"></div>
 <aside id="drawer">
-  <div class="dhead"><button class="plain" id="goHome" title="Home · 主页">Home</button><button class="plain" id="drawerSearch" title="Search chats" style="margin-right:2px">🔍</button><button class="plain" id="newChat">+ New</button></div>
+  <div class="dhead"><button class="plain" id="goHome" title="主页 · Home">Home</button><button class="plain" id="drawerSearch" title="Search chats" style="margin-right:2px">🔍</button><button class="plain" id="newChat">+ New</button></div>
   <div class="dsec open" id="secApps"><div class="dsec-head">My Apps</div><div class="dsec-body"><div class="d-apps-list" id="dApps"></div></div></div>
   <div class="dsec open" id="secFamily"><div class="dsec-head">Family Apps</div><div class="dsec-body"><div id="dFamily" class="d-apps-list" style="padding:0 12px 8px"><span style="color:var(--muted);font-size:13px">None shared yet.</span></div></div></div>
   <!-- 简报 · Briefings — a JOB's output. System-level, like the jobs that produce it, so it
@@ -309,8 +309,8 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
        inside the longevity app: an accident of history, since briefings began as a health
        feature and the reading surface never moved when they became general. -->
   <div class="dsec open" id="secBriefs"><div class="dsec-head">简报 · Briefings</div><div class="dsec-body"><div id="briefs"></div></div></div>
-  <div class="dsec open" id="secChats"><div class="dsec-head">Chats · 对话记录</div><div class="dsec-body"><div id="convos"></div></div></div>
-  <div id="chatSearch"><div class="cs-bar"><input id="csInp" placeholder="Search chats · 搜索对话" autocomplete="off"><button class="plain" id="csClose">✕</button></div><div id="csResults"></div></div>
+  <div class="dsec open" id="secChats"><div class="dsec-head">对话记录 · Chats</div><div class="dsec-body"><div id="convos"></div></div></div>
+  <div id="chatSearch"><div class="cs-bar"><input id="csInp" placeholder="搜索对话 · Search chats" autocomplete="off"><button class="plain" id="csClose">✕</button></div><div id="csResults"></div></div>
 </aside>
 <header>
   <button class="ibtn" id="menu" title="Conversations">☰</button>
@@ -326,7 +326,7 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
 </header>
 <!-- Outside <header>: the toast also answers the app bar's A-/A+, and the header is inert while an app is open. -->
 <span id="updBar" class="fs-toast"></span>   <!-- "Update ready" line, PAUpdate (web/update.js); same place as the toast, outside the inert header -->
-<span id="offLine" class="fs-toast"></span>   <!-- the offline state line, PAOffline (web/offline-client.js): "Offline · 离线 — saving on this device", the queued count -->
+<span id="offLine" class="fs-toast"></span>   <!-- the offline state line, PAOffline (web/offline-client.js): "离线 · Offline — 保存在本设备 · saving on this device", the queued count -->
 <span id="fsToast" class="fs-toast"></span>
 <main>
   <div id="emptyState" style="display:none"><div class="grid" id="eApps"></div></div>
@@ -334,7 +334,7 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
 </main>
 <form id="f">
   <div id="chips"></div>
-  <div class="pac-pills"><button class="pac-model" id="shellModel" type="button" style="display:none"></button><button class="pac-vfy" id="shellVfy" type="button" style="display:none">☐ Verify · 校验</button></div>
+  <div class="pac-pills"><button class="pac-model" id="shellModel" type="button" style="display:none"></button><button class="pac-vfy" id="shellVfy" type="button" style="display:none">校验 · ☐ Verify</button></div>
   <div id="frow">
     <button class="ibtn" id="plus" type="button" title="Attach">+</button>
     <input id="box" placeholder="Ask, or: create an app that…" autocomplete="off">
@@ -343,12 +343,12 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
 </form>
 <input type="file" id="filein-photo" multiple hidden accept="image/*">
 <div id="lightbox"><button id="lightbox-close">✕</button><img id="lightbox-img" src="" alt=""><div style="position:absolute;bottom:calc(env(safe-area-inset-bottom)+16px);left:0;right:0;text-align:center;color:rgba(255,255,255,.55);font-size:13px;pointer-events:none;">Tap outside image to close</div></div>
-<div id="frame"><div class="bar"><button class="plain" id="back">← Home</button><b id="ftitle" style="flex:1"></b><button class="plain fs-dn" id="fs-dn" style="font-size:12px;font-weight:700;padding:4px 8px">A-</button><button class="plain fs-up" id="fs-up" style="font-size:15px;font-weight:700;padding:4px 8px">A+</button></div><button id="barpeek" class="plain" title="Show the app bar · 显示应用栏" aria-label="Show the app bar"></button><iframe id="fr" sandbox="allow-scripts" allow="clipboard-write;microphone"></iframe></div>
+<div id="frame"><div class="bar"><button class="plain" id="back">← Home</button><b id="ftitle" style="flex:1"></b><button class="plain fs-dn" id="fs-dn" style="font-size:12px;font-weight:700;padding:4px 8px">A-</button><button class="plain fs-up" id="fs-up" style="font-size:15px;font-weight:700;padding:4px 8px">A+</button></div><button id="barpeek" class="plain" title="显示应用栏 · Show the app bar" aria-label="Show the app bar"></button><iframe id="fr" sandbox="allow-scripts" allow="clipboard-write;microphone"></iframe></div>
 <!--PA_SETTINGS_DIALOG-->
 <dialog id="actConfirm" style="max-width:340px">
   <div id="acText" style="margin-bottom:14px;overflow-wrap:anywhere"></div>
   <div style="display:flex;gap:8px;justify-content:flex-end">
-    <button class="plain" id="acCancel">Cancel · 取消</button>
+    <button class="plain" id="acCancel">取消 · Cancel</button>
     <button class="primary" id="acOk" style="padding:8px 14px"></button>
   </div>
 </dialog>
@@ -356,8 +356,8 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
   <b id="usTitle" style="display:block;margin-bottom:6px"></b>
   <div id="usChangelog" style="font-size:13px;color:var(--muted);margin-bottom:14px;white-space:pre-wrap"></div>
   <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
-    <button class="plain" id="usCancel">Cancel · 取消</button>
-    <button class="primary" id="usInstall" style="padding:8px 14px">Install update · 安装更新</button>
+    <button class="plain" id="usCancel">取消 · Cancel</button>
+    <button class="primary" id="usInstall" style="padding:8px 14px">安装更新 · Install update</button>
   </div>
 </dialog>
 <dialog id="setup"><form method="dialog">
@@ -374,13 +374,13 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
 <dialog id="login"><form method="dialog">
   <h3 id="loginTitle" style="margin-bottom:12px">Sign in</h3>
   <input id="luser" placeholder="username" autocapitalize="none" autocomplete="username" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
-  <input id="lpin" type="password" placeholder="Password or PIN · 密码或 PIN" autocomplete="current-password" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
+  <input id="lpin" type="password" placeholder="密码或 PIN · Password or PIN" autocomplete="current-password" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
   <input id="lname" placeholder="Your name" style="display:none;width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
   <input id="ltok" placeholder="访问令牌 · access token" autocomplete="off" style="display:none;width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
   <div id="loginErr" style="color:var(--danger);font-size:13px;min-height:18px"></div>
   <button class="primary" id="loginBtn" style="width:100%;padding:10px;margin-top:6px">Sign in</button>
   <div style="text-align:center;margin-top:10px;font-size:14px"><a href="#" id="toReg" style="color:var(--accent)">Create an account</a></div>
-  <div style="text-align:center;margin-top:6px;font-size:12px"><a href="#" id="toTok" style="color:var(--muted)">No password yet: sign in with access token · 尚无密码：用访问令牌登录</a></div>
+  <div style="text-align:center;margin-top:6px;font-size:12px"><a href="#" id="toTok" style="color:var(--muted)">尚无密码：用访问令牌登录 · No password yet: sign in with access token</a></div>
 </form></dialog>
 <script>
 const $=(s)=>document.querySelector(s);
@@ -432,28 +432,28 @@ function renderJobDraft(d){
     box.innerHTML='<div style="font-weight:600;margin-bottom:4px">'+esc(j.title)+'</div>'
       +'<div style="color:var(--muted);font-size:13px">'+esc(j.plan.tool)+' · '+esc(schedText(j.schedule))+'</div>'
       +(Object.keys(j.plan.args||{}).length?'<div style="color:var(--muted);font-size:12px;margin-top:4px;overflow-wrap:anywhere">'+esc(JSON.stringify(j.plan.args))+'</div>':'')
-      +'<div style="display:flex;gap:8px;margin-top:10px"><button class="primary" data-mkjob="1" style="font-size:13px;padding:6px 12px">Create · 创建</button>'
-      +'<button class="plain" data-nojob="1" style="font-size:13px;padding:6px 12px">Not now · 暂不</button></div>'
+      +'<div style="display:flex;gap:8px;margin-top:10px"><button class="primary" data-mkjob="1" style="font-size:13px;padding:6px 12px">创建 · Create</button>'
+      +'<button class="plain" data-nojob="1" style="font-size:13px;padding:6px 12px">暂不 · Not now</button></div>'
       +'<div data-jobmsg style="color:var(--muted);font-size:12px;margin-top:6px"></div>';
     box.querySelector('[data-mkjob]').onclick=async()=>{
-      const m=box.querySelector('[data-jobmsg]'); m.textContent='creating · 创建中…';
+      const m=box.querySelector('[data-jobmsg]'); m.textContent='创建中… · creating';
       let r=null;
       try{ r=await (await api('/api/jobs',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(j)})).json(); }
       catch{ /* !r below reports it (R5) */ }
       // Created PAUSED on purpose — Settings is where you arm it, having seen it.
-      m.textContent=(r&&r.ok)?'Created, paused · 已创建（暂停中）— enable it in Settings › Jobs':((r&&r.error)||'Could not create · 创建失败');
+      m.textContent=(r&&r.ok)?'已创建（暂停中），请在设置 › 任务中开启 · Created, paused — enable it in Settings › Jobs':((r&&r.error)||'创建失败 · Could not create');
       if(r&&r.ok) box.querySelector('[data-mkjob]').disabled=true;
     };
     box.querySelector('[data-nojob]').onclick=()=>{ box.remove(); };
   } else {
     box.innerHTML='<div style="font-size:13px">I can set that up, but I need: <b>'
       +esc((d.ask||[]).map(a=>a.input).join(', '))+'</b></div>'
-      +'<div style="color:var(--muted);font-size:12px;margin-top:6px">Add it in Settings › Jobs › New job · 在设置里补充</div>';
+      +'<div style="color:var(--muted);font-size:12px;margin-top:6px">在设置里补充 · Add it in Settings › Jobs › New job</div>';
   }
   el.appendChild(box);
   const l=$('#log'); l.scrollTop=l.scrollHeight;
 }
-const schedText=(s)=> !s||!s.time ? '—' : (s.day===undefined ? 'daily · 每日 '+s.time
+const schedText=(s)=> !s||!s.time ? '—' : (s.day===undefined ? '每日 · daily '+s.time
   : ['Sun 周日','Mon 周一','Tue 周二','Wed 周三','Thu 周四','Fri 周五','Sat 周六'][s.day]+' '+s.time);
 function renderMsgs(msgs){ $('#log').innerHTML=''; let lastU=''; for(const m of (msgs||[])){ if(m.role==='md'){ const el=add('','',renderMd(m.text)); addActions(el,'response',m.text,lastU); addTook(el,m.ms,m.by); /* the stored duration — reopening a chat keeps it */ } else { const el=add(m.role,m.text); if(m.role==='me'){ lastU=m.text; addActions(el,'prompt',m.text); renderAtts(el,m.attachments); } } } }
 let allConvos=[];
@@ -475,8 +475,8 @@ async function loadBriefs(){
   // Three-state on purpose: a FAILURE must not look like an empty feed. A silently blank
   // section reads as "nothing happened" when the truth is "we could not look" (R5).
   try{ const r=await api('/api/briefings'); if(r.ok) list=await r.json(); }catch{ /* list stays null */ }
-  if(!Array.isArray(list)){ box.innerHTML='<div style="padding:16px;color:var(--danger);font-size:14px">Could not load briefings · 无法加载简报</div>'; return; }
-  if(!list.length){ box.innerHTML='<div style="padding:16px;color:var(--muted)">No briefings yet · 暂无简报</div>'; return; }
+  if(!Array.isArray(list)){ box.innerHTML='<div style="padding:16px;color:var(--danger);font-size:14px">无法加载简报 · Could not load briefings</div>'; return; }
+  if(!list.length){ box.innerHTML='<div style="padding:16px;color:var(--muted)">暂无简报 · No briefings yet</div>'; return; }
   box.innerHTML=list.slice(0,BRIEFS_MAX).map((b)=>
     `<div class="convo${b.id===briefId?' active':''}" data-brief="${esc(b.id)}"><div class="t">
        <div style="display:flex;gap:8px;align-items:baseline"><span style="color:var(--muted);font-size:12px;flex-shrink:0">${esc(briefWhen(b.created))}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(b.title||b.job||'Briefing')}</span></div>
@@ -490,7 +490,7 @@ async function openBrief(id){
   let b=null;
   try{ const r=await api('/api/briefings/'+encodeURIComponent(id)); if(r.ok) b=await r.json(); }catch{ /* b stays null */ }
   briefId=id; closeDrawer(); loadBriefs();
-  if(!b||!b.body){ add('err','⚠ Could not open that briefing · 无法打开该简报'); return; }
+  if(!b||!b.body){ add('err','⚠ 无法打开该简报 · Could not open that briefing'); return; }
   setConvo(null); $('#log').innerHTML=''; hideEmptyState();
   const el=add('','',renderMd(b.body)); addActions(el,'response',b.body,'');
   const l=$('#log'); l.scrollTop=l.scrollHeight;
@@ -659,25 +659,25 @@ $('#toTok').onclick=(e)=>{ e.preventDefault(); $('#ltok').style.display=$('#ltok
 async function doAuth(){
   const username=$('#luser').value.trim().toLowerCase(), password=$('#lpin').value, name=$('#lname').value.trim();
   const tok=$('#ltok').value.trim();
-  if(!tok && (!username||!password)){ $('#loginErr').textContent='Enter a username and password · 请输入用户名和密码'; return false; } // token-only sign-in is allowed
+  if(!tok && (!username||!password)){ $('#loginErr').textContent='请输入用户名和密码 · Enter a username and password'; return false; } // token-only sign-in is allowed
   const path=regMode?'/api/register':'/api/login';
   // relayJson, not `await r.json()`: the auth gate can answer a non-JSON body, and parsing
   // it threw — leaving the sign-in form frozen with no message at all.
   const g=await relayJson(fetch(path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username,password,name,token:tok||undefined})}),'credentials');
   if(!g.ok){ $('#loginErr').style.color='var(--danger)'; $('#loginErr').textContent=g.text; return false; }
   const j=g.data;
-  if(j.pending){ $('#loginErr').style.color='var(--muted)'; $('#loginErr').textContent='Account created — waiting for approval · 账号已创建，等待批准。'; return false; }
-  if(!j.ok){ $('#loginErr').style.color='var(--danger)'; $('#loginErr').textContent=j.error||'Sign-in refused · 登录被拒绝。'; return false; }
+  if(j.pending){ $('#loginErr').style.color='var(--muted)'; $('#loginErr').textContent='账号已创建，等待批准。 · Account created — waiting for approval'; return false; }
+  if(!j.ok){ $('#loginErr').style.color='var(--danger)'; $('#loginErr').textContent=j.error||'登录被拒绝。 · Sign-in refused'; return false; }
   T=j.token; localStorage.setItem('pa_session',T); UID=j.uid;
   return true;
 }
 async function doSetup(){
   const username=$('#sUser').value.trim().toLowerCase(), name=$('#sName').value.trim(), password=$('#sPin').value, setupCode=$('#sCode').value.trim();
-  if(!username||!password||!setupCode){ $('#setupErr').textContent='Fill in username, password and setup code · 请填写用户名、密码和初始化码'; return false; }   // length rule: the server's (lib/owner.mjs MIN_PASSWORD)
+  if(!username||!password||!setupCode){ $('#setupErr').textContent='请填写用户名、密码和初始化码 · Fill in username, password and setup code'; return false; }   // length rule: the server's (lib/owner.mjs MIN_PASSWORD)
   const g=await relayJson(fetch('/api/setup',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username,name,password,setupCode})}),'credentials');   // 403 = wrong setup code: show the server's reason, never "Signed out"
   if(!g.ok){ $('#setupErr').textContent=g.text; return false; }
   const j=g.data;
-  if(!j.ok){ $('#setupErr').textContent=j.error||'Setup refused · 初始化被拒绝。'; return false; }
+  if(!j.ok){ $('#setupErr').textContent=j.error||'初始化被拒绝。 · Setup refused'; return false; }
   T=j.token; localStorage.setItem('pa_session',T); UID=j.uid;
   return true;
 }
@@ -699,7 +699,7 @@ async function ensureToken(){
   }
   $('#dot').classList.add('ok');
 }
-async function logout(){ try{ await api('/api/logout',{method:'POST'}); }catch{} try{ await swSignedOut(window.caches,(u)=>fetch(u,{method:'POST',credentials:'same-origin'})); }catch(err){ alert('Could not clear saved app pages · 未能清除已保存的应用页面 — '+(err&&err.message||err)); } localStorage.removeItem('pa_session'); location.reload(); }
+async function logout(){ try{ await api('/api/logout',{method:'POST'}); }catch{} try{ await swSignedOut(window.caches,(u)=>fetch(u,{method:'POST',credentials:'same-origin'})); }catch(err){ alert('未能清除已保存的应用页面 · Could not clear saved app pages — '+(err&&err.message||err)); } localStorage.removeItem('pa_session'); location.reload(); }
 
 /* ── New-feature key registry: maps feature-key → version added ── */
 // Update this when shipping new UI features; markNew() + PANewDot.mark() use these keys.
@@ -779,7 +779,7 @@ const frameUid=()=>decodeURIComponent((frameRef().match(/\/app\/([^/]+)\//)||[])
 // openUrlApps): the Journal and the Bible notes. Empty until the list loads: refused closed till then.
 let LINK_APPS=new Set();
 let OWNBAR_APPS=new Set();   // own apps whose page draws its own Home + A-/A+ (meta.json ownBar, ADR 0032)
-const NO_APP_TEXT='no app in view · 未打开应用';   // every refusal of a request that names no app (R3)
+const NO_APP_TEXT='未打开应用 · no app in view';   // every refusal of a request that names no app (R3)
 // ME is the profile fetched at boot (settings.js loadProfile, which sets ME={} if the fetch
 // fails). ONE accessor, so a profile that failed to load reads as "nothing remembered" in every
 // caller rather than each of them repeating the guard.
@@ -787,18 +787,18 @@ function appModels(){ return (ME&&ME.appModels&&typeof ME.appModels==='object')?
 function appModel(slug){ return slug?(appModels()[slug]||null):null; }
 async function setAppModel(slug,id){
   if(!slug) return {ok:false,error:NO_APP_TEXT};
-  if(typeof id!=='string'||!id) return {ok:false,error:'no model id · 缺少模型标识'};
+  if(typeof id!=='string'||!id) return {ok:false,error:'缺少模型标识 · no model id'};
   // Only a lane the server actually offers. An unknown id would be stored for ever and then
   // silently ignored on every load, which reads as "it did not remember" rather than as an error.
   // Checked here so an obvious mistake costs no round trip; the route re-checks, because a client
   // is not a trust boundary and this list can be stale.
-  if(!CHAT_MODELS.some(x=>x.id===id)) return {ok:false,error:'unknown model · 未知模型: '+id};
+  if(!CHAT_MODELS.some(x=>x.id===id)) return {ok:false,error:'未知模型 · unknown model: '+id};
   const next=Object.assign({},appModels()); next[slug]=id;
   try{
     const r=await api('/api/profile',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({appModels:next})});
     if(!r.ok){ let why=''; try{ why=(await r.json()).error||''; }catch(e){}
-      return {ok:false,error:'could not save · 无法保存: '+(why||('HTTP '+r.status))}; }
-  }catch(e){ return {ok:false,error:'could not save · 无法保存: '+((e&&e.message)||'network unavailable')}; }
+      return {ok:false,error:'无法保存 · could not save: '+(why||('HTTP '+r.status))}; }
+  }catch(e){ return {ok:false,error:'无法保存 · could not save: '+((e&&e.message)||'network unavailable')}; }
   // Only AFTER the server confirmed. appOrder updates optimistically because it is re-derived
   // from the server on the next boot either way; this must not, or a write the server REFUSED
   // would still read back as remembered — the app would show a lane no reload can reproduce.
@@ -830,7 +830,7 @@ function appPromptOf(slug,appSent){
 function appSettingsOf(slug,appSent){ return { prefs:appPrefsMap()[slug]||{}, systemPrompt:appPromptOf(slug,appSent) }; }
 async function saveAppSettings(slug,prefs,systemPrompt,appSent){
   if(!slug) return {ok:false,error:NO_APP_TEXT};
-  if(!prefs||typeof prefs!=='object'||Array.isArray(prefs)) return {ok:false,error:'preferences must be a JSON object · 偏好必须是 JSON 对象'};
+  if(!prefs||typeof prefs!=='object'||Array.isArray(prefs)) return {ok:false,error:'偏好必须是 JSON 对象 · preferences must be a JSON object'};
   // FULL-OBJECT replace on both fields, because that is what the route does: sending only this
   // app's entry would drop every other app's preferences and every other app's prompt override.
   const nextPrefs=Object.assign({},appPrefsMap()); nextPrefs[slug]=prefs;
@@ -871,13 +871,13 @@ function fsStep(d){ const n=fsIdx+d; if(n<0||n>=FS_STEPS.length) return; fsIdx=n
 // clicks back to normal and overshooting; long-press is already this app's idiom (the version
 // number opens the changelog the same way), so it costs no new button.
 function fsReset(){ if(fsIdx===FS_DEFAULT) return; fsIdx=FS_DEFAULT; fsApply();
-  const t=$('#fsToast'); if(t){ t.textContent='Text size reset · 字号已重置'; t.classList.add('on'); setTimeout(()=>t.classList.remove('on'),1400); } }
+  const t=$('#fsToast'); if(t){ t.textContent='字号已重置 · Text size reset'; t.classList.add('on'); setTimeout(()=>t.classList.remove('on'),1400); } }
 // One source for the tooltips: the same two buttons exist twice (main header + app frame
 // bar), and the reset hint has to be discoverable — a long-press nobody knows about is not
 // a feature. Set here rather than repeated in four title attributes that would drift.
-const FS_RESET_HINT=' — long-press to reset · 长按恢复默认';
+const FS_RESET_HINT=' — 长按恢复默认 · long-press to reset';
 // Also sent to an app that draws its own A-/A+ (prefs fsTitles), so the help text has one source (R3).
-function fsTitle(d){ return (d<0?'Smaller text · 缩小字号':'Larger text · 放大字号')+FS_RESET_HINT; }
+function fsTitle(d){ return (d<0?'缩小字号 · Smaller text':'放大字号 · Larger text')+FS_RESET_HINT; }
 function fsBind(sel,d){
   document.querySelectorAll(sel).forEach(b=>{
     b.title=fsTitle(d);
@@ -1112,7 +1112,7 @@ async function loadApps(){
       ${ownNames.has(a.name)?'<small style="color:var(--accent);font-size:11px">✓ copied</small>':`<button class="plain" style="font-size:12px;padding:3px 8px" data-fork="${esc(a.name)}">Fork</button>`}
     </div>`).join(''):'');
   // Empty state grid: own then shelf (promoted + family-shared)
-  const card=(uid,a,badge)=>`<div class="ecard" data-eu="${esc(uid)}" data-es="${esc(a.name)}" data-et="${esc(a.title)}"><b>${esc(a.title)}${badge||''}${a.hasUpdate?`<span class="update-dot" data-update="${esc(a.name)}" data-title="${esc(a.title)}" title="Update available · 有新版本"></span>`:''}</b>${faceHtml(a)||`<small>${esc(a.desc||a.name)}</small>`}</div>`;
+  const card=(uid,a,badge)=>`<div class="ecard" data-eu="${esc(uid)}" data-es="${esc(a.name)}" data-et="${esc(a.title)}"><b>${esc(a.title)}${badge||''}${a.hasUpdate?`<span class="update-dot" data-update="${esc(a.name)}" data-title="${esc(a.title)}" title="有新版本 · Update available"></span>`:''}</b>${faceHtml(a)||`<small>${esc(a.desc||a.name)}</small>`}</div>`;
   const familyShelf=shelf.filter(a=>a.fromFamily);
   const shelfBadge=(a)=>a.fromFamily?`<button class="plain" style="font-size:11px;padding:2px 7px;margin-left:4px" data-fget="${esc(a.uid)}" data-fslug="${esc(a.name)}">Get</button>`:'<span class="star">★</span>';
   $('#eApps').innerHTML=own.map(a=>card(UID,a,'')).join('')
@@ -1140,7 +1140,7 @@ function appMenu(name, anchor){
   m.innerHTML=(first?'':'<button data-a="up">Move up</button>')
     +(last?'':'<button data-a="dn">Move down</button>')
     +`<button data-a="share">${shared?'Unshare from family':'Share to family'}</button>`
-    +(shared&&!forked?`<button data-a="bump">Publish update ${nextVer} · 发布更新</button>`:'')
+    +(shared&&!forked?`<button data-a="bump">发布更新 ${nextVer} · Publish update ${nextVer}</button>`:'')
     +'<button data-a="delete" class="del">Delete</button>';
   document.body.appendChild(m);
   const r=anchor.getBoundingClientRect(); m.style.top=(r.bottom+4)+'px'; m.style.right=Math.max(6,innerWidth-r.right)+'px';
@@ -1161,7 +1161,7 @@ $('#dApps').onclick=async(e)=>{
   if(menu){ e.stopPropagation(); appMenu(menu.dataset.appmenu, menu); return; }
   const fk=e.target.dataset.fork;
   if(fk){ e.stopPropagation(); const g=await relayJson(api('/api/apps/fork',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({slug:fk})}),'request');
-    if(g.ok&&g.data&&g.data.ok) loadApps(); else alert(g.ok?(g.data.error||'Fork refused · 复制被拒绝。'):g.text); return; }
+    if(g.ok&&g.data&&g.data.ok) loadApps(); else alert(g.ok?(g.data.error||'复制被拒绝。 · Fork refused'):g.text); return; }
   const c=e.target.closest('.dapp'); if(!c) return;
   openApp(c.dataset.u||UID,c.dataset.n,c.querySelector('.dapp-name')?.textContent);
 };
@@ -1171,20 +1171,20 @@ $('#eApps').onclick=async e=>{
   const gb=e.target.closest('[data-fget]');
   if(gb){ e.stopPropagation();
     const g=await relayJson(api('/api/apps/fork',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({fromUid:gb.dataset.fget,slug:gb.dataset.fslug})}),'request');
-    if(g.ok&&g.data&&g.data.ok) loadApps(); else alert(g.ok?(g.data.error||'Could not get app · 获取失败'):g.text); return; }
+    if(g.ok&&g.data&&g.data.ok) loadApps(); else alert(g.ok?(g.data.error||'获取失败 · Could not get app'):g.text); return; }
   const c=e.target.closest('.ecard'); if(c) openApp(c.dataset.eu,c.dataset.es,c.dataset.et);
 };
 async function showUpdateSheet(slug,title){
   $('#usTitle').textContent=`Update available: ${esc(title)}`;
-  $('#usChangelog').innerHTML='<span style="color:var(--muted);font-size:13px">Loading · 加载中…</span>';
+  $('#usChangelog').innerHTML='<span style="color:var(--muted);font-size:13px">加载中… · Loading</span>';
   $('#usInstall').onclick=async()=>{ $('#updateSheet').close(); await doAppUpdate(slug); };
   $('#usCancel').onclick=()=>$('#updateSheet').close();
   $('#updateSheet').showModal();
   let data={features:[],fixes:[]};
   try{ data=await (await api(`/api/apps/${encodeURIComponent(slug)}/changelog`)).json(); }catch{}
   const sec=(t,items)=>items&&items.length?`<div style="font-size:12px;font-weight:600;color:var(--muted);margin:8px 0 4px">${t}</div><ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.7">${items.map(f=>'<li>'+esc(f)+'</li>').join('')}</ul>`:'';
-  const body=sec('New · 新功能',data.features)+sec('Fixed · 修复',data.fixes);
-  $('#usChangelog').innerHTML=body||'<div style="color:var(--muted);font-size:13px">App updated by the owner. · 应用已由所有者更新。</div>';
+  const body=sec('新功能 · New',data.features)+sec('修复 · Fixed',data.fixes);
+  $('#usChangelog').innerHTML=body||'<div style="color:var(--muted);font-size:13px">应用已由所有者更新。 · App updated by the owner.</div>';
 }
 async function doAppUpdate(slug){
   const g=await relayJson(api(`/api/apps/${encodeURIComponent(slug)}/update`,{method:'POST'}),'request');
@@ -1199,7 +1199,7 @@ async function checkAndAutoUpdate(apps){
 }
 
 // TODO(R4): index.html is far over budget; the drawer's app sections (loadApps/loadFamilyApps) are the seam to split out.
-const DEMO_FAMILY_NOTE='Family Apps are available on a privately hosted superelf · 家庭应用仅在私有部署的 superelf 上可用';
+const DEMO_FAMILY_NOTE='家庭应用仅在私有部署的 superelf 上可用 · Family Apps are available on a privately hosted superelf';
 async function loadFamilyApps(){
   // The demo node (lib/demo-boot.mjs sets PADemoAuth) has no family: a muted note, no /api/family-apps request.
   if(window.PADemoAuth){ const d=$('#dFamily'); d.textContent=''; const n=document.createElement('span'); n.id='dFamilyDemo'; n.style.cssText='color:var(--muted);font-size:13px'; n.textContent=DEMO_FAMILY_NOTE; d.appendChild(n); return; }
@@ -1225,7 +1225,7 @@ $('#dFamily').onclick=async(e)=>{
   if(ob){ openApp(ob.dataset.fopen,ob.dataset.fslug,ob.dataset.ftitle); return; }
   const fb=e.target.closest('[data-ffork]');
   if(fb){ if(!confirm(`Fork "${fb.dataset.fslug}"?`)) return; const g=await relayJson(api('/api/apps/fork',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({fromUid:fb.dataset.ffork,slug:fb.dataset.fslug})}),'request');
-    if(g.ok&&g.data&&g.data.ok){loadApps();loadFamilyApps();} else alert(g.ok?(g.data.error||'Fork refused · 复制被拒绝。'):g.text); }
+    if(g.ok&&g.data&&g.data.ok){loadApps();loadFamilyApps();} else alert(g.ok?(g.data.error||'复制被拒绝。 · Fork refused'):g.text); }
 };
 $('#back').onclick=goHome;   // the button says Home, so it goes Home (it used to open the drawer)
 $('#newSession').onclick=newConvo;
@@ -1252,7 +1252,7 @@ function askConfirm(text,okLabel){
 }
 function shellConfirm(kind,title){
   const [en,zh]=SHELL_CONFIRM_LABELS[kind]||[kind,kind];
-  return askConfirm(`App requests: ${en} "${title}"? · 应用请求${zh}，确认？`,`${en} · ${zh}`);
+  return askConfirm(`应用请求${zh}，确认？ · App requests: ${en} "${title}"?`,`${zh} · ${en}`);
 }
 // The action-decide relay, deps injected so the test harness can run it with
 // no DOM (test/actions-ui.test.mjs): WITHOUT deps.confirm resolving true —
@@ -1264,7 +1264,7 @@ async function relayActionDecide(m,deps){
   let title=m.actionId;
   try{ const pend=await deps.listPending(); const a=(pend||[]).find(x=>x.id===m.actionId); if(a&&a.title) title=a.title; }
   catch{ /* lookup is label-only; the human gate below still applies (R5: nothing decided here) */ }
-  if(!await deps.confirm(m.verb,title)) return {ok:false,error:'cancelled in shell · 已在外壳取消'};
+  if(!await deps.confirm(m.verb,title)) return {ok:false,error:'已在外壳取消 · cancelled in shell'};
   return deps.decide(m.actionId,m.verb);
 }
 // Same trusted-chrome rule for revoking a reminder from an app.
@@ -1273,7 +1273,7 @@ async function relayReminderRemove(m,deps){
   let title=m.reminderId;
   try{ const list=await deps.list(); const r=(list||[]).find(x=>x.id===m.reminderId); if(r&&r.text) title=r.text; }
   catch{ /* label-only lookup — the human gate below still applies */ }
-  if(!await deps.confirm('remove-reminder',title)) return {ok:false,error:'cancelled in shell · 已在外壳取消'};
+  if(!await deps.confirm('remove-reminder',title)) return {ok:false,error:'已在外壳取消 · cancelled in shell'};
   return deps.remove(m.reminderId);
 }
 
@@ -1301,7 +1301,7 @@ async function relayReminderRemove(m,deps){
      {ok:false, code:'cancelled',    error}                          the app withdrew it (chat-cancel) — NOT 'network' */
 const DEMO_SIGNIN_CODE='demo_signin', DEMO_SIGNIN_EVENT='pa-demo-signin';   // R3: = SIGNIN_CODE (lib/demo-auth.mjs) and SIGNIN_EVENT (lib/demo-boot.mjs), pinned by test/demo-signin-prompt.test.mjs
 const RELAY_NOT_FOUND='not found';                              // the legacy error string, pinned once (R3)
-const RELAY_CANCELLED='Cancelled · 已取消';                      // == PAC_CANCELLED in web/chat-ui.inline.html (test/chat-cancel.test.mjs)
+const RELAY_CANCELLED='已取消 · Cancelled';                      // == PAC_CANCELLED in web/chat-ui.inline.html (test/chat-cancel.test.mjs)
 /* ── The noun table（名词表）— WHAT was refused ─────────────────────────────────────────
    LEFTOVER (e) of the 2026-09-02 data loss: an oversized photo insert in the notebook read
    "Upload failed" — byte-identical to a 401 and to a dropped connection. A user shown that
@@ -1311,19 +1311,19 @@ const RELAY_CANCELLED='Cancelled · 已取消';                      // == PAC_C
    `did` is what happened to that thing, so a 401 on a photo does not read like a 401 on a
    note: the user must be able to tell whether their work still exists. */
 const RELAY_NOUNS={
-  message:{en:'Message',head:'Message too large · 消息过长',did:'not sent · 未发送',act:'Shorten it or remove an attachment, then send again · 请缩短内容或删除附件后重发'},
-  file:   {en:'File',   head:'File too large · 文件过大',   did:'not uploaded · 未上传',act:'Pick a smaller file · 请选择更小的文件'},
-  photo:  {en:'Photo',  head:'Photo too large · 照片过大',  did:'not uploaded · 未上传',act:'Pick a smaller photo, or crop it · 请选择更小的照片或裁剪后重试'},
-  note:   {en:'Note',   head:'Note too large · 笔记过大',   did:'not saved · 未保存',  act:'Split it across pages, then save again · 请分页后重新保存'},
-  data:   {en:'Data',   head:'Too large · 内容过大',        did:'not saved · 未保存',  act:'Make it smaller, then try again · 请缩小后重试'},
+  message:{head:'消息过长 · Message too large',did:'消息未发送 · Message not sent',act:'请缩短内容或删除附件后重发 · Shorten it or remove an attachment, then send again'},
+  file:   {head:'文件过大 · File too large',   did:'文件未上传 · File not uploaded',act:'请选择更小的文件 · Pick a smaller file'},
+  photo:  {head:'照片过大 · Photo too large',  did:'照片未上传 · Photo not uploaded',act:'请选择更小的照片或裁剪后重试 · Pick a smaller photo, or crop it'},
+  note:   {head:'笔记过大 · Note too large',   did:'笔记未保存 · Note not saved',  act:'请分页后重新保存 · Split it across pages, then save again'},
+  data:   {head:'内容过大 · Too large',        did:'数据未保存 · Data not saved',  act:'请缩小后重试 · Make it smaller, then try again'},
   // A READ that failed. `did` must never say "not saved" here: telling a user their note
   // was not saved when the app merely could not LOAD it is the same category of lie the
   // whole incident was made of — it describes the wrong side of the exchange.
-  content:{en:'Content',head:'Too large · 内容过大',        did:'not loaded · 未加载',  act:'Try again · 请重试'},
+  content:{head:'内容过大 · Too large',        did:'内容未加载 · Content not loaded',  act:'请重试 · Try again'},
   // A shell action that is neither a payload nor a read: signing in, forking an app.
-  request:{en:'Request',head:'Too large · 内容过大',        did:'not completed · 未完成',act:'Try again · 请重试'},
+  request:{head:'内容过大 · Too large',        did:'请求未完成 · Request not completed',act:'请重试 · Try again'},
   // Signing in. Its 401 is a REJECTED CREDENTIAL, not a lost session — see relayText.
-  credentials:{en:'Sign-in',head:'Too large · 内容过大',   did:'not completed · 未完成',act:'Try again · 请重试'},
+  credentials:{head:'内容过大 · Too large',   did:'登录未完成 · Sign-in not completed',act:'请重试 · Try again'},
 };
 const RELAY_TOO_LARGE_MSG=RELAY_NOUNS.message.head;             // chat composer heading
 const RELAY_TOO_LARGE_FILE=RELAY_NOUNS.file.head;               // upload heading
@@ -1360,7 +1360,7 @@ function relayB64Bytes(fileSize){ return Math.ceil(Number(fileSize||0)/3)*4+RELA
 // user pressed "Connection failed" would send them hunting for a network fault (R14).
 function relayNetFail(err,where,signal){
   if(signal&&signal.aborted) return {ok:false,code:'cancelled',error:RELAY_CANCELLED};
-  return {ok:false,code:'network',error:'network unreachable · 网络不可达 ('+where+': '+((err&&err.message)||'unknown')+')'};
+  return {ok:false,code:'network',error:'网络不可达 · network unreachable ('+where+': '+((err&&err.message)||'unknown')+')'};
 }
 // A non-2xx answer → its own code. The body is read ONCE here: a 413 from lib/webutil.mjs
 // carries {error,code:'payload_too_large',limit}, while web.mjs's sendFile answers 404/500
@@ -1369,20 +1369,20 @@ async function relayHttpFail(r){
   let raw=''; try{ raw=await r.text(); }catch{ raw=''; }           // an unreadable body must not mask the status
   let j=null; try{ j=raw?JSON.parse(raw):null; }catch{ j=null; }   // text/plain body: the status alone decides
   const msg=(j&&typeof j.error==='string'&&j.error)||'';
-  if(r.status===413) return {ok:false,code:'too-large',status:413,limit:(j&&Number.isFinite(j.limit))?j.limit:null,error:msg||'payload too large · 内容过大'};
+  if(r.status===413) return {ok:false,code:'too-large',status:413,limit:(j&&Number.isFinite(j.limit))?j.limit:null,error:msg||'内容过大 · payload too large'};
   // The demo node's AI gate (lib/demo-auth.mjs SIGNIN_CODE) answers a visitor who never signed in:
   // still 'unauthorized' for apps, but flagged `signin` so the sentence is the server's own "sign in to
   // use AI" and the demo boot (lib/demo-boot.mjs SIGNIN_EVENT) opens its sign-in. Owner nodes never send it.
   // TODO(R4 seam): grows this over-budget shell by four lines; moves with the broker split (see appAgentInit).
   if(r.status===401&&j&&j.code===DEMO_SIGNIN_CODE){ if(typeof dispatchEvent==='function'&&typeof Event==='function') dispatchEvent(new Event(DEMO_SIGNIN_EVENT));
-    return {ok:false,code:'unauthorized',signin:true,status:401,error:msg||'Sign in to use AI · 登录后使用 AI'}; }
-  if(r.status===401||r.status===403) return {ok:false,code:'unauthorized',status:r.status,error:msg||'signed out · 登录已过期'};
+    return {ok:false,code:'unauthorized',signin:true,status:401,error:msg||'登录后使用 AI · Sign in to use AI'}; }
+  if(r.status===401||r.status===403) return {ok:false,code:'unauthorized',status:r.status,error:msg||'登录已过期 · signed out'};
   if(r.status===404) return {ok:false,code:'not-found',status:404,error:RELAY_NOT_FOUND};
-  if(r.status>=500) return {ok:false,code:'server-error',status:r.status,error:msg||'server error · 服务器错误'};
-  return {ok:false,code:'bad-request',status:r.status,error:msg||'request rejected · 请求被拒绝'};
+  if(r.status>=500) return {ok:false,code:'server-error',status:r.status,error:msg||'服务器错误 · server error'};
+  return {ok:false,code:'bad-request',status:r.status,error:msg||'请求被拒绝 · request rejected'};
 }
 // A path this shell refuses before any request — a client fault, never "absent".
-function relayBadPath(){ return {ok:false,code:'bad-request',error:'bad path · 路径无效'}; }
+function relayBadPath(){ return {ok:false,code:'bad-request',error:'路径无效 · bad path'}; }
 // One request → one reply object. `as` says how a 2xx body is read:
 //   'none' → {ok:true} · 'text' → {ok:true,[key||'text']} · 'json' → {ok:true,[key||'data']}
 //   'blob' → {ok:true,blob} (never postMessage'd — the caller converts it first)
@@ -1403,7 +1403,7 @@ async function relayCall(url,opt,as,key){
   }catch(err){
     // A 2xx whose body will not parse is a broken SERVER answer — not an absent file and
     // not a network drop. Say that, rather than borrowing a neighbouring code (R14).
-    return (err&&err.name==='SyntaxError')?{ok:false,code:'server-error',status:r.status,error:'malformed reply · 回复格式错误'}:relayNetFail(err,'reply');
+    return (err&&err.name==='SyntaxError')?{ok:false,code:'server-error',status:r.status,error:'回复格式错误 · malformed reply'}:relayNetFail(err,'reply');
   }
 }
 // ── App-originated agent requests（应用发起的 AI 请求）────────────────────────────────────────
@@ -1471,7 +1471,7 @@ function relaySize(n){ const b=Number(n);
 // a size rejection can never be mistaken for a 401 or for a dropped connection.
 function relayText(f,sentBytes,what){
   const e=f||{}, w=relayWhat(what);
-  const sent=sentBytes?' — '+relaySize(sentBytes)+' sent · 已发送':'';
+  const sent=sentBytes?' — 已发送 '+relaySize(sentBytes)+' · '+relaySize(sentBytes)+' sent':'';
   if(e.code==='too-large') return w.head+(e.limit?' (max '+relaySize(e.limit)+')':'')+sent+'. '+w.act+'。';
   // A 401 answering a SIGN-IN is a rejected credential, not an expired session. The server
   // already says which ("wrong username or PIN"); this branch used to drop that and print
@@ -1479,15 +1479,15 @@ function relayText(f,sentBytes,what){
   // a session bug and hid the real reason (R5: the specific reason always wins).
   if(e.code==='unauthorized'&&e.signin) return String(e.error)+'。';   // demo: never signed in, not "expired"
   if(e.code==='unauthorized') return w===RELAY_NOUNS.credentials
-    ? String(e.error||'Wrong username or password · 用户名或密码错误')+'。'
-    : 'Signed out · 登录已过期 — '+w.en+' '+w.did+'. Sign in again, then retry · 请重新登录后重试。';
+    ? String(e.error||'用户名或密码错误 · Wrong username or password')+'。'
+    : '登录已过期 · Signed out — '+w.did+'. 请重新登录后重试 · Sign in again, then retry。';
   // NOT the `sent` clause: nothing was sent, so naming a "sent" size here would contradict
   // the sentence it sits in. The size is stated as what is still waiting on the device.
-  if(e.code==='network') return 'Connection failed · 连接失败 — it never left this device · 未发出'+(sentBytes?' ('+relaySize(sentBytes)+' waiting · 待发送)':'')+'. Retry when you are back online · 恢复网络后重试。';
+  if(e.code==='network') return '连接失败 · Connection failed — 未发出 · it never left this device'+(sentBytes?' (待发送 '+relaySize(sentBytes)+' · '+relaySize(sentBytes)+' waiting)':'')+'. 恢复网络后重试 · Retry when you are back online。';
   // No HTTP status in any line below: a code is jargon to a newcomer (overnight QA F1-4); 中文 first.
-  if(e.code==='server-error') return '服务器错误 · Server error — '+w.en+' '+w.did+'. Nothing on this device was changed · 本机内容未受影响。';
-  if(e.code==='not-found') return 'Not found · 未找到 — '+w.en+' '+w.did+'。';
-  if(e.code==='relay-error') return 'App shell error · 外壳出错 — '+w.en+' '+w.did+'. Reload and retry · 请重新加载后重试'+(e.error?' ('+e.error+')':'')+'。';
+  if(e.code==='server-error') return '服务器错误 · Server error — '+w.did+'. 本机内容未受影响 · Nothing on this device was changed。';
+  if(e.code==='not-found') return '未找到 · Not found — '+w.did+'。';
+  if(e.code==='relay-error') return '外壳出错 · App shell error — '+w.did+'. 请重新加载后重试 · Reload and retry'+(e.error?' ('+e.error+')':'')+'。';
   // bad-request (incl. the 408 an unfinished body earns) and anything without a code: the
   // server's own reason is the most specific thing available, so it is shown verbatim
   // rather than replaced by a house sentence that would say less (R5). 'cancelled' lands here
@@ -1507,14 +1507,14 @@ function relayFail(f,sentBytes,what){
 // `p` is a fetch promise rather than a URL because sign-in has no session header yet and
 // so cannot go through relayCall — the PLUMBING differs, the MAPPING does not (R3).
 // SCAR these call sites carried: they did `await r.json()` on a text/plain 4xx, which
-// THROWS — the user saw nothing at all — or printed a house 'Save failed · 保存失败' that
+// THROWS — the user saw nothing at all — or printed a house '保存失败 · Save failed' that
 // read identically for a 413, an expired session and a dead socket.
 // Returns {ok:true,data} or a coded failure carrying its own rendered `text`.
 async function relayJson(p,what){
   let r; try{ r=await p; }catch(err){ return relayFail(relayNetFail(err,'request'),0,what); }
   if(!r.ok) return relayFail(await relayHttpFail(r),0,what);
   try{ return {ok:true,data:await r.json()}; }
-  catch{ return relayFail({ok:false,code:'server-error',status:r.status,error:'malformed reply · 回复格式错误'},0,what); }
+  catch{ return relayFail({ok:false,code:'server-error',status:r.status,error:'回复格式错误 · malformed reply'},0,what); }
 }
 /* RELAY-CORE-END */
 
@@ -1529,13 +1529,13 @@ async function relayJson(p,what){
 // microphone" there is advice they cannot act on — the fix is the https:// address.
 function speechReason(code,secure){
   if(code==='not-allowed'||code==='service-not-allowed') return secure
-    ? 'Microphone blocked · 麦克风被阻止 — turn it on for this site in browser settings, then retry · 请在浏览器设置中为本站开启麦克风后重试'
-    : 'Microphone needs a secure connection · 麦克风需要安全连接 — open this page over its https:// address · 请改用 https:// 地址打开';
-  if(code==='no-speech') return 'No speech heard · 未听到语音 — try again · 请再试一次';
-  if(code==='audio-capture') return 'No microphone found · 未找到麦克风';
-  if(code==='network') return 'Speech service unreachable · 语音服务连接失败';
-  if(code==='aborted') return 'Listening stopped · 已停止聆听';
-  return 'Speech failed · 语音识别失败'+(code?' ('+code+')':'');
+    ? '麦克风被阻止 · Microphone blocked — 请在浏览器设置中为本站开启麦克风后重试 · turn it on for this site in browser settings, then retry'
+    : '麦克风需要安全连接 · Microphone needs a secure connection — 请改用 https:// 地址打开 · open this page over its https:// address';
+  if(code==='no-speech') return '未听到语音 · No speech heard — 请再试一次 · try again';
+  if(code==='audio-capture') return '未找到麦克风 · No microphone found';
+  if(code==='network') return '语音服务连接失败 · Speech service unreachable';
+  if(code==='aborted') return '已停止聆听 · Listening stopped';
+  return '语音识别失败 · Speech failed'+(code?' ('+code+')':'');
 }
 
 // ── Notifications（通知）───────────────────────────────────────────────────────────────
@@ -1544,7 +1544,7 @@ function speechReason(code,secure){
 // ('notify') and the scheduled kind ('notify-at') come through here, so there is exactly
 // one place that decides whether a notification is allowed to happen.
 async function shellNotifyPermission(){
-  if(!('Notification' in window)) return {ok:false,code:'unsupported',error:'Notifications not supported · 不支持通知'};
+  if(!('Notification' in window)) return {ok:false,code:'unsupported',error:'不支持通知 · Notifications not supported'};
   let perm=Notification.permission;
   // requestPermission() REJECTS in some browsers when there is no user gesture (a timer that
   // fires while the user is elsewhere has none). A rejection is not "granted", so it is read
@@ -1556,8 +1556,8 @@ async function shellNotifyPermission(){
   // acted on; the fix is the https:// address. A real denial IS a settings change, and the
   // browser will not re-prompt. Same split as speechReason() for the microphone (R3).
   if(perm!=='granted') return {ok:false,code:'denied',permission:perm,error: window.isSecureContext
-    ? 'Notifications are blocked · 通知被阻止 — turn them on for this site in browser settings, then retry · 请在浏览器设置中为本站开启通知后重试'
-    : 'Notifications need a secure connection · 通知需要安全连接 — open this page over its https:// address · 请改用 https:// 地址打开'};
+    ? '通知被阻止 · Notifications are blocked — 请在浏览器设置中为本站开启通知后重试 · turn them on for this site in browser settings, then retry'
+    : '通知需要安全连接 · Notifications need a secure connection — 请改用 https:// 地址打开 · open this page over its https:// address'};
   return {ok:true,permission:perm};
 }
 // The alarm TONE. A notification's own sound is an OS setting the page cannot control, and the
@@ -1660,14 +1660,14 @@ function notifyAtPlan(m,now){
   const tag=(m&&typeof m.tag==='string')?m.tag.trim().slice(0,NOTIFY_AT_MAX_TAG):'';
   // The tag IS the schedule's identity: it is what a later schedule replaces and what a
   // cancel names. Without one, restarting a pomodoro would stack a second bell on the first.
-  if(!tag) return {ok:false,code:'bad-request',error:'a scheduled notification needs a tag · 定时通知需要 tag'};
+  if(!tag) return {ok:false,code:'bad-request',error:'定时通知需要 tag · a scheduled notification needs a tag'};
   // inMs wins when both are given — a delay cannot disagree with the shell's clock, while an
   // absolute `at` the app computed can (the app may have been loaded before a clock change).
   const at=Number.isFinite(m.inMs)?now+Number(m.inMs):(Number.isFinite(m.at)?Number(m.at):NaN);
-  if(!Number.isFinite(at)) return {ok:false,code:'bad-request',error:'when? give inMs (ms from now) or at (epoch ms) · 需要 inMs（毫秒后）或 at（毫秒时间戳）'};
+  if(!Number.isFinite(at)) return {ok:false,code:'bad-request',error:'需要 inMs（毫秒后）或 at（毫秒时间戳） · when? give inMs (ms from now) or at (epoch ms)'};
   const delay=at-now;
-  if(delay>NOTIFY_AT_MAX_MS) return {ok:false,code:'bad-request',error:'too far ahead · 时间过远 (max 24h)'};
-  if(delay< -NOTIFY_AT_GRACE_MS) return {ok:false,code:'bad-request',error:'that time has already passed · 时间已过'};
+  if(delay>NOTIFY_AT_MAX_MS) return {ok:false,code:'bad-request',error:'时间过远 (max 24h) · too far ahead'};
+  if(delay< -NOTIFY_AT_GRACE_MS) return {ok:false,code:'bad-request',error:'时间已过 · that time has already passed'};
   return {ok:true,rec:{tag,at,
     title:String((m.title==null?'':m.title)).slice(0,NOTIFY_AT_MAX_TEXT),
     body:String((m.body==null?'':m.body)).slice(0,NOTIFY_AT_MAX_TEXT),
@@ -1736,7 +1736,7 @@ async function notifyAtFire(rec){
   if(!g.ok&&!rang){
     const d=$('#actConfirm');
     // Never steal a confirm the user is in the middle of answering.
-    if(d&&!d.open) askConfirm(String(rec.title||'')+(rec.body?' — '+rec.body:'')+' ('+relayText(g,0,'request')+')','OK · 知道了');
+    if(d&&!d.open) askConfirm(String(rec.title||'')+(rec.body?' — '+rec.body:'')+' ('+relayText(g,0,'request')+')','知道了 · OK');
   }
   return {...g,rang};
 }
@@ -1847,9 +1847,9 @@ window.addEventListener('message',async(e)=>{
       // TODO(R4): grows this over-budget file; the seam is the broker (this listener) to its own file.
       // Which app asks is the shell's own reading too: the page in #fr (a held page is hidden, so no
       // tap reaches it), the signed-in user's own app, on the list. Every other app stays sealed.
-      if(fr.held||frameUid()!==UID||!LINK_APPS.has(appSlug)) return reply({ok:false,code:'bad-request',error:'links off for this app',text:'This app cannot open links · 此应用不能打开链接'});
+      if(fr.held||frameUid()!==UID||!LINK_APPS.has(appSlug)) return reply({ok:false,code:'bad-request',error:'links off for this app',text:'此应用不能打开链接 · This app cannot open links'});
       let u=null; try{ u=new URL(String(m.url==null?'':m.url)); }catch(_){ /* not a URL: refused just below */ }
-      if(!u||!OPEN_URL_OK.test(u.protocol)) return reply({ok:false,code:'bad-request',error:'link refused',text:'Only web or email links open · 只能打开网页或邮件链接'});
+      if(!u||!OPEN_URL_OK.test(u.protocol)) return reply({ok:false,code:'bad-request',error:'link refused',text:'只能打开网页或邮件链接 · Only web or email links open'});
       window.open(u.href,'_blank','noopener,noreferrer');
       return reply({ok:true});
     } else if(m.kind==='data'){
@@ -1867,7 +1867,7 @@ window.addEventListener('message',async(e)=>{
       try{
         const u=await new Promise((rr,rj)=>{ const fr=new FileReader(); fr.onload=()=>rr(fr.result); fr.onerror=()=>rj(new Error('FileReader failed')); fr.readAsDataURL(g.blob); });
         reply({ok:true,dataUrl:u});
-      }catch(err){ reply({ok:false,code:'relay-error',error:'could not decode the attachment · 附件解码失败: '+((err&&err.message)||'')}); }
+      }catch(err){ reply({ok:false,code:'relay-error',error:'附件解码失败 · could not decode the attachment: '+((err&&err.message)||'')}); }
     } else if(m.kind==='websearch'){
       // Web search performed BY THE SERVER（联网搜索）. An app is sandboxed with connect-src
       // 'none' and a member's agent cannot run Bash, so this relay is the only way either of
@@ -1924,7 +1924,7 @@ window.addEventListener('message',async(e)=>{
       // chatId is the broker id of the in-flight 'chat' to stop; it cannot travel as `id`, which is
       // this request's own. cancelled:false means nothing by that id is in flight (it ended, or was
       // cancelled already) — idempotent by design, like notify-cancel, and not a failure.
-      if(typeof m.chatId!=='number'&&typeof m.chatId!=='string') return reply({ok:false,code:'bad-request',error:'cancel needs a chatId · 取消需要 chatId'});
+      if(typeof m.chatId!=='number'&&typeof m.chatId!=='string') return reply({ok:false,code:'bad-request',error:'取消需要 chatId · cancel needs a chatId'});
       const ac=relayChats.get(m.chatId);
       if(ac){ relayChats.delete(m.chatId); ac.abort(); }
       reply({ok:true,chatId:m.chatId,cancelled:!!ac});
@@ -1964,7 +1964,7 @@ window.addEventListener('message',async(e)=>{
       reply(await relayReminderRemove(m,{
         list:async()=>{ const g=await relayCall('/api/reminders',undefined,'json','data'); return g.ok?g.data:[]; },
         confirm:shellConfirm,
-        remove:async(id)=>{ const g=await relayCall('/api/reminders/'+encodeURIComponent(id),{method:'DELETE'},'none'); return g.ok?g:{...g,error:'remove failed · 移除失败 ('+g.error+')'}; },
+        remove:async(id)=>{ const g=await relayCall('/api/reminders/'+encodeURIComponent(id),{method:'DELETE'},'none'); return g.ok?g:{...g,error:'移除失败 · remove failed ('+g.error+')'}; },
       }));
     } else if(m.kind==='convo-rename'){
       if(typeof m.convoId!=='string') return reply({ok:false,code:'bad-request',error:'bad id'});
@@ -2024,7 +2024,7 @@ window.addEventListener('message',async(e)=>{
       //   {kind:'notify-cancel',tag} → {ok:true,tag,cancelled}
       // cancelled:false means nothing was pending — idempotent by design, not a failure.
       const tag=(typeof m.tag==='string')?m.tag.trim().slice(0,NOTIFY_AT_MAX_TAG):'';
-      if(!tag) return reply({ok:false,code:'bad-request',error:'cancel needs a tag · 取消需要 tag'});
+      if(!tag) return reply({ok:false,code:'bad-request',error:'取消需要 tag · cancel needs a tag'});
       reply({ok:true,tag,cancelled:notifyAtCancel(tag)});
     } else if(m.kind==='render-md'){
       reply({ok:true,html:renderMd(String(m.text||''))});
@@ -2048,8 +2048,8 @@ window.addEventListener('message',async(e)=>{
       // user as the generic "Upload failed", byte-identical to a 401 or a dropped socket.
       // The reply now always carries the rendered sentence (relayFail, via reply()) WITH
       // the real bytes sent and the noun inferred from the filename, so "Photo too large ·
-      // 照片过大 (max 20.0 MB)" and "Signed out · 登录已过期" can never read the same.
-      if(typeof m.name!=='string'||typeof m.data!=='string') return reply({ok:false,code:'bad-request',error:'missing fields · 缺少字段 (name/data)'});
+      // 照片过大 (max 20.0 MB)" and "登录已过期 · Signed out" can never read the same.
+      if(typeof m.name!=='string'||typeof m.data!=='string') return reply({ok:false,code:'bad-request',error:'缺少字段 (name/data) · missing fields'});
       const body=JSON.stringify({name:m.name,data:m.data});
       const g=await relayCall('/api/upload',{method:'POST',headers:{'content-type':'application/json'},body},'raw');
       reply(g&&g.ok?{ok:true,path:g.path}:g,relayBodyBytes(body));
@@ -2110,7 +2110,7 @@ window.addEventListener('message',async(e)=>{
       // done:true so the app's waiter settles NOW. Without it a browser without the API
       // left the mic spinning until the app's own 15s timeout, reporting "timeout" instead
       // of the real reason.
-      if(!SR) return reply({ok:false,code:'unsupported',done:true,error:'Speech not supported · 不支持语音识别'});
+      if(!SR) return reply({ok:false,code:'unsupported',done:true,error:'不支持语音识别 · Speech not supported'});
       // abort() throws if nothing is listening; either way a fresh recognizer is what the
       // next line creates, so there is nothing to report and nothing to recover (R5).
       if(window._paRec){ try{window._paRec.abort();}catch(_){/* not listening — nothing to abort */} window._paRec=null; }
@@ -2145,7 +2145,7 @@ window.addEventListener('message',async(e)=>{
       // Leads with a CODE, like every other failure the broker answers. A reply that carries only
       // prose cannot be told apart from any other refusal by the caller, which is the whole point
       // of the one-mapper rule — and this branch had been quietly breaking it since print landed.
-      if(!pages.length) return reply({ok:false,code:'no-content',error:'nothing to print · 没有可打印的内容'});
+      if(!pages.length) return reply({ok:false,code:'no-content',error:'没有可打印的内容 · nothing to print'});
       let root=$('#printRoot');
       if(!root){ root=document.createElement('div'); root.id='printRoot'; document.body.appendChild(root); }
       root.innerHTML=pages.map(()=>'<div class="pr-sheet"><img alt=""></div>').join('');
@@ -2180,7 +2180,7 @@ window.addEventListener('message',async(e)=>{
       const t0=Date.now();
       try{ window.print(); }
       catch(err){ clearTimeout(root._paHold); teardown();
-        return reply({ok:false,code:'print-error',error:'could not open the print dialog · 无法打开打印对话框: '+((err&&err.message)||'')}); }
+        return reply({ok:false,code:'print-error',error:'无法打开打印对话框 · could not open the print dialog: '+((err&&err.message)||'')}); }
       // Answered once the dialog has been HANDED OFF, which is all a platform that returns
       // immediately can truthfully tell us. Waiting for afterprint here would leave the app's
       // "Preparing to print…" hanging for the whole hold on exactly the device this bug came from.
@@ -2197,7 +2197,7 @@ window.addEventListener('message',async(e)=>{
     // Reaching here is a fault in THIS shell (a bug in the branch above), not a statement
     // about the app's data. It must never look like 'not-found' — an app that read this as
     // "the file is absent" would save an empty document over a good one (R5).
-    reply({ok:false,code:'relay-error',error:'shell relay error · 外壳中转出错: '+((err&&err.message)||'unknown')});
+    reply({ok:false,code:'relay-error',error:'外壳中转出错 · shell relay error: '+((err&&err.message)||'unknown')});
   }finally{ appFrameBusy(fr,-1); }
 });
 
@@ -2270,7 +2270,7 @@ async function handleFiles(e){
       attachments.push({name:file.name,text});
     } else {
       // Upload binary (images, PDFs, etc.) to workspace. Same mapper as the broker: an
-      // oversize photo says "Photo too large · 照片过大 (max 20.0 MB)" — never "unknown",
+      // oversize photo says "照片过大 (max 20.0 MB) · Photo too large" — never "unknown",
       // and never the same sentence a 401 or a dropped socket produces (leftover (e)).
       const what=relayWhatForFile(file.name);
       // PRE-FLIGHT: the size is known before the read, so refuse here rather than spend the
@@ -2358,11 +2358,11 @@ function speak(text,onEnd){
 // is what makes it safe for the caller to drop the draft it kept.
 function pollForResult(id, afterMs, statusEl, outEl, onSettled){
   let attempts=0;
-  statusEl.className='msg status'; statusEl.textContent='⚡ Connection lost — waiting for result… · 连接中断，正在等待结果…';
+  statusEl.className='msg status'; statusEl.textContent='连接中断，正在等待结果… · ⚡ Connection lost — waiting for result…';
   const stop=(cls,text)=>{ clearInterval(timer); statusEl.className='msg '+cls; statusEl.textContent=text; };
   const timer=setInterval(async()=>{
     attempts++;
-    if(attempts>45){ stop('err','⚠ No result after several minutes · 数分钟后仍无结果 — your message is still in the composer; reopen the chat to check before resending · 消息仍在输入框，请重开对话确认后再重发。'); return; }
+    if(attempts>45){ stop('err','⚠ 数分钟后仍无结果 · No result after several minutes — 消息仍在输入框，请重开对话确认后再重发 · your message is still in the composer; reopen the chat to check before resending。'); return; }
     const g=await relayCall('/api/convos/'+encodeURIComponent(id),undefined,'json','data');
     if(!g.ok){
       // Classified, never swallowed. Only a signed-out / vanished conversation is terminal —
@@ -2471,7 +2471,7 @@ async function submitSend(){
     restoreComposer(q,attsBefore);
     const untouched=()=>$('#box').value===q&&attachments.length===attsBefore.length&&attachments.every((a,i)=>a===attsBefore[i]);
     if(convoId) pollForResult(convoId, sendTime, status, out, ()=>{ if(untouched()) restoreComposer('',[]); });
-    else{ status.className='msg err'; status.textContent='⚠ '+relayText(relayNetFail(err,'stream'),sentBytes,'message')+' Your message is back in the composer; the task may still be running on the laptop · 消息已放回输入框，任务可能仍在电脑上运行。'; }
+    else{ status.className='msg err'; status.textContent='⚠ '+relayText(relayNetFail(err,'stream'),sentBytes,'message')+' 消息已放回输入框，任务可能仍在电脑上运行 · Your message is back in the composer; the task may still be running on the laptop。'; }
   }finally{ if(releaseConvoWait) releaseConvoWait(); }
 }
 
@@ -2499,7 +2499,7 @@ $('#shellModel').onclick=()=>{
   document.body.appendChild(menu);
   setTimeout(()=>{ const off=(ev)=>{ if(!menu.contains(ev.target)&&ev.target!==$('#shellModel')){ menu.remove(); document.removeEventListener('click',off); } }; document.addEventListener('click',off); },0);
 };
-function renderShellVfy(){ const btn=$('#shellVfy'); btn.textContent=(shellVerifyOn?'☑':'☐')+' Verify · 校验'; btn.classList.toggle('on',shellVerifyOn); }
+function renderShellVfy(){ const btn=$('#shellVfy'); btn.textContent=(shellVerifyOn?'☑':'☐')+' 校验 · Verify'; btn.classList.toggle('on',shellVerifyOn); }
 $('#shellVfy').onclick=()=>{ shellVerifyOn=!shellVerifyOn; renderShellVfy(); };
 
 /* PA_SETTINGS_JS */

@@ -76,7 +76,7 @@ test('the bundle: a 200 is stored under pa-<build>; a network failure is answere
   assert.deepEqual(h.log.net, [ORIGIN + '/app/u1/bible/'], 'the network was tried FIRST (never cache-first for HTML, ADR 0026)');
   const miss = await h.request('/app/u1/notes/');
   assert.equal(miss.status, 503);
-  assert.match(await miss.text(), /Offline · 离线 — this page is not saved on this device yet · 此页尚未保存在本机/);
+  assert.match(await miss.text(), /离线 · Offline — 此页尚未保存在本机 · this page is not saved on this device yet/);
 });
 
 test('HARD RULE: a cache:"no-store" request is never answered from the cache and never stored — even when the URL is cached', async () => {

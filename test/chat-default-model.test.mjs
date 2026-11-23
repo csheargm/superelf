@@ -25,7 +25,7 @@ const resolve = (models, want, cur = null) =>
   new Function('PAC_MODELS', 'PAC_WANTMODEL', 'PAC_CURMODEL', `${RESOLVE}\nreturn PAC_CURMODEL;`)(models, want, cur);
 
 const MODELS = [
-  { id: 'deepseek', label: 'DeepSeek · 中文', group: 'Fast' },
+  { id: 'deepseek', label: '中文 · DeepSeek', group: 'Fast' },
   { id: 'glm', label: 'GLM', group: 'Deep' },
   { id: 'claude', label: 'Claude', group: 'Agent' },
   { id: 'gpt', label: 'GPT (Codex)', group: 'Agent' },

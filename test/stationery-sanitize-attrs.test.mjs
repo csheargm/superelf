@@ -2,7 +2,7 @@
 //
 // SCAR (measured 2026-10-12, real CLI, Journal "Design with AI"): one Sonnet design in 14 was
 // REJECTED — "attribute transform-origin is not allowed" — for three star paths written as
-// transform="scale(0.7)" transform-origin="96.5 89.5". The person saw "Rejected · 已拒绝" and paid
+// transform="scale(0.7)" transform-origin="96.5 89.5". The person saw "已拒绝 · Rejected" and paid
 // another ~2 minutes for Try again.
 //
 // The rule now gives every attribute one of three verdicts, and this file pins each:

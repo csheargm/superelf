@@ -24,11 +24,11 @@
 (function(){
   if(window.PANoteText) return;
   // Every line the panel can say, ONE place, English then 中文 (the repo's style, PANote.SEARCH_TXT).
-  const TXT=Object.freeze({ title:(window.PANote&&window.PANote.SEARCH_TXT&&window.PANote.SEARCH_TXT.transcript)||'Transcript', close:'Close · 关闭', loading:'Loading · 加载中',
-    transcribing:'Transcribing · 识别中', failed:'Failed on this node · 本机识别失败', noOcr:'Needs the Mac node · 需要 Mac 节点',
-    ready:'Transcribed · 已转写', none:'Nothing to transcribe on this note · 这条笔记没有可转写的内容',
-    unsaved:'Save the note first · 请先保存笔记', unavailable:'Transcript unavailable · 转写不可用',
-    page:'Page {n} · 第 {n} 页', labels:'Picture labels · 图片标签' });
+  const TXT=Object.freeze({ title:(window.PANote&&window.PANote.SEARCH_TXT&&window.PANote.SEARCH_TXT.transcript)||'Transcript', close:'关闭 · Close', loading:'加载中 · Loading',
+    transcribing:'识别中 · Transcribing', failed:'本机识别失败 · Failed on this node', noOcr:'需要 Mac 节点 · Needs the Mac node',
+    ready:'已转写 · Transcribed', none:'这条笔记没有可转写的内容 · Nothing to transcribe on this note',
+    unsaved:'请先保存笔记 · Save the note first', unavailable:'转写不可用 · Transcript unavailable',
+    page:'第 {n} 页 · Page {n}', labels:'图片标签 · Picture labels' });
   const REFRESH_MS=4000;   // while pages are owed, the panel re-reads this often (read at use time: a test shortens it)
   const refreshMs=()=>(Number(window.PA_TEXT_REFRESH_MS)>0?Number(window.PA_TEXT_REFRESH_MS):REFRESH_MS);
   const esc=s=>String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));

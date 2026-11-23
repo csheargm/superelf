@@ -51,7 +51,7 @@ test('the dynamic shell surfaces are appended to <body>, never into a behind con
   // Menus, the print root, the copy fallback and #scrollBtn are created at run time.
   for (const re of [/scrollBtn\.id='scrollBtn'[^\n]*document\.body\.appendChild\(scrollBtn\)/,
     /root\.id='printRoot'; document\.body\.appendChild\(root\)/,
-    /m\.id='appMenu'[\s\S]{0,400}?document\.body\.appendChild\(m\)/,
+    /m\.id='appMenu'[\s\S]{0,500}?document\.body\.appendChild\(m\)/,
     /m\.id='convoMenu'[\s\S]{0,400}?document\.body\.appendChild\(m\)/]) assert.match(SHELL, re);
 });
 

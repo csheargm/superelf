@@ -225,7 +225,7 @@
   // conversation turn (the server answers it without extended thinking and kills the job when the
   // request is cancelled). `onId` hands the caller this request's broker id — the only handle a
   // later chat-cancel can name, since the waiter is keyed by it.
-  const PAC_CANCELLED='Cancelled · 已取消';   // == RELAY_CANCELLED in web/index.html (test/chat-cancel.test.mjs)
+  const PAC_CANCELLED='已取消 · Cancelled';   // == RELAY_CANCELLED in web/index.html (test/chat-cancel.test.mjs)
   const reqChat=(message,convoId,onEvent,attachments,label,system,assess,oneShot,onId,model)=> new Promise(res=>{ const id='pac'+(++_cid);   // model: ONE turn's lane (a summary's preferred agent lane, web/summary-images.inline.html), else the chooser's
     _wait[id]=(m)=>{ if(m.ev) onEvent(m.ev); if(m.done) res(m); }; if(onId) onId(id);
     // A turn that names its lane, or a oneShot (its lane is the server's one_shot_model), needs no list;
@@ -273,18 +273,18 @@
      LEFTOVER (e): 'Photo' is a noun of its own — an oversized camera-roll insert must not
      read as the generic "File", and must never read like a 401. */
   const PAC_NOUNS={
-    Message:{head:'Message too large · 消息过长',act:'Shorten it or remove an attachment, then send again · 请缩短内容或删除附件后重发'},
-    File:   {head:'File too large · 文件过大',   act:'Pick a smaller file · 请选择更小的文件'},
-    Photo:  {head:'Photo too large · 照片过大',  act:'Pick a smaller photo, or crop it · 请选择更小的照片或裁剪后重试'},
+    Message:{head:'消息过长 · Message too large',act:'请缩短内容或删除附件后重发 · Shorten it or remove an attachment, then send again'},
+    File:   {head:'文件过大 · File too large',   act:'请选择更小的文件 · Pick a smaller file'},
+    Photo:  {head:'照片过大 · Photo too large',  act:'请选择更小的照片或裁剪后重试 · Pick a smaller photo, or crop it'},
   };
   // The composer's ＋ delegates to PAPhoto; if the page never received that component there is
   // nothing to delegate to, and the user is told WHICH piece is missing rather than tapping a
   // button that does nothing. Reachable only on a page serving PAChat without PA_PHOTO_UI.
-  const PAC_NO_PHOTO='Photo upload unavailable · 无法上传照片 — the shared photo component did not load on this page · 本页未加载共享照片组件';
+  const PAC_NO_PHOTO='无法上传照片 · Photo upload unavailable — 本页未加载共享照片组件 · the shared photo component did not load on this page';
   const PAC_IMAGE_RE=/\.(jpe?g|png|heic|heif|gif|webp|bmp|tiff?|avif)$/i;   // == the shell's RELAY_IMAGE_RE
   const pacWhatForFile=name=>PAC_IMAGE_RE.test(String(name||''))?'Photo':'File';
   const pacTooLargeText=(what,bytes,limit)=>{ const n=PAC_NOUNS[what]||PAC_NOUNS.Message;
-    return n.head+(limit?' (max '+pacHuman(limit)+')':'')+(bytes?' — '+pacHuman(bytes)+' sent · 已发送':'')+'. '+n.act+'。'; };
+    return n.head+(limit?' (max '+pacHuman(limit)+')':'')+(bytes?' — 已发送 '+pacHuman(bytes)+' · '+pacHuman(bytes)+' sent':'')+'. '+n.act+'。'; };
   // Did this reply mean "too large"? Reads the machine-readable code first and falls back to
   // the 413 status, so it holds whichever of those the relay happens to forward (R14: no
   // pattern-matching on prose — a translated or reworded message must not turn into a silent
@@ -357,7 +357,7 @@
     if(a.skipped&&a.skipped.length) s+=' · skipped 跳过: '+a.skipped.map(x=>x.label||x.id).join(', ')+' (current model 当前模型)';
     return s; }
   function assessDeepMd(a){
-    if(a.state==='error') return '⚠ **Verify failed · 校验失败** — '+(a.error||'unknown error 未知错误')+'\n\n'+assessLine(a);   // explicit error, never a blank deep view (R5/R14)
+    if(a.state==='error') return '⚠ **校验失败 · Verify failed** — '+(a.error||'未知错误 · unknown error')+'\n\n'+assessLine(a);   // explicit error, never a blank deep view (R5/R14)
     return assessLine(a)+'\n\n---\n\n'+(a.summary||''); }
 
   // ── shared list helpers (day grouping + relative time) ──
@@ -367,7 +367,7 @@
   // which as a date is 1970 — a row must say it has no time rather than claim it was written then.
   function usableTs(ts){ const ms=Number(ts);
     if(!Number.isFinite(ms)||ms<=0) return 0; const d=new Date(ms); return Number.isFinite(d.getTime())?ms:0; }
-  function listDay(ts){ const ms=usableTs(ts); if(!ms) return 'No date · 无日期';
+  function listDay(ts){ const ms=usableTs(ts); if(!ms) return '无日期 · No date';
     const d=new Date(ms), now=new Date();
     const s=x=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime();
     const diff=Math.round((s(now)-s(d))/86400000);
@@ -494,18 +494,18 @@
     const host=document.createElement('div'); host.className='pac-drawerhost';
     host.innerHTML=
       '<div class="pac-list">'+
-        '<div class="pac-top"><div class="pac-title pac-dtitle" style="flex:1;text-align:left" role="button" tabindex="0" title="Collapse · 收起" aria-label="Collapse · 收起"></div>'+
+        '<div class="pac-top"><div class="pac-title pac-dtitle" style="flex:1;text-align:left" role="button" tabindex="0" title="收起 · Collapse" aria-label="收起 · Collapse"></div>'+
           (c.onNew?'<button class="pac-new pac-dnew" title="New chat 新对话">'+esc(c.newLabel||'＋')+'</button>':'')+
           (c.onNew2?'<button class="pac-new pac-dnew2" title="New note 新笔记">'+esc(c.newLabel2||'📝')+'</button>':'')+
           '<span class="pac-dhead"></span>'+   // PADrawerSummary mounts Summarize · 总结 here (owner 2026-11-11: the header shows ＋, Summarize and ⋯ only)
-          '<button class="pac-new pac-dmore" title="More · 更多" aria-label="More · 更多">⋯</button>'+
+          '<button class="pac-new pac-dmore" title="更多 · More" aria-label="更多 · More">⋯</button>'+
         '</div>'+
-        '<div class="pac-lsearch"><div class="pac-qwrap"><input class="pac-q" placeholder="Search · 搜索" autocomplete="off"><button type="button" class="pac-qx" aria-label="Clear · 清除" hidden>×</button></div><div class="pac-lsmsg"></div></div>'+
+        '<div class="pac-lsearch"><div class="pac-qwrap"><input class="pac-q" placeholder="搜索 · Search" autocomplete="off"><button type="button" class="pac-qx" aria-label="清除 · Clear" hidden>×</button></div><div class="pac-lsmsg"></div></div>'+
         (tabs?'<div class="pac-ltabs">'+tabs.map((t,i)=>'<button class="pac-ltab'+(i===0?' on':'')+'" data-t="'+esc(t.key)+'">'+esc(t.label)+'</button>').join('')+'</div>':'')+
         '<div class="pac-lrows"></div>'+
         '<div class="pac-lbulk"><span class="pac-lbulkn"></span>'+
-          '<button class="pac-lbulkx">Cancel · 取消</button>'+
-          '<button class="pac-lbulkdel" disabled>Delete · 删除</button></div>'+
+          '<button class="pac-lbulkx">取消 · Cancel</button>'+
+          '<button class="pac-lbulkdel" disabled>删除 · Delete</button></div>'+
       '</div>'+
       '<div class="pac-backdrop"></div>';
     document.body.appendChild(host);
@@ -576,11 +576,11 @@
         const picked=(_multi&&_picked.has(it.id))?' picked':'';
         const hit=hitFor(it,f), prev=(hit&&hit.snippet)||it.preview;   // a search hit shows WHERE the words are, not the page's first line
         return '<div class="pac-lrow'+(it.id===sel&&!_multi?' active':'')+picked+'" data-id="'+esc(it.id)+'">'+box+'<div class="pac-lic">'+esc(it.icon||'📝')+'</div><div class="pac-lbody">'+   // single highlight: at most ONE row (id===sel) is .active
-          '<div class="pac-lttl">'+(it.pin?'<span class="pac-lstar" aria-label="Bookmarked · 已收藏">★</span> ':'')+esc(window.PASummaryTitle?window.PASummaryTitle.displayTitle(it.title||''):(it.title||''))+'</div>'+   // TODO(R4 seam): row rendering → its own part; a saved summary's raw W title shows as its period title (display only)
+          '<div class="pac-lttl">'+(it.pin?'<span class="pac-lstar" aria-label="已收藏 · Bookmarked">★</span> ':'')+esc(window.PASummaryTitle?window.PASummaryTitle.displayTitle(it.title||''):(it.title||''))+'</div>'+   // TODO(R4 seam): row rendering → its own part; a saved summary's raw W title shows as its period title (display only)
           (prev?'<div class="pac-lprev">'+esc(prev)+'</div>':'')+
           '<div class="pac-lmeta">'+(it.chip?'<span class="pac-lchip">'+esc(it.chip)+'</span>':'')+(tags?tags.chips(it):'')+
           (hit?'<span class="pac-lchip pac-lwhere">'+esc(whereLabel(hit.where))+'</span>':'')+
-          (it.ai?'<span class="pac-lai" title="Has an AI conversation · 有 AI 对话" aria-label="Has an AI conversation">✨</span>':'')+'<span class="pac-ltime">'+listTime(sortTs(it))+'</span></div>'+
+          (it.ai?'<span class="pac-lai" title="有 AI 对话 · Has an AI conversation" aria-label="Has an AI conversation">✨</span>':'')+'<span class="pac-ltime">'+listTime(sortTs(it))+'</span></div>'+
           '</div>'+menu+'</div>';
       };
       rows.innerHTML=groups?groups.html(shown,rowHtml,!!f):dayHtml(shown,rowHtml);   // grouped (plan H) when the component is on the page; a search stays the day list
@@ -616,7 +616,7 @@
       // Bookmark · 收藏 (plan D): a reader's mark, kept in the row's own app data, never in the note.
       // Offered only on a row with an onPin, exactly as Rename is; the label reads the same `pin`
       // flag the ★ before the title does. TODO(R4 seam): buildDrawer → web/drawer-ui.inline.html.
-      if(it.onPin) acts.push({ label:it.pin?'Unbookmark · 取消收藏':'Bookmark · 收藏',
+      if(it.onPin) acts.push({ label:it.pin?'取消收藏 · Unbookmark':'收藏 · Bookmark',
         run:async()=>{ await it.onPin(!it.pin); } });
       // Offered ONLY on a row that has one — the ✨ badge and this entry read the same flag, so
       // the menu can never promise to delete a conversation that is not there.
@@ -639,7 +639,7 @@
     // broadcasts it back, so the choice survives a reload and holds across every app's drawer.
     // The ⋯ sheet's entry says what a tap DOES (the other order), bilingual like every label here: a menu
     // entry that read the current state and toggled it was two things at once.
-    const SORT_TXT={ updated:'Sort by date created · 按创建时间排序', created:'Sort by last edited · 按修改时间排序' };   // keyed by the CURRENT order
+    const SORT_TXT={ updated:'按创建时间排序 · Sort by date created', created:'按修改时间排序 · Sort by last edited' };   // keyed by the CURRENT order
     function applySort(v,quiet){ _sortBy=(v==='created')?'created':'updated'; if(!quiet) draw(); }
     // STORED ON THE SERVER, per app — not in this device's localStorage. A journal read on a
     // laptop and an iPad is one journal, and a list that sorts differently depending on which
@@ -655,12 +655,12 @@
       // REVERT on a refused write. The order lives on the server now, so a refusal means the setting did
       // not change — leaving the list in the new order would show a preference that does not exist and
       // would come back the other way on the next device. The reason goes under the box (R5).
-      if(r&&r.ok===false){ applySort(was); if(smsg) smsg.textContent='Not saved · 未保存'+(r.error?' — '+r.error:''); }
+      if(r&&r.ok===false){ applySort(was); if(smsg) smsg.textContent='未保存 · Not saved'+(r.error?' — '+r.error:''); }
     }
     // The header's ONE ⋯ sheet (owner, 2026-11-11): Sort, Select, Refresh, then the components' entries (Show hidden · 显示隐藏).
     // TODO(R4 seam): grows this over-budget file by six lines; the seam is buildDrawer → web/drawer-ui.inline.html.
     async function moreMenu(anchor){
-      const acts=[{label:SORT_TXT[_sortBy],run:toggleSort},{label:_multi?'Done · 完成':'Select · 多选',run:()=>setMulti(!_multi)},{label:'Refresh · 刷新',run:()=>refresh(true)}].concat(tags?tags.menu():[]);
+      const acts=[{label:SORT_TXT[_sortBy],run:toggleSort},{label:_multi?'完成 · Done':'多选 · Select',run:()=>setMulti(!_multi)},{label:'刷新 · Refresh',run:()=>refresh(true)}].concat(tags?tags.menu():[]);
       const pick=await pacSheet(host,acts.map(a=>({label:a.label})),anchor); if(pick==null||!acts[pick]) return;
       await acts[pick].run(); }
     const moreBtn=q('.pac-dmore'); if(moreBtn) moreBtn.onclick=()=>moreMenu(moreBtn);
@@ -678,7 +678,7 @@
     }
     function syncBulk(){
       const n=_picked.size;
-      bulkN.textContent = n ? `${n} selected · 已选 ${n}` : 'Tap to select · 点击选择';
+      bulkN.textContent = n ? `已选 ${n} · ${n} selected` : '点击选择 · Tap to select';
       bulkDel.disabled = !n;
     }
     function setMulti(on){
@@ -707,7 +707,7 @@
       _picked.clear(); failed.forEach((id)=>_picked.add(id));
       await refresh();
       if(failed.length){
-        bulkN.textContent=`${ok} deleted, ${failed.length} failed · 已删除 ${ok}，失败 ${failed.length}`;
+        bulkN.textContent=`已删除 ${ok}，失败 ${failed.length} · ${ok} deleted, ${failed.length} failed`;
         bulkDel.disabled=false;
       } else { setMulti(false); }
     }
@@ -838,10 +838,10 @@
   function render(host){
     host.classList.add('pac');
     host.innerHTML=
-      '<div class="pac-top"><button class="pac-tbtn pac-toList" title="Notes & Chats · 笔记与对话" aria-label="Notes & Chats · 笔记与对话">☰</button><div class="pac-title"></div><button class="pac-new pac-newC" title="New chat">＋</button><button class="pac-new pac-close" title="Close" style="display:none">✕</button></div>'+
+      '<div class="pac-top"><button class="pac-tbtn pac-toList" title="笔记与对话 · Notes & Chats" aria-label="笔记与对话 · Notes & Chats">☰</button><div class="pac-title"></div><button class="pac-new pac-newC" title="New chat">＋</button><button class="pac-new pac-close" title="Close" style="display:none">✕</button></div>'+
       '<div class="pac-log"></div>'+
       '<button class="pac-scroll" title="Scroll to bottom">↓</button>'+
-      '<div class="pac-row"><div class="pac-chips"></div><div class="pac-pills"><button class="pac-model" style="display:none"></button><button class="pac-vfy" title="Verify with multiple models · 多模型校验">☐ Verify · 校验</button></div><div class="pac-frow">'+
+      '<div class="pac-row"><div class="pac-chips"></div><div class="pac-pills"><button class="pac-model" style="display:none"></button><button class="pac-vfy" title="多模型校验 · Verify with multiple models">校验 · ☐ Verify</button></div><div class="pac-frow">'+
         '<button class="pac-plus" title="Attach a photo">＋</button>'+
         '<textarea class="pac-inp" rows="1" autocomplete="off"></textarea>'+
         '<button class="pac-go" title="Send">↑</button>'+
@@ -920,7 +920,7 @@
       el.log.appendChild(bar); pin(); updateScroll();
     }
     // ── Verify · 校验 chip row under an AI bubble. state 'pending' → a plain
-    //    "Verifying · 校验中" chip + a background poll of the convo (10s→30s backoff, deadline
+    //    "校验中 · Verifying" chip + a background poll of the convo (10s→30s backoff, deadline
     //    from the server-declared timeout — passing it SURFACES the missing result, R14);
     //    terminal → [Fast · 快速][Deep ×N · 多模型] switch swapping the bubble content. ──
     function addAssessRow(bubble, fastMd, a0, convoId){
@@ -929,10 +929,10 @@
       const chip=(label,tag)=>{ const b=document.createElement(tag||'button'); b.className='pac-vchip'; b.textContent=label; bar.appendChild(b); return b; };
       const show=(v)=>{ if(view===v) return; view=v; draw(); if(bubble.isConnected) paint(bubble, v==='deep'?assessDeepMd(cur):fastMd); };
       function draw(){ bar.innerHTML='';
-        if(cur.state==='pending'){ chip('⏳ Verifying · 校验中','span').classList.add('pend'); return; }
-        if(cur.state==='timeout'){ chip('⚠ Verify timed out · 校验超时','span').classList.add('pend'); return; }
+        if(cur.state==='pending'){ chip('校验中 · ⏳ Verifying','span').classList.add('pend'); return; }
+        if(cur.state==='timeout'){ chip('⚠ 校验超时 · Verify timed out','span').classList.add('pend'); return; }
         const n=(cur.models||[]).filter(x=>x.ok).length;
-        const bf=chip('Fast · 快速'), bd=chip(cur.state==='error'?'⚠ Verify failed · 校验失败':'Deep ×'+n+' · 多模型');
+        const bf=chip('快速 · Fast'), bd=chip(cur.state==='error'?'⚠ 校验失败 · Verify failed':'Deep ×'+n+' · 多模型');
         bf.classList.toggle('on',view==='fast'); bd.classList.toggle('on',view==='deep');
         bf.onclick=()=>show('fast'); bd.onclick=()=>show('deep'); }
       async function poll(){ let wait=10000;
@@ -1019,7 +1019,7 @@
     // ('_verify' is reserved: apps must not use it as a thread scope key.) Apps without
     // opts.persist degrade to session-only — the toggle resets when the app reloads.
     let verifyOn=false;
-    const renderVerify=()=>{ el.vfy.textContent=(verifyOn?'☑':'☐')+' Verify · 校验'; el.vfy.classList.toggle('on',verifyOn); };
+    const renderVerify=()=>{ el.vfy.textContent=(verifyOn?'☑':'☐')+' 校验 · Verify'; el.vfy.classList.toggle('on',verifyOn); };
     window.PANewDot.mark(el.vfy,'verify-toggle');   // buffered if the shell's prefs push hasn't arrived yet
     loadMap().then(mp=>{ if(mp&&mp._verify===true){ verifyOn=true; renderVerify(); } });
     async function saveVerify(){ if(!opts.persist) return; await loadMap();   // never write before the read finished (a racing save would drop the stored map)
@@ -1153,7 +1153,7 @@
         else if(failure){ thinking.className='pac-m status'; thinking.textContent='⚠ '+failure; }
         else { thinking.textContent='No response — try rephrasing.'; thinking.classList.remove('pac-md'); }   // plain text again: pre-wrap back on
       }catch(err){ clearTimeout(_rt); clearInterval(_elTimer); thinking.className='pac-m status';
-        thinking.textContent='⚠ Could not send · 发送失败 — '+((err&&err.message)||'unknown error 未知错误')+'. Your message is in the bubble above; copy it before retrying.'; }
+        thinking.textContent='⚠ 发送失败 · Could not send — '+((err&&err.message)||'unknown error 未知错误')+'. Your message is in the bubble above; copy it before retrying.'; }
       finally{ clearInterval(_elTimer); sending=false; el.go.disabled=false; pin(); updateScroll(); }
       return true;                              // the turn RAN — its outcome is in the log above
     }
@@ -1164,9 +1164,9 @@
     //    here and by PAChat.listDrawer. It merges this app's chats (app-convos, 🤖) with the
     //    host's augmented notes (opts.listAugment, ✏️). Selecting a row keeps the drawer open. ──
     const drawer=buildDrawer({
-      title:'Notes & Chats · 笔记与对话', newLabel:'＋', onNew:newChat,
+      title:'笔记与对话 · Notes & Chats', newLabel:'＋', onNew:newChat,
       onNew2:opts.onNewNote||null, newLabel2:'📝',
-      tabs:[{key:'all',label:'All · 全部'},{key:'notes',label:'Notes · 笔记'},{key:'chats',label:'Chats · 对话'}],
+      tabs:[{key:'all',label:'全部 · All'},{key:'notes',label:'笔记 · Notes'},{key:'chats',label:'对话 · Chats'}],
       activeId:()=>_sel, summary:opts.summary,   // summary: the host's period-summary hooks (plan E)
       items:async()=>{
         let convos=[]; try{ const r=await req({kind:'app-convos'}); convos=(r&&r.ok&&r.convos)||[]; }catch{ convos=[]; }   // R5: empty on failure → drawer shows "Nothing here yet"
@@ -1258,7 +1258,7 @@
         // PAPhoto answers with an outcome for every failure it knows about, so a THROW here is a
         // bug in it — and a bug must still reach the user rather than an unhandled rejection (R5).
         try{ up=await window.PAPhoto.upload(f,{what:pacWhatForFile(f.name)}); }
-        catch(err){ up={ok:false,text:'Could not read that file · 无法读取该文件 — '+((err&&err.message)||'unknown error 未知错误')}; }
+        catch(err){ up={ok:false,text:'无法读取该文件 · Could not read that file — '+((err&&err.message)||'unknown error 未知错误')}; }
         if(up.ok){ atts.push({name:f.name,path:up.path,thumb:up.dataUrl}); renderChips(); }
         else{ addMsg('status','⚠ '+up.text); updateScroll(); }
       } };
@@ -1375,11 +1375,11 @@
       const answer=reqChat(String(message||''),c.convoId||null,(ev)=>{
         if(ev.type==='convo'&&ev.id) convoId=ev.id;
         if(ev.type==='delta') acc+=ev.text||'';
-        if(ev.type==='done'){ if(ev.ok===false) failure=ev.text||ev.error||'failed · 失败'; else fin=ev.text||''; }
-        if(ev.type==='error'||(ev.ok===false&&ev.type!=='done')) failure=ev.text||ev.error||'failed · 失败'; },
+        if(ev.type==='done'){ if(ev.ok===false) failure=ev.text||ev.error||'失败 · failed'; else fin=ev.text||''; }
+        if(ev.type==='error'||(ev.ok===false&&ev.type!=='done')) failure=ev.text||ev.error||'失败 · failed'; },
         c.attachments,c.label,c.system,undefined,true,(id)=>{ chatId=id; }).then(r=>{
-        const f=failure||(r&&r.ok===false?(r.text||r.error||'failed · 失败'):''), text=f?'':(fin||acc);
-        return {ok:!f&&!!text.trim(),text,error:f||(text.trim()?'':'No response · 无回答'),convoId}; });
+        const f=failure||(r&&r.ok===false?(r.text||r.error||'失败 · failed'):''), text=f?'':(fin||acc);
+        return {ok:!f&&!!text.trim(),text,error:f||(text.trim()?'':'无回答 · No response'),convoId}; });
       if(!sig) return answer;
       const stopped=new Promise(res=>{ onAbort=()=>{ req({kind:'chat-cancel',chatId}); res(cancelled()); }; sig.addEventListener('abort',onAbort,{once:true}); });
       return Promise.race([answer,stopped]).then(r=>{ sig.removeEventListener('abort',onAbort); return r; }); },
@@ -1402,7 +1402,7 @@
     failText:(reply,o)=>{ const c=o||{}, what=c.what||'File', lim=pacTooLargeLimit(reply);
       if(reply&&typeof reply.text==='string'&&reply.text) return reply.text;
       if(lim) return pacTooLargeText(what,c.bytes||0,lim);
-      return (reply&&reply.error)||'Request failed · 请求失败 — no reason given · 未给出原因'; },
+      return (reply&&reply.error)||'请求失败 · Request failed — 未给出原因 · no reason given'; },
     // One call gives any app the SAME full-screen "Ask AI": a fixed, full-height
     // overlay whose composer owns the bottom safe-area, with ✕ to close. The app
     // just calls .open(key) when its Ask-AI entry point is invoked; .hide()/.show()

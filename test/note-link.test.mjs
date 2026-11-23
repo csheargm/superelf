@@ -175,11 +175,11 @@ test('MUTATION: without the rule in cleanInto, a javascript: href survives — t
 
 // ── Wiring the user flow depends on ──────────────────────────────────────────────────────────
 test('the Link button sits with the format buttons, titled bilingually, and never uses prompt()', () => {
-  assert.match(ENGINE, /data-cmd="strikeThrough"[^\n]*\n\s*'<button class="pan-fmtbtn pan-flink" title="Link · 链接" aria-label="Link">'\+ico\('link'\)/);
+  assert.match(ENGINE, /data-cmd="strikeThrough"[^\n]*\n\s*'<button class="pan-fmtbtn pan-flink" title="链接 · Link" aria-label="Link">'\+ico\('link'\)/);
   assert.match(ENGINE, /'<div class="pan-linkpop">'\+\s*'<input class="pan-linkurl"/, 'an address field of its own, under the button');
   const code = ENGINE.split('\n').filter((l) => !/^\s*(\/\/|\/\*|\*)/.test(l)).join('\n');
   assert.doesNotMatch(code, /\bprompt\(/, 'prompt() returns null in the sandbox (no allow-modals)');
-  for (const k of ['select', 'bad', 'failed', 'noShell']) assert.match(G.LINK_TXT[k], / · .*[一-鿿]/, `${k} is bilingual`);
+  for (const k of ['select', 'bad', 'failed', 'noShell']) assert.match(G.LINK_TXT[k], /^[^A-Za-z]*[一-鿿][^·]* · [A-Za-z]/, `${k} is bilingual`);
 });
 
 test('the read-state tap asks the SHELL, synchronously, with the checked href', () => {

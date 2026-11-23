@@ -110,12 +110,12 @@ body{display:flex;flex-direction:column}
 </head>
 <body>
 <div id="nav">
-  <button class="ch-btn" id="log-btn" title="Notes & Chats · 笔记与对话" aria-label="Notes & Chats · 笔记与对话">☰</button>
+  <button class="ch-btn" id="log-btn" title="笔记与对话 · Notes & Chats" aria-label="笔记与对话 · Notes & Chats">☰</button>
   <select id="book-sel"></select>
-  <select id="ch-label" aria-label="Chapter · 章"></select>
+  <select id="ch-label" aria-label="章 · Chapter"></select>
 <button class="ch-btn" id="search-btn" title="Search">🔍</button>
 <button class="ch-btn" id="daily-btn" title="今日晨读 Daily Reading">☀️</button>
-<span id="top-panes"><button class="top-pane" id="top-mark" data-short="高亮" disabled></button><button class="top-pane" id="top-note" data-short="笔记" aria-pressed="false" title="Note · 笔记" aria-label="Note · 笔记">Note · 笔记</button><button class="top-pane" id="top-ai" data-short="问AI" aria-pressed="false" title="Ask AI · 问一问" aria-label="Ask AI · 问一问">Ask AI · 问一问</button></span>
+<span id="top-panes"><button class="top-pane" id="top-mark" data-short="高亮" disabled></button><button class="top-pane" id="top-note" data-short="笔记" aria-pressed="false" title="笔记 · Note" aria-label="笔记 · Note">笔记 · Note</button><button class="top-pane" id="top-ai" data-short="问AI" aria-pressed="false" title="问一问 · Ask AI" aria-label="问一问 · Ask AI">问一问 · Ask AI</button></span>
 </div>
 <div id="daily-banner"></div>
 <!-- The one persistent failure surface. Fixed and above every overlay on purpose — see the
@@ -123,7 +123,7 @@ body{display:flex;flex-direction:column}
 <div id="pa-notice" class="pa-notice"></div>
 <div id="search-overlay">
   <div id="search-bar">
-    <input id="search-inp" placeholder="Search verses · 搜索经文 (EN or 中文)" autocomplete="off">
+    <input id="search-inp" placeholder="搜索经文 · Search verses (中文 or EN)" autocomplete="off">
     <button id="search-go" class="ch-btn">🔍</button>
     <button id="search-close" class="ch-btn">✕</button>
   </div>
@@ -133,7 +133,7 @@ body{display:flex;flex-direction:column}
 
 
 
-<button id="back-chat">‹ Back to chat · 返回对话</button>
+<button id="back-chat">返回对话 · ‹ Back to chat</button>
 
 <!--PA_CHAT_UI-->
 <!--PA_NOTE_UI-->
@@ -159,7 +159,7 @@ function paLoad(path){ return new Promise(res=>{ const id=++_id; _wait[id]=res; 
 // of it was rejected in total silence. It also had no deadline. The ok-vs-not rule and the
 // deadline both live in PANote (R3 — one definition shared by every app).
 function paSave(path,data){ return new Promise(res=>{ const id=++_id;
-  const t=setTimeout(()=>{ delete _wait[id]; res({ok:false,error:'save timed out · 保存超时'}); },PANote.SAVE_TIMEOUT_MS);
+  const t=setTimeout(()=>{ delete _wait[id]; res({ok:false,error:'保存超时 · save timed out'}); },PANote.SAVE_TIMEOUT_MS);
   _wait[id]=m=>{ clearTimeout(t); res(PANote.saveOutcome(m)); };
   parent.postMessage({pa:'req',id,kind:'save-data',path,data},'*'); }); }
 // Image IO for PANote's optional photo hooks — bytes go through the shell (uploads/ store),
@@ -212,7 +212,7 @@ const LOAD_TIMEOUT_MS=20000;
 const PA_LOAD=PANote.LOAD;
 const PA_ST=PA_LOAD.STATUS;
 // The refusal a REPLACE-ONLY write gets when this session never established what the path holds.
-const PA_UNKNOWN='not read this session · 本次未读取 — refusing to replace it 拒绝覆盖';
+const PA_UNKNOWN='本次未读取 · not read this session — refusing to replace it 拒绝覆盖';
 // io = { load(path)->Promise<brokerReply>, save(path,text)->Promise<{ok,error}>, now?, timeoutMs? }
 function makeReader(io){
   const timeoutMs=io.timeoutMs||LOAD_TIMEOUT_MS;
@@ -251,15 +251,15 @@ function makeReader(io){
   async function read(path,opts){
     const o=opts||{};
     const m=await deadline(io.load(path));
-    if(m&&m.__late) return fail(path,'read timed out · 读取超时','timeout');
+    if(m&&m.__late) return fail(path,'读取超时 · read timed out','timeout');
     const out=PA_LOAD.fromBroker(m);
     if(out.status===PA_ST.loaded) return ok(path,out);
     // Every non-loaded outcome that is not a PROVEN absence is a failure — including a reply that
     // carried no code at all, which is what the shell used to send for a 401/500/network drop.
     if(out.status===PA_ST.failed) return fail(path,out.error,out.code);
-    if(o.mustExist) return fail(path,'listed but missing · 已列出却读不到 — refusing to recreate it 拒绝重建','vanished');
+    if(o.mustExist) return fail(path,'已列出却读不到 · listed but missing — refusing to recreate it 拒绝重建','vanished');
     return (await absentEarned(path)) ? ok(path,out)
-      : fail(path,'a previous version exists · 存在旧版本 — refusing to start blank 拒绝以空白开始','bak_present');
+      : fail(path,'存在旧版本 · a previous version exists — refusing to start blank 拒绝以空白开始','bak_present');
   }
   // EVERY write goes through here: a path we could not READ is a path we must not WRITE.
   // opts = { replaces:true   this write DESTROYS whatever the path currently holds (a page file,
@@ -410,7 +410,7 @@ function migrateKeys(o){ const out={}; for(const k of Object.keys(o)) out[/^[0-9
 // Draws are vector JSON: draws[k] is the whole PANote notebook, inline in the chapter file.
 // Deliberate: no PNG back-compat — old bitmap draws are discarded, not migrated.
 function vectorDraws(o){ const out={}; for(const k of Object.keys(o)) if(o[k]&&typeof o[k]==='object') out[k]=o[k]; return out; }
-const CH_UNREADABLE='Chapter notes unreadable · 本章笔记无法读取';
+const CH_UNREADABLE='本章笔记无法读取 · Chapter notes unreadable';
 // Bilingual message prefixes and the two non-path notice keys — one source each (R3).
 const PHOTO_FAILED=PANote.PHOTO_TXT.failed;
 const NOTES_LIST_KEY='notes-list';      // the server listing, not an app-data path
@@ -468,7 +468,7 @@ async function readChapterOrRefuse(bi,ch){
   // rule the reader applies everywhere, stated once here so rename/delete cannot forget it.
   const rd=await DATA.read(chapterFile(bi,ch),{mustExist:true});
   if(rd.status===DATA.ST.loaded){ paNoticeOk(chapterFile(bi,ch)); return (rd.data&&typeof rd.data==='object')?rd.data:{}; }
-  annNotice('Cannot read that chapter · 无法读取该章 — '+rd.error+' — no changes made 未做改动','',chapterFile(bi,ch));
+  annNotice('无法读取该章 · Cannot read that chapter — '+rd.error+' — no changes made 未做改动','',chapterFile(bi,ch));
   return null;
 }
 
@@ -584,7 +584,7 @@ async function saveGen(){ const r=await DATA.write(GEN_PATH, JSON.stringify(GEN)
 async function loadGen(){
   const r=await DATA.read(GEN_PATH);
   if(r.status===DATA.ST.loaded){ const o=r.data||{}; GEN={note:o.note||'',chat:o.chat}; paNoticeOk(GEN_PATH); return; }
-  if(r.status===DATA.ST.failed) annNotice('General note unreadable · 通用笔记无法读取 — '+r.error+' — writes blocked 已停止写入','',GEN_PATH);
+  if(r.status===DATA.ST.failed) annNotice('通用笔记无法读取 · General note unreadable — '+r.error+' — writes blocked 已停止写入','',GEN_PATH);
 }
 function scopeRef(){ const [en]=BOOKS[bookIdx];
   if(!selV.size) return 'Bible 圣经';
@@ -594,10 +594,10 @@ function scopeRef(){ const [en]=BOOKS[bookIdx];
 const TITLE_WORDS=5;   // words of the first selected verse shown after its reference in a note title
 // A pane / note title: the book + chapter it was opened from, or the verse ref + its first words.
 function scopeTitle(){ const [en,zh]=BOOKS[bookIdx];
-  if(!selV.size) return `${en} \u00b7 ${zh} ${chapter}`;
+  if(!selV.size) return `${zh} ${chapter} \u00b7 ${en}`;
   const v=(typeof VERSES!=='undefined'&&VERSES||[]).find(x=>x.n===Math.min(...selV));
   const w=v&&v.en?String(v.en).split(/\s+/).filter(Boolean):[];
-  return `${en} \u00b7 ${zh} `+scopeRef().slice(en.length+1)+(w.length?' \u2014 '+w.slice(0,TITLE_WORDS).join(' ')+(w.length>TITLE_WORDS?'\u2026':''):''); }
+  return `${zh} `+scopeRef().slice(en.length+1)+` \u00b7 ${en}`+(w.length?' \u2014 '+w.slice(0,TITLE_WORDS).join(' ')+(w.length>TITLE_WORDS?'\u2026':''):''); }
 function scopeCtx(){ if(!selV.size) return 'the whole Bible (the user may ask about any book, passage, or topic)'; const [en,zh]=BOOKS[bookIdx]; const r=scopeRef().slice(en.length+1); return `${en} (${zh}) ${r}`; }
 function annotatedVerses(){ const s=new Set();
   for(const src of [ANN.notes,ANN.draws,ANN.chat,ANN.marks,ANN.ink]) for(const k of Object.keys(src||{})) versesOfKey(k).forEach(n=>s.add(n));
@@ -607,7 +607,7 @@ function annotatedVerses(){ const s=new Set();
 const bookSel=document.getElementById('book-sel');
 BOOKS.forEach(([en,zh],i)=>{
   const o=document.createElement('option');
-  o.value=i; o.textContent=`${en} · ${zh}`;
+  o.value=i; o.textContent=`${zh} · ${en}`;
   bookSel.appendChild(o);
 });
 bookSel.value=bookIdx;
@@ -618,7 +618,7 @@ bookSel.onchange=()=>{ bookIdx=+bookSel.value; chapter=1; load(); };
 // Clear; the Bible only lends DATA, the book names and the jump. Restored before the first load() unless a
 // #b<book>c<chapter> hash asked for a chapter; recorded on every chapter whose text loaded.
 // TODO(R4 seam): this wiring and the search block → bible/host-search.js when this file is split.
-const SEARCH_HINT='<div class="sl-hint">Type to search verses · 输入以搜索经文</div>';
+const SEARCH_HINT='<div class="sl-hint">输入以搜索经文 · Type to search verses</div>';
 const RH=PAReadingHistory.attach({ store:{read:(p)=>DATA.read(p),write:(p,t)=>DATA.write(p,t,{replaces:true})}, ST:DATA.ST,
   bookName:(b)=>BOOKS[b]&&{en:BOOKS[b][0],zh:BOOKS[b][1]}, notice:(m,k)=>annNotice(m,'',k), noticeOk:paNoticeOk,
   onPick:(b,c)=>{ document.getElementById('search-overlay').classList.remove('on'); bookIdx=b; chapter=Math.min(c,BOOKS[b][2]); bookSel.value=b; load(); } });
@@ -652,12 +652,12 @@ async function runSearch(){
   const r=await paSearch(q);
   // A search that FAILED is not a search with no hits — "No results." for a 401/500/dropped
   // connection is the same lie one level up (V6 re-audit). Say which one it was.
-  if(!(r&&r.ok)){ box.innerHTML='<div style="padding:14px;color:var(--muted)">Search failed · 搜索失败 — '+esc((r&&r.error)||'try again 请重试')+'</div>'; return; }
+  if(!(r&&r.ok)){ box.innerHTML='<div style="padding:14px;color:var(--muted)">搜索失败 · Search failed — '+esc((r&&r.error)||'try again 请重试')+'</div>'; return; }
   const all=Array.isArray(r.results)?r.results:((r.results&&r.results.hits)||[]), hits=all.slice(0,60), more=all.length>60||!!(r.results&&r.results.more);   // lib/bible.mjs bibleSearchWire: an array, one past the 60 cap when there is more
-  if(!hits.length){ box.innerHTML='<div style="padding:14px;color:var(--muted)">No results · 无结果</div>'; return; }
+  if(!hits.length){ box.innerHTML='<div style="padding:14px;color:var(--muted)">无结果 · No results</div>'; return; }
   const re=q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   box.innerHTML=hits.map(v=>{
-    const label=`${BOOKS[v.book-1]?BOOKS[v.book-1][0]+' · '+BOOKS[v.book-1][1]:''} ${v.chapter}:${v.verse}`;
+    const label=`${BOOKS[v.book-1]?BOOKS[v.book-1][1]+' · '+BOOKS[v.book-1][0]:''} ${v.chapter}:${v.verse}`;
     const txt=esc(v.text).replace(new RegExp('('+re+')','gi'),'<mark>$1</mark>');
     return `<div class="sr" data-b="${v.book}" data-c="${v.chapter}" data-v="${v.verse}"><div class="sr-ref">${esc(label)}</div><div class="sr-txt">${txt}</div></div>`;
   }).join('')+(more?'<div style="padding:14px;color:var(--muted)">仅显示前 '+hits.length+' 条，再加一个词可缩小范围 · Showing the first '+hits.length+' — add a word to narrow it</div>':'');
@@ -701,7 +701,7 @@ async function load(){
   const timeout=new Promise(res=>setTimeout(()=>res(null),10000));
   const r=await Promise.race([paBible(bookIdx+1, chapter), timeout]);
   if(g!==_loadSeq) return false;                         // superseded while the text loaded: never paint an old chapter or its timeout over the new one
-  if(!r){ wrap.innerHTML='<div id="loading">Could not load · 无法加载 — check the connection and retry 请检查网络后重试</div>'; return; }
+  if(!r){ wrap.innerHTML='<div id="loading">无法加载 · Could not load — 请检查网络后重试 · check the connection and retry</div>'; return; }
   const vs=(r.ok&&r.data&&r.data.verses)?r.data.verses:[];
   renderVerses(vs); if(vs.length&&g===_loadSeq&&b0===bookIdx&&c0===chapter) RH.record(b0,c0);   // a superseded load never records
 }
@@ -713,7 +713,7 @@ function hasAnnotation(n, set){ return (set||annotatedVerses()).has(n); }
 function renderVerses(verses){
   const wrap=document.getElementById('verses');
   if(!verses.length){
-    wrap.innerHTML='<div id="loading">Could not load · 无法加载 — try again 请重试</div>'; return;
+    wrap.innerHTML='<div id="loading">无法加载 · Could not load — 请重试 · try again</div>'; return;
   }
   wrap.innerHTML='';
   VERSES=verses;
@@ -830,9 +830,9 @@ async function topToggle(k,openIt){
 TOP.note.onclick=()=>topToggle('note',()=>openPanel('note'));
 TOP.chat.onclick=()=>topToggle('chat',()=>{ hideBackPill(); return askAI(); });   // rail when there is room, full-screen chat otherwise
 if(typeof PATips!=='undefined'){   // first-use tips (ADR 0030); a bare global so a host harness can supply it
-  PATips.register({id:'bible-top-panes',anchor:()=>TOP.note,text:'Note and Ask AI open here; float or maximise from the pane header · 笔记和问一问在这里打开；可在面板标题栏浮动或最大化'});
-  PATips.register({id:'bible-highlight',anchor:()=>document.getElementById('top-mark'),text:'Select verses or words, then tap to highlight or underline · 选中经文或词语，点此高亮或划线'});
-  PATips.register({id:'bible-history',anchor:()=>document.getElementById('search-btn'),text:'Your reading history is in Search · 阅读历史在搜索里'});
+  PATips.register({id:'bible-top-panes',anchor:()=>TOP.note,text:'笔记和问一问在这里打开；可在面板标题栏浮动或最大化 · Note and Ask AI open here; float or maximise from the pane header'});
+  PATips.register({id:'bible-highlight',anchor:()=>document.getElementById('top-mark'),text:'选中经文或词语，点此高亮或划线 · Select verses or words, then tap to highlight or underline'});
+  PATips.register({id:'bible-history',anchor:()=>document.getElementById('search-btn'),text:'阅读历史在搜索里 · Your reading history is in Search'});
 }
 
 // ── Panel ──
@@ -882,7 +882,7 @@ async function openDrawFull(forceKey,forceTitle,rowId,at){
     // Title from the note's own content where it has some, so reopening shows what the drawer says.
     paintNoteTitle(forceKey?(forceTitle||freeNoteTitle(forceKey)):noteTitleFor(scopeKey(),ANN.draws[scopeKey()]));
   });
-  if(r&&!r.ok) annNotice('Previous drawing not saved · 上一幅未保存 — reopen it to retry 请重新打开重试','',from);
+  if(r&&!r.ok) annNotice('上一幅未保存 · Previous drawing not saved — reopen it to retry 请重新打开重试','',from);
   // The id of the ROW THAT WAS CLICKED wins over a re-derived one. A chat row works because
   // openConvo records the row's own id; a note row used to re-compute the identity from selV /
   // _drawScope and overwrite the drawer's correct record with it. Two places deriving one fact
@@ -915,7 +915,7 @@ async function openNewDrawNote(key){               // key: a note the caller alr
   // placeholder here is what made six notes all read "New Note". Format mirrors freeStamp
   // and is pinned by test/bible-note-title.test.mjs.
   const r=await drawPad.open(()=>{ _drawScope=freeKey; drawPad.setTitle(freeNoteTitle(freeKey)); });
-  if(r&&!r.ok) annNotice('Previous drawing not saved · 上一幅未保存 — reopen it to retry 请重新打开重试','',from);
+  if(r&&!r.ok) annNotice('上一幅未保存 · Previous drawing not saved — reopen it to retry 请重新打开重试','',from);
   // Use the explicit note ID so the drawer highlights this new entry, not the general slot.
   chatUI().setActiveNote(`file:${bookIdx}:${chapter}:${freeKey}`);
 }
@@ -985,7 +985,7 @@ function convoIdFor(k){ return k==='general' ? GEN.chat : (ANN.chat||{})[k]; }
 // full-screen chat opens exactly as it does today.
 const EXPLAIN_PROMPT_BODY='Answer briefly first.\n\n'
   +'FIRST REPLY — 1–2 plain sentences saying what this verse means, then one short line offering more: '
-  +'"Ask for more · 想深入可以问我". Nothing else. No headings, no lists, no background. '
+  +'"想深入可以问我 · Ask for more". Nothing else. No headings, no lists, no background. '
   +'Do NOT include anything from the section below in this first reply.\n\n'
   +'ONLY IF I ASK FOR MORE — answer under the heading `详解 Details`:\n'
   +'1. 历史背景 Context — who is speaking, to whom, when, and what is happening around it.\n'
@@ -1034,7 +1034,7 @@ const chatUI=()=>railChat||aiChat;
 // run note's page 0 text, write the whole object back (every other key kept as read). Not loaded = not written (R5).
 async function summaryOffChapter(b,ch,key,html){
   const p=`notes/${b+1}-${ch}.json`, r=await DATA.read(p);
-  if(r.status!==DATA.ST.loaded||!r.data) return {ok:false,error:'that chapter could not be read · 无法读取该章'};
+  if(r.status!==DATA.ST.loaded||!r.data) return {ok:false,error:'无法读取该章 · that chapter could not be read'};
   const o=r.data, d=o.draws&&o.draws[key]; if(!d||!Array.isArray(d.pages)||!d.pages.length) return {ok:false,gone:true};
   const now=Date.now(); o.draws[key]=Object.assign({},d,{updated:now,pages:[Object.assign({},d.pages[0],{updated:now,pageHtml:html})].concat(d.pages.slice(1))});
   const w=await saveAnnAt(p,JSON.stringify(o)); return w&&w.ok?{ok:true,key,id:`file:${b}:${ch}:${key}`}:(w||{ok:false,error:'not saved'}); }
@@ -1119,7 +1119,7 @@ const chatData={
     // R5: a failed listing used to render as "you have no saved notes" — the same lie as V1, one
     // level up. An empty list is only reported as empty when the server actually said so.
     if(r&&r.ok) paNoticeOk(NOTES_LIST_KEY);
-    else annNotice('Could not list your notes · 无法列出笔记 — the list may be incomplete 列表可能不完整','',NOTES_LIST_KEY);
+    else annNotice('无法列出笔记 · Could not list your notes — the list may be incomplete 列表可能不完整','',NOTES_LIST_KEY);
     const allNotes=(r&&r.ok&&r.notes)||[];
     for(const n of allNotes){
       const vNums=n.verseKey&&n.verseKey.startsWith('v')?n.verseKey.slice(1).split('.').map(Number):[];
@@ -1162,10 +1162,10 @@ const aiChat=PAChat.fullscreen(Object.assign({}, chatData, {
 // chapter file, so both are exactly the shape V1 destroys: readChapterOrRefuse returns null on
 // any read it could not complete, and null means NOTHING is written.
 async function renameChapterNote(n,newTitle){
-  const obj=await readChapterOrRefuse(n.bookIdx,n.chapter); if(!obj) return {ok:false,error:'unreadable · 无法读取'};
+  const obj=await readChapterOrRefuse(n.bookIdx,n.chapter); if(!obj) return {ok:false,error:'无法读取 · unreadable'};
   obj.titles=obj.titles||{}; obj.titles[n.verseKey||'general']=newTitle;
   const r=await DATA.write(chapterFile(n.bookIdx,n.chapter), JSON.stringify(obj));
-  if(!r.ok) annNotice('Rename not saved · 重命名未保存 — '+r.error,'',chapterFile(n.bookIdx,n.chapter)); else paNoticeOk(chapterFile(n.bookIdx,n.chapter));
+  if(!r.ok) annNotice('重命名未保存 · Rename not saved — '+r.error,'',chapterFile(n.bookIdx,n.chapter)); else paNoticeOk(chapterFile(n.bookIdx,n.chapter));
   // The write above went to the FILE; ANN is the in-memory copy the next saveAnn() serializes over
   // that same file. Renaming a note in the chapter that is currently open therefore has to land in
   // BOTH, or the stale ANN carries the OLD title and the next stroke undoes the rename. (Reading
@@ -1179,19 +1179,19 @@ async function renameChapterNote(n,newTitle){
 // in-memory ANN of the open chapter, for the same two reasons renameChapterNote() names.
 // TODO(R4 seam): chapter-note list actions (rename/pin/delete) → apps/bible/notes-actions.js
 async function pinChapterNote(n,flag){
-  const obj=await readChapterOrRefuse(n.bookIdx,n.chapter); if(!obj) return {ok:false,error:'unreadable · 无法读取'};
+  const obj=await readChapterOrRefuse(n.bookIdx,n.chapter); if(!obj) return {ok:false,error:'无法读取 · unreadable'};
   obj.pins=obj.pins||{}; if(flag) obj.pins[n.verseKey||'general']=true; else delete obj.pins[n.verseKey||'general'];
   const r=await DATA.write(chapterFile(n.bookIdx,n.chapter), JSON.stringify(obj));
-  if(!r.ok) annNotice('Bookmark not saved · 收藏未保存 — '+r.error,'',chapterFile(n.bookIdx,n.chapter)); else paNoticeOk(chapterFile(n.bookIdx,n.chapter));
+  if(!r.ok) annNotice('收藏未保存 · Bookmark not saved — '+r.error,'',chapterFile(n.bookIdx,n.chapter)); else paNoticeOk(chapterFile(n.bookIdx,n.chapter));
   if(r.ok&&n.bookIdx===bookIdx&&n.chapter===chapter) ANN.pins=obj.pins;
   return r;
 }
 async function deleteChapterNote(n){
-  const obj=await readChapterOrRefuse(n.bookIdx,n.chapter); if(!obj) return {ok:false,error:'unreadable · 无法读取'};
+  const obj=await readChapterOrRefuse(n.bookIdx,n.chapter); if(!obj) return {ok:false,error:'无法读取 · unreadable'};
   // Marks survive the note's delete unless the row IS only marks (the drawer row said `Mark` and nothing else).
   if(n.verseKey){ delete (obj.notes||{})[n.verseKey]; delete (obj.draws||{})[n.verseKey]; if(!n.hasDraws&&!n.hasText) delete (obj.marks||{})[n.verseKey]; delete (obj.titles||{})[n.verseKey]; delete (obj.pins||{})[n.verseKey]; }
   const r=await DATA.write(chapterFile(n.bookIdx,n.chapter), JSON.stringify(obj));
-  if(!r.ok){ annNotice('Delete not saved · 删除未保存 — '+r.error,'',chapterFile(n.bookIdx,n.chapter)); return r; }
+  if(!r.ok){ annNotice('删除未保存 · Delete not saved — '+r.error,'',chapterFile(n.bookIdx,n.chapter)); return r; }
   paNoticeOk(chapterFile(n.bookIdx,n.chapter));
   if(n.bookIdx===bookIdx&&n.chapter===chapter&&await loadAnn()){ renderDots(); VM.render(); INK.load(ANN.ink); }   // the deleted marks must leave the text too
   return r;
@@ -1349,11 +1349,11 @@ const NOTE_OPTS={
     const r=await window.PAPhoto.upload(file,{name:file.name||'image.png',what:'Photo',
       maxEdge:window.PAPhoto.DEFAULT_MAX_EDGE});
     if(r&&r.ok){ paNoticeOk(UPLOAD_KEY); return r.path; }
-    const why=(r&&(r.text||r.error))||'upload rejected · 上传被拒绝';
+    const why=(r&&(r.text||r.error))||'上传被拒绝 · upload rejected';
     paNotice(PHOTO_FAILED+' — '+why,'',UPLOAD_KEY);
     return {ok:false,error:why,text:(r&&r.text)||''}; },   // an OUTCOME, so the pad's own flash carries the reason too
   imageUrl:async(path)=>{ const r=await paAttachUrl(path); return (r&&r.ok)?r.dataUrl:null; },
-  // Diagnostics — PANote's "Send Pencil log · 发送笔迹日志" (ink popover) writes its Pencil recorder
+  // Diagnostics — PANote's "发送笔迹日志 · Send Pencil log" (ink popover) writes its Pencil recorder
   // here: debug/pencil-log-<time>.json in this app's own data namespace, through the same checked
   // write as an annotation. Timings, contact kinds and geometry: NOT the handwriting (inking moves
   // carry no x/y), and never text, images, ids or titles.
@@ -1386,7 +1386,7 @@ function mountHost(wide){
         // moved with the ⤓/⤒ control in its own header.
         // Collapsed until Ask AI is pressed. It used to be open by default, so opening a NOTE
         // revealed an empty chat pane beside it that nobody had asked for.
-        { key:'chat', title:'Ask AI · 问一问', zone:'right', min:260, collapsed:true,
+        { key:'chat', title:'问一问 · Ask AI', zone:'right', min:260, collapsed:true,
           mount:(host,r)=>{ railChat=PAChat.panel(Object.assign({host:host}, chatData, {
             // The rail's OWN onShow — deliberately not the full-screen one, which dismisses the draw
             // pad: here the pad is a sibling, so revealing the chat must leave it alone. PAChat calls
@@ -1400,7 +1400,7 @@ function mountHost(wide){
             onNewNote:async()=>{ await openNewDrawNote(); },
           })); return railChat; } },
         // Collapsed until asked for: Ask AI must not surrender half the rail to an empty note.
-        { key:'note', title:'Note · 笔记', zone:'bottom', min:200, collapsed:true,
+        { key:'note', title:'笔记 · Note', zone:'bottom', min:200, collapsed:true,
           mount:(host)=>{ drawPad=PANote.panel(Object.assign({host:host}, NOTE_OPTS)); return drawPad; } },
       ],
     });
@@ -1442,7 +1442,7 @@ mountHost(_wide);                                  // boot stays SYNCHRONOUS: dr
 let _swapping=Promise.resolve();
 if(window.PASplit&&PASplit.onGate) PASplit.onGate(function(on){
   _swapping=_swapping.then(()=>swapHost(on)).catch(e=>{
-    annNotice('Layout change failed · 布局切换失败 — '+((e&&e.message)||e)+' — reload to recover 请重新加载','',GEN_PATH);
+    annNotice('布局切换失败 · Layout change failed — '+((e&&e.message)||e)+' — reload to recover 请重新加载','',GEN_PATH);
   });
 });
 
@@ -1474,7 +1474,7 @@ function dailyRead(){
     const b=document.getElementById('daily-banner');
     // No arbitration with the failure surface any more — they are different elements now, so a
     // greeting can never hide a "not saved" report and a report can never suppress the greeting.
-    b.textContent=`☀️ 今日晨读 · ${en} · ${zh} 第${chapter}章`;
+    b.textContent=`☀️ 今日晨读 · ${zh} 第${chapter}章 · ${en} ${chapter}`;
     b.classList.add('show');
     setTimeout(()=>b.classList.remove('show'),5000);
   });
@@ -1510,8 +1510,8 @@ if(window.PASettings&&PASettings.available){
     host:document.getElementById('nav'),
     appPrompt:chatData.system(),
     extras:[{
-      label:'Explain prompt · 解经提示词',
-      hint:'What to ask when you long-press a verse. Leave blank to restore the default · 长按经文时的提示，留空则使用默认。',
+      label:'解经提示词 · Explain prompt',
+      hint:'长按经文时的提示，留空则使用默认。 · What to ask when you long-press a verse. Leave blank to restore the default',
       getValue:()=>_explainPromptOverride!==null?_explainPromptOverride:EXPLAIN_PROMPT_BODY,
       onCommit:async(v)=>{
         const r=await DATA.write(EP_FILE, JSON.stringify({prompt:v}));
@@ -1561,9 +1561,9 @@ async function askAboutImage(im){
   let chat=aiChat, opened;
   if(splitOn()){ rail.open(); rail.expand('chat'); opened=await railChat.open(key); chat=railChat; }
   else opened=await aiChat.open(key);
-  if(opened===false||scopeKey()!==key||bookIdx!==b0||chapter!==c0){ annNotice('Selection changed · 选择已改变 — ask again','',NOTES_LIST_KEY); return; }   // a superseded open returns normally: the chat now shows another thread
-  if(!chat.attach({name:'picture.jpg',path:im.path})){ annNotice('Could not attach the picture · 无法附加图片','',NOTES_LIST_KEY); return; }
-  if(await chat.send(IMAGE_ASK_PROMPT(ref))===false) annNotice('Still answering · 正在回答中 — ask again in a moment','',NOTES_LIST_KEY);
+  if(opened===false||scopeKey()!==key||bookIdx!==b0||chapter!==c0){ annNotice('选择已改变 · Selection changed — 请重新提问 · ask again','',NOTES_LIST_KEY); return; }   // a superseded open returns normally: the chat now shows another thread
+  if(!chat.attach({name:'picture.jpg',path:im.path})){ annNotice('无法附加图片 · Could not attach the picture','',NOTES_LIST_KEY); return; }
+  if(await chat.send(IMAGE_ASK_PROMPT(ref))===false) annNotice('正在回答中 · Still answering — 请稍后再问 · ask again in a moment','',NOTES_LIST_KEY);
 }
 async function askAI(opts){
   const force=!!(opts&&opts.force);
@@ -1574,7 +1574,7 @@ async function askAI(opts){
     if(await aiChat.open(k)===false||moved()) return;   // superseded, or the selection moved meanwhile: never send into the wrong thread
     if(!fresh) return;
     if(await aiChat.send(msg)===false){
-      annNotice('Still answering · 正在回答中 — ask again in a moment','',NOTES_LIST_KEY);
+      annNotice('正在回答中 · Still answering — 请稍后再问 · ask again in a moment','',NOTES_LIST_KEY);
     }
     return;
   }
@@ -1587,7 +1587,7 @@ async function askAI(opts){
   // AWAITED: send() is async, so the unawaited call resolves to a Promise and `===false` could
   // never have matched — the report below would have been dead code.
   if(await railChat.send(msg)===false){
-    annNotice('Still answering · 正在回答中 — ask again in a moment','',NOTES_LIST_KEY);
+    annNotice('正在回答中 · Still answering — 请稍后再问 · ask again in a moment','',NOTES_LIST_KEY);
   }
 }
 

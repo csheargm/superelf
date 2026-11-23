@@ -1,4 +1,4 @@
-// Owner 2026-11-21: the phone had network back but the shell stayed "Offline · 离线" on the home grid —
+// Owner 2026-11-21: the phone had network back but the shell stayed "离线 · Offline" on the home grid —
 // offline was set by one failed request and only a later success could clear it. The shell now asks again.
 import test from 'node:test'; import assert from 'node:assert/strict'; import fs from 'node:fs'; import vm from 'node:vm';
 const SRC = fs.readFileSync(new URL('../web/index.html', import.meta.url), 'utf8');

@@ -38,7 +38,7 @@ test('trusted chrome: relayActionDecide refuses without the SHELL confirm — an
   const relay = extractFn(readShell(ROOT), 'relayActionDecide');
   let decided = 0;
   const deps = (confirmAnswer) => ({
-    listPending: async () => [{ id: 'a1', title: 'Daily walk reminder · 每日散步提醒' }],
+    listPending: async () => [{ id: 'a1', title: '每日散步提醒 · Daily walk reminder' }],
     confirm: async () => confirmAnswer,
     decide: async (id, verb) => { decided++; return { ok: true, action: { id, status: verb === 'approve' ? 'done' : 'denied' } }; },
   });
@@ -59,12 +59,12 @@ test('trusted chrome: relayActionDecide refuses without the SHELL confirm — an
 test('trusted chrome: the confirm label comes from the SERVER queue, never from the app message', async () => {
   const relay = extractFn(readShell(ROOT), 'relayActionDecide');
   const titles = [];
-  await relay({ actionId: 'a1', verb: 'approve', title: 'Harmless thing · 无害操作' }, {
-    listPending: async () => [{ id: 'a1', title: 'Send email · 发送邮件' }],
+  await relay({ actionId: 'a1', verb: 'approve', title: '无害操作 · Harmless thing' }, {
+    listPending: async () => [{ id: 'a1', title: '发送邮件 · Send email' }],
     confirm: async (verb, title) => { titles.push(title); return false; },
     decide: async () => ({ ok: true }),
   });
-  assert.deepEqual(titles, ['Send email · 发送邮件'], 'an app cannot caption its own confirm dialog');
+  assert.deepEqual(titles, ['发送邮件 · Send email'], 'an app cannot caption its own confirm dialog');
 });
 
 test('trusted chrome: relayReminderRemove goes through the same confirm gate', async () => {
@@ -97,27 +97,27 @@ test('longevity template: approvals + reminders sections wired to the broker kin
   assert.match(html, /待批准 · Pending Approvals/, 'section present');
   assert.match(html, /kind:'actions'/, 'queue loaded via the shell broker');
   assert.match(html, /kind:'action-decide',actionId:/, 'decision via the broker (actionId, never a clobbering `id`)');
-  assert.match(html, /Approve · 批准/);
-  assert.match(html, /Deny · 拒绝/);
+  assert.match(html, /批准 · Approve/);
+  assert.match(html, /拒绝 · Deny/);
   assert.match(html, /已批准并执行/, 'outcome labels bilingual');
   assert.match(html, /执行失败/, 'executor failure surfaced in the section (honest, R14)');
   assert.match(html, /审批队列加载失败/, 'R5: a failed queue load is shown, never identical to an empty queue');
   assert.match(html, /提醒 · Reminders/, 'revocation section present');
   assert.match(html, /kind:'reminder-remove',reminderId:/, 'remove via the gated broker kind');
-  assert.match(html, /Remove · 移除/);
+  assert.match(html, /移除 · Remove/);
   assert.match(html, /提醒加载失败/, 'R5 failure state for the reminders list too');
 });
 
 // Functional harness: run the template's own card builders on real data.
 test('harness: the template renders a pending proposal card with working Approve/Deny controls', () => {
   const render = extractFn(read('workspace.example/apps/longevity/index.html'), 'renderActionsHtml', { esc });
-  const html = render([{ id: 'health-brief-1000-a0', title: 'Daily walk reminder · 每日散步提醒',
+  const html = render([{ id: 'health-brief-1000-a0', title: '每日散步提醒 · Daily walk reminder',
     summary: 'why: steps 7d avg 4000 < 5000 threshold' }]);
   assert.match(html, /data-aid="health-brief-1000-a0"/, 'card carries the action id the click handler decides on');
-  assert.match(html, /Daily walk reminder · 每日散步提醒/);
+  assert.match(html, /每日散步提醒 · Daily walk reminder/);
   assert.match(html, /why: steps 7d avg 4000 &lt; 5000 threshold/, 'why sentence shown, HTML-escaped');
-  assert.match(html, /<button class="act-btn" data-verb="approve">Approve · 批准<\/button>/);
-  assert.match(html, /<button class="act-btn" data-verb="deny">Deny · 拒绝<\/button>/);
+  assert.match(html, /<button class="act-btn" data-verb="approve">批准 · Approve<\/button>/);
+  assert.match(html, /<button class="act-btn" data-verb="deny">拒绝 · Deny<\/button>/);
   const hostile = render([{ id: 'x', title: '<img src=x onerror=alert(1)>', summary: '' }]);
   assert.ok(!hostile.includes('<img'), 'titles are escaped — no HTML injection into the card');
 });
@@ -126,8 +126,8 @@ test('harness: the template renders each reminder with its Remove control', () =
   const src = read('workspace.example/apps/longevity/index.html');
   const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const render = extractFn(src, 'renderRemindersHtml', { esc, DAY_NAMES });
-  const html = render([{ id: 'walk', text: 'Walk 20 minutes · 散步20分钟', time: '18:00' },
-    { id: 'chk', text: 'Check Shortcut · 检查快捷指令', time: '09:00', day: 6 }]);
+  const html = render([{ id: 'walk', text: '散步20分钟 · Walk 20 minutes', time: '18:00' },
+    { id: 'chk', text: '检查快捷指令 · Check Shortcut', time: '09:00', day: 6 }]);
   assert.match(html, /data-rid="walk"/);
   assert.match(html, /18:00 · daily · 每日/);
   assert.match(html, /09:00 · weekly Sat · 每周/);

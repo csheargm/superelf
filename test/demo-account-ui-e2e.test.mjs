@@ -113,7 +113,7 @@ test('the header is menu, title, controls: "superelf", no status or new-feature 
   await ctx.close();
 });
 
-test('signed out, an AI request says "sign in to use AI" (not "signed out · 登录已过期") and opens the sign-in', { skip }, async () => {
+test('signed out, an AI request says "sign in to use AI" (not "登录已过期 · signed out") and opens the sign-in', { skip }, async () => {
   const ctx = await browser.newContext(); const page = await ctx.newPage();
   await page.goto(`http://127.0.0.1:${port}/`);
   await settled(page);
@@ -176,7 +176,7 @@ test('the demo drawer keeps Family Apps with the private-hosting note, muted, an
   await page.locator('#drawer.open').waitFor();
   const note = page.locator('#secFamily #dFamilyDemo');
   await note.waitFor({ state: 'visible' });
-  assert.equal(await note.textContent(), 'Family Apps are available on a privately hosted superelf · 家庭应用仅在私有部署的 superelf 上可用');
+  assert.equal(await note.textContent(), '家庭应用仅在私有部署的 superelf 上可用 · Family Apps are available on a privately hosted superelf');
   assert.equal(await page.locator('#secFamily >> text=None shared yet.').count(), 0);
   const [c, m] = await note.evaluate((e) => [getComputedStyle(e).color, (() => { const p = document.createElement('span'); p.style.color = 'var(--muted)'; document.body.appendChild(p); const v = getComputedStyle(p).color; p.remove(); return v; })()]);
   assert.equal(c, m, 'muted, not an error colour');

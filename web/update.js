@@ -12,7 +12,7 @@
 const UPDATE_POLL_MS=15*60*1000;
 const BUSY_REPLY_MS=500;
 const BUSY_QUERY={kind:'pa-busy?'};
-const UPDATE_READY_TXT='Update ready · 有新版本 — tap to reload';
+const UPDATE_READY_TXT='有新版本 · Update ready — 点按刷新 · tap to reload';
 const REOPEN_KEY='pa_reopen';   // sessionStorage: the app open when PAUpdate reloaded, reopened after boot
 const RELOAD_RETRY_MS=1000;     // a tap on ↺/the bar under a queue drain: asked again this often until the drain ends
 // deps: loaded() → the version this page loaded with; fetchJson(path) → parsed JSON or throws;

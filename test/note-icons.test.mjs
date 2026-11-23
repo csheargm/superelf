@@ -218,11 +218,11 @@ test('EVERY menu row carries its label in that element — both menus', () => {
 });
 
 test('the row labels are short and parallel', () => {
-  // "Crop & straighten · 裁剪" was the one row written as a sentence while every other was a verb.
+  // "裁剪 · Crop & straighten" was the one row written as a sentence while every other was a verb.
   // It was also the widest, which is what made the wrap visible at all.
   const labels = [...E.matchAll(/<span class="pan-optlbl">([^<]+)</g)].map((m) => m[1]);
   assert.ok(labels.length >= 9);
-  assert.ok(labels.includes('Crop · 裁剪'), 'crop is named like Copy and Cut are');
+  assert.ok(labels.includes('裁剪 · Crop'), 'crop is named like Copy and Cut are');
   assert.ok(!labels.some((l) => /straighten/.test(l)), 'the long form is gone');
   for (const l of labels) {
     assert.ok(l.split('·')[0].trim().split(/\s+/).length <= 3, `"${l}" is a label, not a sentence`);

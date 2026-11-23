@@ -25,7 +25,7 @@ function el(tag) {
     set textContent(v) { e._t = String(v); }, get textContent() { return e._t; } };
   return e;
 }
-const WHERE = { ink: 'Ink 手写', photo: 'Photo 图片', transcript: 'Transcript · 转写' };   // the title is PANote's ONE constant (R3)
+const WHERE = { ink: 'Ink 手写', photo: 'Photo 图片', transcript: '转写 · Transcript' };   // the title is PANote's ONE constant (R3)
 // One attached panel over a fake host. `answer` plays the node (PAStore.ask); `doc` is the host's.
 function panel({ answer, doc = () => ({ path: 'entry-1.json', scope: '' }) } = {}) {
   const src = TEXT.slice(TEXT.indexOf('>', TEXT.indexOf('<script id="pnt-script">')) + 1, TEXT.indexOf('</script>', TEXT.indexOf('<script id="pnt-script">')));
@@ -48,15 +48,15 @@ test('open asks the node for THIS note\'s pages (src + labels, by path and scope
     page(2, { src: { typed: '', ink: '', photo: 'Receipt <total> 12.50' }, labels: ['document', 'receipt'] }),
   ], pending: 0, ocr: 'ready' }) });
   assert.equal(P.dom.className, 'pan-tr'); assert.equal(P.dom.attrs.role, 'dialog');
-  assert.match(P.dom.innerHTML, /Transcript · 转写/); assert.match(P.dom.innerHTML, /class="pan-trx"/, 'a close button');
+  assert.match(P.dom.innerHTML, /转写 · Transcript/); assert.match(P.dom.innerHTML, /class="pan-trx"/, 'a close button');
   assert.equal(await P.p.open(), true);
   assert.deepEqual(P.asked, [{ kind: 'note-text', paths: ['entry-1.json'], scope: '', fields: ['src', 'labels'] }], 'the note\'s file and scope, the transcript fields, no tags');
   assert.ok(P.p.isOpen());
   assert.equal(P.state(), P.TXT.ready);
   const b = P.body();
-  assert.match(b, /<div class="pan-trpg">Page 1 · 第 1 页<\/div><div class="pan-trsrc">Ink 手写<\/div><div>line one\nline two #ores<\/div>/, 'page numbers are 1-based; the heading is PANote\'s own where-label');
+  assert.match(b, /<div class="pan-trpg">第 1 页 · Page 1<\/div><div class="pan-trsrc">Ink 手写<\/div><div>line one\nline two #ores<\/div>/, 'page numbers are 1-based; the heading is PANote\'s own where-label');
   assert.doesNotMatch(b, /Page 2/, 'a typed-only page has no transcript');
-  assert.match(b, /Page 3 · 第 3 页<\/div><div class="pan-trsrc">Photo 图片<\/div><div>Receipt &lt;total&gt; 12.50<\/div><div class="pan-trsrc">Picture labels · 图片标签<\/div><div>document · receipt<\/div>/, 'escaped, labels joined');
+  assert.match(b, /第 3 页 · Page 3<\/div><div class="pan-trsrc">Photo 图片<\/div><div>Receipt &lt;total&gt; 12.50<\/div><div class="pan-trsrc">图片标签 · Picture labels<\/div><div>document · receipt<\/div>/, 'escaped, labels joined');
   P.close();
   assert.equal(P.p.isOpen(), false);
 });
@@ -71,7 +71,7 @@ test('the state line: transcribing re-reads until the page is done; failed on th
   assert.equal(T.state(), T.TXT.ready); assert.match(T.body(), /done now/);
   const F = panel({ answer: () => ({ ok: true, pages: [page(0, { pending: true })], pending: 1, ocr: 'failed', reason: 'swiftc: no toolchain' }) });
   await F.p.open();
-  assert.equal(F.state(), 'Failed on this node · 本机识别失败 — swiftc: no toolchain');
+  assert.equal(F.state(), '本机识别失败 · Failed on this node — swiftc: no toolchain');
   F.close(); await tick(60);
   assert.equal(F.asked.length, 1, 'closing stops the re-read');
   const U = panel({ answer: () => ({ ok: true, pages: [page(0, { pending: true })], pending: 1, ocr: 'unavailable' }) });
@@ -79,7 +79,7 @@ test('the state line: transcribing re-reads until the page is done; failed on th
   assert.equal(U.asked.length, 1, 'no Mac node: nothing can progress, so no re-read is armed'); U.close();
   await tick(60); assert.equal(F.asked.length, 1, 'an environmental failure arms no re-read either');
   const B = panel({ answer: () => ({ ok: true, pages: [page(0, { error: 'panote-ocr ink: tool died' })], pending: 0, ocr: 'ready' }) });
-  await B.p.open(); assert.equal(B.state(), 'Failed on this node · 本机识别失败 — panote-ocr ink: tool died');
+  await B.p.open(); assert.equal(B.state(), '本机识别失败 · Failed on this node — panote-ocr ink: tool died');
   const N = panel({ answer: () => ({ ok: true, pages: [page(0)], pending: 0, ocr: 'ready' }) });
   await N.p.open(); assert.equal(N.state(), N.TXT.none); assert.equal(N.body(), '');
 });
@@ -87,8 +87,8 @@ test('the state line: transcribing re-reads until the page is done; failed on th
 test('no doc (a note not saved yet) asks nothing; a failed read is said on the state line; a reply after close is dropped (R5)', async () => {
   const D = panel({ answer: () => ({ ok: true, pages: [] }), doc: () => null });
   assert.equal(await D.p.open(), false); assert.equal(D.state(), D.TXT.unsaved); assert.deepEqual(D.asked, []);
-  const F = panel({ answer: () => ({ ok: false, code: 'server-error', text: 'Note text failed · 笔记文本失败 (500)' }) });
-  await F.p.open(); assert.equal(F.state(), 'Note text failed · 笔记文本失败 (500)');
+  const F = panel({ answer: () => ({ ok: false, code: 'server-error', text: '笔记文本失败 (500) · Note text failed' }) });
+  await F.p.open(); assert.equal(F.state(), '笔记文本失败 (500) · Note text failed');
   const N = panel();   // no PAStore on the page
   await N.p.open(); assert.equal(N.state(), N.TXT.unavailable);
   let release; const slow = new Promise((r) => { release = r; });
@@ -105,7 +105,7 @@ test('pins: the panel paints ABOVE the pad header (its ✕ must be tappable) and
 });
 
 test('pins: PANote\'s page-settings row opens it, the marker and registration follow note-ui, the panel is selectable, both hosts pass opts.doc', () => {
-  const sheet = E.slice(E.indexOf("'<div class=\"pan-pop pan-paperpop\">'"), E.indexOf("'<div class=\"pan-customlbl\">Template · 模板</div>'"));
+  const sheet = E.slice(E.indexOf("'<div class=\"pan-pop pan-paperpop\">'"), E.indexOf("'<div class=\"pan-customlbl\">模板 · Template</div>'"));
   assert.match(sheet, /<button class="pan-photoopt pan-pgtext" data-pg="text">.*SEARCH_TXT\.transcript/, 'one row in the page-settings sheet, before Template');
   assert.match(E, /else if\(a==='text'\)\{ if\(textPanel\) textPanel\.open\(\); else flash\(NO_TEXT_PANEL\); \}/, 'the data-pg dispatcher opens it (or says the component is missing)');
   assert.match(E, /const textPanel=window\.PANoteText\?window\.PANoteText\.attach\(\{host,doc:\(\)=>\(typeof opts\.doc==='function'\?opts\.doc\(\):null\)\}\):null;/, 'PANote lends it the host and the host\'s doc()');

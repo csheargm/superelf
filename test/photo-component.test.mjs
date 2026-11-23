@@ -69,7 +69,7 @@ function realPAChat() {
   const helpers = CHAT.slice(CHAT.indexOf('  const PAC_LIMITS='), CHAT.indexOf('\n  const esc=s=>'));
   assert.match(helpers, /PAC_NOUNS/, 'the extraction found chat-ui\'s round-3 noun table');
   const from = CHAT.indexOf('    failText:(reply,o)=>');
-  const endMark = "'Request failed · 请求失败 — no reason given · 未给出原因'; },";
+  const endMark = "'请求失败 · Request failed — 未给出原因 · no reason given'; },";
   const to = CHAT.indexOf(endMark);
   assert.ok(from > 0 && to > from, 'PAChat.failText must stay one findable expression');
   const expr = CHAT.slice(from, to + endMark.length).replace(/^\s*failText:/, '').replace(/,\s*$/, '');
@@ -91,9 +91,9 @@ test('CONTROL: the PRE-FIX surface collapses every failure to one sentence — t
   const preFix = () => 'Upload failed';
   const classes = [
     { ok: false, code: CODE_TOO_LARGE, status: 413, limit: BODY_LIMITS.upload },
-    { ok: false, code: 'unauthorized', status: 401, text: 'Signed out · 登录已过期. Photo not uploaded · 未上传' },
-    { ok: false, code: 'network', text: 'Connection lost · 连接中断' },
-    { ok: false, code: 'timeout', error: 'No answer from the app shell · 外卡无响应' },
+    { ok: false, code: 'unauthorized', status: 401, text: '登录已过期 · Signed out. 未上传 · Photo not uploaded' },
+    { ok: false, code: 'network', text: '连接中断 · Connection lost' },
+    { ok: false, code: 'timeout', error: '外卡无响应 · No answer from the app shell' },
     { ok: true },   // an ok with no path
   ];
   assert.equal(new Set(classes.map(preFix)).size, 1, 'the pre-fix surface really is one indistinguishable sentence');
@@ -178,7 +178,7 @@ test('a successful reply becomes {ok,path}; a reply that confirms without storin
   const empty = C.papOutcome({ ok: true }, { what: 'Photo', bytes: 4096 });
   assert.equal(empty.ok, false, 'an ok:true with no path is NOT a success');
   assert.equal(empty.code, 'no-path');
-  assert.match(empty.text, /Upload confirmed but no file was stored · 上传已确认但未保存文件/, 'and it says exactly that, in both languages');
+  assert.match(empty.text, /上传已确认但未保存文件 · Upload confirmed but no file was stored/, 'and it says exactly that, in both languages');
 });
 
 test('MUTATION: treating an ok-without-path as success hands the caller an empty path', () => {
@@ -204,18 +204,18 @@ test('every failure shape — including null, undefined and {} — comes back as
 test('the failure sentence is PAChat\'s — the shell\'s own wording, not a second dialect', () => {
   const C = core(winChat());
   // 1. The shell already rendered it: that sentence wins, verbatim, so every surface agrees.
-  const fromShell = { ok: false, code: 'unauthorized', status: 401, text: 'Signed out · 登录已过期. Photo not uploaded · 未上传' };
+  const fromShell = { ok: false, code: 'unauthorized', status: 401, text: '登录已过期 · Signed out. 未上传 · Photo not uploaded' };
   assert.equal(C.papOutcome(fromShell, { what: 'Photo' }).text, fromShell.text);
   // 2. A bare 413 still gets the size sentence WITH the cap — through PAChat, not a local copy.
   const sized = C.papOutcome({ ok: false, code: CODE_TOO_LARGE, status: 413, limit: 15 * 1048576 }, { what: 'Photo', bytes: 24 * 1048576 }).text;
-  assert.match(sized, /Photo too large · 照片过大/);
+  assert.match(sized, /照片过大 · Photo too large/);
   assert.match(sized, new RegExp(`max ${humanBytes(15 * 1048576)}`), 'the cap is named');
   assert.match(sized, /请选择更小的照片或裁剪后重试/, 'and what to DO about it');
   assert.equal(sized, PACHAT.failText({ ok: false, code: CODE_TOO_LARGE, status: 413, limit: 15 * 1048576 }, { what: 'Photo', bytes: 24 * 1048576 }),
     'byte-for-byte the seam\'s own output — PAPhoto owns no second renderer (R3)');
   // 3. A non-image name degrades to "File" through the SAME inference point PAChat exposes.
-  assert.match(C.papOutcome({ ok: false, code: CODE_TOO_LARGE, limit: 99 }, { what: C.papWhat('scan.pdf'), bytes: 100 }).text, /File too large · 文件过大/);
-  assert.match(C.papOutcome({ ok: false, code: CODE_TOO_LARGE, limit: 99 }, { what: C.papWhat('IMG_1.HEIC'), bytes: 100 }).text, /Photo too large · 照片过大/);
+  assert.match(C.papOutcome({ ok: false, code: CODE_TOO_LARGE, limit: 99 }, { what: C.papWhat('scan.pdf'), bytes: 100 }).text, /文件过大 · File too large/);
+  assert.match(C.papOutcome({ ok: false, code: CODE_TOO_LARGE, limit: 99 }, { what: C.papWhat('IMG_1.HEIC'), bytes: 100 }).text, /照片过大 · Photo too large/);
 });
 
 test('MUTATION: a component-local generic sentence collapses the failure classes again', () => {
@@ -227,8 +227,8 @@ test('MUTATION: a component-local generic sentence collapses the failure classes
 test('without PAChat on the page the component degrades to the shell\'s HEADING, never to a second dialect', () => {
   const bare = core(null);
   const t = bare.papOutcome({ ok: false, code: CODE_TOO_LARGE, limit: 99 }, { what: 'Photo', bytes: 100 }).text;
-  assert.equal(t, 'Photo too large · 照片过大', 'the same heading the shell and the note pad use');
-  assert.equal(CHAT.includes('Photo too large · 照片过大'), true, 'which really is the shared heading, not a string invented here');
+  assert.equal(t, '照片过大 · Photo too large', 'the same heading the shell and the note pad use');
+  assert.equal(CHAT.includes('照片过大 · Photo too large'), true, 'which really is the shared heading, not a string invented here');
   assert.equal(bare.papWhat('x.pdf'), 'Photo', 'and with no PAChat to ask, a photo component says Photo rather than inventing a noun table');
 });
 
@@ -360,7 +360,7 @@ test('END TO END: an oversized photo is refused BEFORE the upload is spent, nami
   assert.equal(out.ok, false);
   assert.equal(posted, false, 'nothing was sent — the refusal happens before the bytes go over cellular');
   assert.equal(out.code, CODE_TOO_LARGE);
-  assert.match(out.text, /Photo too large · 照片过大/, 'the noun is PHOTO, from the file name');
+  assert.match(out.text, /照片过大 · Photo too large/, 'the noun is PHOTO, from the file name');
   assert.match(out.text, new RegExp(`max ${humanBytes(PAPhoto.MAX_BYTES)}`), 'and the sentence names the cap the component actually enforces');
   assert.equal(PAPhoto.MAX_BYTES > 0 && PAPhoto.MAX_BYTES < BODY_LIMITS.upload, true, 'which is the FILE cap, not the body cap');
 });
@@ -592,7 +592,7 @@ test('the note pad stands down from its own pre-flight only when PAPhoto is ther
   const NOTE = read('web', 'note-ui.inline.html');
   assert.match(NOTE, /if\(!window\.PAPhoto&&file&&file\.size>PHOTO_MAX_BYTES\)\{ flash\(PHOTO_TXT\.big\(PHOTO_MAX_BYTES\)\+PHOTO_TXT\.bigAct\); return; \}/,
     'the guard is still there for a page without the component, and gone for a page with it');
-  assert.match(NOTE, /noComponent:'Photo unavailable · 无法添加照片/,
+  assert.match(NOTE, /noComponent:'无法添加照片 · Photo unavailable/,
     'and a missing component is NAMED rather than silently doing nothing (R5)');
   // The cap itself is untouched: PANote still EXPORTS the number an app states in its own surface.
   assert.match(NOTE, /UPLOAD_MAX_BYTES, PHOTO_TXT,/, 'the exported cap and vocabulary are unchanged');
@@ -619,7 +619,7 @@ test('camera-as-input replaced the Shortcut, and a photographed health screen is
   // and a grep that cannot tell a comment from a statement would fail on its own documentation.
   assert.equal(/set up the Shortcut/i.test(stripComments(LNG.replace(/<!--[\s\S]*?-->/g, ''))), false,
     'the app no longer advertises the abandoned route');
-  assert.match(LNG, /📷 Photograph a Health screen · 拍照读取/, 'it offers the camera instead');
+  assert.match(LNG, /拍照读取 · 📷 Photograph a Health screen/, 'it offers the camera instead');
   assert.match(LNG, /PAPhoto\.capture\(\)/, 'through the shared component, camera-first and downscaled');
 
   // THE JUDGEMENT, pinned: this reading is shown and talked about, never stored as a metric.

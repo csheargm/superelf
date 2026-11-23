@@ -31,8 +31,8 @@ test('it refreshes when the drawer opens — a stale feed is a wrong answer', ()
 test('empty and FAILED are different states — a blank box must never mean "we could not look"', () => {
   // The worst failure mode in this codebase: a section that renders nothing and reads as
   // "nothing happened". loadApps had exactly this bug.
-  assert.match(SHELL, /No briefings yet · 暂无简报/, 'an empty feed says so');
-  assert.match(SHELL, /Could not load briefings · 无法加载简报/, 'a failure says something DIFFERENT');
+  assert.match(SHELL, /暂无简报 · No briefings yet/, 'an empty feed says so');
+  assert.match(SHELL, /无法加载简报 · Could not load briefings/, 'a failure says something DIFFERENT');
   assert.match(SHELL, /color:var\(--danger\)[^`]*Could not load briefings/, 'and is coloured as an error');
   // Three-state: only an Array is data. `r.ok` alone is not enough — a 401 answers 200-shaped
   // JSON on some routes, and `{error:…}` is not a list.
@@ -59,7 +59,7 @@ test('opening one fetches the BODY — the list only carries previews', () => {
   // briefing would silently truncate it at ~140 chars.
   assert.match(SHELL, /api\('\/api\/briefings\/'\+encodeURIComponent\(id\)\)/, 'the full record is fetched on open');
   assert.match(SHELL, /renderMd\(b\.body\)/, 'and rendered as markdown, like any other reply');
-  assert.match(SHELL, /Could not open that briefing · 无法打开该简报/, 'a failed open says so rather than showing a blank page');
+  assert.match(SHELL, /无法打开该简报 · Could not open that briefing/, 'a failed open says so rather than showing a blank page');
 });
 
 // ── Manual runs are delivered, not deferred ───────────────────────────────────────────────

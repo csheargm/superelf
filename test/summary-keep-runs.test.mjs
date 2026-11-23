@@ -15,7 +15,7 @@ import { loadFollowup, loadRefs } from './helpers-summary.mjs';
 const INDEX = { v: 1, entries: [{ id: 'e0', title: 'Note 0', created: 1, updated: 2, preview: 'p' }] };
 const RUN1 = new Date(2026, 10, 12, 14, 52).getTime(), RUN2 = new Date(2026, 10, 12, 16, 5).getTime();
 const mkEl = (tag) => { const kids = []; return { tagName: tag, className: '', textContent: '', children: kids, appendChild(k) { kids.push(k); return k; }, setAttribute(k, v) { this['@' + k] = v; } }; };
-const BLOCK = { ok: true, heading: 'Follow-up · 跟进', text: '- researched', items: [{ item: 'x', kind: 'research', ok: true }], partial: false };
+const BLOCK = { ok: true, heading: '跟进 · Follow-up', text: '- researched', items: [{ item: 'x', kind: 'research', ok: true }], partial: false };
 const UPSERT = (src) => src.replace('if(runId!=null){ const old=entryById(String(runId));',
   '{ const up=newestSummary(period); if(up) return updateSummaryNote(up,{title,html,convoId,quiet}); } if(runId!=null){ const old=entryById(String(runId));');
 
@@ -38,7 +38,7 @@ for (const app of ['notes (template)', 'notes (live)']) {
     const { h, A, Title } = await boot(app);
     try {
       const { r1, r2, one, two } = await twoRuns(A, Title);
-      assert.equal(one.title, 'This week · 本周 Nov 9–15, 2026 · 11/12 14:52', 'the human period title + the run\'s local time');
+      assert.equal(one.title, '本周 · This week Nov 9–15, 2026 · 11/12 14:52', 'the human period title + the run\'s local time');
       assert.ok(r1.ok && r2.ok && r1.id !== r2.id, 'two entries');
       const idx = JSON.parse(fs.readFileSync(h.file('journal.json'), 'utf8')).entries.filter((x) => x.summary === '2026-W46');
       assert.deepEqual(idx.map((x) => x.title).sort(), [one.title, two.title].sort(), 'both listed, told apart by their titles');
@@ -49,7 +49,7 @@ for (const app of ['notes (template)', 'notes (live)']) {
       const F = loadFollowup(A.win, { createElement: mkEl });
       const f = await F.run({ answer: 'x', html: two.html, period: two.period, scope: two.scope, title: two.title, id: r2.id, convoId: 'c-2', hooks: A.SUMMARY_HOOKS, bar: mkEl('div') });
       assert.equal(f.ok, true, f.status);
-      assert.ok(readNb(h, r2.id).pages[0].pageHtml.startsWith('<div>run two</div><h3>Follow-up · 跟进</h3>'), 'run 2\'s note carries its follow-up');
+      assert.ok(readNb(h, r2.id).pages[0].pageHtml.startsWith('<div>run two</div><h3>跟进 · Follow-up</h3>'), 'run 2\'s note carries its follow-up');
       assert.equal(readNb(h, r1.id).pages[0].pageHtml, '<div>run one</div>', 'run 1\'s note is untouched');
       assert.equal(JSON.parse(fs.readFileSync(h.file('journal.json'), 'utf8')).entries.length, 3, 'the follow-up created nothing');
       A.stopPads();
@@ -65,7 +65,7 @@ for (const app of ['notes (template)', 'notes (live)']) {
       A.win.PAStore = { ask: async () => BLOCK };
       const F = loadFollowup(A.win, { createElement: mkEl }); const bar = mkEl('div');
       const f = await F.run({ answer: 'x', html: two.html, period: two.period, scope: two.scope, title: two.title, id: r2.id, hooks: A.SUMMARY_HOOKS, bar });
-      assert.equal(f.ok, false); assert.equal(bar.children[0].textContent, 'Follow-up not saved · 跟进未保存 — its summary note was deleted · 该总结笔记已删除');
+      assert.equal(f.ok, false); assert.equal(bar.children[0].textContent, '跟进未保存 · Follow-up not saved — 该总结笔记已删除 · its summary note was deleted');
       assert.equal(JSON.parse(fs.readFileSync(h.file('journal.json'), 'utf8')).entries.length, before, 'no new note');
       assert.equal(A.S.entries.some((x) => x.id === r2.id), false);
       A.stopPads();
@@ -135,6 +135,6 @@ test('a run title reads cleanly: its link label has no repeated date, displayTit
   const t = Title.runTitleOf('2026-W46', RUN1);
   assert.equal(Title.scopeOfLabel(t), 'summary:2026-W46'); assert.equal(Title.displayTitle(t), t);
   const l = R.label({ n: 3, title: t, day: '2026-11-12' });
-  assert.equal(l.includes('2026-11-12'), false, l); assert.ok(l.startsWith('[3] This week · 本周 Nov 9–15, 2026'), l);
+  assert.equal(l.includes('2026-11-12'), false, l); assert.ok(l.startsWith('[3] 本周 · This week Nov 9–15, 2026'), l);
   assert.equal(R.label({ n: 1, title: 'Roof', day: '2026-11-09' }), '[1] Roof · 2026-11-09', 'CONTROL: a plain note keeps its day');
 });

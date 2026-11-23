@@ -5,7 +5,7 @@
 // saveNote (by the id of ITS run's note, never a new one) and says added / partial / none / failed / not saved — never silent (R5). Then
 // the real drawer-summary over the real chat-ui: the turn's own auto-save triggers exactly one follow-up, a
 // replayed answer none; a later re-save keeps the block. The to-do heading is pinned equal to the lib's.
-// R11 — searched: "PASummaryFollowup", "Follow-up · 跟进", "pds-fu", "Researching", "quiet:true" — no duplicates.
+// R11 — searched: "PASummaryFollowup", "跟进 · Follow-up", "pds-fu", "Researching", "quiet:true" — no duplicates.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -21,7 +21,7 @@ const NOW = new Date(2026, 10, 10, 12, 0, 0).getTime();
 const at = (y, m, d) => new Date(y, m - 1, d, 9, 0, 0).getTime();
 function mkEl(tag) { const on = {}, kids = []; return { tagName: String(tag).toUpperCase(), className: '', innerHTML: '', textContent: '', disabled: false, checked: false, on, children: kids,
   appendChild(k) { kids.push(k); return k; }, addEventListener: (t, fn) => (on[t] ||= []).push(fn), setAttribute(k, v) { this['@' + k] = v; }, remove() { this.removed = true; } }; }
-const BLOCK = { ok: true, heading: FOLLOWUP_HEADING, text: '### Find out X\n- An answer\n- Sources · 来源: a.com', items: [{ item: 'Find out X', kind: 'research', ok: true }], partial: false };
+const BLOCK = { ok: true, heading: FOLLOWUP_HEADING, text: '### Find out X\n- An answer\n- 来源 · Sources: a.com', items: [{ item: 'Find out X', kind: 'research', ok: true }], partial: false };
 const status = (bar) => bar.children.find((k) => k.className === 'pds-fu');
 
 function unit({ ask = async () => BLOCK, save = async () => ({ ok: true, id: 'n1' }) } = {}) {
@@ -35,32 +35,32 @@ function unit({ ask = async () => BLOCK, save = async () => ({ ok: true, id: 'n1
 test('run: ONE status line (researching → added), one broker ask with the answer text, the block appended under the node\'s heading through saveNote (the id of its run\'s note)', async () => {
   const U = unit();
   const p = U.run();
-  assert.equal(status(U.bar).textContent, 'Researching to-dos · 正在研究待办'); assert.equal(status(U.bar)['@role'], 'status');
+  assert.equal(status(U.bar).textContent, '正在研究待办 · Researching to-dos'); assert.equal(status(U.bar)['@role'], 'status');
   const r = await p;
   assert.deepEqual(U.calls.asks, [{ kind: 'summary-followup', text: 'SUMMARY TEXT' }]);
   assert.equal(U.calls.saved.length, 1);
-  assert.deepEqual(U.calls.saved[0], { id: 'n7', title: 'This month', html: '<div>first</div><p>body</p><h3>Follow-up · 跟进</h3><p>### Find out X|- An answer|- Sources · 来源: a.com</p>', period: '2026-11', scope: 'summary:2026-11', convoId: 'c1', quiet: true }, 'quiet: the host writes, never opens');
-  assert.equal(r.ok, true); assert.equal(r.status, 'Follow-up added · 已添加跟进 — 1 to-dos · 1 项待办'); assert.equal(status(U.bar).textContent, r.status);
+  assert.deepEqual(U.calls.saved[0], { id: 'n7', title: 'This month', html: '<div>first</div><p>body</p><h3>跟进 · Follow-up</h3><p>### Find out X|- An answer|- 来源 · Sources: a.com</p>', period: '2026-11', scope: 'summary:2026-11', convoId: 'c1', quiet: true }, 'quiet: the host writes, never opens');
+  assert.equal(r.ok, true); assert.equal(r.status, '已添加跟进 · Follow-up added — 1 项待办 · 1 to-dos'); assert.equal(status(U.bar).textContent, r.status);
   assert.equal(U.bar.children.filter((k) => k.className === 'pds-fu').length, 1);
 });
 
 test('said, never silent: partial, no to-dos (nothing saved), the node failing, a thrown ask, saveNote refusing, no broker', async () => {
   const P = unit({ ask: async () => ({ ...BLOCK, partial: true, items: [{ item: 'a', kind: 'research', ok: false }, { item: 'b', kind: 'personal', ok: true }] }) });
-  assert.equal((await P.run()).status, 'Follow-up added (partial) · 已添加跟进（部分失败）— 2 to-dos · 2 项待办'); assert.equal(P.calls.saved.length, 1, 'a partial block is saved as partial');
+  assert.equal((await P.run()).status, '已添加跟进（部分失败） · Follow-up added (partial) — 2 项待办 · 2 to-dos'); assert.equal(P.calls.saved.length, 1, 'a partial block is saved as partial');
   const N = unit({ ask: async () => ({ ok: true, heading: FOLLOWUP_HEADING, text: '', items: [], partial: false }) });
-  const n = await N.run(); assert.equal(n.ok, true); assert.equal(n.status, 'No open to-dos · 没有待办'); assert.deepEqual(N.calls.saved, [], 'nothing to append: the note is left as saved');
+  const n = await N.run(); assert.equal(n.ok, true); assert.equal(n.status, '没有待办 · No open to-dos'); assert.deepEqual(N.calls.saved, [], 'nothing to append: the note is left as saved');
   const E = unit({ ask: async () => ({ ok: false, code: 'server-error', error: 'research lane down' }) });
-  assert.equal((await E.run()).status, 'Follow-up failed · 跟进失败 — research lane down');
+  assert.equal((await E.run()).status, '跟进失败 · Follow-up failed — research lane down');
   const T = unit({ ask: async () => { throw new Error('relay closed'); } });
-  assert.equal((await T.run()).status, 'Follow-up failed · 跟进失败 — relay closed');
+  assert.equal((await T.run()).status, '跟进失败 · Follow-up failed — relay closed');
   const S = unit({ save: async () => ({ ok: false, error: 'disk full' }) });
-  const s = await S.run(); assert.equal(s.ok, false); assert.equal(s.status, 'Follow-up not saved · 跟进未保存 — disk full');
+  const s = await S.run(); assert.equal(s.ok, false); assert.equal(s.status, '跟进未保存 · Follow-up not saved — disk full');
   const G = unit({ save: async () => ({ ok: false, gone: true }) });
-  const g = await G.run(); assert.equal(g.ok, false); assert.equal(g.status, 'Follow-up not saved · 跟进未保存 — its summary note was deleted · 该总结笔记已删除', 'its note deleted meanwhile: said on the bar');
+  const g = await G.run(); assert.equal(g.ok, false); assert.equal(g.status, '跟进未保存 · Follow-up not saved — 该总结笔记已删除 · its summary note was deleted', 'its note deleted meanwhile: said on the bar');
   const I = unit(); const i = await I.run({ id: undefined }); assert.equal(i.ok, false); assert.deepEqual(I.calls.saved, [], 'no id: nothing saved, never a new note');
   const B = loadFollowup({}, { createElement: mkEl }); const bar = mkEl('div');
   const b = await B.run({ answer: 'x', html: '', hooks: { saveNote: async () => ({ ok: true }) }, bar });
-  assert.equal(b.status, 'Follow-up failed · 跟进失败 — no broker · 无通道');
+  assert.equal(b.status, '跟进失败 · Follow-up failed — 无通道 · no broker');
   assert.deepEqual(await B.run({ answer: 'x' }), { ok: false, status: '' }, 'no bar or host: nothing to say it on');
 });
 
@@ -93,10 +93,10 @@ test('the turn\'s own auto-save runs the follow-up ONCE: second saveNote carries
   assert.equal(D.calls.saved.length, 2);
   assert.equal(D.calls.saved[0].scope, 'summary:2026-11'); assert.equal(D.calls.saved[0].id, undefined, 'the first save creates the run\'s note'); assert.equal(D.calls.saved[1].id, 'n1', 'the follow-up updates THAT note by id');
   assert.equal(D.calls.saved[1].title, D.calls.saved[0].title); assert.match(D.calls.saved[0].title, / · \d{2}\/\d{2} \d{2}:\d{2}$/, 'titled with the run time');
-  assert.equal(D.calls.saved[1].html, D.calls.saved[0].html + '<h3>Follow-up · 跟进</h3><p>' + BLOCK.text + '</p>');
+  assert.equal(D.calls.saved[1].html, D.calls.saved[0].html + '<h3>跟进 · Follow-up</h3><p>' + BLOCK.text + '</p>');
   assert.equal(D.calls.saved[0].quiet, undefined, 'the turn\'s own save opens the note'); assert.equal(D.calls.saved[1].quiet, true, 'the follow-up\'s save is QUIET: no open, no pad or rail move');
-  assert.equal(status(bar).textContent, 'Follow-up added · 已添加跟进 — 1 to-dos · 1 项待办');
-  assert.equal(b.textContent, 'Saved · 已存');
+  assert.equal(status(bar).textContent, '已添加跟进 · Follow-up added — 1 项待办 · 1 to-dos');
+  assert.equal(b.textContent, '已存 · Saved');
   await b.onclick();   // a tap after the follow-up: the block stays in the note
   assert.equal(D.calls.saved.length, 3); assert.equal(D.calls.saved[2].html, D.calls.saved[1].html); assert.equal(D.calls.saved[2].id, 'n1', 'a re-save updates its own note');
   assert.equal(D.calls.asks.length, 1, 'no second follow-up');
@@ -121,13 +121,13 @@ test('pins: both hosts honour {quiet:true} — the note is written, the open is 
 const ENGINE = fs.readFileSync(path.join(ROOT, 'web', 'note-ui.inline.html'), 'utf8');
 const realMd = new Function(ENGINE.slice(ENGINE.indexOf('  const SCHEMA='), ENGINE.indexOf('\n  function Note(host, opts){')) + '\nreturn mdToHtml;')();
 test('block: source links render as <a href> through the real mdToHtml; a javascript: link stays text; writerFallback is said on the status line', async () => {
-  const text = '### Fasting research\n- Start with one 12-hour fast a week [1].\n- Sources · 来源: [Fasting & prayer](https://www.desiringgod.org/fasting) · [IF basics](https://www.hopkinsmedicine.org/if) · [x](javascript:alert(1))';
+  const text = '### Fasting research\n- Start with one 12-hour fast a week [1].\n- 来源 · Sources: [Fasting & prayer](https://www.desiringgod.org/fasting) · [IF basics](https://www.hopkinsmedicine.org/if) · [x](javascript:alert(1))';
   const win = { PAStore: { ask: async () => ({ ...BLOCK, text, writerFallback: 'Codex' }) }, PANote: { mdToHtml: realMd } };
   const F = loadFollowup(win, { createElement: mkEl }); const bar = mkEl('div'); const saved = [];
   const r = await F.run({ answer: 'a', html: '', period: 'p', scope: 's', title: 't', id: 'n1', hooks: { saveNote: async (o) => { saved.push(o); return { ok: true }; } }, bar });
   const html = saved[0].html;
-  assert.ok(html.includes('<li>Sources · 来源: <a href="https://www.desiringgod.org/fasting">Fasting &amp; prayer</a> · '), html);
+  assert.ok(html.includes('<li>来源 · Sources: <a href="https://www.desiringgod.org/fasting">Fasting &amp; prayer</a> · '), html);
   assert.ok(html.includes('<a href="https://www.hopkinsmedicine.org/if">IF basics</a>'));
   assert.equal(/href="javascript/.test(html), false, 'only http(s) is lifted'); assert.equal(/PSFLINK/.test(html), false, 'no token left behind');
-  assert.equal(r.status, 'Follow-up added · 已添加跟进 — 1 to-dos · 1 项待办 — via Codex · 经 Codex');
+  assert.equal(r.status, '已添加跟进 · Follow-up added — 1 项待办 · 1 to-dos — 经 Codex · via Codex');
 });

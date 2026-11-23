@@ -57,19 +57,19 @@ let healthSetupLoaded=false;
 $('#healthWrap').addEventListener('toggle',async()=>{
   if(!$('#healthWrap').open||healthSetupLoaded) return;
   let s=null; try{ s=await (await api('/api/health/setup')).json(); }catch{ /* handled below: !s shows the error line */ }
-  if(!s||!s.ok){ $('#healthSetupTxt').textContent='Could not load setup info · 无法加载接入信息'; return; }
+  if(!s||!s.ok){ $('#healthSetupTxt').textContent='无法加载接入信息 · Could not load setup info'; return; }
   healthSetupLoaded=true;
-  $('#healthSetupTxt').innerHTML=`<div style="margin-bottom:4px"><b>URL</b> ${esc(s.url)}</div><div><b>Token 令牌</b> ${esc(s.token)}</div><button type="button" class="plain" id="hsCopy" style="font-size:12px;padding:2px 8px;margin-top:6px">Copy · 复制</button><button type="button" class="plain" id="hsRotate" style="font-size:12px;padding:2px 8px;margin-left:6px">Regenerate · 重新生成</button><span id="hsCopied" style="font-size:12px;color:var(--muted);margin-left:6px"></span>`;
-  $('#hsCopy').onclick=async()=>{ try{ await navigator.clipboard.writeText(`URL: ${s.url}\nToken: ${s.token}`); $('#hsCopied').textContent='copied · 已复制'; }catch{ $('#hsCopied').textContent='copy failed — select the text above · 复制失败，请手动选择上方文本'; } };
+  $('#healthSetupTxt').innerHTML=`<div style="margin-bottom:4px"><b>URL</b> ${esc(s.url)}</div><div><b>Token 令牌</b> ${esc(s.token)}</div><button type="button" class="plain" id="hsCopy" style="font-size:12px;padding:2px 8px;margin-top:6px">复制 · Copy</button><button type="button" class="plain" id="hsRotate" style="font-size:12px;padding:2px 8px;margin-left:6px">重新生成 · Regenerate</button><span id="hsCopied" style="font-size:12px;color:var(--muted);margin-left:6px"></span>`;
+  $('#hsCopy').onclick=async()=>{ try{ await navigator.clipboard.writeText(`URL: ${s.url}\nToken: ${s.token}`); $('#hsCopied').textContent='已复制 · copied'; }catch{ $('#hsCopied').textContent='复制失败，请手动选择上方文本 · copy failed — select the text above'; } };
   // Rotating REVOKES the current token everywhere at once. A health Shortcut using it stops
   // working immediately and fails with the same "bad token" 401 an unauthenticated request
   // gets — indistinguishable from a setup mistake — so say that plainly before doing it.
   $('#hsRotate').onclick=async()=>{
-    if(!await askConfirm('Regenerate your token? Any device using the old one — a health Shortcut above all — stops working immediately. · 重新生成令牌？正在使用旧令牌的设备（尤其是健康快捷指令）会立即失效。','Regenerate · 重新生成')) return;
-    $('#hsCopied').textContent='regenerating · 生成中…';
+    if(!await askConfirm('重新生成令牌？正在使用旧令牌的设备（尤其是健康快捷指令）会立即失效。 · Regenerate your token? Any device using the old one — a health Shortcut above all — stops working immediately.','重新生成 · Regenerate')) return;
+    $('#hsCopied').textContent='生成中… · regenerating';
     let r=null;
     try{ r=await (await api('/api/profile/token/rotate',{method:'POST'})).json(); }catch{ /* !r below reports it (R5) */ }
-    if(!r||!r.ok){ $('#hsCopied').textContent=(r&&r.error)||'could not regenerate · 生成失败'; return; }
+    if(!r||!r.ok){ $('#hsCopied').textContent=(r&&r.error)||'生成失败 · could not regenerate'; return; }
     // Re-render from scratch: the panel still shows the DEAD token until it is reloaded.
     healthSetupLoaded=false;
     $('#healthSetupTxt').textContent='';
@@ -85,10 +85,10 @@ let agentAddrLoaded=false;
 $('#agentMailWrap').addEventListener('toggle',async()=>{
   if(!$('#agentMailWrap').open||agentAddrLoaded) return;
   let s=null; try{ s=await (await api('/api/agentmail/address')).json(); }catch{ /* handled below: !s renders the bilingual error line */ }
-  if(!s||!s.ok){ $('#agentAddr').textContent=(s&&s.error)||'Could not load agent address · 无法加载管家邮箱'; return; }
+  if(!s||!s.ok){ $('#agentAddr').textContent=(s&&s.error)||'无法加载管家邮箱 · Could not load agent address'; return; }
   agentAddrLoaded=true;
-  $('#agentAddr').innerHTML=`<b>${esc(s.address)}</b><button type="button" class="plain" id="agCopy" style="font-size:12px;padding:2px 8px;margin-left:8px">Copy · 复制</button><span id="agCopied" style="font-size:12px;color:var(--muted);margin-left:6px"></span>`;
-  $('#agCopy').onclick=async()=>{ try{ await navigator.clipboard.writeText(s.address); $('#agCopied').textContent='copied · 已复制'; }catch{ $('#agCopied').textContent='copy failed — select the address · 复制失败，请手动选择地址'; } };
+  $('#agentAddr').innerHTML=`<b>${esc(s.address)}</b><button type="button" class="plain" id="agCopy" style="font-size:12px;padding:2px 8px;margin-left:8px">复制 · Copy</button><span id="agCopied" style="font-size:12px;color:var(--muted);margin-left:6px"></span>`;
+  $('#agCopy').onclick=async()=>{ try{ await navigator.clipboard.writeText(s.address); $('#agCopied').textContent='已复制 · copied'; }catch{ $('#agCopied').textContent='复制失败，请手动选择地址 · copy failed — select the address'; } };
 });
 /* ── Jobs · 任务: per-user job & reminder status + Run now（立即运行）.
    Re-fetched on every open so the status is fresh. Outcomes come from the
@@ -97,9 +97,9 @@ $('#agentMailWrap').addEventListener('toggle',async()=>{
    DELETE /api/reminders/:id — the same endpoint the longevity app relays to. */
 function fmtDue(ms){
   if(ms==null) return '—';
-  if(ms<=Date.now()) return 'due now · 待运行';
+  if(ms<=Date.now()) return '待运行 · due now';
   const d=new Date(ms),p=(n)=>String(n).padStart(2,'0'),hm=`${p(d.getHours())}:${p(d.getMinutes())}`;
-  return d.toDateString()===new Date().toDateString()?`today · 今天 ${hm}`:`${d.getMonth()+1}/${d.getDate()} ${hm}`;
+  return d.toDateString()===new Date().toDateString()?`今天 ${hm} · today`:`${d.getMonth()+1}/${d.getDate()} ${hm}`;
 }
 /* Three different questions, and only the first was ever answered here:
      did it RUN · did it SAY anything · did that ARRIVE.
@@ -110,39 +110,39 @@ const SILENT_RUNS_WARN=5;
 // This is a ceiling on the WAIT, not on the job — the run continues server-side either way.
 const RUN_NOW_TIMEOUT_MS=5*60*1000;
 function fmtWhen(ms){ if(!ms) return '—'; const d=new Date(ms);
-  return d.toDateString()===new Date().toDateString()?`today · 今天 ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`:`${d.getMonth()+1}/${d.getDate()}`; }
+  return d.toDateString()===new Date().toDateString()?`今天 · today ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`:`${d.getMonth()+1}/${d.getDate()}`; }
 function jobHealth(r){
   if(r.kind!=='job') return '';
   const bits=[];
   if(r.delivery&&r.delivery.status==='failed'){
-    bits.push(`<span style="color:var(--danger)">⚠ not delivered · 未送达${r.delivery.channel?' ('+esc(r.delivery.channel)+')':''}${r.delivery.error?' — '+esc(String(r.delivery.error).slice(0,60)):''}</span>`);
+    bits.push(`<span style="color:var(--danger)">⚠ 未送达 · not delivered${r.delivery.channel?' ('+esc(r.delivery.channel)+')':''}${r.delivery.error?' — '+esc(String(r.delivery.error).slice(0,60)):''}</span>`);
   }
   // Only worth saying once a job has been quiet for a WHILE — a conditional job is supposed
   // to be silent most days, and flagging that every morning would be the noise we removed.
   if(r.lastReportAt) bits.push(`said something 上次报告: ${esc(fmtWhen(r.lastReportAt))}${r.silentRuns>=SILENT_RUNS_WARN?` · quiet since 已连续 ${r.silentRuns} 次无报告`:''}`);
-  else if(r.silentRuns>=SILENT_RUNS_WARN) bits.push(`<span style="color:var(--danger)">never reported · 从未报告 (${r.silentRuns} runs 次)</span>`);
+  else if(r.silentRuns>=SILENT_RUNS_WARN) bits.push(`<span style="color:var(--danger)">从未报告 (${r.silentRuns} runs 次) · never reported</span>`);
   return bits.length?`<div style="color:var(--muted);font-size:12px">${bits.join(' · ')}</div>`:'';
 }
-function outcomeLabel(o){ return o==='ok'?'✓ ok · 成功':o==='failed'?'✗ failed · 失败':o==='skipped'?'– skipped · 已跳过':'—'; }
+function outcomeLabel(o){ return o==='ok'?'✓ 成功 · ok':o==='failed'?'✗ 失败 · failed':o==='skipped'?'– 已跳过 · skipped':'—'; }
 async function loadJobs(){
   const box=$('#jobsList');
   let rows=null; try{ rows=await (await api('/api/jobs')).json(); }catch{ /* !Array below renders the bilingual failure line (R5) */ }
-  if(!Array.isArray(rows)){ box.textContent='Could not load jobs · 无法加载任务'; return; }
+  if(!Array.isArray(rows)){ box.textContent='无法加载任务 · Could not load jobs'; return; }
   // The buttons WRAP to their own line rather than squeezing the label. Every button is
   // flex-shrink:0, so on a narrow panel they took the whole row and left the text column about
   // 20px wide — the job title then rendered one character per line. A flex-basis on the text is
   // what forces the wrap: below it the buttons move down instead of stealing the last pixels.
   box.innerHTML=rows.map((r,i)=>`<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)">
       <div style="flex:1 1 200px;min-width:0"><div style="overflow-wrap:anywhere">${esc(r.label)}</div>
-        <div style="color:var(--muted);font-size:12px">${esc(r.schedule)} · ${r.paused?'paused · 已暂停'+(r.pausedReason?' — '+esc(r.pausedReason):''):'next 下次: '+esc(fmtDue(r.nextDue))}</div>
+        <div style="color:var(--muted);font-size:12px">${esc(r.schedule)} · ${r.paused?'已暂停 · paused'+(r.pausedReason?' — '+esc(r.pausedReason):''):'next 下次: '+esc(fmtDue(r.nextDue))}</div>
         <div style="color:var(--muted);font-size:12px">last 上次: ${esc(r.lastRun||'—')} · ${esc(outcomeLabel(r.lastOutcome))}<span data-jr="${esc(r.name)}"></span></div>
         ${jobHealth(r)}</div>
-      ${r.kind==='job'&&r.editable?`<button type="button" class="plain" style="font-size:12px;padding:3px 8px;flex-shrink:0" data-editjob="${esc(r.name)}">Edit · 编辑</button>`:''}
-      ${r.kind==='job'?`<button type="button" class="plain" style="font-size:12px;padding:3px 8px;flex-shrink:0" data-togglejob="${esc(r.name)}" data-on="${r.paused?'1':'0'}">${r.paused?'On · 开启':'Off · 关闭'}</button>`:''}
+      ${r.kind==='job'&&r.editable?`<button type="button" class="plain" style="font-size:12px;padding:3px 8px;flex-shrink:0" data-editjob="${esc(r.name)}">编辑 · Edit</button>`:''}
+      ${r.kind==='job'?`<button type="button" class="plain" style="font-size:12px;padding:3px 8px;flex-shrink:0" data-togglejob="${esc(r.name)}" data-on="${r.paused?'1':'0'}">${r.paused?'开启 · On':'关闭 · Off'}</button>`:''}
       ${r.kind==='job'
-        ?`<button type="button" class="plain" style="font-size:12px;padding:3px 8px;flex-shrink:0" data-runjob="${esc(r.name)}" data-jlabel="${esc(r.label)}">Run now · 立即运行</button>`
-        :`<button type="button" class="plain" style="font-size:12px;padding:3px 8px;flex-shrink:0" data-remrem="${esc(r.id)}" data-jlabel="${esc(r.label)}">Remove · 移除</button>`}
-    </div>`).join('')||'<div style="color:var(--muted)">No jobs · 暂无任务</div>';
+        ?`<button type="button" class="plain" style="font-size:12px;padding:3px 8px;flex-shrink:0" data-runjob="${esc(r.name)}" data-jlabel="${esc(r.label)}">立即运行 · Run now</button>`
+        :`<button type="button" class="plain" style="font-size:12px;padding:3px 8px;flex-shrink:0" data-remrem="${esc(r.id)}" data-jlabel="${esc(r.label)}">移除 · Remove</button>`}
+    </div>`).join('')||'<div style="color:var(--muted)">暂无任务 · No jobs</div>';
 }
 $('#jobsWrap').addEventListener('toggle',()=>{ if($('#jobsWrap').open) loadJobs(); });
 /* ── Job editor（任务编辑）— create and edit a job WITHOUT touching a file or restarting.
@@ -156,7 +156,7 @@ async function jobTools(){ if(JOB_TOOLS) return JOB_TOOLS;
   // said nothing. Shape it here so every caller can rely on the two arrays existing (R5).
   let raw=null; try{ raw=await (await api('/api/jobs/tools')).json(); }catch{ /* raw stays null */ }
   JOB_TOOLS = (raw && Array.isArray(raw.runnable) && raw.tools)
-    ? raw : { tools:{}, runnable:[], error:(raw && raw.error) || 'Could not load tools · 无法加载工具' };
+    ? raw : { tools:{}, runnable:[], error:(raw && raw.error) || '无法加载工具 · Could not load tools' };
   return JOB_TOOLS; }
 function jobFieldRow(label,inner){ return `<label style="display:block;margin:6px 0">${esc(label)}<br>${inner}</label>`; }
 async function openJobEditor(job){
@@ -166,7 +166,7 @@ async function openJobEditor(job){
   // No runnable tools = nothing a job could DO. Say so instead of rendering a form whose
   // Save can only fail.
   if(!t.runnable.length){ box.style.display='block';
-    box.innerHTML=`<div style="border:1px solid var(--line);border-radius:8px;padding:10px;color:var(--muted)">${esc(t.error||'No tools available · 暂无可用工具')}<div style="margin-top:8px"><button type="button" class="plain" id="jeCancel2" style="font-size:13px;padding:6px 12px">Close · 关闭</button></div></div>`;
+    box.innerHTML=`<div style="border:1px solid var(--line);border-radius:8px;padding:10px;color:var(--muted)">${esc(t.error||'暂无可用工具 · No tools available')}<div style="margin-top:8px"><button type="button" class="plain" id="jeCancel2" style="font-size:13px;padding:6px 12px">关闭 · Close</button></div></div>`;
     $('#jeCancel2').onclick=()=>{ box.style.display='none'; box.innerHTML=''; JOB_TOOLS=null; };
     return; }
   // Only RUNNABLE tools are offered: picking one with no runner would create a job that can
@@ -174,27 +174,27 @@ async function openJobEditor(job){
   const opts=t.runnable.map(n=>`<option value="${esc(n)}"${n===j.plan.tool?' selected':''}>${esc(n)} — ${esc((t.tools[n]||{}).purpose||'')}</option>`).join('');
   box.style.display='block';
   box.innerHTML=`<div style="border:1px solid var(--line);border-radius:8px;padding:10px">
-    <b style="font-size:13px">${isNew?'New job · 新建任务':'Edit · 编辑 '+esc(j.title)}</b>
+    <b style="font-size:13px">${isNew?'新建任务 · New job':'编辑 · Edit '+esc(j.title)}</b>
     ${isNew?`<div style="margin:8px 0 10px;padding:8px;border:1px dashed var(--line);border-radius:8px">
-      <div style="color:var(--muted);font-size:12px;margin-bottom:5px">Describe it and let the assistant fill this in · 用一句话描述，助手自动填写</div>
+      <div style="color:var(--muted);font-size:12px;margin-bottom:5px">用一句话描述，助手自动填写 · Describe it and let the assistant fill this in</div>
       <textarea id="jeSay" rows="2" style="${S}" placeholder="alert me if the pollen count is high today"></textarea>
       <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
-        <button type="button" class="plain" id="jeResolve" style="font-size:12px;padding:4px 10px">Fill it in · 自动填写</button>
+        <button type="button" class="plain" id="jeResolve" style="font-size:12px;padding:4px 10px">自动填写 · Fill it in</button>
         <span id="jeSayMsg" style="color:var(--muted);font-size:12px"></span></div></div>`:''}
     ${isNew?jobFieldRow('Id (a-z 0-9 -)',`<input id="jeId" style="${S}" value="${esc(j.id)}" placeholder="pollen-alert">`):''}
-    ${jobFieldRow('Title · 标题',`<input id="jeTitle" style="${S}" value="${esc(j.title)}">`)}
-    ${jobFieldRow('What should it do? · 任务说明',`<textarea id="jePrompt" rows="2" style="${S}">${esc(j.prompt||'')}</textarea>`)}
-    ${jobFieldRow('Tool · 工具',`<select id="jeTool" style="${S}">${opts}</select>`)}
-    ${jobFieldRow('Settings (JSON) · 参数',`<textarea id="jeArgs" rows="2" style="${S}">${esc(JSON.stringify(j.plan.args||{}))}</textarea>`)}
-    <div id="jeModelRow" style="display:none">${jobFieldRow('Model · 模型 (blank = default 留空用默认)',`<select id="jeModel" style="${S}"></select>`)}</div>
-    ${jobFieldRow('Time · 时间 (HH:MM)',`<input id="jeTime" style="${S}" value="${esc(j.schedule.time)}">`)}
-    ${jobFieldRow('Day · 星期 (blank = daily 每日)',`<input id="jeDay" style="${S}" value="${j.schedule.day===undefined?'':j.schedule.day}" placeholder="0=Sun … 6=Sat">`)}
-    <label style="display:block;margin:8px 0"><input type="checkbox" id="jeOn"${j.enabled?' checked':''}> Enabled · 启用</label>
+    ${jobFieldRow('标题 · Title',`<input id="jeTitle" style="${S}" value="${esc(j.title)}">`)}
+    ${jobFieldRow('任务说明 · What should it do?',`<textarea id="jePrompt" rows="2" style="${S}">${esc(j.prompt||'')}</textarea>`)}
+    ${jobFieldRow('工具 · Tool',`<select id="jeTool" style="${S}">${opts}</select>`)}
+    ${jobFieldRow('参数 · Settings (JSON)',`<textarea id="jeArgs" rows="2" style="${S}">${esc(JSON.stringify(j.plan.args||{}))}</textarea>`)}
+    <div id="jeModelRow" style="display:none">${jobFieldRow('模型 (blank = default 留空用默认) · Model',`<select id="jeModel" style="${S}"></select>`)}</div>
+    ${jobFieldRow('时间 (HH:MM) · Time',`<input id="jeTime" style="${S}" value="${esc(j.schedule.time)}">`)}
+    ${jobFieldRow('星期 (blank = daily 每日) · Day',`<input id="jeDay" style="${S}" value="${j.schedule.day===undefined?'':j.schedule.day}" placeholder="0=Sun … 6=Sat">`)}
+    <label style="display:block;margin:8px 0"><input type="checkbox" id="jeOn"${j.enabled?' checked':''}> 启用 · Enabled</label>
     <div id="jeErr" style="color:var(--danger);font-size:12px;min-height:16px"></div>
     <div style="display:flex;gap:8px;margin-top:6px">
-      <button type="button" class="primary" id="jeSave" style="font-size:13px;padding:6px 12px">Save · 保存</button>
-      <button type="button" class="plain" id="jeCancel" style="font-size:13px;padding:6px 12px">Cancel · 取消</button>
-      ${isNew?'':`<button type="button" class="plain" id="jeDel" style="font-size:13px;padding:6px 12px;margin-left:auto">Delete · 删除</button>`}
+      <button type="button" class="primary" id="jeSave" style="font-size:13px;padding:6px 12px">保存 · Save</button>
+      <button type="button" class="plain" id="jeCancel" style="font-size:13px;padding:6px 12px">取消 · Cancel</button>
+      ${isNew?'':`<button type="button" class="plain" id="jeDel" style="font-size:13px;padding:6px 12px;margin-left:auto">删除 · Delete</button>`}
     </div></div>`;
   // The model picker appears only for tools that actually call one. Offering it on a
   // deterministic tool would be a setting that does nothing — the server refuses it anyway.
@@ -205,7 +205,7 @@ async function openJobEditor(job){
     row.style.display='block';
     if(!$('#jeModel').options.length){
       let models=[]; try{ models=await (await api('/api/models')).json(); }catch{ /* blank list = default only (R5) */ }
-      $('#jeModel').innerHTML='<option value="">default · 默认</option>'
+      $('#jeModel').innerHTML='<option value="">默认 · default</option>'
         +models.map(m=>`<option value="${esc(m.id)}">${esc(m.label)}${m.group?' · '+esc(m.group):''}</option>`).join('');
     }
     $('#jeModel').value=j.model||'';
@@ -214,31 +214,31 @@ async function openJobEditor(job){
   $('#jeCancel').onclick=()=>{ box.style.display='none'; box.innerHTML=''; };
   if($('#jeResolve')) $('#jeResolve').onclick=async()=>{
     const said=$('#jeSay').value.trim(); if(!said) return;
-    const msg=$('#jeSayMsg'); msg.textContent='thinking · 思考中…'; $('#jeResolve').disabled=true;
+    const msg=$('#jeSayMsg'); msg.textContent='思考中… · thinking'; $('#jeResolve').disabled=true;
     let out=null;
     try{ out=await (await api('/api/jobs/resolve',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({prompt:said})})).json(); }
     catch{ /* !out below reports it (R5) */ }
     $('#jeResolve').disabled=false;
-    if(!out){ msg.textContent='Could not reach the assistant · 无法连接助手'; return; }
+    if(!out){ msg.textContent='无法连接助手 · Could not reach the assistant'; return; }
     // It ASKS only when an input genuinely cannot be inferred — then it names which one,
     // rather than handing back an empty form with no explanation.
     if(!out.ok&&Array.isArray(out.ask)&&out.ask.length){
-      msg.textContent='Needs · 还需要: '+out.ask.map(a=>a.input).join(', ');
+      msg.textContent='还需要 · Needs: '+out.ask.map(a=>a.input).join(', ');
       if(out.draft){ $('#jeTitle').value=out.draft.title||''; $('#jeTool').value=out.draft.tool||$('#jeTool').value;
         $('#jeArgs').value=JSON.stringify(out.draft.args||{}); $('#jeTime').value=(out.draft.schedule||{}).time||$('#jeTime').value; }
       return; }
-    if(!out.ok){ msg.textContent=out.error||'Could not work that out · 无法解析'; return; }
+    if(!out.ok){ msg.textContent=out.error||'无法解析 · Could not work that out'; return; }
     const j2=out.job;
     $('#jeId').value=j2.id; $('#jeTitle').value=j2.title; $('#jePrompt').value=j2.prompt||said;
     $('#jeTool').value=j2.plan.tool; $('#jeArgs').value=JSON.stringify(j2.plan.args||{});
     $('#jeTime').value=j2.schedule.time; $('#jeDay').value=j2.schedule.day===undefined?'':j2.schedule.day;
     // Stays UNCHECKED on purpose — you review what it worked out before it can message you.
     $('#jeOn').checked=false;
-    msg.textContent=out.usedDefaultTime?'filled · 已填写 (no time given, defaulted · 未指定时间，用默认值)':'filled · 已填写 — review, then Save';
+    msg.textContent=out.usedDefaultTime?'已填写 · filled (未指定时间，用默认值 · no time given, defaulted)':'已填写，请检查后保存 · filled — review, then Save';
   };
   $('#jeSave').onclick=async()=>{
     let args; try{ args=JSON.parse($('#jeArgs').value||'{}'); }
-    catch{ $('#jeErr').textContent='Settings must be JSON · 参数需为 JSON'; return; }
+    catch{ $('#jeErr').textContent='参数需为 JSON · Settings must be JSON'; return; }
     const dayRaw=$('#jeDay').value.trim();
     const body={ id:isNew?$('#jeId').value.trim():j.id, title:$('#jeTitle').value.trim(), prompt:$('#jePrompt').value,
       schedule:dayRaw===''?{time:$('#jeTime').value.trim()}:{time:$('#jeTime').value.trim(),day:Number(dayRaw)},
@@ -248,11 +248,11 @@ async function openJobEditor(job){
       {method:isNew?'POST':'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
     let out=null; try{ out=await r.json(); }catch{ /* !out below shows the failure (R5) */ }
     // The server is the authority on validity; show ITS sentence rather than a generic one.
-    if(!out||!out.ok){ $('#jeErr').textContent=(out&&out.error)||'Could not save · 保存失败'; return; }
+    if(!out||!out.ok){ $('#jeErr').textContent=(out&&out.error)||'保存失败 · Could not save'; return; }
     box.style.display='none'; box.innerHTML=''; loadJobs();
   };
   if($('#jeDel')) $('#jeDel').onclick=async()=>{
-    if(!await askConfirm(`Delete "${j.title}"? · 删除该任务？`,'Delete · 删除')) return;
+    if(!await askConfirm(`删除该任务？ · Delete "${j.title}"?`,'删除 · Delete')) return;
     await api('/api/jobs/'+encodeURIComponent(j.id),{method:'DELETE'});
     box.style.display='none'; box.innerHTML=''; loadJobs();
   };
@@ -262,7 +262,7 @@ $('#jobNew').onclick=()=>openJobEditor(null);
 $('#jobsList').onclick=async(e)=>{
   const rb=e.target.closest('[data-runjob]');
   if(rb){ e.preventDefault();
-    if(!await askConfirm(`Run "${rb.dataset.jlabel}" now? · 立即运行该任务？`,'Run now · 立即运行')) return;
+    if(!await askConfirm(`立即运行该任务？ · Run "${rb.dataset.jlabel}" now?`,'立即运行 · Run now')) return;
     // Re-FIND the slot each time rather than holding a reference: loadJobs() re-renders the
     // whole list, and a captured node is then orphaned — the update lands on a detached
     // element while the visible row keeps saying "running" for ever.
@@ -272,8 +272,8 @@ $('#jobsList').onclick=async(e)=>{
     // does a web search, scrapes pages and calls a model — tens of seconds is NORMAL, and the
     // honest answer to "how long will this take" is to show the time passing.
     const t0=Date.now();
-    const tick=setInterval(()=>say(' · running · 运行中… '+took(Date.now()-t0)),1000);
-    say(' · running · 运行中… 0.0s');
+    const tick=setInterval(()=>say(' · 运行中… · running '+took(Date.now()-t0)),1000);
+    say(' · 运行中… · running 0.0s');
     // And a real ceiling. Without one a request that never returns leaves the row claiming to
     // be running until the page is reloaded — which is exactly what happened.
     const ac=new AbortController();
@@ -283,9 +283,9 @@ $('#jobsList').onclick=async(e)=>{
     catch(err){ timedOut=ac.signal.aborted; /* !j below shows failed (R5) */ }
     clearInterval(tick); clearTimeout(killer);
     const elapsed=took(Date.now()-t0);
-    if(timedOut){ say(` · ✗ gave up after ${elapsed} · 超时未完成 — it may still finish; reopen to check`); return; }
-    say((!j||!j.ok)?` · ✗ failed · 失败${j&&j.error?': '+j.error:''}`
-      :j.skipped?` · no report today · 今日无简报 (${elapsed})`:j.alreadyRanToday?` · ✓ ran again today · 已再次运行 (${elapsed})`:` · ✓ ran · 已运行 (${elapsed})`);
+    if(timedOut){ say(` · ✗ 超时未完成 · gave up after ${elapsed} — 可能仍会完成，请重新打开查看 · it may still finish; reopen to check`); return; }
+    say((!j||!j.ok)?` · ✗ 失败 · failed${j&&j.error?': '+j.error:''}`
+      :j.skipped?` · 今日无简报 · no report today (${elapsed})`:j.alreadyRanToday?` · ✓ 已再次运行 · ran again today (${elapsed})`:` · ✓ 已运行 · ran (${elapsed})`);
     // SHOW the result. "ran ok" with the output only in the feed is not an answer to someone
     // who just pressed Run now.
     const out=$('#jobRunOut');
@@ -293,13 +293,13 @@ $('#jobsList').onclick=async(e)=>{
       if(j&&j.ok&&j.body){
         out.style.display='block';
         out.innerHTML=`<div style="border:1px solid var(--line);border-radius:8px;padding:10px;margin:4px 0 10px">
-          <div style="color:var(--muted);font-size:12px;margin-bottom:6px">${esc(rb.dataset.jlabel)}${j.truncated?' · shortened 已截断':''}</div>
+          <div style="color:var(--muted);font-size:12px;margin-bottom:6px">${esc(rb.dataset.jlabel)}${j.truncated?' · 已截断 shortened':''}</div>
           <div style="white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px">${esc(j.body)}</div>
-          <div style="margin-top:8px"><button type="button" class="plain" id="jobRunClose" style="font-size:12px;padding:3px 8px">Close · 关闭</button></div></div>`;
+          <div style="margin-top:8px"><button type="button" class="plain" id="jobRunClose" style="font-size:12px;padding:3px 8px">关闭 · Close</button></div></div>`;
         $('#jobRunClose').onclick=()=>{ out.style.display='none'; out.innerHTML=''; };
       } else if(j&&j.ok&&j.skipped){
         out.style.display='block';
-        out.innerHTML=`<div style="border:1px solid var(--line);border-radius:8px;padding:10px;margin:4px 0 10px;color:var(--muted);font-size:13px">Nothing to report today · 今日无需报告 — the job ran and decided there was nothing worth saying.</div>`;
+        out.innerHTML=`<div style="border:1px solid var(--line);border-radius:8px;padding:10px;margin:4px 0 10px;color:var(--muted);font-size:13px">今日无需报告 · Nothing to report today — 任务已运行，没有值得报告的内容 · the job ran and decided there was nothing worth saying.</div>`;
       }
     }
     return;
@@ -309,7 +309,7 @@ $('#jobsList').onclick=async(e)=>{
     // Fetch the job's own record — the view row is a SUMMARY and does not carry plan/args.
     let all=null; try{ all=await (await api('/api/jobs/files')).json(); }catch{}
     const rec=all&&all.jobs&&all.jobs[eb.dataset.editjob];
-    if(!rec){ alert('Could not load that job · 无法加载该任务'); return; }
+    if(!rec){ alert('无法加载该任务 · Could not load that job'); return; }
     openJobEditor(rec); return;
   }
   const tb=e.target.closest('[data-togglejob]');
@@ -325,15 +325,15 @@ $('#jobsList').onclick=async(e)=>{
     // The server's own sentence, not a house string: "built-in" and "unknown job" are different
     // problems and the row must not flatten them into one (R5).
     if(!r.ok){ let m=''; try{ m=(await r.json()).error||''; }catch{}
-      alert(m||'Could not change that job · 无法更改该任务'); }
+      alert(m||'无法更改该任务 · Could not change that job'); }
     loadJobs(); return;
   }
   const rr=e.target.closest('[data-remrem]');
   if(rr){ e.preventDefault();
     const [en,zh]=SHELL_CONFIRM_LABELS['remove-reminder'];
-    if(!await askConfirm(`${en} "${rr.dataset.jlabel}"? · ${zh}，确认？`,`${en} · ${zh}`)) return;
+    if(!await askConfirm(`${zh}，确认？ · ${en} "${rr.dataset.jlabel}"?`,`${zh} · ${en}`)) return;
     const r=await api('/api/reminders/'+encodeURIComponent(rr.dataset.remrem),{method:'DELETE'});
-    if(r.ok) loadJobs(); else alert('Remove failed · 移除失败');
+    if(r.ok) loadJobs(); else alert('移除失败 · Remove failed');
   }
 };
 /* ── Node settings · 节点设置 (owner): whitelisted config editor. Secrets are
@@ -344,83 +344,83 @@ $('#jobsList').onclick=async(e)=>{
 async function loadNodeCfg(){
   const box=$('#nodeCfgList');
   let rows=null; try{ rows=await (await api('/api/admin/config')).json(); }catch{ /* !Array below renders the bilingual failure line (R5) */ }
-  if(!Array.isArray(rows)){ box.textContent='Could not load config · 无法加载配置'; return; }
+  if(!Array.isArray(rows)){ box.textContent='无法加载配置 · Could not load config'; return; }
   box.innerHTML=rows.map((r)=>{
     const val=r.kind==='value'?(Array.isArray(r.value)?r.value.join(', '):(r.value==null?'':String(r.value))):'';
-    const badge=r.kind==='secret'?`<small style="flex-shrink:0;color:${r.status==='SET'?'var(--accent)':'var(--muted)'}">${r.status==='SET'?'SET · 已设置':'empty · 未设置'}</small>`:'';
+    const badge=r.kind==='secret'?`<small style="flex-shrink:0;color:${r.status==='SET'?'var(--accent)':'var(--muted)'}">${r.status==='SET'?'已设置 · SET':'未设置 · empty'}</small>`:'';
     return `<div style="padding:6px 0;border-bottom:1px solid var(--line)">
-      <div style="font-size:12px;color:var(--muted)">${esc(r.label)}${r.boot?' <small>(after restart · 重启后生效)</small>':''}</div>
+      <div style="font-size:12px;color:var(--muted)">${esc(r.label)}${r.boot?' <small>(重启后生效 · after restart)</small>':''}</div>
       <div style="display:flex;gap:6px;align-items:center;margin-top:3px">${badge}
-        <input data-ck="${esc(r.key)}" ${r.kind==='secret'?'type="password" placeholder="paste to replace · 粘贴以替换" autocomplete="new-password"':''} value="${esc(val)}" style="flex:1;min-width:0;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px">
-        <button type="button" class="plain" style="font-size:12px;padding:3px 8px" data-cs="${esc(r.key)}">Save · 保存</button>
-        ${r.kind==='secret'&&r.status==='SET'?`<button type="button" class="plain" style="font-size:12px;padding:3px 8px" data-cc="${esc(r.key)}">Clear · 清除</button>`:''}
+        <input data-ck="${esc(r.key)}" ${r.kind==='secret'?'type="password" placeholder="粘贴以替换 · paste to replace" autocomplete="new-password"':''} value="${esc(val)}" style="flex:1;min-width:0;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px">
+        <button type="button" class="plain" style="font-size:12px;padding:3px 8px" data-cs="${esc(r.key)}">保存 · Save</button>
+        ${r.kind==='secret'&&r.status==='SET'?`<button type="button" class="plain" style="font-size:12px;padding:3px 8px" data-cc="${esc(r.key)}">清除 · Clear</button>`:''}
       </div><div data-cmsg="${esc(r.key)}" style="font-size:12px;color:var(--muted)"></div></div>`;
   }).join('')
-  +'<div style="margin-top:10px;display:flex;gap:8px;align-items:center"><button type="button" class="plain" id="cfgReload">Reload config · 重载配置</button><button type="button" class="plain" id="cfgRestart" style="color:var(--danger)">Apply &amp; restart · 应用并重启</button><span id="cfgRestartMsg" style="font-size:12px;color:var(--muted)"></span></div>';
+  +'<div style="margin-top:10px;display:flex;gap:8px;align-items:center"><button type="button" class="plain" id="cfgReload">重载配置 · Reload config</button><button type="button" class="plain" id="cfgRestart" style="color:var(--danger)">应用并重启 · Apply &amp; restart</button><span id="cfgRestartMsg" style="font-size:12px;color:var(--muted)"></span></div>';
   $('#cfgReload').onclick=doReloadConfig;
   $('#cfgRestart').onclick=doNodeRestart;
 }
 async function putNodeCfg(key,value){
   const msg=$('#nodeCfgList').querySelector(`[data-cmsg="${CSS.escape(key)}"]`);
   // A 413 (BODY_LIMITS.config), an expired session and a dead socket used to be ONE
-  // sentence here — 'Save failed · 保存失败'. Each is now its own (R3, relayText).
+  // sentence here — '保存失败 · Save failed'. Each is now its own (R3, relayText).
   const g=await relayJson(api('/api/admin/config',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({key,value})}),'data');
-  if(!g.ok||!g.data||!g.data.ok){ if(msg){ msg.style.color='var(--danger)'; msg.textContent=g.ok?((g.data&&g.data.error)||'Save refused · 保存被拒绝。'):g.text; } return; }
+  if(!g.ok||!g.data||!g.data.ok){ if(msg){ msg.style.color='var(--danger)'; msg.textContent=g.ok?((g.data&&g.data.error)||'保存被拒绝。 · Save refused'):g.text; } return; }
   loadNodeCfg(); // re-render from the server's view — a typed secret never lingers in the DOM
 }
 $('#nodeCfgList').onclick=async(e)=>{
   const s=e.target.closest('[data-cs]');
   if(s){ e.preventDefault(); const inp=$('#nodeCfgList').querySelector(`input[data-ck="${CSS.escape(s.dataset.cs)}"]`); putNodeCfg(s.dataset.cs,inp?inp.value:''); return; }
   const c=e.target.closest('[data-cc]');
-  if(c){ e.preventDefault(); if(await askConfirm('Clear this secret? · 清除该密钥，确认？','Clear · 清除')) putNodeCfg(c.dataset.cc,''); }
+  if(c){ e.preventDefault(); if(await askConfirm('清除该密钥，确认？ · Clear this secret?','清除 · Clear')) putNodeCfg(c.dataset.cc,''); }
 };
 async function doReloadConfig(){
   const m=$('#cfgRestartMsg');
   m.style.color='var(--muted)'; m.textContent='';
   const g=await relayJson(api('/api/admin/reload-config',{method:'POST'}),'request');
   if(!g.ok){ m.style.color='var(--danger)'; m.textContent=g.text; return; }
-  m.style.color='var(--accent)'; m.textContent='reloaded · 已重载';
+  m.style.color='var(--accent)'; m.textContent='已重载 · reloaded';
   setTimeout(()=>{ m.textContent=''; },3000);
 }
 async function doNodeRestart(){
-  if(!await askConfirm('Restart the node now? Boot-time settings apply after restart. · 立即重启节点？重启后生效的设置将被应用。','Restart · 重启')) return;
+  if(!await askConfirm('立即重启节点？重启后生效的设置将被应用。 · Restart the node now? Boot-time settings apply after restart.','重启 · Restart')) return;
   const m=$('#cfgRestartMsg');
   // SCAR: this swallowed the result. `api` is a bare fetch, so a 401 (signed out — which
   // is exactly what a new origin gives you) or a 403 (not owner) never threw; the catch
   // was not even reached. The UI then said "restarting…", polled '/', got 200 from the
-  // server that had never gone down, and reported "restarted · 已重启" — a success message
+  // server that had never gone down, and reported "已重启 · restarted" — a success message
   // for a request that was refused (R14: a failed step must never read as a pass).
   const g=await relayJson(api('/api/admin/restart',{method:'POST'}),'request');
   if(!g.ok){ m.style.color='var(--danger)'; m.textContent=g.text; return; }   // nothing restarted — say so
   m.style.color='var(--muted)';
-  m.textContent='restarting · 重启中…';
+  m.textContent='重启中… · restarting';
   const t0=Date.now();
   const poll=setInterval(async()=>{
-    if(Date.now()-t0>120000){ clearInterval(poll); m.textContent='still down — check the node · 未恢复，请检查节点'; return; }
-    try{ const r=await fetch('/',{cache:'no-store'}); if(r.ok){ clearInterval(poll); m.textContent='restarted · 已重启'; } }catch{ /* still down — keep polling until the deadline above */ }
+    if(Date.now()-t0>120000){ clearInterval(poll); m.textContent='未恢复，请检查节点 · still down — check the node'; return; }
+    try{ const r=await fetch('/',{cache:'no-store'}); if(r.ok){ clearInterval(poll); m.textContent='已重启 · restarted'; } }catch{ /* still down — keep polling until the deadline above */ }
   },2000);
 }
 $('#nodeCfgWrap').addEventListener('toggle',()=>{ if($('#nodeCfgWrap').open) loadNodeCfg(); });
 $('#logoutBtn').onclick=(e)=>{ e.preventDefault(); logout(); };
 // Release-notes sheet content (pure builders — the test harness renders them
 // without a DOM). Latest RECENT_VERSIONS expanded; the rest behind a
-// "Show earlier · 更早版本" toggle.
+// "更早版本 · Show earlier" toggle.
 const RECENT_VERSIONS=3;
 // TODO(R4 seam): the release-notes sheet (verBadge, verBlock, verSheetHtml, showVerNotes) is its own part — web/vernotes-sheet.js.
 // n.auto: the automatic 'v<pkg>+<N>' entry's badge text, written by lib/version-auto.mjs (ONE wording).
 const verBadge=(t)=>'<span style="font-size:11px;font-weight:600;margin-left:6px;padding:1px 6px;border:1px solid var(--accent);border-radius:8px">'+t+'</span>';
 function verBlock(v,n,cur){
   const isCur=v===cur;
-  let h=`<div style="margin-bottom:18px${isCur?';border-left:3px solid var(--accent);padding-left:10px':''}"><div style="font-size:14px;font-weight:700;color:var(--accent)">${esc(v)}${isCur?verBadge('current · 当前'):''}${n.auto?verBadge(esc(n.auto)):''}<span style="font-weight:400;color:var(--muted);margin-left:8px;font-size:12px">${esc(n.date||'')}</span></div>`;
+  let h=`<div style="margin-bottom:18px${isCur?';border-left:3px solid var(--accent);padding-left:10px':''}"><div style="font-size:14px;font-weight:700;color:var(--accent)">${esc(v)}${isCur?verBadge('当前 · current'):''}${n.auto?verBadge(esc(n.auto)):''}<span style="font-weight:400;color:var(--muted);margin-left:8px;font-size:12px">${esc(n.date||'')}</span></div>`;
   const sec=(t,items)=>items&&items.length?`<div style="font-size:12px;font-weight:600;color:var(--muted);margin:8px 0 4px">${t}</div><ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.7">${items.map(f=>'<li>'+esc(f)+'</li>').join('')}</ul>`:'';
-  return h+sec('New · 新功能',n.features)+sec('Fixed · 修复',n.fixes)+'</div>';
+  return h+sec('新功能 · New',n.features)+sec('修复 · Fixed',n.fixes)+'</div>';
 }
 function verSheetHtml(vers,notes,cur){
-  if(!vers.length) return '<div style="color:var(--muted);font-size:13px;padding:8px 0 16px">No release notes yet · 暂无版本记录</div>';
+  if(!vers.length) return '<div style="color:var(--muted);font-size:13px;padding:8px 0 16px">暂无版本记录 · No release notes yet</div>';
   const blocks=vers.map(v=>verBlock(v,notes[v],cur));
   const recent=blocks.slice(0,RECENT_VERSIONS).join('');
   const earlier=blocks.slice(RECENT_VERSIONS).join('');
-  return recent+(earlier?'<button id="_ver_more" class="plain" style="width:100%;margin:2px 0 14px">Show earlier · 更早版本</button><div id="_ver_earlier" style="display:none">'+earlier+'</div>':'');
+  return recent+(earlier?'<button id="_ver_more" class="plain" style="width:100%;margin:2px 0 14px">更早版本 · Show earlier</button><div id="_ver_earlier" style="display:none">'+earlier+'</div>':'');
 }
 
 // Version label → release-notes sheet. Mouse: plain click opens. Touch/pen:
@@ -461,7 +461,7 @@ function markNewSel(sel,key){ markNew($(sel),key); }
     dlg.id='_ver_sheet';
     dlg.style.cssText='width:min(100vw - 24px,480px);max-width:none;box-sizing:border-box;padding:0;border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--text);overflow:hidden';
     dlg.innerHTML='<div style="display:flex;flex-direction:column;max-height:min(80dvh,80vh)">'
-      +'<div style="position:sticky;top:0;flex-shrink:0;display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line);background:var(--card)"><b style="flex:1;font-size:16px">Release Notes · 版本记录</b><button id="_ver_close" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);padding:0 2px">✕</button></div>'
+      +'<div style="position:sticky;top:0;flex-shrink:0;display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line);background:var(--card)"><b style="flex:1;font-size:16px">版本记录 · Release Notes</b><button id="_ver_close" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);padding:0 2px">✕</button></div>'
       +'<div style="overflow-y:auto;padding:16px 16px calc(16px + env(safe-area-inset-bottom));overflow-wrap:anywhere">'+verSheetHtml(vers,notes,cur)+'</div></div>';
     document.body.appendChild(dlg);
     const openedAt=Date.now();
@@ -477,7 +477,7 @@ function markNewSel(sel,key){ markNew($(sel),key); }
       const box=dlg.querySelector('#_ver_earlier');
       const show=box.style.display==='none';
       box.style.display=show?'':'none';
-      more.textContent=show?'Hide earlier · 收起更早版本':'Show earlier · 更早版本';
+      more.textContent=show?'收起更早版本 · Hide earlier':'更早版本 · Show earlier';
     };
     dlg.showModal();
   }
@@ -493,7 +493,7 @@ $('#pSave').onclick=async(e)=>{
   // A refused save (e.g. invalid 简报邮箱 · briefing email → 400) is SHOWN and the
   // dialog stays open for the fix — never silently closed as if saved (R5).
   // The prompt overrides can be long, so a 413 (BODY_LIMITS.profile) is reachable here:
-  // it must say "Too large · 内容过大 (max 64 KB)", never the same words a dropped
+  // it must say "内容过大 (max 64 KB) · Too large", never the same words a dropped
   // connection produces — and a null `r` used to make `r.json()` throw inside the try,
   // discarding the reason entirely.
   const g=await relayJson(api('/api/profile',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(body)}),'data');

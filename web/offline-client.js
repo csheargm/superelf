@@ -12,21 +12,21 @@
 // makeOffline on an in-memory IndexedDB and a fake line.
 const OFF_DB='pa-offline', OFF_DB_VERSION=1, OFF_WRITES='writes', OFF_FILES='files';
 // 'this device', never 'this iPad': the same shell runs on a phone and a desktop (F5-6).
-const OFF_TXT_OFFLINE='Offline · 离线 — saving on this device · 保存在本设备';
+const OFF_TXT_OFFLINE='离线 · Offline — 保存在本设备 · saving on this device';
 // Offline while the device itself has a network: the usual cause is the VPN (owner 2026-11-21: Tailscale
 // quietly needed a re-sign-in). Shown only then, so a real no-network day keeps the short line.
-const OFF_TXT_CHECK_VPN=' · check Tailscale or the node · 请检查 Tailscale 或节点';   // 'or the node': a plain-LAN install has no VPN
-const OFF_TXT_PENDING=' to sync · 待同步';   // '· 3 to sync · 待同步' (§5)
-const OFF_TXT_SYNCING='Syncing · 同步中';     // online with a queue, the drain running (web/offline-sync.js)
-const OFF_TXT_SYNC_FAIL='Sync failed · 同步失败 — ';   // + the node's sentence; a tap on the line retries
-const OFF_TXT_RETRY=' · tap to retry · 点按重试';
-const OFF_NEEDS_NODE='Needs the home node · 需要家中节点';
-const OFF_TXT_FULL='This device is full · 本设备存储已满 — not saved · 未保存';
-const OFF_TXT_NOT_KEPT='Could not keep it on this device · 无法保存在本设备';
-const OFF_TXT_NOT_HERE='Not on this device · 本设备上没有 — open it once online · 联网后打开一次';
+const OFF_TXT_CHECK_VPN=' · 请检查 Tailscale 或节点 · check Tailscale or the node';   // 'or the node': a plain-LAN install has no VPN
+const offTxtPending=n=>'待同步 '+n+' · '+n+' to sync';   // '· 待同步 3 · 3 to sync' (§5)
+const OFF_TXT_SYNCING='同步中 · Syncing';     // online with a queue, the drain running (web/offline-sync.js)
+const OFF_TXT_SYNC_FAIL='同步失败 · Sync failed — ';   // + the node's sentence; a tap on the line retries
+const OFF_TXT_RETRY=' · 点按重试 · tap to retry';
+const OFF_NEEDS_NODE='需要家中节点 · Needs the home node';
+const OFF_TXT_FULL='本设备存储已满 · This device is full — 未保存 · not saved';
+const OFF_TXT_NOT_KEPT='无法保存在本设备 · Could not keep it on this device';
+const OFF_TXT_NOT_HERE='本设备上没有 · Not on this device — 联网后打开一次 · open it once online';
 const OFF_WARM_KEY='pa_offline_warm';          // localStorage (PASW.remember): the warm cap from the last online read of the config
 const OFF_LOCAL_ORIGIN_KEY='pa_local_origin';  // localStorage (PASW.remember): config local_origin from that same read, for a boot with no public node (web/offline-origin.js)
-const OFF_TXT_HOME='Home node · 家中节点';
+const OFF_TXT_HOME='家中节点 · Home node';
 const OFF_FULL_MS=4000;   // the full line shows this long after it changes, then shrinks to a corner pill (tap shows it again)
 const OFF_MINI_OFFLINE='离线 Offline';      // the line, briefly, when the broker's base switched to the home name (§6)
 // Broker kinds that need the node (§5): answered with OFF_NEEDS_NODE while offline, so a component
@@ -81,7 +81,7 @@ async function offMirror(d,status,uid,slug,path,text,queued){
 // failure with tap-to-retry) or the count while nothing syncs (never 'Syncing' with no sync running, R14);
 // 'Home node' for a moment after the base switched to the home name (web/offline-origin.js).
 function offLineText(status,deviceOnline){   // deviceOnline: navigator.onLine — the phone has a network, the node is still unreachable
-  const n=status.pending, count=n?n+OFF_TXT_PENDING:'';
+  const n=status.pending, count=n?offTxtPending(n):'';
   if(status.net==='offline') return OFF_TXT_OFFLINE+(deviceOnline?OFF_TXT_CHECK_VPN:'')+(n?' · '+count:'');
   if(status.home) return OFF_TXT_HOME+(n?' · '+count:'');
   if(status.sync==='syncing') return OFF_TXT_SYNCING+(n?' · '+count:'');

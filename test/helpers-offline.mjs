@@ -63,7 +63,7 @@ export function standInNode(files, { build = 'b1' } = {}) {
       node.auth = req.headers.authorization || '';
       const json = (code, o) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(o)); };
       if (req.url === '/api/build') return json(200, { build, version: 'v1 · ' + build });
-      if (req.url === '/api/save-data') { const b = JSON.parse(body); posts.push(b.path); if (b.path.endsWith('fail.json')) return json(500, { ok: false, error: 'save failed · 保存失败', code: 'write_failed' }); files.set(b.path, b.data); return json(200, { ok: true, bytes: b.data.length }); }
+      if (req.url === '/api/save-data') { const b = JSON.parse(body); posts.push(b.path); if (b.path.endsWith('fail.json')) return json(500, { ok: false, error: '保存失败 · save failed', code: 'write_failed' }); files.set(b.path, b.data); return json(200, { ok: true, bytes: b.data.length }); }
       if (req.url.startsWith('/api/data/')) { const t = files.get(decodeURIComponent(req.url.slice('/api/data/'.length))); if (t == null) return json(404, { error: 'not found' }); res.writeHead(200, { 'content-type': 'text/plain' }); return res.end(t); }
       json(404, { error: 'nf' });
     });

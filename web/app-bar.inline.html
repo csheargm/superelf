@@ -37,7 +37,7 @@
   // it restarts the clock, and keepOpen holds it. A finger pull of PULL_PX down, or a scroll up past it, shows it.
   const IDLE_MS=4000, PULL_PX=24, USER_SCROLL_MS=1000;
   const NARROW_MQ='(max-width:600px)';   // the phone breakpoint every app page here uses
-  const TIP='Home and text size live here now — the bar hides after a few seconds; pull down or tap the top handle to bring it back · 主页和字号在这里；几秒后自动隐藏，下拉或点顶部把手返回';
+  const TIP='主页和字号在这里；几秒后自动隐藏，下拉或点顶部把手返回 · Home and text size live here now — the bar hides after a few seconds; pull down or tap the top handle to bring it back';
   const S={cfg:null,on:false,bar:null,hidden:false,handle:null,idle:0,lastY:0,mark:0,t0:null,pen:false,ptrs:new Set(),touches:0,held:false,inputAt:0};
   const el=(v)=>typeof v==='function'?v():v;
   const post=(type,d)=>{ try{ parent.postMessage({pa:'shell',type,d:d||0},'*'); }
@@ -94,7 +94,7 @@
     const c=S.cfg, bar=el(c.bar); if(!bar||S.bar) return;
     S.bar=bar; bar.classList.add('paab-on');
     const home=document.createElement('button'); home.type='button'; home.className='paab-btn paab-home';
-    home.title='Home · 主页'; home.setAttribute('aria-label','Home · 主页');
+    home.title='主页 · Home'; home.setAttribute('aria-label','主页 · Home');
     home.innerHTML='← <span class="paab-lbl">Home</span>';
     home.addEventListener('click',()=>post('home'));
     const hs=el(c.homeSlot)||bar; hs.insertBefore(home,hs.firstChild);
@@ -111,7 +111,7 @@
     // Any use of the bar restarts the idle clock.
     for(const ev of ['pointerdown','click','keydown','focusin','change']) bar.addEventListener(ev,arm,{passive:true,capture:true});
     const h=S.handle=document.createElement('button'); h.type='button'; h.className='paab-handle';
-    h.title='Show the bar · 显示栏'; h.setAttribute('aria-label','Show the bar');
+    h.title='显示栏 · Show the bar'; h.setAttribute('aria-label','Show the bar');
     // A Pencil resting near the top must not pull the bar over the page: finger / mouse only.
     let pen=false; h.addEventListener('pointerdown',(e)=>{ pen=e.pointerType==='pen'; });
     h.addEventListener('click',()=>{ if(pen){ pen=false; return; } setHidden(false); });

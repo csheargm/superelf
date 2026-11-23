@@ -33,13 +33,13 @@ test('an ordinary redraw never re-reads', () => {
   // redraws — open, rename, delete — must still stay unforced and cheap.
   assert.equal((CHAT.match(/refresh\(true\)/g) || []).length, 2, 'only the two deliberate callers force it');
   const menu = /async function moreMenu\(anchor\)\{[\s\S]*?\n      await acts\[pick\]\.run\(\); \}/.exec(CHAT);
-  assert.ok(menu && /\{label:'Refresh · 刷新',run:\(\)=>refresh\(true\)\}/.test(menu[0]), 'the ⋯ sheet\'s Refresh entry forces it');
+  assert.ok(menu && /\{label:'刷新 · Refresh',run:\(\)=>refresh\(true\)\}/.test(menu[0]), 'the ⋯ sheet\'s Refresh entry forces it');
   const wake = /const onWake=\(\)=>\{[\s\S]*?\n    \};/.exec(CHAT);
   assert.ok(wake && /refresh\(true\)/.test(wake[0]), 'and returning to the tab forces it');
 });
 
 test('the entry says what it is, in the header\'s ONE ⋯ sheet (owner 2026-11-11), and no ↺ button is left in the header', () => {
-  assert.match(CHAT, /'<button class="pac-new pac-dmore" title="More · 更多" aria-label="More · 更多">⋯<\/button>'/, 'bilingual, like its neighbours');
+  assert.match(CHAT, /'<button class="pac-new pac-dmore" title="更多 · More" aria-label="更多 · More">⋯<\/button>'/, 'bilingual, like its neighbours');
   assert.doesNotMatch(CHAT, /pac-drefresh|pac-dsort|pac-dsel\b/, 'the three header buttons are gone (test/drawer-groups.test.mjs drives the sheet)');
 });
 

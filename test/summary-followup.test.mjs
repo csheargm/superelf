@@ -17,7 +17,7 @@ import { QUESTION_PROMPT } from '../lib/followup-question.mjs';
 const EN = `## Reflections\n- A wet week on the roof [1]\n\n## ${TODO_HEADING}\n- Call the landlord about the gutter [1]\n- **Find out** whether solar tiles work on a flat roof [2]\n- [ ] Pay the November rent\n- Compare e-bike prices under $1500\n- Call the landlord about the gutter [1]\n\n## Sources\n- nothing`;
 const ZH = `## 反思\n- 屋顶漏水 [1]\n\n**待办事项：**\n1. 给房东打电话说明雨槽问题 [1]\n2. 了解平屋顶能否装太阳能瓦 [2]\n3. 交十一月房租\n\n其他说明`;
 
-test('extractTodos: the list under the to-do heading, EN (`## Open to-dos · 待办`) and 中文 (`**待办事项：**`), undressed, [n] dropped, unique; nothing without the heading', () => {
+test('extractTodos: the list under the to-do heading, EN (`## 待办 · Open to-dos`) and 中文 (`**待办事项：**`), undressed, [n] dropped, unique; nothing without the heading', () => {
   const en = extractTodos(EN);
   assert.equal(en.found, true);
   assert.deepEqual(en.items, ['Call the landlord about the gutter', 'Find out whether solar tiles work on a flat roof', 'Pay the November rent', 'Compare e-bike prices under $1500'], 'bold and checkbox undressed, the duplicate once, the Sources section not read');
@@ -25,7 +25,7 @@ test('extractTodos: the list under the to-do heading, EN (`## Open to-dos · 待
   assert.deepEqual(zh.items, ['给房东打电话说明雨槽问题', '了解平屋顶能否装太阳能瓦', '交十一月房租'], 'numbered list under a bold 中文 heading; the paragraph after it is not an item');
   assert.deepEqual(extractTodos('## Reflections\n- nothing open'), { items: [], dropped: 0, found: false });
   assert.deepEqual(extractTodos(''), { items: [], dropped: 0, found: false });
-  for (const h of ['## Open To-Dos', '### Open todos:', '**Open to-dos · 待办**', '## 待办', '# Todo list']) assert.equal(isTodoHeading(h), true, h);
+  for (const h of ['## Open To-Dos', '### Open todos:', '**待办 · Open to-dos**', '## 待办', '# Todo list']) assert.equal(isTodoHeading(h), true, h);
   for (const h of ['- Open to-dos are many', '## Reflections', 'Open to-dos', '## ' + 'x'.repeat(70) + ' 待办']) assert.equal(isTodoHeading(h), false, h);
   const long = `## ${TODO_HEADING}\n` + Array.from({ length: ITEMS_MAX + 3 }, (_, i) => `- item ${i}`).join('\n');
   const l = extractTodos(long); assert.equal(l.items.length, ITEMS_MAX); assert.equal(l.dropped, 3, 'past the cap: counted, not silently gone');
@@ -69,7 +69,7 @@ test('concurrency: at most FOLLOWUP_CONCURRENCY (2) items in flight, results in 
   const t = await buildFollowup(`## ${TODO_HEADING}\n- Find out A\n- Find out B\n- Find out C`, { research: (q) => (q === 'Find out A' ? never() : Promise.resolve({ ok: true, text: 'ok ' + q, sources: [] })), suggest: async () => 'x', perItemTimeoutMs: 30 });
   assert.ok(Date.now() - t0 < 2000, 'bounded by the deadline, not by the hung lane');
   assert.equal(t.partial, true); assert.deepEqual(t.items.map((i) => i.ok), [false, true, true]);
-  assert.equal(t.text.split('\n\n')[0], `### Find out A\n- ${TXT.noResult} — timed out after 30ms · 超时`);
+  assert.equal(t.text.split('\n\n')[0], `### Find out A\n- ${TXT.noResult} — 超时 · timed out after 30ms`);
 });
 
 const research = (items = {}) => (q) => (items[q] ? items[q]() : Promise.resolve({ ok: true, text: 'Answer for ' + q + ' [1]\nSecond line\nThird line\nFourth line', sources: [{ url: 'https://www.example.com/a' }, { url: 'https://b.org/x', error: 'boom' }, { url: 'https://c.net/' }] }));
@@ -84,13 +84,13 @@ test('buildFollowup: one heading per item, ≤3 whole-sentence bullets then ≤2
   assert.deepEqual(r.items.map((i) => [i.kind, i.ok]), [[KIND_PERSONAL, true], [KIND_RESEARCH, true], [KIND_PERSONAL, true], [KIND_RESEARCH, true]]);
   assert.equal(r.researched, 2); assert.equal(r.suggested, 2);
   assert.equal(r.text, ['### Call the landlord about the gutter\n- Do it on Monday morning.',
-    '### Find out whether solar tiles work on a flat roof\n- Answer for Find out whether solar tiles work on a flat roof\n- Second line\n- Third line\n- Sources · 来源: [example.com](https://www.example.com/a) · [c.net](https://c.net/)',
+    '### Find out whether solar tiles work on a flat roof\n- Answer for Find out whether solar tiles work on a flat roof\n- Second line\n- Third line\n- 来源 · Sources: [example.com](https://www.example.com/a) · [c.net](https://c.net/)',
     '### Pay the November rent\n- Do it on Monday morning.',
-    '### Compare e-bike prices under $1500\n- Answer for Compare e-bike prices under $1500\n- Second line\n- Third line\n- Sources · 来源: [example.com](https://www.example.com/a) · [c.net](https://c.net/)'].join('\n\n'),
+    '### Compare e-bike prices under $1500\n- Answer for Compare e-bike prices under $1500\n- Second line\n- Third line\n- 来源 · Sources: [example.com](https://www.example.com/a) · [c.net](https://c.net/)'].join('\n\n'),
   'three answer lines + one sources line of links; the [1] dropped; a failed source is not linked; an untitled source is titled by its host');
   // Caps: a 300-char line with no word break is cut to BULLET_CHARS; a long research block never exceeds 3 bullets.
   const longLine = 'x'.repeat(300);
-  const b = researchBullets({ ok: true, text: `${longLine}\n${longLine}\n${longLine}\n${longLine}\n\n**Sources · 来源**\n1. [a](https://a.com)`, sources: [] });
+  const b = researchBullets({ ok: true, text: `${longLine}\n${longLine}\n${longLine}\n${longLine}\n\n**来源 · Sources**\n1. [a](https://a.com)`, sources: [] });
   assert.equal(b.length, BULLETS_MAX); for (const l of b) assert.equal(l.length, BULLET_CHARS); assert.equal(b[0].endsWith('…'), true);
   assert.equal(formatBlock([{ item: 'i', bullets: ['a', 'b', 'c', 'd', 'e'] }]).split('\n').length, 5, 'formatBlock keeps 3 bullets + the sources line whatever it is handed');
   // Failures: a timed-out research item, a rejected one, an ok:false one, an empty suggestion — each on its own line, the block partial.
@@ -99,13 +99,13 @@ test('buildFollowup: one heading per item, ≤3 whole-sentence bullets then ≤2
   const p = await buildFollowup(text, { research: research({ 'Find out A': slow, 'Find out B': () => Promise.reject(new Error('Tavily HTTP 500')), 'Find out C': () => Promise.resolve({ ok: false, text: 'Search failed · 搜索失败 — x' }) }),
     suggest: suggest({ 'Pay D': () => Promise.resolve('   \n'), 'Pay E': () => Promise.reject(new Error('Ollama HTTP 410')) }), perItemTimeoutMs: 20 });
   assert.equal(p.partial, true); assert.deepEqual(p.items.map((i) => i.ok), [false, false, false, false, false]);
-  assert.equal(p.text, `### Find out A\n- ${TXT.noResult} — timed out after 20ms · 超时\n\n### Find out B\n- ${TXT.failed} — Tavily HTTP 500\n\n### Find out C\n- ${TXT.failed} — Search failed · 搜索失败 — x\n\n### Pay D\n- ${TXT.empty}\n\n### Pay E\n- ${TXT.failed} — Ollama HTTP 410`);
+  assert.equal(p.text, `### Find out A\n- ${TXT.noResult} — 超时 · timed out after 20ms\n\n### Find out B\n- ${TXT.failed} — Tavily HTTP 500\n\n### Find out C\n- ${TXT.failed} — Search failed · 搜索失败 — x\n\n### Pay D\n- ${TXT.empty}\n\n### Pay E\n- ${TXT.failed} — Ollama HTTP 410`);
   // The research cap: the sixth researchable item is not sent and says so; no keys: every researchable item says so, the personal ones still run.
   const many = `## ${TODO_HEADING}\n` + Array.from({ length: RESEARCH_MAX_ITEMS + 1 }, (_, i) => `- Find out thing ${i}`).join('\n') + '\n- Pay the rent';
   const c = { research: [] };
   const m = await buildFollowup(many, { research: (q) => { c.research.push(q); return research()(q); }, suggest: suggest(), perItemTimeoutMs: 1000 });
   assert.equal(c.research.length, RESEARCH_MAX_ITEMS); assert.equal(m.partial, true);
-  assert.match(m.text, new RegExp(`### Find out thing ${RESEARCH_MAX_ITEMS}\\n- Not researched \\(cap ${RESEARCH_MAX_ITEMS}\\)`));
+  assert.match(m.text, new RegExp(`### Find out thing ${RESEARCH_MAX_ITEMS}\\n- 未研究（上限 ${RESEARCH_MAX_ITEMS}） · Not researched \\(cap ${RESEARCH_MAX_ITEMS}\\)`));
   const none = await buildFollowup(EN, { research: null, suggest: suggest(), perItemTimeoutMs: 1000 });
   assert.equal(none.partial, true); assert.equal(none.researched, 0); assert.equal(none.suggested, 2);
   assert.match(none.text, new RegExp(`### Find out whether solar tiles work on a flat roof\\n- ${TXT.unavailable.replace(/[()]/g, '\\$&')}`));
@@ -188,7 +188,7 @@ test('POST /api/summary-followup over the real web.mjs (writer = a stub fast lan
   assert.equal(r.status, 200); const j = await r.json();
   assert.equal(j.ok, true); assert.equal(j.heading, FOLLOWUP_HEADING); assert.equal(j.partial, false, JSON.stringify(j));
   assert.deepEqual(j.items.map((i) => [i.item, i.kind, i.ok]), [['Call the landlord about the gutter', KIND_PERSONAL, true], ['Find out whether solar tiles work on a flat roof', KIND_RESEARCH, true], ['Pay the November rent', KIND_PERSONAL, true], ['Compare e-bike prices under $1500', KIND_RESEARCH, true]]);
-  assert.match(j.text, /### Find out whether solar tiles work on a flat roof\n- Flat roofs take solar tiles with a tilt frame\. Check the warranty\.\n- Sources · 来源: \[Solar on flat roofs\]\(https:\/\/www\.solar\.example\/flat\)/, 'the writer\'s answer, [1] dropped, the source as a link');
+  assert.match(j.text, /### Find out whether solar tiles work on a flat roof\n- Flat roofs take solar tiles with a tilt frame\. Check the warranty\.\n- 来源 · Sources: \[Solar on flat roofs\]\(https:\/\/www\.solar\.example\/flat\)/, 'the writer\'s answer, [1] dropped, the source as a link');
   assert.match(j.text, /### Call the landlord about the gutter\n- Ask for a written quote first\./);
   const searches = seen.filter((s) => s.path === '/search').map((s) => s.body.query);
   assert.deepEqual(searches.sort(), ['Best e-bikes under $1500 in 2026?', 'Do solar tiles work on a flat roof?'], 'the search engine saw the writer\'s one question per research to-do');

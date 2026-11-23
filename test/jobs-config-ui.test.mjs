@@ -76,11 +76,11 @@ test('web.mjs: JOBS titles double as bilingual labels (R3 — no parallel labels
 // ── web/index.html: shell UI ─────────────────────────────────────────────────
 test('shell: Jobs · 任务 collapsible for every user; rows honest, Run now confirmed, reminder Remove reuses the existing path', () => {
   assert.match(html, /<details id="jobsWrap"/);
-  assert.match(html, /Jobs · 任务/);
+  assert.match(html, /任务 · Jobs/);
   assert.match(html, /无法加载任务/, 'R5: a failed load is shown, never an empty-looking list');
   assert.match(html, /outcomeLabel/, 'outcome painted from the SERVER\'s audit-derived field');
   assert.match(html, /失败/, 'failed outcome shown bilingually');
-  assert.match(html, /askConfirm\(`Run "\$\{rb\.dataset\.jlabel\}" now\? · 立即运行该任务？`,'Run now · 立即运行'\)/, 'Run now goes through the shared confirm');
+  assert.match(html, /askConfirm\(`立即运行该任务？ · Run "\$\{rb\.dataset\.jlabel\}" now\?`,'立即运行 · Run now'\)/, 'Run now goes through the shared confirm');
   // The ENDPOINT is the contract; which expression supplies the name is not. This first pinned
   // `encodeURIComponent(rb.dataset.runjob)` inline and broke when the run-now fix hoisted that
   // into a `jobName` const — same endpoint, same source, a false regression.
@@ -93,23 +93,23 @@ test('shell: Jobs · 任务 collapsible for every user; rows honest, Run now con
 
 test('shell: ONE confirm surface — shellConfirm delegates to askConfirm; new sections use it too', () => {
   assert.match(html, /function askConfirm\(text,okLabel\)/);
-  assert.match(html, /return askConfirm\(`App requests: \$\{en\}/, 'shellConfirm is now a thin wording wrapper (R3)');
+  assert.match(html, /return askConfirm\(`应用请求\$\{zh\}，确认？ · App requests: \$\{en\}/, 'shellConfirm is now a thin wording wrapper (R3)');
   assert.equal((html.match(/d\.showModal\(\)/g) || []).length >= 1, true);
-  assert.match(html, /askConfirm\('Clear this secret\? · 清除该密钥，确认？','Clear · 清除'\)/);
-  assert.match(html, /askConfirm\('Restart the node now\?/, 'restart confirmed in shell chrome');
+  assert.match(html, /askConfirm\('清除该密钥，确认？ · Clear this secret\?','清除 · Clear'\)/);
+  assert.match(html, /askConfirm\('立即重启节点？[^']* · Restart the node now\?/, 'restart confirmed in shell chrome');
 });
 
 test('shell: Node settings · 节点设置 is owner-only, secrets are write-only in the DOM, restart polls until the node answers', () => {
   assert.match(html, /<details id="nodeCfgWrap" style="display:none/, 'hidden until the profile load proves owner');
   assert.match(html, /\$\('#nodeCfgWrap'\)\.style\.display=ME\.role==='owner'\?'block':'none'/);
-  assert.match(html, /Node settings · 节点设置/);
-  assert.match(html, /type="password" placeholder="paste to replace · 粘贴以替换" autocomplete="new-password"/, 'secret inputs start blank and never prefill');
-  assert.match(html, /SET · 已设置/); assert.match(html, /empty · 未设置/);
-  assert.match(html, /after restart · 重启后生效/, 'boot-time fields marked');
-  assert.match(html, /Apply &amp; restart · 应用并重启/);
+  assert.match(html, /节点设置 · Node settings/);
+  assert.match(html, /type="password" placeholder="粘贴以替换 · paste to replace" autocomplete="new-password"/, 'secret inputs start blank and never prefill');
+  assert.match(html, /已设置 · SET/); assert.match(html, /未设置 · empty/);
+  assert.match(html, /重启后生效 · after restart/, 'boot-time fields marked');
+  assert.match(html, /应用并重启 · Apply &amp; restart/);
   assert.match(html, /loadNodeCfg\(\); \/\/ re-render from the server's view/, 'a typed secret never lingers in the DOM after save');
   assert.match(html, /fetch\('\/',\{cache:'no-store'\}\)/, 'restart poll hits / uncached');
-  assert.match(html, /restarted · 已重启/);
+  assert.match(html, /已重启 · restarted/);
   assert.match(html, /未恢复，请检查节点/, 'poll deadline is honest, not an infinite spinner');
   assert.match(html, /无法加载配置/, 'R5 failure state for the config list');
 });

@@ -232,10 +232,10 @@ document.getElementById('loc-input').addEventListener('keydown', e => {
 // "no city yet". Saves are not blocked: a check replaces this whole file with the city just typed.
 (async () => {
   const r = await broker('data', { path: POLLEN_PATH });
-  if (!r.ok && r.code !== 'not-found') setStatus('Saved city not loaded · 未能读取已存城市 — ' + (r.text || r.error));
+  if (!r.ok && r.code !== 'not-found') setStatus('未能读取已存城市 · Saved city not loaded — ' + (r.text || r.error));
   if (r.ok) {
     let saved;
-    try { saved = JSON.parse(r.text); } catch (e) { setStatus('Saved city unreadable · 已存城市无法读取 (' + e.message + ')'); }
+    try { saved = JSON.parse(r.text); } catch (e) { setStatus('已存城市无法读取 · Saved city unreadable (' + e.message + ')'); }
     if (saved && saved.location) {
       currentLoc = saved.location;
       document.getElementById('loc-input').value = saved.location;

@@ -39,11 +39,11 @@ test('a save with no network is queued and answered {ok:true,offline:true}; the 
   assert.deepEqual({ ...h.writes()[0], ts: 0 }, { seq: 1, uid: 'u1', slug: 'notes', path: 'entry-e1.json', text: '{"v":2,"pages":[]}', bytes: 18, ts: 0, kind: 'save-data' });
   assert.equal(h.files()[0].queued, true, 'the mirror row is marked queued: never trimmed');
   assert.equal(h.o.offline(), true);
-  assert.equal(h.line.textContent, OFF_TXT_OFFLINE + OFF_TXT_CHECK_VPN + ' · 1 to sync · 待同步');
+  assert.equal(h.line.textContent, OFF_TXT_OFFLINE + OFF_TXT_CHECK_VPN + ' · 待同步 1 · 1 to sync');
   assert.ok(h.line.classList.contains('on'));
   await h.o.write('notes', 'journal.json', '{"v":1}', async () => NET);
   assert.equal(h.o.status().pending, 2);
-  assert.equal(h.line.textContent, OFF_TXT_OFFLINE + OFF_TXT_CHECK_VPN + ' · 2 to sync · 待同步');
+  assert.equal(h.line.textContent, OFF_TXT_OFFLINE + OFF_TXT_CHECK_VPN + ' · 待同步 2 · 2 to sync');
 });
 
 test('a 4xx/5xx is a real refusal: passed through, nothing queued, the device stays online', async () => {
@@ -66,7 +66,7 @@ test('reads: the node first; with no network a warm path is served from the mirr
   assert.deepEqual(await h.o.read('notes', 'journal.json', async () => NET), { ok: true, text: '{"v":1,"entries":[]}', offline: true });
   const cold = await h.o.read('notes', 'entry-never.json', async () => NET);
   assert.equal(cold.ok, false); assert.equal(cold.code, 'offline');
-  assert.match(cold.error, /Not on this device · 本设备上没有/);
+  assert.match(cold.error, /本设备上没有 · Not on this device/);
   assert.equal(h.line.textContent, OFF_TXT_OFFLINE + OFF_TXT_CHECK_VPN, 'offline, nothing queued');
   // Back: a successful read flips the line off again.
   await h.o.read('notes', 'journal.json', async () => online);
@@ -77,7 +77,7 @@ test('quota: {ok:false,code:"offline-full"}, nothing queued, the count unchanged
   const h = harness();
   h.f.state.quota = true;
   const r = await h.o.write('notes', 'a.json', '{}', async () => NET);
-  assert.equal(r.ok, false); assert.equal(r.code, 'offline-full'); assert.match(r.error, /This device is full · 本设备存储已满/);
+  assert.equal(r.ok, false); assert.equal(r.code, 'offline-full'); assert.match(r.error, /本设备存储已满 · This device is full/);
   assert.equal(h.writes().length, 0); assert.equal(h.o.status().pending, 0);
   // A store that fails for another reason is not "full" and is not ok either.
   h.f.state.quota = false;
@@ -124,7 +124,7 @@ test('greyed features: a kind that needs the node is refused only while offline,
   h.o.noteNet(false);
   assert.deepEqual(h.o.refuse('note-search'), { ok: false, code: 'offline', error: OFF_NEEDS_NODE, text: OFF_NEEDS_NODE });
   assert.equal(h.o.refuse('data'), null, 'a read is never refused up front: it has a mirror to try');
-  assert.equal(OFF_NEEDS_NODE, 'Needs the home node · 需要家中节点');
+  assert.equal(OFF_NEEDS_NODE, '需要家中节点 · Needs the home node');
 });
 
 test('the browser\'s online/offline events move the line; the count is read back at boot', async () => {
@@ -132,9 +132,9 @@ test('the browser\'s online/offline events move the line; the count is read back
   await h.o.write('notes', 'a.json', '{}', async () => NET);
   h.d.net(true);
   assert.equal(h.o.offline(), false);
-  assert.equal(h.line.textContent, '1 to sync · 待同步', 'online with a queue: the count, never "Syncing" while nothing syncs (session 3)');
+  assert.equal(h.line.textContent, '待同步 1 · 1 to sync', 'online with a queue: the count, never "Syncing" while nothing syncs (session 3)');
   h.d.net(false);
-  assert.equal(h.line.textContent, OFF_TXT_OFFLINE + OFF_TXT_CHECK_VPN + ' · 1 to sync · 待同步');
+  assert.equal(h.line.textContent, OFF_TXT_OFFLINE + OFF_TXT_CHECK_VPN + ' · 待同步 1 · 1 to sync');
   // A second PAOffline over the same database (the next boot) finds the queue.
   const o2 = makeOffline({ ...h.d, line: () => h.line });
   await o2.boot();
@@ -179,14 +179,14 @@ test('broker flow: save with the node gone → queued ok; read it back from this
   await gone.post({ id: 3, kind: 'save-data', path: 'entry-e1.json', data: { v: 3, pages: [] } }); await settle();
   assert.deepEqual(gone.reply(3), { pa: 'res', id: 3, ok: true, offline: true, bytes: 18 }, 'queued on this device');
   assert.equal(f.rows(OFF_DB, 'writes').length, 1);
-  assert.equal(line.textContent, OFF_TXT_OFFLINE + OFF_TXT_CHECK_VPN + ' · 1 to sync · 待同步');
+  assert.equal(line.textContent, OFF_TXT_OFFLINE + OFF_TXT_CHECK_VPN + ' · 待同步 1 · 1 to sync');
   await gone.post({ id: 4, kind: 'data', path: 'entry-e1.json' }); await settle();
   assert.deepEqual(gone.reply(4), { pa: 'res', id: 4, ok: true, text: '{"v":3,"pages":[]}', offline: true }, 'read back from the mirror');
   await gone.post({ id: 5, kind: 'data', path: 'journal.json' }); await settle();
   assert.deepEqual(gone.reply(5), { pa: 'res', id: 5, ok: true, text: '{"live":1}', offline: true }, 'the warm set from the online session');
   await gone.post({ id: 6, kind: 'data', path: 'entry-cold.json' }); await settle();
   assert.equal(gone.reply(6).ok, false); assert.equal(gone.reply(6).code, 'offline');
-  assert.match(gone.reply(6).text, /Not on this device · 本设备上没有/, 'relayFail rendered the reason');
+  assert.match(gone.reply(6).text, /本设备上没有 · Not on this device/, 'relayFail rendered the reason');
   await gone.post({ id: 7, kind: 'note-search', q: 'x' }); await settle();
   assert.deepEqual(gone.reply(7), { pa: 'res', id: 7, ok: false, code: 'offline', error: OFF_NEEDS_NODE, text: OFF_NEEDS_NODE }, 'greyed: refused at once');
   assert.equal(gone.held.size, 0, 'nothing left in flight');
@@ -197,7 +197,7 @@ test('broker without IndexedDB (every other suite): a save-data with no node is 
   const B = loadShellBroker(base, { app: 'notes' });
   await B.post({ id: 1, kind: 'save-data', path: 'a.json', data: {} }); await settle();
   assert.equal(B.reply(1).code, 'network');
-  assert.match(B.reply(1).text, /Connection failed · 连接失败/);
+  assert.match(B.reply(1).text, /连接失败 · Connection failed/);
 });
 
 test('wiring in the shell as served: the part last, both broker hooks, the refusal first, the line, boot and ping', () => {
@@ -211,7 +211,7 @@ test('wiring in the shell as served: the part last, both broker hooks, the refus
   assert.match(SHELL, /await ensureToken\(\);\n\s*PAOffline\.boot\(\);/, 'boot after the sign-in');
   assert.match(SHELL, /catch\{ if\(T===t0&&!signal\) PAOffline\.noteNet\(false\); return 'offline'; \} if\(T!==t0\) return false;[^\n]*\n  if\(signal\)\{ let j0; try\{ j0=await r\.clone\(\)\.json\(\); \}catch\{ return false; \}[^\n]*\n  PAOffline\.noteNet\(true\);/, 'ping tells the line both ways');
   assert.match(SHELL, /remember:PASW\.remember, recall:PASW\.recall,/, 'one per-device memory (R3)');
-  assert.equal(SHELL.split("'Needs the home node · 需要家中节点'").length, 2, 'the sentence is written once');
+  assert.equal(SHELL.split("'需要家中节点 · Needs the home node'").length, 2, 'the sentence is written once');
 });
 
 test('the offline line shows in full for a few seconds, then shrinks to a corner pill; a tap shows it again', async () => {
@@ -239,7 +239,7 @@ test('owner 2026-11-21: offline with the device on a network adds "check Tailsca
   assert.equal(h.line.textContent, OFF_TXT_OFFLINE, 'no network at all: the short line');
   const h2 = harness(); h2.o.noteNet(false);
   assert.equal(h2.line.textContent, OFF_TXT_OFFLINE + OFF_TXT_CHECK_VPN, 'network up, node unreachable: the VPN hint');
-  assert.match(OFF_TXT_CHECK_VPN, /check Tailscale or the node · 请检查 Tailscale 或节点/);
+  assert.match(OFF_TXT_CHECK_VPN, /请检查 Tailscale 或节点 · check Tailscale or the node/);
 });
 test('GPT: losing the device network while already offline drops the Tailscale hint', async () => {
   let up = true; const h = harness(); h.d.onLine = () => up;
@@ -247,12 +247,12 @@ test('GPT: losing the device network while already offline drops the Tailscale h
   up = false; h.o.noteNet(false); assert.equal(h.line.textContent, OFF_TXT_OFFLINE);
 });
 
-// F5-6 (overnight 2026-11-22): the offline line said "saving on this device · 保存在本设备" on a
+// F5-6 (overnight 2026-11-22): the offline line said "保存在本设备 · saving on this device" on a
 // phone and a desktop too. The shell cannot know the device, so every offline string says
-// "this device · 本设备" — one word for every screen it runs on.
+// "本设备 · this device" — one word for every screen it runs on.
 test('offline strings never name one kind of device', () => {
   const texts = OFFLINE_CORE.match(/const OFF_TXT_\w+='[^']*'/g) || [];
   assert.ok(texts.length >= 6, 'the offline strings were found');
   for (const t of texts) assert.doesNotMatch(t, /iPad|iPhone|Mac\b/, t);
-  assert.match(OFFLINE_CORE, /const OFF_TXT_OFFLINE='Offline · 离线 — saving on this device · 保存在本设备'/);
+  assert.match(OFFLINE_CORE, /const OFF_TXT_OFFLINE='离线 · Offline — 保存在本设备 · saving on this device'/);
 });

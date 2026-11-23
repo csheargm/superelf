@@ -31,7 +31,7 @@ for (const app of APPS) {
       assert.equal(A.INK_PEN.isShown(), false, 'a finger and a mouse leave it hidden');
       penStroke(dom, v16.en, 11, 16, 7);
       assert.equal(A.INK_PEN.cluster.classList.contains('on'), true, 'a Pencil stroke shows it');
-      assert.equal(A.INK_PEN.button.title, 'Pen tools · 笔工具', 'English then 中文');
+      assert.equal(A.INK_PEN.button.title, '笔工具 · Pen tools', 'English then 中文');
       assert.equal(A.INK_PEN.cluster.style.right, '716px', 'pinned 12px inside the LIST\'s right edge (#verses ends at 320 in a 1024 window: the rail beside it stays clear)');
       A.INK_PEN.button.onclick(); assert.equal(A.INK_PEN.sheet.classList.contains('on'), true, 'tap opens the sheet');
       A.INK_PEN.button.onclick(); assert.equal(A.INK_PEN.sheet.classList.contains('on'), false, 'tap again closes it');
@@ -55,13 +55,13 @@ for (const app of APPS) {
     try {
       const { dom, A, v16 } = await boot(app, h);
       assert.equal(A.INK_PEN.ui.grid.innerHTML, ENG_PALETTE.swatchesHtml('color'), 'the pad\'s swatch markup, not a copy');
-      assert.deepEqual(A.INK_PEN.ui.toolBtns.map((b) => b.title), ['Pen · 笔', 'Highlighter · 荧光笔', 'Eraser · 橡皮']);
-      assert.deepEqual(A.INK_PEN.ui.sizeBtns.map((s) => s.b.title), ['Thin · 细', 'Medium · 中', 'Thick · 粗']);
+      assert.deepEqual(A.INK_PEN.ui.toolBtns.map((b) => b.title), ['笔 · Pen', '荧光笔 · Highlighter', '橡皮 · Eraser']);
+      assert.deepEqual(A.INK_PEN.ui.sizeBtns.map((s) => s.b.title), ['细 · Thin', '中 · Medium', '粗 · Thick']);
       await pick(A, { t: 'highlighter', size: 'thick', c: RED });
       penStroke(dom, v16.en, 11, 16, 7);
       const hl = A.INK.groups().at(-1).strokes[0];
       assert.deepEqual({ c: hl.c, w: hl.w, t: hl.t, a: hl.a }, { c: RED, w: ENG_PALETTE.HILITE_W, t: 'highlighter', a: ENG_PALETTE.HILITE_ALPHA });
-      assert.equal(A.INK_PEN.ui.cap.textContent, 'Highlighter · 荧光笔 — Thick · 粗');
+      assert.equal(A.INK_PEN.ui.cap.textContent, '荧光笔 · Highlighter — 粗 · Thick');
       await pick(A, { t: 'pen', size: 'medium' });
       penStroke(dom, v16.en, 21, 26, 8);
       const p = A.INK.groups().at(-1).strokes[0];
@@ -148,7 +148,7 @@ for (const app of APPS) {
       again.pen.fire('message', { data: { pa: 'prefs', fontScale: 1 } }); await again.A.INK_PEN.whenIdle();
       assert.equal(again.A.INK_PEN.choice().t, 'erase', 'the shell\'s prefs push re-reads');
       store.refuse = true; await pick(again.A, { t: 'pen' });
-      assert.equal(again.A.INK_PEN.ui.msg.textContent, 'Not saved · 未保存 — disk full', 'R5: a refused write is said in the sheet');
+      assert.equal(again.A.INK_PEN.ui.msg.textContent, '未保存 · Not saved — disk full', 'R5: a refused write is said in the sheet');
     } finally { await h.stop(); }
   });
 }
@@ -168,7 +168,7 @@ test('twin: both Bible copies carry the marker after PAInkAnchor\'s and the one 
   }
 });
 
-// R3 review 2026-11-13: the sheet dropped from "Pen · 笔" kept its old top/left after an iPad rotation
+// R3 review 2026-11-13: the sheet dropped from "笔 · Pen" kept its old top/left after an iPad rotation
 // (the resize listener only re-placed a SHOWN floating button). It now re-drops below its control.
 const NO_REDROP = (s) => s.replace(' if(open&&dropFrom) drop(dropFrom);', '');
 for (const app of APPS) {

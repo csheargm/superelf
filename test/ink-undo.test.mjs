@@ -65,7 +65,7 @@ test('Bible: ↶ and ↷ beside the pen button step the chapter file back and fo
   try {
     const { dom, A, v16 } = await boot('bible (live)', h);
     const P = A.INK_PEN, off = (b) => b.classList.contains('off');
-    assert.deepEqual([P.undoButton.title, P.redoButton.title], ['Undo · 撤销', 'Redo · 重做'], 'English then 中文');
+    assert.deepEqual([P.undoButton.title, P.redoButton.title], ['撤销 · Undo', '重做 · Redo'], 'English then 中文');
     assert.deepEqual([off(P.undoButton), off(P.redoButton)], [true, true], 'nothing to undo or redo at boot');
     assert.equal(P.cluster.classList.contains('on'), false, 'hidden with the pen button until a Pencil comes');
     penStroke(dom, v16.en, 11, 16, 7); penStroke(dom, v16.en, 21, 26, 8);

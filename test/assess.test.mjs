@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { runAssessment, callPanelModel, pickPanel, ollamaMessages, agentPrompt, buildSummaryPrompt, inconclusiveSummary, ANSWER_CAP } from '../lib/assess.mjs';
 
 const CHAT_MODELS = [
-  { id: 'deepseek', label: 'DeepSeek · 中文', group: 'Fast', provider: 'ollama', model: 'deepseek-cloud' },
+  { id: 'deepseek', label: '中文 · DeepSeek', group: 'Fast', provider: 'ollama', model: 'deepseek-cloud' },
   { id: 'glm', label: 'GLM', group: 'Deep', provider: 'ollama', model: 'glm-cloud' },
   { id: 'claude', label: 'Claude', group: 'Agent', provider: 'claude', model: null },
   { id: 'gpt', label: 'GPT (Codex)', group: 'Agent', provider: 'codex', model: null },

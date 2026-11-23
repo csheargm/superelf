@@ -8,7 +8,7 @@
        proved the file absent, and the failure is reported through the host's notice (R5).
      - Writes are serialized and coalesced: one in flight at a time, and the next one carries the newest
        state, so rapid chapter taps never race and never lose the latest chapter.
-     - render(box) draws the list (Reading history · 阅读历史) with a two-tap "Clear history · 清除历史"
+     - render(box) draws the list (Reading history · 阅读历史) with a two-tap "清除历史 · Clear history"
        (window.PATwoTap: sandboxed pages have no confirm()); a row tap calls onPick(b, c).
      attach({store:{read(path), write(path,text)}, ST:{loaded,absent,failed}, bookName(b)->{en,zh},
              onPick(b,c), notice(msg,key), noticeOk(key), now?(), locale?})
@@ -29,9 +29,9 @@
   const PATH='reading.json';
   const CAP=100;                               // entries kept; older ones fall off the end
   const JUST_NOW_MS=60*1000;                   // under a minute reads "Just now"
-  const TXT={ title:'Reading history · 阅读历史', clear:'Clear history · 清除历史', ask:'Clear? · 清除?',
-    justNow:'Just now · 刚刚', unreadable:'Reading history unreadable · 阅读记录无法读取',
-    notSaved:'Reading history not saved · 阅读记录未保存' };
+  const TXT={ title:'阅读历史 · Reading history', clear:'清除历史 · Clear history', ask:'清除? · Clear?',
+    justNow:'刚刚 · Just now', unreadable:'阅读记录无法读取 · Reading history unreadable',
+    notSaved:'阅读记录未保存 · Reading history not saved' };
   const okInt=(n,min)=>Number.isInteger(n)&&n>=min;
   const okEntry=(e)=>!!e&&okInt(e.b,0)&&okInt(e.c,1)&&typeof e.at==='number'&&isFinite(e.at);
 

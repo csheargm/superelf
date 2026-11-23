@@ -29,13 +29,13 @@ test('addReminder: validates id, text, HH:MM time, weekday; idempotent by id', (
 
 test('addReminder: SEMANTIC dedupe — a re-proposed flag approved under a fresh action id never stacks an identical reminder', () => {
   const u = mkUser();
-  addReminder(u, { id: 'health-brief-T1-a0', text: 'Walk 20 minutes · 散步20分钟', time: '18:00' });
+  addReminder(u, { id: 'health-brief-T1-a0', text: '散步20分钟 · Walk 20 minutes', time: '18:00' });
   // Week 2: same flag re-proposed → new briefing id → new action id. Id-only
   // dedupe registered a second identical 18:00 nag (R13 finding).
-  const again = addReminder(u, { id: 'health-brief-T2-a0', text: 'Walk 20 minutes · 散步20分钟', time: '18:00' });
+  const again = addReminder(u, { id: 'health-brief-T2-a0', text: '散步20分钟 · Walk 20 minutes', time: '18:00' });
   assert.equal(again.id, 'health-brief-T1-a0', 'the existing reminder is returned');
   assert.equal(loadReminders(u).length, 1, 'no duplicate');
-  addReminder(u, { id: 'health-brief-T3-a0', text: 'Walk 20 minutes · 散步20分钟', time: '19:00' });
+  addReminder(u, { id: 'health-brief-T3-a0', text: '散步20分钟 · Walk 20 minutes', time: '19:00' });
   assert.equal(loadReminders(u).length, 2, 'a genuinely different time is a different reminder');
 });
 
@@ -73,7 +73,7 @@ test('first fire = NEXT occurrence: approved after HH:MM → not today (no hours
 
 test('tick: fires once per local day after HH:MM, marks shared with the job engine', async () => {
   const u = mkUser();
-  addReminder(u, { id: 'walk', text: 'Walk 20 minutes · 散步20分钟', time: '18:00', created: LONG_AGO });
+  addReminder(u, { id: 'walk', text: '散步20分钟 · Walk 20 minutes', time: '18:00', created: LONG_AGO });
   const { events, audit } = mkAudit();
   const delivered = [];
   const deliver = async (usr, rem, now) => delivered.push({ id: rem.id, text: rem.text });
@@ -91,7 +91,7 @@ test('tick: fires once per local day after HH:MM, marks shared with the job engi
 
 test('tick: weekly reminder fires only on its weekday', async () => {
   const u = mkUser();
-  addReminder(u, { id: 'chk', text: 'Check Shortcut · 检查快捷指令', time: '09:00', day: 6, created: LONG_AGO });
+  addReminder(u, { id: 'chk', text: '检查快捷指令 · Check Shortcut', time: '09:00', day: 6, created: LONG_AGO });
   const { audit } = mkAudit();
   const delivered = [];
   await remindersTick({ users: [u], audit, deliver: async (_, r) => delivered.push(r.id), now: new Date(2026, 8, 4, 10, 0) }); // Friday
@@ -201,8 +201,8 @@ test('updateReminderTime records the adjustment: adjustedAt anchor + the left sl
 
 test('addReminder back-compat: a re-approved flag upgrades a legacy flagless reminder in place', () => {
   const u = mkUser();
-  addReminder(u, { id: 'old-a0', text: 'Walk 20 minutes · 散步20分钟', time: '18:00' }); // pre-flag era
-  const again = addReminder(u, { id: 'hb-2-a0', text: 'Walk 20 minutes · 散步20分钟', time: '18:00', flag: 'steps_min_daily' });
+  addReminder(u, { id: 'old-a0', text: '散步20分钟 · Walk 20 minutes', time: '18:00' }); // pre-flag era
+  const again = addReminder(u, { id: 'hb-2-a0', text: '散步20分钟 · Walk 20 minutes', time: '18:00', flag: 'steps_min_daily' });
   assert.equal(again.id, 'old-a0', 'semantic dedupe returns the existing reminder');
   assert.equal(loadReminders(u)[0].flag, 'steps_min_daily', 'the legacy entry gains the adherence join key');
   assert.equal(loadReminders(u).length, 1);

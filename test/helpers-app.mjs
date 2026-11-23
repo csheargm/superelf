@@ -249,7 +249,7 @@ function startServer({ dir }) {
 const SERVED = new Set(['data', 'save-data', 'notes-list', 'bible', 'bible-search']);
 // The broker's catch: the one place a branch's throw becomes a reply. Pinned, so the fault check in
 // makeRelay cannot go quiet if the shell renames its code.
-assert.ok(SHELL.includes("reply({ok:false,code:'relay-error',error:'shell relay error · 外壳中转出错: '"),
+assert.ok(SHELL.includes("reply({ok:false,code:'relay-error',error:'外壳中转出错 · shell relay error: '"),
   "the broker's catch still answers code 'relay-error'");
 
 function makeRelay(port, slug) {

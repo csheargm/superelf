@@ -31,9 +31,9 @@ body{display:flex;flex-direction:column}
 
 <div id="home">
   <div class="icon">🔬</div>
-  <p>Ask a question and get a reasoned answer. Pick the model in the composer; tap <b>Verify · 校验</b> to cross-check it with independent models.</p>
-  <button id="start">Ask · 提问</button>
-  <div class="hint">Past sessions live in the drawer · 历史记录在抽屉里</div>
+  <p>Ask a question and get a reasoned answer. Pick the model in the composer; tap <b>校验 · Verify</b> to cross-check it with independent models.</p>
+  <button id="start">提问 · Ask</button>
+  <div class="hint">历史记录在抽屉里 · Past sessions live in the drawer</div>
 </div>
 
 <!--PA_CHAT_UI-->
@@ -54,7 +54,7 @@ const chat = PAChat.fullscreen({
   defaultModel: 'claude',
   placeholder: 'Ask anything…',
   system: 'You are a research assistant. Answer carefully and concretely. State what is well established, what is contested, and what you are unsure of — never pad. When you rely on a source, name it. 重要术语保留英文。',
-  greeting: 'Ask anything · 问点什么。Pick a model below, and tap Verify · 校验 to cross-check the answer.',
+  greeting: '问点什么 · Ask anything。在下方选择模型，点「校验」交叉核对答案 · Pick a model below, and tap Verify to cross-check the answer.',
   getLabel: () => 'Research 研究',
   persist: 'research-chats',
   onClose: () => { document.getElementById('home').style.display = 'flex'; },

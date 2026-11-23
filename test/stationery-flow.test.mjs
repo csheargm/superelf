@@ -71,8 +71,8 @@ test('MUTATION: without guarding the panels, the second tap starts a second AI t
 });
 // ── Stopping a turn: the timeout, reset, a newer run and Cancel ABORT the channel's signal ────
 const WAIT = 5 * 60 * 1000;   // the studio's AI_WAIT_MS, unmutated: the mock clock makes 5 minutes free
-const CANCELLED = 'Cancelled · 已取消';
-const TIMED_OUT = 'AI request failed · AI 请求失败 — no answer after 5 minutes · 超时未回答';
+const CANCELLED = '已取消 · Cancelled';
+const TIMED_OUT = 'AI 请求失败 · AI request failed — 超时未回答 · no answer after 5 minutes';
 const flush = () => new Promise((r) => setImmediate(r));   // setImmediate is not mocked: it drains the promises
 const clock = (t, apis = ['setTimeout', 'setInterval', 'Date']) => t.mock.timers.enable({ apis, now: 0 });
 const never = (seen) => (m, o) => { seen.push(o.signal); return new Promise(() => {}); };
@@ -124,9 +124,9 @@ test('picker: while the AI works the message counts the time, and Cancel is the 
   btn('✨').click();
   assert.equal(btn('Cancel ·').style.display, 'none', 'no Cancel while nothing is in flight');
   btn('Design ·').click();
-  assert.equal(say(), 'Working… 0:00 · 处理中…');
+  assert.equal(say(), '处理中… · Working… 0:00');
   t.mock.timers.tick(72000);
-  assert.equal(say(), 'Working… 1:12 · 处理中…', 'it advances each second');
+  assert.equal(say(), '处理中… · Working… 1:12', 'it advances each second');
   assert.equal(btn('Cancel ·').style.display, ''); assert.equal(btn('Cancel ·').disabled, false, 'the busy guard leaves Cancel on');
   assert.equal(btn('Design ·').disabled, true);
   pending[0].res({ ok: true, text: GOOD, convoId: 'c1' }); await flush();
@@ -152,7 +152,7 @@ test('picker: Cancel aborts the turn, ends busy, says Cancelled, offers Try agai
   assert.equal(drawn(), false, 'the late answer paints nothing'); assert.equal(say(), CANCELLED);
   btn('Try again ·').click();
   assert.equal(pending.length, 2); assert.equal(pending[1].o.signal.aborted, false, 'Try again is a fresh turn with a live signal');
-  assert.equal(say(), 'Working… 0:00 · 处理中…', 'counted from its own start');
+  assert.equal(say(), '处理中… · Working… 0:00', 'counted from its own start');
   pending[1].res({ ok: true, text: GOOD, convoId: 'c2' }); await flush();
   assert.equal(drawn(), true);
 });
@@ -161,7 +161,7 @@ test('picker: after AI_WAIT_MS the turn is aborted and the timeout is the messag
   const { pending, btn, say } = mountStudio();
   btn('✨').click(); btn('Design ·').click();
   t.mock.timers.tick(WAIT - 1000); await flush();
-  assert.equal(pending[0].o.signal.aborted, false); assert.equal(say(), 'Working… 4:59 · 处理中…');
+  assert.equal(pending[0].o.signal.aborted, false); assert.equal(say(), '处理中… · Working… 4:59');
   t.mock.timers.tick(1000); await flush();
   assert.equal(pending[0].o.signal.aborted, true, 'the server job is told to stop, not just abandoned');
   assert.equal(say(), TIMED_OUT);
@@ -179,11 +179,11 @@ test('picker: a reset and a newer run each abort the turn in flight', async (t) 
   // a newer run with no reset in between: a second Tweak, forced past the guard
   const b = mountStudio();
   b.btn('✨').click(); b.btn('Design ·').click(); b.pending[0].res({ ok: true, text: GOOD, convoId: 'c1' }); await flush();
-  b.host.querySelectorAll('input').find((i) => String(i.placeholder).startsWith('What to change')).value = 'blue dots';
+  b.host.querySelectorAll('input').find((i) => String(i.placeholder).includes('What to change')).value = 'blue dots';
   b.btn('Tweak ·').click(); b.btn('Tweak ·').disabled = false; b.btn('Tweak ·').click(); await flush();
   assert.equal(b.pending.length, 3);
   assert.deepEqual(b.pending.slice(1).map((p) => p.o.signal.aborted), [true, false], 'the older tweak was aborted, the newer is live');
-  assert.equal(b.say(), 'Working… 0:00 · 处理中…', 'and its ticker is the newer run’s');
+  assert.equal(b.say(), '处理中… · Working… 0:00', 'and its ticker is the newer run’s');
 });
 // The whole Journal path, picker -> studio -> PAChat.complete (chat-ui's own source, over the real broker
 // head), wired exactly as the Journal's host line is. The shell here never answers: the job runs on.
@@ -228,7 +228,7 @@ test('MUTATION: without the run token, a run that a reset ended writes over the 
     btn('Design ·').disabled = false; btn('Design ·').click(); await flush();
     assert.equal(pending[0].o.signal.aborted, true, 'the reset aborted the first turn');
     assert.equal(btn('Design ·').disabled, !clobbered, clobbered ? 'mutant: the guard is off mid-run' : 'shipped: still guarded');
-    assert.equal(say(), clobbered ? CANCELLED : 'Working… 0:00 · 处理中…');
+    assert.equal(say(), clobbered ? CANCELLED : '处理中… · Working… 0:00');
     pending[1].res({ ok: false, error: 'done' }); await flush();
   }
 });

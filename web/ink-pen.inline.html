@@ -8,7 +8,7 @@
        session (PAInkAnchor's onPen), and stays: a finger-only reader never sees a control for ink.
        Pinned to the list's bottom-right corner, above the fab and the safe area.
      - floating:false — NO round button: the host opens the SAME sheet from its own control with
-       openSheet(control) (the Bible's top-bar "Pen · 笔", owner 2026-11-13). The sheet then drops below
+       openSheet(control) (the Bible's top-bar "笔 · Pen", owner 2026-11-13). The sheet then drops below
        that control, and a press outside both closes it. onToggle(open) tells the host (aria-expanded, so its
        auto-hiding bar stays while the sheet is open).
      - The choice {t, size, c} is a per-app pref ON THE SERVER, kept through PAAppPrefs (web/app-prefs.inline.html,
@@ -49,12 +49,12 @@
   const TOOL_IDS=Object.freeze(['pen','highlighter','erase']);         // the subset of PANote's TOOLS the verse ink takes
   const ZH=Object.freeze({pen:'笔',highlighter:'荧光笔',erase:'橡皮'});   // the 中文 half of each tool's label (the English is the pad's title)
   // Three sizes, as points along the pad's pen scale (SIZE_MIN..SIZE_MAX) and fractions of its highlighter width.
-  const SIZES=Object.freeze([['thin','Thin · 细',0.1,0.6],['medium','Medium · 中',0.25,0.8],['thick','Thick · 粗',0.5,1]]);
-  const PREF_KEY='inkPen', BTN_LABEL='Pen tools · 笔工具', EDGE_PX=12, DOT_MAX=14;
-  const TIP='Pen tools: pen, highlighter, eraser, size and colour · 笔工具：笔、荧光笔、橡皮擦、粗细和颜色';
-  const NOT_SAVED='Not saved · 未保存';
-  const UNDO_LABEL='Undo · 撤销', REDO_LABEL='Redo · 重做', POS_KEY='inkPenPos', DRAG_PX=8, GAP_PX=8, POS_MAX=6;
-  const HIST_TIP='Undo · 撤销, Redo · 重做 — drag to move · 拖动可移动';
+  const SIZES=Object.freeze([['thin','细 · Thin',0.1,0.6],['medium','中 · Medium',0.25,0.8],['thick','粗 · Thick',0.5,1]]);
+  const PREF_KEY='inkPen', BTN_LABEL='笔工具 · Pen tools', EDGE_PX=12, DOT_MAX=14;
+  const TIP='笔工具：笔、荧光笔、橡皮擦、粗细和颜色 · Pen tools: pen, highlighter, eraser, size and colour';
+  const NOT_SAVED='未保存 · Not saved';
+  const UNDO_LABEL='撤销 · Undo', REDO_LABEL='重做 · Redo', POS_KEY='inkPenPos', DRAG_PX=8, GAP_PX=8, POS_MAX=6;
+  const HIST_TIP='撤销 · Undo，重做 · Redo — 拖动可移动 · drag to move';
   // ── DOM-free placement: the cluster's top-left inside the viewport minus the safe areas and EDGE_PX ──
   function clampPos(x,y,w,h,vw,vh,ins){
     const i=ins||{t:0,r:0,b:0,l:0}, lo=(a,s)=>a+EDGE_PX, hi=(v,b,s)=>v-b-EDGE_PX-s;
@@ -79,7 +79,7 @@
     if(ch.t==='highlighter') return {t:ch.t,c:ch.c,w:round2(pal.HILITE_W*st[3]),a:pal.HILITE_ALPHA};
     return {t:ch.t,c:ch.c,w:round2(pal.SIZE_MIN+(pal.SIZE_MAX-pal.SIZE_MIN)*st[2])};
   }
-  const toolLabel=(pal,id)=>{ const t=pal.TOOLS.find(x=>x[0]===id); return (t?t[2]:id)+' · '+ZH[id]; };
+  const toolLabel=(pal,id)=>{ const t=pal.TOOLS.find(x=>x[0]===id); return ZH[id]+' · '+(t?t[2]:id); };
   const caption=(pal,ch)=>toolLabel(pal,ch.t)+(ch.t==='erase'?'':' — '+SIZES.find(s=>s[0]===ch.size)[1]);
 
   function el(tag,cls,title){ const e=document.createElement(tag); e.className=cls; if(title){ e.title=title; e.setAttribute('aria-label',title); } return e; }

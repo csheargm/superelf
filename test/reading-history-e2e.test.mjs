@@ -51,7 +51,7 @@ test('the Bible reopens where you were reading; Search lists the history newest 
     assert.deepEqual(await where(f), [0, '2'], 'reopened at Genesis 2');
     await f.evaluate(() => document.getElementById('search-btn').click());
     const list = await rows(f);
-    assert.equal(list[0], '创世记 Genesis 第 2 章 | Just now · 刚刚');
+    assert.equal(list[0], '创世记 Genesis 第 2 章 | 刚刚 · Just now');
     assert.match(list[1], /^创世记 Genesis 第 1 章 \| /);
     assert.match(list[2], /^约翰福音 John 第 3 章 \| /);
     assert.equal(list.length, 3, 'deduped: Genesis 2 was loaded twice (go + reload) but listed once');
@@ -72,7 +72,7 @@ test('the Bible reopens where you were reading; Search lists the history newest 
     // Clear asks first: one tap arms, the second clears.
     await f.evaluate(() => document.querySelector('.prh-clear').click());
     assert.equal((await rows(f)).length, 3, 'one tap only asks');
-    assert.match(await f.evaluate(() => document.querySelector('.prh-clear').textContent), /Clear\? · 清除\?/);
+    assert.match(await f.evaluate(() => document.querySelector('.prh-clear').textContent), /清除\? · Clear\?/);
     await f.evaluate(() => document.querySelector('.prh-clear').click());
     assert.equal((await rows(f)).length, 0, 'cleared');
     await f.evaluate(() => RH.idle());
@@ -133,7 +133,7 @@ test('the first-use tip "Your reading history is in Search" shows beside the Sea
         near: Math.abs((r.left + r.right) / 2 - (a.left + a.right) / 2) < innerWidth && Math.min(Math.abs(r.top - a.bottom), Math.abs(a.top - r.bottom)) < 60,
         btnShown: a.width > 0 && a.right <= innerWidth };
     });
-    assert.match(g.text, /Your reading history is in Search · 阅读历史在搜索里/);
+    assert.match(g.text, /阅读历史在搜索里 · Your reading history is in Search/);
     assert.ok(g.btnShown && g.inView && g.near, JSON.stringify(g));
   } finally { await ctx.close(); }
 });

@@ -125,7 +125,7 @@ test('srcdoc route: data-app names the page at once, src goes, the HTML follows;
   assert.equal(h.fr.srcdoc, '<!doctype html><title>notes</title>', 'only the page of the app the frame now names');
   assert.deepEqual(h.log.fetched, ['/app/u1/bible/', '/app/u1/notes/']);
   h.c.frameLoad('u1', 'missing'); await settle();
-  assert.match(h.fr.srcdoc, /^<!doctype html><meta charset="utf-8"><p>Could not open · 无法打开 — HTTP 404<\/p>$/);
+  assert.match(h.fr.srcdoc, /^<!doctype html><meta charset="utf-8"><p>无法打开 · Could not open — HTTP 404<\/p>$/);
   h.c.frameLoad('u1', 'bible'); await settle();   // back to the src-less frame on a good page
   assert.equal(h.fr.srcdoc, '<!doctype html><title>bible</title>');
 });
@@ -161,7 +161,7 @@ test('prefetch stops short honestly (R14): over the byte cap → "capped", a fai
   assert.equal(await capped.c.prefetch('u1'), 'capped');
   assert.equal(capped.log.fetched.filter((u) => u.startsWith('/api/bible?')).length, 2, 'the second chapter crossed the cap; the third was never asked');
   assert.ok(!capped.log.posted.some((m) => m.kind === 'pa-bible-done'), 'the worker is NOT told done');
-  assert.match(capped.c.status().error, /byte cap · 圣经预取已达字节上限/);
+  assert.match(capped.c.status().error, /圣经预取已达字节上限 · Bible prefetch stopped at the byte cap/);
   const failed = harness({ config: { apps: [], bible_cap_bytes: 1e9, bible: [3] }, chapterBytes: new Error('HTTP 500') });
   failed.setAnswer((m) => (m.kind === 'pa-bible-status' ? { kind: 'pa-bible-status', done: false } : { kind: 'pa-bundle', ok: true }));
   await started(failed);

@@ -92,7 +92,7 @@ test('the readout line from fake metrics', () => {
 });
 
 test('the readout lives in the existing page-settings sheet and refreshes when it opens', () => {
-  const sheet = /<div class="pan-pop pan-paperpop">'\+([\s\S]*?)'<div class="pan-customlbl">Template/.exec(ENGINE);
+  const sheet = /<div class="pan-pop pan-paperpop">'\+([\s\S]*?)'<div class="pan-customlbl">模板 · Template/.exec(ENGINE);
   assert.ok(sheet, 'the page settings sheet must be findable');
   assert.match(sheet[1], /pan-pgtext/, 'the Transcript row is in the same sheet');
   assert.match(sheet[1], /<div class="pan-devro"><\/div>/, 'the readout slot sits in that sheet — no new button');

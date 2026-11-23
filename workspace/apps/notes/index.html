@@ -79,7 +79,7 @@ function paLoad(path){ return new Promise(res=>{ const id=++_id; _wait[id]=res; 
 // replied left the promise pending forever, hanging flushAll() during pagehide. Both fixed here;
 // the ok-vs-not rule and the deadline are PANote's (R3 — one definition for every app).
 function paSave(path,data){ return new Promise(res=>{ const id=++_id;
-  const t=setTimeout(()=>{ delete _wait[id]; res({ok:false,error:'save timed out · 保存超时'}); },PANote.SAVE_TIMEOUT_MS);
+  const t=setTimeout(()=>{ delete _wait[id]; res({ok:false,error:'保存超时 · save timed out'}); },PANote.SAVE_TIMEOUT_MS);
   _wait[id]=m=>{ clearTimeout(t); res(PANote.saveOutcome(m)); };
   parent.postMessage({pa:'req',id,kind:'save-data',path,data},'*'); }); }
 // Image IO for PANote's photo hooks (same broker kinds as the Bible app's Draw pad — R3):
@@ -132,7 +132,7 @@ const LOAD_TIMEOUT_MS=20000;
 const PA_LOAD=PANote.LOAD;
 const PA_ST=PA_LOAD.STATUS;
 // The refusal a REPLACE-ONLY write gets when this session never established what the path holds.
-const PA_UNKNOWN='not read this session · 本次未读取 — refusing to replace it 拒绝覆盖';
+const PA_UNKNOWN='本次未读取 · not read this session — refusing to replace it 拒绝覆盖';
 // io = { load(path)->Promise<brokerReply>, save(path,text)->Promise<{ok,error}>, now?, timeoutMs? }
 function makeReader(io){
   const timeoutMs=io.timeoutMs||LOAD_TIMEOUT_MS;
@@ -171,15 +171,15 @@ function makeReader(io){
   async function read(path,opts){
     const o=opts||{};
     const m=await deadline(io.load(path));
-    if(m&&m.__late) return fail(path,'read timed out · 读取超时','timeout');
+    if(m&&m.__late) return fail(path,'读取超时 · read timed out','timeout');
     const out=PA_LOAD.fromBroker(m);
     if(out.status===PA_ST.loaded) return ok(path,out);
     // Every non-loaded outcome that is not a PROVEN absence is a failure — including a reply that
     // carried no code at all, which is what the shell used to send for a 401/500/network drop.
     if(out.status===PA_ST.failed) return fail(path,out.error,out.code);
-    if(o.mustExist) return fail(path,'listed but missing · 已列出却读不到 — refusing to recreate it 拒绝重建','vanished');
+    if(o.mustExist) return fail(path,'已列出却读不到 · listed but missing — refusing to recreate it 拒绝重建','vanished');
     return (await absentEarned(path)) ? ok(path,out)
-      : fail(path,'a previous version exists · 存在旧版本 — refusing to start blank 拒绝以空白开始','bak_present');
+      : fail(path,'存在旧版本 · a previous version exists — refusing to start blank 拒绝以空白开始','bak_present');
   }
   // EVERY write goes through here: a path we could not READ is a path we must not WRITE.
   // opts = { replaces:true   this write DESTROYS whatever the path currently holds (a page file,
@@ -270,8 +270,8 @@ const DATA=makeReader({load:paLoad,save:paSave});
 // Stationery · 信纸: the bundled designs plus "My templates" (templates/ in this app's own data,
 // through the SAME checked DATA read/write as a note). No component inlined = no stationery.
 const STN_STORE=window.PAStationery?window.PAStationery.store({read:(p)=>DATA.read(p),write:(p,t)=>DATA.write(p,t)}):null;
-const STN_NOT_LOADED='My templates could not be read · 我的模板无法读取';
-const STN_PIC_NOT_LOADED='Stationery picture could not be loaded · 信纸图片无法加载';
+const STN_NOT_LOADED='我的模板无法读取 · My templates could not be read';
+const STN_PIC_NOT_LOADED='信纸图片无法加载 · Stationery picture could not be loaded';
 // An uploaded picture comes back as a data: URL through attach-url — the photo's own path (R3).
 const imageUrlOf=async(path)=>{ const r=await paAttachUrl(path); return (r&&r.ok)?r.dataUrl:null; };
 // A picture used AS stationery is fetched the same way; a failure is NAMED, keyed to that picture.
@@ -280,7 +280,7 @@ if(STN_STORE) window.PAStationery.pictures(async(p)=>{ const u=await imageUrlOf(
 // The 信纸 studio's IO: My templates, the journal's AI channel (PAChat.complete = the 'chat' broker
 // kind, confined app lane — the AI only answers) and the photo upload (PAPhoto, maxEdge chosen by the studio).
 const STN_HOST=STN_STORE&&{store:STN_STORE,
-  ai:(message,o)=>window.PAChat&&PAChat.complete?PAChat.complete(message,o):Promise.resolve({ok:false,error:'Ask AI is not on this page · 此页面没有 AI'}),
+  ai:(message,o)=>window.PAChat&&PAChat.complete?PAChat.complete(message,o):Promise.resolve({ok:false,error:'此页面没有 AI · Ask AI is not on this page'}),
   upload:(file,o)=>window.PAPhoto?PAPhoto.upload(file,o):Promise.resolve({ok:false,text:PANote.PHOTO_TXT.noComponent})};
 // Deleted here (V6, round 3): `noticeClear()`, which cleared the WHOLE surface whenever the two
 // paths it happened to check were unblocked. It erased reports about every OTHER path — the
@@ -378,8 +378,8 @@ async function flushIndex(){ return S.iTimer ? writeIndexNow() : {ok:true}; }
 // `alert` is deliberately not a fallback anywhere: the sandbox has no allow-modals (no-op here).
 function padFlash(msg){ if(pad&&pad.flash) pad.flash(msg); }
 // Bilingual message prefixes — one source each (R3).
-const IDX_NOT_SAVED='Note list not saved · 笔记列表未保存';
-const NOT_LOADED='Could not open this note · 无法打开此笔记';
+const IDX_NOT_SAVED='笔记列表未保存 · Note list not saved';
+const NOT_LOADED='无法打开此笔记 · Could not open this note';
 const WRITES_BLOCKED=' — not saving until it loads 载入成功前不会保存';
 const PHOTO_FAILED=PANote.PHOTO_TXT.failed;
 const UPLOAD_KEY='uploads';             // notice key for the photo store (not an app-data path)
@@ -462,7 +462,7 @@ pad=PANote.fullscreen({
       if(why){ paNotice(NOT_LOADED+' — '+why+WRITES_BLOCKED,'',contentPath(curId)); return {ok:false,error:why}; } }
     else if(DATA.blockedReason(IDX_PATH)) return {ok:false,error:DATA.blockedReason(IDX_PATH)};
     const e=curId?entryById(curId):promoteNote(nb);   // first save of a blank page promotes it to a real entry
-    if(!e) return {ok:false,error:'no entry · 无条目'};
+    if(!e) return {ok:false,error:'无条目 · no entry'};
     const r=await writeNote(e.id,nb);
     if(!r.ok) return r;
     e.updated=Date.now(); e.preview=previewOf(nb); e.derived=derivedTitleOf(nb); scheduleIndex();
@@ -488,11 +488,11 @@ pad=PANote.fullscreen({
     const r=await window.PAPhoto.upload(file,{name:file.name||'image.png',what:'Photo',
       maxEdge:window.PAPhoto.DEFAULT_MAX_EDGE});
     if(r&&r.ok){ paNoticeOk(UPLOAD_KEY); return r.path; }
-    const why=(r&&(r.text||r.error))||'upload rejected · 上传被拒绝';
+    const why=(r&&(r.text||r.error))||'上传被拒绝 · upload rejected';
     paNotice(PHOTO_FAILED+' — '+why,'',UPLOAD_KEY);
     return {ok:false,error:why,text:(r&&r.text)||''}; },   // an OUTCOME, so the pad's own flash carries the reason too
   imageUrl:imageUrlOf,
-  // Diagnostics — PANote's "Send Pencil log · 发送笔迹日志" (ink popover) writes its Pencil recorder
+  // Diagnostics — PANote's "发送笔迹日志 · Send Pencil log" (ink popover) writes its Pencil recorder
   // here: debug/pencil-log-<time>.json in this app's own data namespace, through the same checked
   // write as a note. Timings, contact kinds and geometry: NOT the handwriting (inking moves carry
   // no x/y; a contact's start and end points are kept), and never text, images, ids or titles.
@@ -526,7 +526,7 @@ function promoteNote(nb){
 // on the row's ⋯ — it is an action on a list item, not on the note being edited. ──
 // ── Period summaries · 按时期总结 (plan E) — the drawer's bulk Summarize, through THIS rail ────
 // run: the pressed turn goes into the Ask AI rail under its summary scope (a normal chat turn,
-// saved like any other, follow-ups continue it); monthSummary: an existing "Summary · 总结 YYYY-MM"
+// saved like any other, follow-ups continue it); monthSummary: an existing "总结 YYYY-MM · Summary"
 // entry's text, read from its own file (the year preset reuses it instead of re-sending the month);
 // saveNote: a NEW entry for EVERY run (owner 2026-11-12: runs of the same period are all kept), through
 // the same writeNote + index path as every note, bound to the thread, on the blank 'plain' page; with `id`
@@ -582,7 +582,7 @@ const drawer=PAChat.listDrawer({
     // The pointer is released only AFTER the server confirms. Releasing first would leave a live
     // thread with nothing pointing at it — invisible in the list, and unreachable (R5: the
     // failure is shown and the binding is kept, rather than silently half-applied).
-    if(!r||!r.ok){ paNotice('Could not delete the AI chat · 无法删除 AI 对话'+((r&&r.error)?' — '+r.error:''),'',IDX_PATH); return; }
+    if(!r||!r.ok){ paNotice('无法删除 AI 对话 · Could not delete the AI chat'+((r&&r.error)?' — '+r.error:''),'',IDX_PATH); return; }
     askData.unbindConvo(cid);            // drops e.chat — the same release path a ☰ delete uses
     if(railChat) railChat.newChat();     // the surface must not keep showing a thread that is gone
     if(curId===id) syncAsk();            // ...and the rail closes: this note no longer has a chat
@@ -623,7 +623,7 @@ const askData={
   // A summary thread (plan E) gets the component's ONE system line instead; `k` is the thread's key.
   system:(k)=>(window.PADrawerSummary&&window.PADrawerSummary.isScope(k))?window.PADrawerSummary.SYSTEM:
     'You are helping with a personal handwritten journal. Answer briefly and plainly. '+
-    'Reply in the language the user writes in · 用用户使用的语言回答。',
+    '用用户使用的语言回答。 · Reply in the language the user writes in',
   // The chip the chat list shows for this thread, so a conversation is recognisable as belonging
   // to a note rather than appearing as an untitled chat.
   getLabel:(k)=>{ if(window.PADrawerSummary&&PADrawerSummary.isScope(k)) return PADrawerSummary.titleOf(PADrawerSummary.periodOfScope(k));
@@ -658,7 +658,7 @@ const askData={
 // null = use the built-in default; a non-null string is the user's saved override.
 // DEFAULT_CTX_PREFIX uses {title} as a placeholder — replaced with the note's display title at
 // call time in contextPrefix() above. OCR_PROMPT is referenced at call time in askAboutImage.
-const DEFAULT_CTX_PREFIX='About my journal note "{title}" · 关于我的日记《{title}》';
+const DEFAULT_CTX_PREFIX='关于我的日记《{title}》 · About my journal note "{title}"';
 const CTX_PREFIX_FILE='context-prefix.json';
 const OCR_PROMPT_FILE='ocr-prompt.json';
 let _ctxPrefixOverride=null, _ocrPromptOverride=null;
@@ -677,8 +677,8 @@ if(window.PASettings&&PASettings.available){
     host:pad.el.querySelector('.pan-top'),
     appPrompt:askData.system(),
     extras:[{
-      label:'Note context prefix · 笔记上下文前缀',
-      hint:'Prepended to every message you send. Use {title} for the note name. Leave blank to restore the default · 每条消息的前缀；用 {title} 代表笔记名，留空则恢复默认。',
+      label:'笔记上下文前缀 · Note context prefix',
+      hint:'每条消息的前缀；用 {title} 代表笔记名，留空则恢复默认 · Prepended to every message you send. Use {title} for the note name. Leave blank to restore the default。',
       getValue:()=>_ctxPrefixOverride!==null?_ctxPrefixOverride:DEFAULT_CTX_PREFIX,
       onCommit:async(v)=>{
         const r=await DATA.write(CTX_PREFIX_FILE, JSON.stringify({tpl:v}));
@@ -686,8 +686,8 @@ if(window.PASettings&&PASettings.available){
         return r;
       },
     },{
-      label:'Photo transcription prompt · 照片转写提示',
-      hint:'Sent automatically when you ask about a photo. Leave blank to restore the default · 询问照片时自动发送的提示，留空则恢复默认。',
+      label:'照片转写提示 · Photo transcription prompt',
+      hint:'询问照片时自动发送的提示，留空则恢复默认。 · Sent automatically when you ask about a photo. Leave blank to restore the default',
       getValue:()=>_ocrPromptOverride!==null?_ocrPromptOverride:OCR_PROMPT,
       onCommit:async(v)=>{
         const r=await DATA.write(OCR_PROMPT_FILE, JSON.stringify({prompt:v}));
@@ -710,12 +710,12 @@ const chatScope=()=>'note:'+(curId||'blank');
 const OCR_PROMPT=
   'Transcribe this photographed document into text, keeping its headings and numbering · '+
   '请将这张文档照片转写为文字，保留标题与编号。\n\n'+
-  'Then answer questions about it from the transcription · 之后请依据转写内容回答我的提问。';
+  '之后请依据转写内容回答我的提问。 · Then answer questions about it from the transcription';
 
 function ensureRail(){
   if(rail||!splitOn()) return rail;
   rail=PASplit.open({ ratio:0.34, slots:[
-    { key:'chat', title:'Ask AI · 问一问', zone:'right', min:280, collapsed:true,
+    { key:'chat', title:'问一问 · Ask AI', zone:'right', min:280, collapsed:true,
       mount:(host,r)=>{ railChat=PAChat.panel(Object.assign({ host }, askData, {
         // PAChat calls this before opening a thread from its own ☰ list, so tapping a chat row
         // expands the slot instead of loading into a pane nobody can see.
@@ -729,7 +729,7 @@ function ensureRail(){
 // Open the chat for this note. Returns false when there is no room for a rail — the caller says
 // so rather than appearing to do nothing.
 async function openAsk(scope){                     // scope: a thread other than this note's (a period summary)
-  if(!ensureRail()||!railChat){ paNotice('Ask AI needs a wider screen · 问一问需要更宽的屏幕','','ask'); return false; }
+  if(!ensureRail()||!railChat){ paNotice('问一问需要更宽的屏幕 · Ask AI needs a wider screen','','ask'); return false; }
   rail.open(); rail.expand('chat'); askOpen=true;
   const s=scope||chatScope();
   if(await railChat.open(s)===false||(!scope&&chatScope()!==s)) return false;   // AWAITED: a send before this lands in the wrong thread; false = superseded or the note changed meanwhile
@@ -757,9 +757,9 @@ async function askAboutImage(im){
   // Attached BY PATH — the photo is already on the server, so asking about it costs no upload and
   // no second copy of the bytes. The model is told where the file is; PAChat writes that line.
   if(!railChat.attach({name:'page.jpg',path:im.path})){
-    paNotice('Could not attach the photo · 无法附加图片','','ask'); return;
+    paNotice('无法附加图片 · Could not attach the photo','','ask'); return;
   }
-  if(await railChat.send(_ocrPromptOverride!==null?_ocrPromptOverride:OCR_PROMPT)===false) paNotice('Still answering · 正在回答中…','','ask');
+  if(await railChat.send(_ocrPromptOverride!==null?_ocrPromptOverride:OCR_PROMPT)===false) paNotice('正在回答中… · Still answering','','ask');
   syncDrawer();   // the note now has a conversation — the list should say so without a reload
 }
 
@@ -772,7 +772,7 @@ async function askAboutImage(im){
 // bilingual notice keyed to THAT note, so the next note's successful save cannot hide the failure.
 // The unsaved strokes are still in this tab's notebook object — there is no second store any more
 // — so the message says exactly that and points back at the note.
-const PREV_UNSAVED='Previous note not saved · 上一条未保存 — reopen it to retry 请重新打开该笔记重试';
+const PREV_UNSAVED='上一条未保存 · Previous note not saved — reopen it to retry 请重新打开该笔记重试';
 // The report belongs to the OUTGOING note's path, captured before the switch: only a later
 // confirmed write of THAT note may retire it. Keyed to the incoming note (or to nothing at all,
 // as it was) the very next successful save erased it — the note that did not land is exactly the
@@ -802,7 +802,7 @@ async function deleteById(id){
   const keep=S.entries;
   S.entries=S.entries.filter(x=>x.id!==id);
   const idx=await writeIndexNow();
-  if(!idx.ok){ S.entries=keep; syncDrawer(); paNotice('Delete failed · 删除失败 — '+idx.error,'',IDX_PATH); return; }
+  if(!idx.ok){ S.entries=keep; syncDrawer(); paNotice('删除失败 · Delete failed — '+idx.error,'',IDX_PATH); return; }
   // THE TOMBSTONE GOES ON THE NOTE'S OWN FILE — the only file it has (F3). It is derived from the
   // id, not from any session-local map, so deleting a note this session has never opened writes to
   // exactly the same path as deleting one that is open. That was the bug: `isLegacyNote(id)` read a
@@ -814,7 +814,7 @@ async function deleteById(id){
   const wiped=await DATA.write(tp, JSON.stringify({v:1,deleted:true}));
   // Tombstone failure is NOT data loss (the note is already dereferenced and its bytes are still
   // intact), but the user is told so a stale file is never a silent surprise.
-  if(!wiped.ok) paNotice('Removed from the list; file not cleared · 已从列表移除，文件未清除','',tp);
+  if(!wiped.ok) paNotice('已从列表移除，文件未清除 · Removed from the list; file not cleared','',tp);
   else paNoticeOk(tp);
   if(curId===id) await newEntry(); else syncDrawer();
 }
@@ -826,7 +826,7 @@ async function deleteById(id){
 async function flushAll(){
   const target=outgoingPath();                     // the file this flush is ABOUT — the notice key
   try{ const r=await pad.flush(); if(!r.ok) paNotice(PANote.NOT_SAVED+' — '+r.error,'',target); }
-  catch(err){ paNotice('Save error · 保存错误 — '+((err&&err.message)||err),'',target); }
+  catch(err){ paNotice('保存错误 · Save error — '+((err&&err.message)||err),'',target); }
   await flushIndex();
 }
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') flushAll(); });
@@ -845,7 +845,7 @@ async function boot(){
   if(r.status===DATA.ST.failed){
     DATA.blockAll(r.error);
     S.entries=[];
-    paNotice('Could not open your notes · 无法读取笔记列表 — '+r.error+
+    paNotice('无法读取笔记列表 · Could not open your notes — '+r.error+
              ' — nothing has been changed on the server 服务器数据未被改动','',IDX_PATH);
     curId=null; await pad.open(); syncDrawer(); return;
   }
@@ -853,9 +853,9 @@ async function boot(){
     // The file READ fine but is not an index. That is a corrupt/foreign file, not an empty one:
     // same rule as the Bible app's ANN_CORRUPT — a file we cannot make sense of is a file we
     // must not overwrite.
-    DATA.blockAll('note list is not readable as an index · 笔记列表格式无法识别');
+    DATA.blockAll('笔记列表格式无法识别 · note list is not readable as an index');
     S.entries=[];
-    paNotice('Note list is unreadable · 笔记列表无法识别 — refusing to overwrite it 拒绝覆盖','',IDX_PATH);
+    paNotice('笔记列表无法识别 · Note list is unreadable — refusing to overwrite it 拒绝覆盖','',IDX_PATH);
     curId=null; await pad.open(); syncDrawer(); return;
   }
   let idx=r.status===DATA.ST.loaded?r.data:{v:1,entries:[]};
@@ -866,7 +866,7 @@ async function boot(){
       // now would strand it behind a list that says "no notes".
       DATA.blockAll(lg.error);
       S.entries=[];
-      paNotice('Could not check for an older notebook · 无法确认是否有旧笔记 — '+lg.error+
+      paNotice('无法确认是否有旧笔记 · Could not check for an older notebook — '+lg.error+
                ' — nothing has been changed 未做任何改动','',LEGACY_PATH);
       curId=null; await pad.open(); syncDrawer(); return;
     }
@@ -880,7 +880,7 @@ async function boot(){
         idx.entries.push({id,title:'Journal',created:legacy.created||now,updated:legacy.updated||now,preview:''});
       // A failed migration write leaves notebook.json untouched (it is never overwritten), so the
       // next boot retries it. Say so rather than starting silently empty.
-      else paNotice('Could not migrate the old notebook · 旧笔记迁移失败 — will retry 下次重试','',LEGACY_PATH);
+      else paNotice('旧笔记迁移失败 · Could not migrate the old notebook — will retry 下次重试','',LEGACY_PATH);
     }
     const w=await DATA.write(IDX_PATH, JSON.stringify(idx));
     if(!w.ok) paNotice(IDX_NOT_SAVED+' — '+w.error,'',IDX_PATH); else paNoticeOk(IDX_PATH);
@@ -911,8 +911,8 @@ async function boot(){
 // A throw here must not white-screen the app — but it must not look healthy either: writes stay
 // blocked until a read succeeds, and the reason is on the notice (R5: never a bare catch).
 (async()=>{ try{ await boot(); }
-  catch(err){ DATA.blockAll('boot failed · 启动失败');
-    paNotice('Could not start · 无法启动 — '+((err&&err.message)||err)+WRITES_BLOCKED,'','boot');
+  catch(err){ DATA.blockAll('启动失败 · boot failed');
+    paNotice('无法启动 · Could not start — '+((err&&err.message)||err)+WRITES_BLOCKED,'','boot');
     try{ await pad.open(); }catch(_){ /* the pad itself is gone; the notice above is the only surface left */ } } })();
 </script>
 </body>

@@ -34,7 +34,7 @@
 (function(){
   if(window.PADrawerGroups) return;
   const PINS='pins', SUMS='sums', NONE='none';   // the fixed groups' keys; a month's key is its 'YYYY-MM'; NONE = rows without a usable time
-  const TXT=Object.freeze({ pins:'★ Bookmarked · 收藏', sums:'Summaries · 总结', noDate:'No date · 无日期' });
+  const TXT=Object.freeze({ pins:'★ 收藏 · Bookmarked', sums:'总结 · Summaries', noDate:'无日期 · No date' });
   const MONTHS_EN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];   // = PASummaryTitle.MONTHS (pinned equal by the test)
   const MONTHS_ZH=['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
   const SUMMARY_TAG='summary';      // the tag the saved summary's first line carries (PADrawerSummary.TXT.firstLine, pinned by the test)
@@ -47,7 +47,7 @@
   const monthLabel=key=>{ const m=Number(key.slice(5,7))-1; return key.slice(0,4)+' · '+MONTHS_EN[m]+' '+MONTHS_ZH[m]; };
   const labelOf=key=>key===PINS?TXT.pins:key===SUMS?TXT.sums:isMonth(key)?monthLabel(key):TXT.noDate;
 
-  const TIP='Tap ⋯ on a note, then Bookmark; bookmarked notes stay in the ★ group at the top · 点笔记上的 ⋯ 选“收藏”，收藏的笔记置于顶部 ★ 组';
+  const TIP='点笔记上的 ⋯ 选“收藏”，收藏的笔记置于顶部 ★ 组 · Tap ⋯ on a note, then Bookmark; bookmarked notes stay in the ★ group at the top';
   function attach(c){
     if(window.PATips) window.PATips.register({id:'drawer-bookmark',anchor:()=>c.host.querySelector('.pac-lmenu'),text:TIP});   // first-use tip (ADR 0030)
     const esc=c.esc;

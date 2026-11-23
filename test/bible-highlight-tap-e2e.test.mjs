@@ -53,7 +53,7 @@ for (const rel of APPS) {
     try {
       const page = await browser.newPage({ viewport: { width: 375, height: 812 } });
       await page.setContent(`${css}${nav.replace(/<select id="book-sel"><\/select>/, '<select id="book-sel"><option>Genesis</option></select>')}`);
-      await page.evaluate(() => { document.getElementById('top-mark').textContent = 'Highlight · 高亮'; });
+      await page.evaluate(() => { document.getElementById('top-mark').textContent = '高亮 · Highlight'; });
       const out = await page.evaluate(() => [...document.querySelectorAll('#nav button, #nav select')]
         .map((e) => ({ id: e.id, r: e.getBoundingClientRect().right })).filter((x) => x.r > 375));
       assert.deepEqual(out, [], 'nothing past the right edge');

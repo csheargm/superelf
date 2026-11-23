@@ -17,7 +17,7 @@ test('the header carries a settings button in every mode', () => {
   const bar = /\(hasTop\?'<div class="pan-top">'[\s\S]*?'<\/div>'/.exec(E);
   assert.ok(bar, 'the header markup must be findable');
   assert.match(bar[0], /class="pan-hmore"/, 'the ⋯ lives in the header');
-  assert.match(bar[0], /title="Page settings · 页面设置"/, 'bilingual, like every other control');
+  assert.match(bar[0], /title="页面设置 · Page settings"/, 'bilingual, like every other control');
   // Nothing hides it per mode: syncMode toggles the tool ROW and the tabs, never this.
   const sync = /function syncMode\(\)\{[\s\S]*?\n    \}/.exec(E);
   assert.ok(sync, 'syncMode must be findable');

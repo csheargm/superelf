@@ -135,14 +135,14 @@ export const useChain = (levels, fan, more = '') => { let c = `<circle id="l0" r
 export const svg = (inner, rootAttrs = VB) => `<svg xmlns="http://www.w3.org/2000/svg" ${rootAttrs}>${inner}</svg>`;
 export const tick = () => new Promise((r) => setTimeout(r, 0));
 // simplify()'s note and an AI turn that answers with `text` (test/stationery-simplify*.test.mjs; R3: one copy each)
-export const simplifiedNote = (en, zh) => `Simplified to draw fast, without ${en} · 已简化：去掉了${zh}`;
+export const simplifiedNote = (en, zh) => `已简化：去掉了${zh} · Simplified to draw fast, without ${en}`;
 // simplify()'s deadline (stationery-simplify SIMPLIFY_MS) reads a wall clock: on a loaded runner (CI's windows-latest, run
 // 43090576890, 460 layers) a design is refused plain (fail closed, by design). A test that pins WHAT a design is simplified
 // into passes NO_DEADLINE, a clock that never moves, or loads the page with loadStill, whose performance.now() never moves —
 // the studio's calls too. The work budget still applies; stationery-simplify-deadline proves the deadline (R13 round 5).
 export const NO_DEADLINE = Object.freeze({ clock: () => 0 });
 export const loadStill = (o = {}) => loadStationery({ ...o, globals: { performance: { now: () => 0 }, ...o.globals } });
-export const TOO_COMPLEX = 'Too complex for the iPad to draw · 太复杂，iPad 画不动 — try again or ask for a simpler design · 请重试或要求简单些';
+export const TOO_COMPLEX = '太复杂，iPad 画不动 · Too complex for the iPad to draw — 请重试或要求简单些 · try again or ask for a simpler design';
 export const answerWith = (text) => async () => ({ ok: true, text: 'Here is your design:\n\n' + text + '\n\nEnjoy!', convoId: 'c1', error: '' });
 // How often re matches s; and a mutant that must match the shipped text EXACTLY once — one that matched twice or not at all
 // would prove nothing (the simplify suites; R3: one copy each).
@@ -249,7 +249,11 @@ export function mountStudio(mutate, studioMutate, channel, win, opts) {
   const host = new FakeEl('div'), list = new FakeEl('div'); host.append(list);
   const { picker } = loadPicker(S, ST, { mutate, win });
   picker.mount(list, { current: () => null, choose: () => {}, studio: { ai, store: { saveMine: async () => ({ ok: true }) }, upload: async () => ({ ok: false }) }, ...opts });
-  const btn = (t) => host.querySelectorAll('button').find((b) => b.textContent.startsWith(t));
+  // Labels read '中文 · English': a key like 'Design ·' names the English half, so it matches
+  // either half's start (the old English-first prefix keys keep working).
+  const btn = (t) => { const k = t.replace(/\s*·\s*$/, ''), all = host.querySelectorAll('button');
+    const en = (b) => { const s = String(b.textContent), i = s.lastIndexOf(' · '); return i < 0 ? s : s.slice(i + 3); };
+    return all.find((b) => en(b) === k) || all.find((b) => b.textContent.startsWith(t)) || all.find((b) => en(b).startsWith(k)); };
   host.querySelectorAll('textarea')[0].value = 'pink dots';
   const draft = host.querySelectorAll('.pst-draft')[0], msg = draft.children.find((c) => c.classList.contains('pst-msg'));
   const prev = draft.children.find((c) => c.classList.contains('pst-prev'));

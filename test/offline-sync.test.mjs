@@ -51,9 +51,9 @@ test('drain: entries first, the last text per path, journal.json last; rows gone
   await queue(h, 'entry-a.json', nb(10, [page('p', 10)]));
   await queue(h, 'entry-a.json', nb(20, [page('p', 20)]));
   await queue(h, 'entry-b.json', nb(30, [page('q', 30)]));
-  assert.equal(h.line.textContent, 'Offline · 离线 — saving on this device · 保存在本设备 · check Tailscale or the node · 请检查 Tailscale 或节点 · 4 to sync · 待同步');
+  assert.equal(h.line.textContent, '离线 · Offline — 保存在本设备 · saving on this device · 请检查 Tailscale 或节点 · check Tailscale or the node · 待同步 4 · 4 to sync');
   h.o.noteNet(true);
-  assert.equal(h.line.textContent, '4 to sync · 待同步', 'online with a queue, nothing running: the count');
+  assert.equal(h.line.textContent, '待同步 4 · 4 to sync', 'online with a queue, nothing running: the count');
   const seen = [];
   const origPost = h.node.posts;
   h.node.posts = { push: (x) => { seen.push(h.line.textContent); origPost.push(x); } };
@@ -64,7 +64,7 @@ test('drain: entries first, the last text per path, journal.json last; rows gone
   assert.equal(h.s.inFlight(), false);
   assert.deepEqual(origPost.map((x) => x[0]), ['entry-a.json', 'entry-b.json', 'journal.json']);
   assert.equal(JSON.parse(origPost[0][1]).updated, 20, 'the LAST text per path went up');
-  assert.deepEqual(seen, ['Syncing · 同步中 · 4 to sync · 待同步', 'Syncing · 同步中 · 2 to sync · 待同步', 'Syncing · 同步中 · 1 to sync · 待同步'], 'the count falls as paths land');
+  assert.deepEqual(seen, ['同步中 · Syncing · 待同步 4 · 4 to sync', '同步中 · Syncing · 待同步 2 · 2 to sync', '同步中 · Syncing · 待同步 1 · 1 to sync'], 'the count falls as paths land');
   assert.equal(h.writes().length, 0);
   assert.equal(h.line.textContent, '', 'drained: nothing to say');
   assert.ok(h.files().every((r) => r.queued === false && r.base === null), 'the mirror rows are plain warm rows again');
@@ -78,15 +78,15 @@ test('a 4xx/5xx stops the drain: the path\'s rows and every later row stay, the 
   await queue(h, 'entry-a.json', nb(10, [page('p', 10)]));
   await queue(h, 'entry-b.json', nb(20, [page('q', 20)]));
   await queue(h, 'journal.json', '{"v":1,"entries":[]}');
-  h.node.postFail = { ok: false, code: 'server-error', status: 500, error: 'save failed · 保存失败' };
+  h.node.postFail = { ok: false, code: 'server-error', status: 500, error: '保存失败 · save failed' };
   assert.equal(await h.s.drain(), 'failed');
   assert.deepEqual(h.writes().map((r) => r.path), ['entry-a.json', 'entry-b.json', 'journal.json'], 'nothing dropped: the first POST failed');
-  assert.equal(h.line.textContent, 'Sync failed · 同步失败 — save failed · 保存失败 · tap to retry · 点按重试');
+  assert.equal(h.line.textContent, '同步失败 · Sync failed — 保存失败 · save failed · 点按重试 · tap to retry');
   assert.equal(h.o.status().pending, 3);
-  h.node.postFail = { ok: false, code: 'too-large', status: 413, error: 'payload too large · 内容过大' };
+  h.node.postFail = { ok: false, code: 'too-large', status: 413, error: '内容过大 · payload too large' };
   assert.equal(await h.s.drain(), 'failed', 'the retry starts over with entry-a: the 413 stops it there');
   assert.deepEqual(h.writes().map((r) => r.path), ['entry-a.json', 'entry-b.json', 'journal.json']);
-  assert.match(h.line.textContent, /^Sync failed · 同步失败 — payload too large/);
+  assert.match(h.line.textContent, /^同步失败 · Sync failed — 内容过大 · payload too large/);
   assert.equal(await h.s.drain(), 'drained', 'the tap: the rest goes');
   assert.equal(h.line.textContent, '');
   assert.deepEqual(h.node.posts.map((x) => x[0]), ['entry-a.json', 'entry-b.json', 'journal.json']);
@@ -103,7 +103,7 @@ test('no node: /api/build unanswered → nothing read or posted; a network failu
   h.node.reachable = true; h.node.readNet = true;
   assert.equal(await h.s.drain(), 'unreachable', 'the GET of the node\'s file failed as the network');
   assert.equal(h.o.offline(), true);
-  assert.equal(h.line.textContent, 'Offline · 离线 — saving on this device · 保存在本设备 · check Tailscale or the node · 请检查 Tailscale 或节点 · 1 to sync · 待同步', 'no "Sync failed": the node is simply away again');
+  assert.equal(h.line.textContent, '离线 · Offline — 保存在本设备 · saving on this device · 请检查 Tailscale 或节点 · check Tailscale or the node · 待同步 1 · 1 to sync', 'no "Sync failed": the node is simply away again');
   h.node.readNet = false; h.node.postFail = NET;
   assert.equal(await h.s.drain(), 'unreachable', 'the POST failed as the network');
   assert.equal(h.writes().length, 1);
@@ -121,7 +121,7 @@ test('rule A on the way up: the node moved since the base this device read → t
   assert.equal(await h.s.drain(), 'drained');
   const posted = JSON.parse(h.node.posts[0][1]);
   assert.equal(posted.updated, 31);
-  assert.deepEqual(posted.pages.map((p) => p.pageHtml.replace(/<p><b>Conflict copy · 冲突副本 \([^)]*\)<\/b><\/p>/, 'COPY:')), ['mine again', 'COPY:theirs']);
+  assert.deepEqual(posted.pages.map((p) => p.pageHtml.replace(/<p><b>冲突副本 · Conflict copy \([^)]*\)<\/b><\/p>/, 'COPY:')), ['mine again', 'COPY:theirs']);
   assert.deepEqual(h.s.status().log, [{ path: 'entry-a.json', did: 'merged (1 copy)' }]);
   assert.equal(h.files()[0].text, h.node.posts[0][1], 'the mirror holds what the node holds now');
   // The node did not move: the local text goes up untouched.
@@ -139,7 +139,7 @@ test('rule A on the way up: the node moved since the base this device read → t
   await queue(h, 'entry-c.json', nb(60, [page('c', 60)]));
   h.node.files.set('notes/entry-c.json', 'not json');
   assert.equal(await h.s.drain(), 'failed');
-  assert.match(h.line.textContent, /^Sync failed · 同步失败 — cannot read the node file/);
+  assert.match(h.line.textContent, /^同步失败 · Sync failed — 无法读取节点文件 · cannot read the node file/);
   assert.equal(h.writes().length, 1);
 });
 
@@ -175,7 +175,7 @@ test('broker flow: read online, save with the node gone, node back → one drain
   await B.post({ id: 2, kind: 'save-data', path: 'journal.json', data: '{"v":1,"entries":[{"id":"e1","updated":30}]}' }); await settle();
   await B.post({ id: 3, kind: 'save-data', path: 'entry-e1.json', data: nb(30, [page('p', 30, 'mine')]) }); await settle();
   assert.equal(B.reply(3).offline, true);
-  assert.equal(line.textContent, 'Offline · 离线 — saving on this device · 保存在本设备 · check Tailscale or the node · 请检查 Tailscale 或节点 · 2 to sync · 待同步');
+  assert.equal(line.textContent, '离线 · Offline — 保存在本设备 · saving on this device · 请检查 Tailscale 或节点 · check Tailscale or the node · 待同步 2 · 2 to sync');
   assert.equal(await B.sync.drain(), 'unreachable', 'still gone: the drain asks /api/build and stops');
   node.files.set('data/notes/entry-e1.json', nb(20, [page('p', 20, 'theirs')]));   // the Mac wrote meanwhile
   await node.listen(port);
@@ -184,7 +184,7 @@ test('broker flow: read online, save with the node gone, node back → one drain
     await settle(200);
     assert.deepEqual(node.posts, ['data/notes/entry-e1.json', 'data/notes/journal.json'], 'entry before index, through the shipped POST');
     const merged = JSON.parse(node.files.get('data/notes/entry-e1.json'));
-    assert.deepEqual(merged.pages.map((p) => p.pageHtml.replace(/<p><b>Conflict copy · 冲突副本 \([^)]*\)<\/b><\/p>/, 'COPY:')), ['mine', 'COPY:theirs']);
+    assert.deepEqual(merged.pages.map((p) => p.pageHtml.replace(/<p><b>冲突副本 · Conflict copy \([^)]*\)<\/b><\/p>/, 'COPY:')), ['mine', 'COPY:theirs']);
     assert.equal(f.rows(OFF_DB, 'writes').length, 0);
     assert.equal(line.textContent, '');
     assert.equal(B.sync.inFlight(), false);
@@ -197,7 +197,7 @@ test('broker flow: read online, save with the node gone, node back → one drain
     await node.listen(port);
     B.triggers.click[0]({ target: { id: 'offLine' } });
     await settle(200);
-    assert.equal(line.textContent, 'Sync failed · 同步失败 — save failed · 保存失败 · tap to retry · 点按重试');
+    assert.equal(line.textContent, '同步失败 · Sync failed — 保存失败 · save failed · 点按重试 · tap to retry');
     assert.equal(f.rows(OFF_DB, 'writes').length, 1);
   } finally { await node.close(); }
 });
@@ -213,7 +213,7 @@ test('wiring in the shell as served: merge then sync after PAOffline, the boot d
   assert.match(SHELL, /merge:mergeOffline, state:PAOffline\.syncState,/);
   assert.match(SHELL, /setInterval\(\(\)=>\{ if\(document\.visibilityState==='visible'\) fn\(\); \},UPDATE_POLL_MS\);/, 'one cadence (R3)');
   assert.match(SHELL, /if\(e\.target&&e\.target\.id==='offLine'\) fn\(\);/, 'the line: tap to retry');
-  for (const s of ['Syncing · 同步中', 'Sync failed · 同步失败 — ', 'Conflict copy · 冲突副本']) assert.equal(SHELL.split(`'${s}'`).length, 2, `${s} is written once`);
+  for (const s of ['同步中 · Syncing', '同步失败 · Sync failed — ', '冲突副本 · Conflict copy']) assert.equal(SHELL.split(`'${s}'`).length, 2, `${s} is written once`);
 });
 
 // ── Regressions (review of session 3): a queued path survives an online read and a save that lands mid-drain.

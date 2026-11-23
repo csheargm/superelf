@@ -132,7 +132,7 @@ let selected = null;               // "YYYY-MM-DD"
 // failed or unreadable read `notes` is still empty, and the next save would replace every saved note.
 const notesFile = PAStore.file('calendar-notes.json', {
   shape: d => (d && typeof d === 'object' && !Array.isArray(d)) ? '' : 'not a notes map',
-  unreadable: why => 'Notes file unreadable · 笔记文件无法读取 (' + why + ')',
+  unreadable: why => '笔记文件无法读取 · Notes file unreadable (' + why + ')',
 });
 async function loadNotes(){
   const r = await notesFile.load();

@@ -201,7 +201,7 @@ test('a refused gzipped save tells the user its UNCOMPRESSED size, as the shell 
     const r = await h.relay({ kind: 'save-data', path: NOTE, data: { pad: 'x'.repeat(CAP) } });
     assert.deepEqual(h.state.encodings, [GZIP_ENCODING], 'the request crossed the wire gzipped');
     assert.equal(r.code, 'too-large');
-    assert.match(r.text, /^Note too large · 笔记过大 \(max [\d.]+ MB\) — [\d.]+ MB sent · 已发送\./,
+    assert.match(r.text, /^笔记过大 · Note too large \(max [\d.]+ MB\) — 已发送 [\d.]+ MB · [\d.]+ MB sent\./,
       'MBs, not the few KB that crossed the wire');
   });
 });

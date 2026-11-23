@@ -76,7 +76,7 @@ test('the UI warns before revoking, and clears the QR after', () => {
   assert.match(SHELL, /id="hsRotate"/, 'there is a button');
   // Not just that the sentence EXISTS — that it GATES the request. A confirm whose answer is
   // ignored is decoration, and the first version of this test could not tell the difference.
-  assert.match(SHELL, /if\(!await askConfirm\('Regenerate your token\?[^)]*\)\) return;/,
+  assert.match(SHELL, /if\(!await askConfirm\('重新生成令牌？[^)]* · Regenerate your token\?[^)]*\)\) return;/,
     'the confirm must be able to CANCEL the rotation, not merely be displayed');
   assert.match(SHELL, /stops working immediately/, 'saying plainly what it breaks');
   // …and the request must come after the gate, not before it.

@@ -37,7 +37,7 @@ test('release notes: native nested <dialog> + showModal, Esc/backdrop close, sti
   assert.ok(!sheet.includes("style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55)"), 'no z-index overlay left');
 });
 
-test('release notes: latest 3 versions expanded, the rest behind "Show earlier · 更早版本"', () => {
+test('release notes: latest 3 versions expanded, the rest behind "更早版本 · Show earlier"', () => {
   const { verSheetHtml, RECENT_VERSIONS } = extractVerBuilders();
   assert.equal(RECENT_VERSIONS, 3);
   const notes = {}; const vers = [];
@@ -45,7 +45,7 @@ test('release notes: latest 3 versions expanded, the rest behind "Show earlier �
   const out = verSheetHtml(vers, notes, 'v2.4.9');
   const earlier = out.slice(out.indexOf('_ver_earlier'));
   for (const v of ['v2.4.9', 'v2.4.8', 'v2.4.7']) assert.ok(out.indexOf(v) < out.indexOf('_ver_more'), `${v} expanded above the toggle`);
-  assert.match(out, /Show earlier · 更早版本/);
+  assert.match(out, /更早版本 · Show earlier/);
   assert.match(out, /id="_ver_earlier" style="display:none"/, 'older versions collapsed');
   for (const v of ['v2.4.6', 'v2.4.5']) assert.ok(earlier.includes(v), `${v} inside the collapsed block`);
   // 3 or fewer versions → no toggle at all; none → the bilingual empty state.

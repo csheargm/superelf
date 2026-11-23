@@ -194,7 +194,7 @@ test('the panel shows the effective app system prompt, its SOURCE, and the overr
     prefs: { fontSize: 18 },
   });
   assert.equal(dom.find('pag-eff').textContent, 'Answer as a study aid.', 'what the model is actually told');
-  assert.match(dom.find('pag-src').textContent, /your override · 你的覆盖设置/, 'and where it came from');
+  assert.match(dom.find('pag-src').textContent, /你的覆盖设置 · your override/, 'and where it came from');
   const boxes = dom.made.filter((n) => n.tag === 'textarea');
   assert.equal(boxes.length, 2, 'one box for the prompt override, one for the JSON');
   assert.equal(boxes[0].value, 'Answer as a study aid.', 'the override box holds the override');
@@ -204,7 +204,7 @@ test('the panel shows the effective app system prompt, its SOURCE, and the overr
 test('each provenance is named in plain language, both languages', async () => {
   // "why is it answering like that" is the question this answers. A box of text with no
   // provenance cannot.
-  for (const [source, want] of [['profile', /your override/], ['config', /this node/], ['app', /app’s own/], [undefined, /none · 无/]]) {
+  for (const [source, want] of [['profile', /your override/], ['config', /this node/], ['app', /app’s own/], [undefined, /无 · none/]]) {
     const dom = mkDom();
     const PASettings = load(dom);
     await opened(dom, PASettings, { ok: true, systemPrompt: { effective: 'x', source }, prefs: {} });
@@ -223,10 +223,10 @@ test('an app with no preferences yet opens on an EMPTY box, not on "{}"', async 
 test('a failed READ says so instead of opening on a blank panel that looks like "no settings"', async () => {
   const dom = mkDom();
   const PASettings = load(dom);
-  await opened(dom, PASettings, { ok: false, error: 'offline · 离线' });
+  await opened(dom, PASettings, { ok: false, error: '离线 · offline' });
   const msg = dom.find('pag-msg');
-  assert.match(msg.textContent, /Could not load settings · 无法加载设置/, 'the failure is on screen (R5)');
-  assert.match(msg.textContent, /offline · 离线/, "carrying the shell's own reason");
+  assert.match(msg.textContent, /无法加载设置 · Could not load settings/, 'the failure is on screen (R5)');
+  assert.match(msg.textContent, /离线 · offline/, "carrying the shell's own reason");
   assert.ok(msg.classList.contains('pag-err'), 'and marked as an error, not as status');
 });
 
@@ -237,7 +237,7 @@ test('with no shell at all the read REPORTS rather than hanging on a promise nob
   const host = dom.doc.createElement('div');
   PASettings.attach({ host }).el.fire('click');
   await tick(); await tick();
-  assert.match(dom.find('pag-msg').textContent, /no shell · 无法连接外壳/);
+  assert.match(dom.find('pag-msg').textContent, /无法连接外壳 · no shell/);
 });
 
 // ── 5. saving ────────────────────────────────────────────────────────────────────────────────
@@ -270,12 +270,12 @@ test('a failed SAVE keeps the panel open with every edit intact, and says why', 
   jTa.value = '{"a":1}';
   dom.made.find((n) => n.classList.contains('pag-go')).fire('click');
   await tick();
-  dom.reply({ ok: false, error: 'Preferences too large · 偏好过大' });
+  dom.reply({ ok: false, error: '偏好过大 · Preferences too large' });
   await tick();
   assert.equal(h.isOpen(), true, 'the panel stays open');
   assert.equal(jTa.value, '{"a":1}', 'and the edit is still there to retry');
   const msg = dom.find('pag-msg');
-  assert.match(msg.textContent, /Not saved · 未保存/);
+  assert.match(msg.textContent, /未保存 · Not saved/);
   assert.match(msg.textContent, /偏好过大/, "with the SERVER's reason, not a generic one");
   assert.ok(msg.classList.contains('pag-err'));
 });
@@ -307,7 +307,7 @@ test('the JSON box reports a mistake WHILE it is typed, not only on Save', async
   jTa.value = '{"a":';
   jTa.fire('input');
   assert.ok(jTa.classList.contains('pag-bad'), 'marked while typing');
-  assert.match(dom.find('pag-msg').textContent, /Not valid JSON · JSON 格式无效/);
+  assert.match(dom.find('pag-msg').textContent, /JSON 格式无效 · Not valid JSON/);
   jTa.value = '{"a":1}';
   jTa.fire('input');
   assert.ok(!jTa.classList.contains('pag-bad'), 'and unmarked as soon as it parses again');
@@ -501,7 +501,7 @@ test('a BLANK override clears it, so the default starts flowing again', async ()
 
 test('a failed save is REPORTED and ME is left untouched', async () => {
   for (const [what, respond] of [
-    ['a refusal', async () => ({ ok: false, status: 400, json: async () => ({ error: 'Preferences too large · 偏好过大' }) })],
+    ['a refusal', async () => ({ ok: false, status: 400, json: async () => ({ error: '偏好过大 · Preferences too large' }) })],
     ['a dropped request', async () => { throw new Error('Failed to fetch'); }],
     ['a non-JSON error body', async () => ({ ok: false, status: 500, json: async () => { throw new Error('not json'); } })],
   ]) {
@@ -549,7 +549,7 @@ test('an extra with readout:true renders a .pag-eff line filled on open, has no 
   const host = dom.doc.createElement('div');
   let reads = 0, commits = 0;
   const h = PASettings.attach({ host, extras: [
-    { label: 'Device readout · 设备读数', readout: true, getValue: () => { reads++; return 'Device 设备: 834×1194 px'; }, onCommit: async () => { commits++; return { ok: true }; } },
+    { label: '设备读数 · Device readout', readout: true, getValue: () => { reads++; return 'Device 设备: 834×1194 px'; }, onCommit: async () => { commits++; return { ok: true }; } },
     { label: 'Box', getValue: () => 'typed', onCommit: async () => { commits++; return { ok: true }; } },
   ] });
   h.el.fire('click'); await tick();

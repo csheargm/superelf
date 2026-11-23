@@ -72,16 +72,16 @@
   const PAP_REQ_TIMEOUT_MS=120000;              // a 15MB photo over cellular is slow; silence is still an ANSWER (R5)
   const PAP_CANCEL_MS=800;                      // focus-back grace before a picker with no file counts as cancelled
   const PAP_TXT={
-    noFile:'No photo chosen · 未选择照片',
-    unreadable:'Could not read that photo · 无法读取该照片',
-    notImage:'That file is not an image · 该文件不是图片',
-    noReason:'Upload failed · 上传失败 — no reason given by the shell · 外壳未给出原因',
-    noPath:'Upload confirmed but no file was stored · 上传已确认但未保存文件',
-    timeout:'No answer from the app shell · 外壳无响应 — the photo was not uploaded 照片未上传',
+    noFile:'未选择照片 · No photo chosen',
+    unreadable:'无法读取该照片 · Could not read that photo',
+    notImage:'该文件不是图片 · That file is not an image',
+    noReason:'上传失败 · Upload failed — 外壳未给出原因 · no reason given by the shell',
+    noPath:'上传已确认但未保存文件 · Upload confirmed but no file was stored',
+    timeout:'外壳无响应 · No answer from the app shell — the photo was not uploaded 照片未上传',
     // ONLY reachable on a page that has PAPhoto and NO PAChat. The full sentence (cap, bytes,
     // what to do, both languages) belongs to PAChat.failText and is not copied here (R3); this
     // is the shell's own heading and nothing more, so the two can never drift into dialects.
-    bigNoChat:'Photo too large · 照片过大',
+    bigNoChat:'照片过大 · Photo too large',
   };
   // Base64 decodes 3 bytes per 4 characters, minus the padding. Measured, not estimated: a
   // 4/3 guess is wrong by up to 2 bytes and this number is printed to the user.

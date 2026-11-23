@@ -62,7 +62,7 @@ test('sanitize: a damaged file reads as empty; bad rows are dropped', () => {
 test('timeLabel: "Just now" under a minute, else weekday + date + time', () => {
   const P = load();
   const at = new Date(2026, 10, 13, 9, 5).getTime();
-  assert.equal(P.timeLabel(at, at + 59000, 'en-US'), 'Just now · 刚刚');
+  assert.equal(P.timeLabel(at, at + 59000, 'en-US'), '刚刚 · Just now');
   const l = P.timeLabel(at, at + 61000, 'en-US');
   assert.match(l, /Fri/); assert.match(l, /Nov 13/); assert.match(l, /09:05/);
 });

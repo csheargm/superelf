@@ -3,8 +3,8 @@
 // loadChatUi) with a fake PANote; the drawer's own code decides.
 import { loadChatUi } from './helpers-stationery.mjs';
 
-export const WHERE = { tag: 'Tag 标签', typed: 'Text 文本', ink: 'Ink 手写', photo: 'Photo 图片', failed: 'Search unavailable · 搜索不可用', searching: 'Searching… 搜索中', more: 'Only the best matches are shown · 仅显示最相关的笔记',
-  pending: 'Transcribing {n} pages · 正在识别 {n} 页', noOcr: 'Handwriting search needs the Mac node · 手写搜索需要 Mac 节点', ocrFailed: 'Handwriting transcription failed on this node · 本机手写识别失败' };
+export const WHERE = { tag: 'Tag 标签', typed: 'Text 文本', ink: 'Ink 手写', photo: 'Photo 图片', failed: '搜索不可用 · Search unavailable', searching: 'Searching… 搜索中', more: '仅显示最相关的笔记 · Only the best matches are shown',
+  pending: '正在识别 {n} 页 · Transcribing {n} pages', noOcr: '手写搜索需要 Mac 节点 · Handwriting search needs the Mac node', ocrFailed: '本机手写识别失败 · Handwriting transcription failed on this node' };
 export const rows = () => [
   { id: 'a', title: 'Roof', preview: 'typed about the roof', updated: 3, doc: { path: 'entry-1.json' } },
   { id: 'b', title: 'Tuesday', preview: 'Handwritten note 手写笔记', updated: 2, doc: { path: 'entry-2.json' } },
@@ -40,7 +40,7 @@ export async function pickMore(d, label) {
     const sheet = d.el.children.filter((k) => /^pac-modal/.test(k.className)).pop();
     const labels = sheet ? sheet.children[0].children.map((k) => k.textContent) : [];
     if (label === '') return labels;
-    const btn = sheet && sheet.children[0].children.find((k) => String(k.textContent).startsWith(label));
+    const btn = sheet && sheet.children[0].children.find((k) => String(k.textContent).includes(label));
     if (!btn) throw new Error('no ⋯ entry "' + label + '" among: ' + labels.join(' | '));
     btn.onclick(); await tick(5);
     return labels;

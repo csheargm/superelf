@@ -38,7 +38,7 @@ test('an expired session STILL gets the sign-in-again sentence — the other con
   const f = await R.relayHttpFail(new Response(JSON.stringify({ error: 'bad token' }), { status: 401 }));
   for (const what of ['note', 'photo', 'content', 'request', 'message']) {
     const shown = R.relayText(f, 0, what);
-    assert.match(shown, /Signed out · 登录已过期/, `${what}: a lost session must still say so`);
+    assert.match(shown, /登录已过期 · Signed out/, `${what}: a lost session must still say so`);
     assert.match(shown, /Sign in again, then retry/, `${what}: and give the remedy`);
     assert.equal(/bad token/.test(shown), false, `${what}: the raw server token is less useful than the house sentence`);
   }
@@ -71,13 +71,13 @@ test('the server states the reason bilingually', () => {
 });
 
 test('other 401 renderings did not drift: still exactly one house sign-out sentence', () => {
-  const n = (codeOnly(SHELL).match(/Signed out · 登录已过期/g) || []).length;
+  const n = (codeOnly(SHELL).match(/登录已过期 · Signed out/g) || []).length;
   assert.equal(n, 1, 'one sentence, one place (R3)');
 });
 
 test('the sign-in form asks for a password, not only a PIN (any password is accepted)', () => {
   const html = fs.readFileSync(new URL('../web/index.html', import.meta.url), 'utf8');
-  assert.match(html, /id="lpin" type="password" placeholder="Password or PIN · 密码或 PIN"/);
+  assert.match(html, /id="lpin" type="password" placeholder="密码或 PIN · Password or PIN"/);
   assert.match(html, /No password yet: sign in with access token/);
   assert.equal(/No PIN yet/.test(html), false, 'the PIN-only hint is gone');
 });

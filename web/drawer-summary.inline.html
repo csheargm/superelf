@@ -1,7 +1,7 @@
 <!-- PADrawerSummary — Ask AI period summaries（按时期总结, docs/plans/note-features.md E, option 1).
      Inlined by web.mjs into any page carrying the PA_DRAWER_SUMMARY_UI marker (chat-ui carries it, so
      every drawer gets it with no app code). The drawer's multi-select bar gains ONE button,
-     `Summarize · 总结`; it opens a sheet with period presets, an "include photo text" tick and ONE
+     `总结 · Summarize`; it opens a sheet with period presets, an "include photo text" tick and ONE
      honest confirm line (pages · characters · lane) computed from a local `note-text` ask. Nothing is
      sent until Send is pressed; every lane sends text off the Mac and the line names the lane.
      The turn then runs through the HOST's own Ask AI rail (hooks.run) under the scope `summary:<period>`,
@@ -9,9 +9,9 @@
      built from month summaries: an existing month summary note (hooks.monthSummary) is reused, else the
      month is summarised first through PAChat.complete (the same 'chat' kind), then the year turn runs
      in the rail. The summary turn's answer is SAVED AS A NOTE as soon as it has streamed (decorate, auto-save):
-     through the host (hooks.saveNote: a NEW note per run, titled runTitleOf(period, run time)) with the first line `AI summary · AI 总结 — <titleOf(period)> #summary #ai`
+     through the host (hooks.saveNote: a NEW note per run, titled runTitleOf(period, run time)) with the first line `AI 总结 · AI summary — <titleOf(period)> #summary #ai`
      (older notes carry the raw period id there; FIRST_LINE_RE reads both);
-     the `Save as note · 存为笔记` button under it reads Saved · 已存 and re-saves a follow-up on a tap.
+     the `存为笔记 · Save as note` button under it reads Saved · 已存 and re-saves a follow-up on a tap.
      Host hooks (listDrawer / Chat opts `summary`): run({scope,label,message}) → Promise<boolean>,
        monthSummary(period, title) → Promise<string|null> (title = the summary note's own title),
        saveNote({id?,title,html,period,scope,convoId,quiet?}) → Promise<{ok,id?,error?,gone?}> — without `id` creates a NEW
@@ -21,9 +21,9 @@
      thread's key to opts.system(k); a host answers SYSTEM when isScope(k)). A reopened summary thread is recognised
      by its stored label through scopeOfLabel (the inverse of titleOf), so Save as note appears on it again.
      Titles（标题）: the period id names the scope and the note (`2026-W46`); what the user sees is
-     PASummaryTitle.titleOf(id) — "This week · 本周 Nov 9–15, 2026" (web/summary-title.inline.html, marker below).
+     PASummaryTitle.titleOf(id) — "本周 Nov 9–15, 2026 · This week" (web/summary-title.inline.html, marker below).
      Important lines and source links（重点与链接, note-features.md F): the turn asks the `important` field too, numbers
-     each note [n] with an `Important · 重点` block, and PASummaryRefs (web/summary-refs.inline.html, carried by the
+     each note [n] with an `重点 · Important` block, and PASummaryRefs (web/summary-refs.inline.html, carried by the
      marker below) remembers [n] → note per scope, links the [n] in a rendered answer and in the saved note, and
      opens a tapped link through the host's onLink({id,page}) hook (summary hooks).
      API: PADrawerSummary.attach({host, bar, picked, items, done, hooks}) → {open, choose, togglePhoto, send, cancel, state}
@@ -55,7 +55,7 @@
   const R=()=>window.PASummaryRefs;   // present before this script runs: the marker above inlines it
   const I=()=>window.PASummaryImages, F=()=>window.PASummaryFollowup;   // page images and the follow-up (note-features.md I): the markers above inline them
   // ONE heading for the open to-dos (R3): the turn writes it, the node's extractor reads it (= lib/summary-followup.mjs TODO_HEADING, pinned by test).
-  const TODO_HEADING='Open to-dos · 待办';
+  const TODO_HEADING='待办 · Open to-dos';
   // ONE prompt for every summary turn (R3): reflections first, open todos last, in the notes' language.
   // The marked points are named by the heading the turn itself writes (PASummaryRefs.TXT.important).
   const SUMMARY_PROMPT='Summarise these journal notes: first the reflections and what happened, grouped by theme; '+
@@ -66,22 +66,22 @@
   // ONE system line for a summary thread (R3): the hosts' verse-study / journal prompts do not apply to it.
   const SYSTEM='You are summarising the user\'s own notes. Answer in the language the notes are written in; keep headings short. · '+
     '你在总结用户自己的笔记。用笔记所用的语言回答，标题简短。';
-  const YEAR_NOTE='The sections below are month summaries of this year; summarise the year from them. · 以下各节是本年各月的总结，请据此总结全年。';
+  const YEAR_NOTE='以下各节是本年各月的总结，请据此总结全年。 · The sections below are month summaries of this year; summarise the year from them.';
   const TURN_MAX_CHARS=80000;   // one turn's text cap (a month is 10–26k measured; a Fast lane holds far less than 1 MB usefully)
   // The period ids, the dates and the human titles live in PASummaryTitle (web/summary-title.inline.html, the marker above).
   const T=()=>window.PASummaryTitle;
   const SCOPE='summary:';   // = PASummaryTitle.SCOPE, pinned equal by test/summary-title.test.mjs
-  const TIP_SUMMARIZE='Summarize: an AI summary of a week, month or year; ⋯ beside it has Sort, Select, Refresh, Show hidden · 总结：AI 总结一周、一月或一年；旁边的 ⋯ 有排序、选择、刷新、显示隐藏';
-  const TIP_RUNS='Each summary run is kept as its own note; the research appears below it · 每次总结都保存为单独的笔记；研究结果显示在其下方';
-  const TXT=Object.freeze({ button:'Summarize · 总结', title:'Summarize · 总结',
-    photo:'Include photo text · 含图片文字', counting:'Counting · 统计中', nothing:'No notes in this period · 此时期没有笔记',
-    send:'Send · 发送', cancel:'Cancel · 取消', noLane:'no lane · 无通道', turns:'{n} turns · {n} 轮',
-    trimmed:'[Trimmed to {n} characters · 已截断至 {n} 字]', trimmedShort:'trimmed · 已截断',
-    line:'Send {p} pages · {c} characters to {lane} · 发送 {p} 页 · {c} 字到 {lane} (off this Mac · 离开本机)',
-    failed:'Could not read the notes · 无法读取笔记', busy:'Still answering · 正在回答中', monthFailed:'Month summary failed · 月总结失败',
-    progress:'Summarizing {m} · 正在总结 {m} ({i}/{n})', saveNote:'Save as note · 存为笔记', saved:'Saved · 已存', notSaved:'Not saved · 未保存',
-    firstLine:'AI summary · AI 总结 — {p} #summary #ai', noText:'No text to send · 没有可发送的文字',
-    pending:'{n} pending · {n} 页待转写', incomplete:'incomplete · 不完整', sendFailed:'Could not send · 无法发送 — {e}' });
+  const TIP_SUMMARIZE='总结：AI 总结一周、一月或一年；旁边的 ⋯ 有排序、选择、刷新、显示隐藏 · Summarize: an AI summary of a week, month or year; ⋯ beside it has Sort, Select, Refresh, Show hidden';
+  const TIP_RUNS='每次总结都保存为单独的笔记；研究结果显示在其下方 · Each summary run is kept as its own note; the research appears below it';
+  const TXT=Object.freeze({ button:'总结 · Summarize', title:'总结 · Summarize',
+    photo:'含图片文字 · Include photo text', counting:'统计中 · Counting', nothing:'此时期没有笔记 · No notes in this period',
+    send:'发送 · Send', cancel:'取消 · Cancel', noLane:'无通道 · no lane', turns:'{n} 轮 · {n} turns',
+    trimmed:'[已截断至 {n} 字 · Trimmed to {n} characters]', trimmedShort:'已截断 · trimmed',
+    line:'发送 {p} 页 · {c} 字到 {lane} · Send {p} pages · {c} characters to {lane} (离开本机 · off this Mac)',
+    failed:'无法读取笔记 · Could not read the notes', busy:'正在回答中 · Still answering', monthFailed:'月总结失败 · Month summary failed',
+    progress:'正在总结 {m} ({i}/{n}) · Summarizing {m}', saveNote:'存为笔记 · Save as note', saved:'已存 · Saved', notSaved:'未保存 · Not saved',
+    firstLine:'AI 总结 · AI summary — {p} #summary #ai', noText:'没有可发送的文字 · No text to send',
+    pending:'{n} 页待转写 · {n} pending', incomplete:'不完整 · incomplete', sendFailed:'无法发送 · Could not send — {e}' });
   const fill=(s,o)=>String(s).replace(/\{(\w+)\}/g,(_,k)=>String(o[k]==null?'':o[k]));
   const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const dayOf=ts=>T().dayOf(ts), monthOf=ts=>T().monthOf(ts);
@@ -104,7 +104,11 @@
   const stripRefs=t=>String(t||'').replace(REF_RE,'');
   // A saved summary note: the host's flag (it.summary), titled titleOf(period) or the old raw form for some period,
   // opening with the first line Save as note writes (the human title or, on older notes, the raw period), or tagged #summary.
-  const FIRST_LINE_RE=new RegExp('^'+TXT.firstLine.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/\\\{p\\\}/,'.+')+'$');
+  // LEGACY_FIRST_LINE: the English-first line every summary note carried before the 2026-11 中文-first sweep;
+  // notes already saved with it still count as summaries (read only, never written).
+  const LEGACY_FIRST_LINE='AI summary · AI 总结 — {p} #summary #ai';
+  const lineRe=t=>t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/\\\{p\\\}/,'.+');
+  const FIRST_LINE_RE=new RegExp('^(?:'+lineRe(TXT.firstLine)+'|'+lineRe(LEGACY_FIRST_LINE)+')$');
   // The #summary tag counts on the FIRST line only: a note that mentions #summary in its body is still the owner's own note (a source).
   // The tag word is drawer-groups' SUMMARY_TAG (R3), read at use time because drawer-groups registers after this file.
   const summaryTagRe=()=>new RegExp('(^|\\s)#'+((window.PADrawerGroups&&window.PADrawerGroups.SUMMARY_TAG)||'summary')+'(?![\\w-])','i');

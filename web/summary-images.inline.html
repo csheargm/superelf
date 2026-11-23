@@ -21,8 +21,8 @@
   const YEAR_KEYS=Object.freeze(['year','lastYear']);   // = the drawer's whole-year presets (web/drawer-summary.inline.html), pinned by test: no page images
   const PROMPT='Page images are attached for the pages with marked handwriting: where the transcript and an image disagree, trust the image. · '+
     '已附上带重点手写的页面图片：转写与图片不一致时，以图片为准。';
-  const TXT=Object.freeze({ images:'{n} page images · {n} 页图片', cap:'max {n} · 最多 {n}', textOnly:'{lane} cannot see images · {lane} 无法看图 — text only · 仅发送文字',
-    fetching:'Rendering page images · 正在生成页图片', failed:'Page images failed · 页图片失败 — {e}', noBroker:'no broker · 无通道' });
+  const TXT=Object.freeze({ images:'{n} 页图片 · {n} page images', cap:'最多 {n} · max {n}', textOnly:'{lane} 无法看图 · {lane} cannot see images — 仅发送文字 · text only',
+    fetching:'正在生成页图片 · Rendering page images', failed:'页图片失败 · Page images failed — {e}', noBroker:'无通道 · no broker' });
   const fill=(s,o)=>String(s).replace(/\{(\w+)\}/g,(_,k)=>String(o[k]==null?'':o[k]));
   const lanes=()=>(window.PAChat&&typeof window.PAChat.lanes==='function'?window.PAChat.lanes():[])||[];
   // The lane a summary turn asks for: the first preferred provider the node serves, else the current one.
@@ -54,7 +54,7 @@
     const images=[];
     for(const pg of pages||[]){
       let r; try{ r=await window.PAStore.ask({kind:'note-page-image',path:pg.path,scope:pg.scope||'',page:pg.page||0}); }catch(e){ r={ok:false,error:String((e&&e.message)||e)}; }
-      if(!r||!r.ok||typeof r.path!=='string') return {ok:false,images,error:(r&&(r.error||r.text))||'no image · 无图片'};
+      if(!r||!r.ok||typeof r.path!=='string') return {ok:false,images,error:(r&&(r.error||r.text))||'无图片 · no image'};
       images.push({name:r.path.slice(r.path.lastIndexOf('/')+1),path:r.path});
     }
     return {ok:true,images};

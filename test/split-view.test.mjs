@@ -601,7 +601,7 @@ test('a discarded auto-send is REPORTED, not rendered as an empty pane', () => {
   // PAChat drops a send while a turn is streaming. Programmatic sends have no human watching the
   // composer, so an unreported drop looks exactly like the model answering with nothing (R5).
   assert.match(BIBLE, /await railChat\.send\(msg\)===false/, 'the result is AWAITED and checked');
-  assert.match(BIBLE, /Still answering · 正在回答中/, 'and the user is told why nothing appeared');
+  assert.match(BIBLE, /正在回答中 · Still answering/, 'and the user is told why nothing appeared');
   // The contract that makes the check meaningful lives in the component.
   assert.match(CHAT_SRC, /if\(sending\) return false;/, 'send() reports a refusal');
   assert.match(CHAT_SRC, /return true;\s*\/\/ the turn RAN/, 'and reports a delivery');
@@ -735,7 +735,7 @@ test('two fast rotations cannot run two swaps at once, and a failed swap is repo
   // "exactly one PANote" invariant is a promise about instants, not about source lines.
   assert.match(LIVE_BIBLE, /_swapping=_swapping\.then\(\(\)=>swapHost\(on\)\)/,
     'crossings are serialised on one chain');
-  assert.match(LIVE_BIBLE, /\.catch\(e=>\{\s*\n\s*annNotice\('Layout change failed/,
+  assert.match(LIVE_BIBLE, /\.catch\(e=>\{\s*\n\s*annNotice\('布局切换失败 · Layout change failed/,
     'and a swap that fails is REPORTED — the screen is then in a state no later rotation repairs (R5)');
 });
 
@@ -1110,12 +1110,12 @@ test('a note that becomes real shows up in the ☰ list', () => {
 test('the rail can retitle a slot, and the header is where it lands', () => {
   const dom = mkDom({ width: 1280, height: 800 });
   const rail = loadSplit(dom).open({
-    slots: [{ key: 'note', zone: 'bottom', title: 'Note · 笔记', mount: () => ({ resize: () => {} }) }],
+    slots: [{ key: 'note', zone: 'bottom', title: '笔记 · Note', mount: () => ({ resize: () => {} }) }],
   });
   rail.open();
   const head = dom.made.find((n) => n.classList.contains('pas-head-t'));
   assert.ok(head, 'the slot header has a title element');
-  assert.equal(head.textContent, 'Note · 笔记', 'starting with the slot label');
+  assert.equal(head.textContent, '笔记 · Note', 'starting with the slot label');
   rail.setTitle('note', 'Nicodemus came at night');
   assert.equal(head.textContent, 'Nicodemus came at night', 'which the host can replace');
   rail.setTitle('nope', 'x');            // unknown slot must not throw

@@ -3,20 +3,23 @@
      marker: drawer-summary carries it ABOVE its own script, so PADrawerSummary reads it at run time.
      Split out of PADrawerSummary (R4): that file builds and sends the turn; this one owns the dates.
      A period id names the scope and the saved note for good (`summary:2026-W46`, `2026-11`, `2026`,
-     `2026-03-03..2026-10-15`); what the user SEES is titleOf(id) — "This week · 本周 Nov 9–15, 2026",
-     "Last month · 上月 Oct 2026", "Selected · 已选 Mar 3–Oct 15, 2026" — the ONE text for the thread
+     `2026-03-03..2026-10-15`); what the user SEES is titleOf(id) — "本周 · This week Nov 9–15, 2026",
+     "上月 · Last month Oct 2026", "已选 · Selected Mar 3–Oct 15, 2026" — the ONE text for the thread
      label and the saved note's title (owner 2026-11-11: "W46 — not sure what it is"). The period word
      is relative to now (this / last / plain), so scopeOfLabel, its inverse, accepts every word and the
-     earlier "Summary · 总结 <id>" labels, which existing notes and threads still carry; displayTitle shows any of
+     earlier English-first "Summary · 总结 <id>" labels, which existing notes and threads still carry; displayTitle shows any of
      them as today's titleOf (links, drawer rows) without rewriting what is stored.
      Driven for real by test/summary-title.test.mjs and test/drawer-summary.test.mjs. -->
 <script id="pst-script">
 (function(){
   if(window.PASummaryTitle) return;
   const SCOPE='summary:';
-  const TXT=Object.freeze({ selected:'Selected · 已选', week:'This week · 本周', lastWeek:'Last week · 上周', anyWeek:'Week · 周',
-    month:'This month · 本月', lastMonth:'Last month · 上月', anyMonth:'Month · 月', year:'This year · 今年', lastYear:'Last year · 去年', anyYear:'Year · 年',
+  const TXT=Object.freeze({ selected:'已选 · Selected', week:'本周 · This week', lastWeek:'上周 · Last week', anyWeek:'周 · Week',
+    month:'本月 · This month', lastMonth:'上月 · Last month', anyMonth:'月 · Month', year:'今年 · This year', lastYear:'去年 · Last year', anyYear:'年 · Year',
     oldTitle:'Summary · 总结 {p}' });   // the label before 2026-11-11: still recognised, never written again
+  // The English-first words every label carried before the 2026-11 中文-first sweep: titles already stored
+  // in notes and threads still read as their period (scopeOfLabel), never written again.
+  const LEGACY_TXT=Object.freeze({ selected:'Selected · 已选', week:'This week · 本周', lastWeek:'Last week · 上周', anyWeek:'Week · 周', month:'This month · 本月', lastMonth:'Last month · 上月', anyMonth:'Month · 月', year:'This year · 今年', lastYear:'Last year · 去年', anyYear:'Year · 年' });
   const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const DASH='–';
   const DAY_MS=86400000;
@@ -51,7 +54,7 @@
     if(a.getMonth()!==b.getMonth()) return mdy(a)+DASH+mdy(b,true);
     if(a.getDate()!==b.getDate()) return mdy(a)+DASH+b.getDate()+', '+a.getFullYear();
     return mdy(a,true); }
-  // The period word, relative to now: this / last / plain ("Week · 周" for any other week).
+  // The period word, relative to now: this / last / plain ("周 · Week" for any other week).
   const WORDS={week:['week','lastWeek','anyWeek'],month:['month','lastMonth','anyMonth'],year:['year','lastYear','anyYear']};
   function wordOf(kind,id){ const t=now(), [cur,last,any]=WORDS[kind];
     if(id===periodOf(kind,t).id) return TXT[cur];
@@ -64,7 +67,7 @@
     if(d.kind==='year') return wordOf('year',id)+' '+d.from.getFullYear();
     return wordOf('week',id)+' '+rangeText(d.from,d.to); }
   // A saved run's title (owner 2026-11-12: every run is its own note): the period's title and the run's local time,
-  // "This week · 本周 Nov 9–15, 2026 · 11/12 14:52" — the ONE formatter (R3); the suffix is part of the title, never a second date.
+  // "本周 · This week Nov 9–15, 2026 · 11/12 14:52" — the ONE formatter (R3); the suffix is part of the title, never a second date.
   const RUN_SEP=' · ', RUN_RE=/ · (\d{2})\/(\d{2}) (\d{2}):(\d{2})$/;
   const runOf=ts=>{ const d=new Date(ts); return pad2(d.getMonth()+1)+'/'+pad2(d.getDate())+' '+pad2(d.getHours())+':'+pad2(d.getMinutes()); };
   const runTitleOf=(p,at)=>titleOf(p)+RUN_SEP+runOf(at);
@@ -72,7 +75,8 @@
   // ── The inverse: a stored label → its summary scope, or null for any other label ──
   const escRe=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   const WORD_KEYS=['selected','week','lastWeek','anyWeek','month','lastMonth','anyMonth','year','lastYear','anyYear'];
-  const LABEL_RE=new RegExp('^('+WORD_KEYS.map(k=>escRe(TXT[k])).join('|')+')(?: (.+))?$');
+  const LABEL_RE=new RegExp('^('+WORD_KEYS.flatMap(k=>[escRe(TXT[k]),escRe(LEGACY_TXT[k])]).join('|')+')(?: (.+))?$');
+  const wordNow=w=>{ const k=WORD_KEYS.find(x=>LEGACY_TXT[x]===w); return k?TXT[k]:w; };   // a legacy word → today's
   const RANGE_RE=/^([A-Z][a-z]{2}) (\d{1,2})(?:, (\d{4}))?(?:–(?:([A-Z][a-z]{2}) )?(\d{1,2}))?(?:, (\d{4}))?$/;
   function parseRange(s){ const m=RANGE_RE.exec(s); if(!m) return null;
     const m1=MONTHS.indexOf(m[1]), m2=m[4]?MONTHS.indexOf(m[4]):m1, y1=+(m[3]||m[6]), y2=+(m[6]||m[3]); if(m1<0||m2<0||!y1) return null;
@@ -84,7 +88,7 @@
     const r=parseRange(rest||''); return r?isoWeek(r.a.getTime()):null; }
   function scopeOfLabel(l0){ if(typeof l0!=='string') return null; const l=splitRun(l0).base;   // a run's time suffix names no period
     const old=TXT.oldTitle.slice(0,TXT.oldTitle.indexOf('{p}')); if(l.length>old.length&&l.startsWith(old)) return SCOPE+l.slice(old.length);
-    const m=LABEL_RE.exec(l); if(!m) return null; const id=periodIdOf(m[1],m[2]||''); return id?SCOPE+id:null; }
+    const m=LABEL_RE.exec(l); if(!m) return null; const id=periodIdOf(wordNow(m[1]),m[2]||''); return id?SCOPE+id:null; }
   const isScope=k=>typeof k==='string'&&k.startsWith(SCOPE);
   const periodOfScope=k=>isScope(k)?k.slice(SCOPE.length):'';
   // What a stored label is SHOWN as: a saved summary's title (an old raw "Summary · 总结 2026-W46" included) reads

@@ -79,10 +79,10 @@ function page({ width = 1280, height = 800, store = { prefs: {} }, refuseRead = 
   const run = (src) => new Function('window', 'document', 'parent', 'setTimeout', 'clearTimeout', src)(win, doc, parent, timers.setTimeout, timers.clearTimeout);
   run(SPLIT); run(PREFS); if (chrome) run(CHROME);
   const rail = win.PASplit.open({ slots: [
-    { key: 'chat', title: 'Ask AI · 问一问', zone: 'right', collapsed: true, mount: () => ({}) },
-    { key: 'note', title: 'Note · 笔记', zone: 'bottom', collapsed: true, mount: () => ({}) },
+    { key: 'chat', title: '问一问 · Ask AI', zone: 'right', collapsed: true, mount: () => ({}) },
+    { key: 'note', title: '笔记 · Note', zone: 'bottom', collapsed: true, mount: () => ({}) },
   ] });
-  const head = (k) => byClass(body, 'pas-head').find((h) => h.children.some((c) => c.textContent === (k === 'chat' ? 'Ask AI · 问一问' : 'Note · 笔记')));
+  const head = (k) => byClass(body, 'pas-head').find((h) => h.children.some((c) => c.textContent === (k === 'chat' ? '问一问 · Ask AI' : '笔记 · Note')));
   const btn = (k, c) => byClass(head(k), c)[0];
   const rotate = (w, h) => { win.innerWidth = w; win.innerHeight = h; (wl.resize || []).slice().forEach((f) => f({})); mqls.forEach((m) => m._s.forEach((f) => f())); };
   return { win, html, body, rail, head, btn, store, writes, rotate };
@@ -227,7 +227,7 @@ test('remount: the account layout comes back when each pane opens; a pane with n
 test('a refused layout read is shown on the pane header (R5) and the panes still work docked', async () => {
   const p = page({ refuseRead: true }); await settle();
   const err = byClass(p.head('chat'), 'pch-err')[0];
-  assert.ok(err && /Layout not loaded · 布局未读取/.test(err.textContent), 'shown, bilingual');
+  assert.ok(err && /布局未读取 · Layout not loaded/.test(err.textContent), 'shown, bilingual');
   p.rail.open(); p.rail.expand('chat');
   assert.ok(p.rail.el.classList.contains('on'));
 });

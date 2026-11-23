@@ -144,11 +144,11 @@ test('R3: the bilingual heading a user reads is the SAME sentence in the shell a
   // the wording exists twice by necessity. Pinned on the STRING, not the constant name, so
   // it survives a rename in either file but fails the moment the wording drifts apart.
   const shell = readShell(ROOT);
-  for (const heading of ['Message too large · 消息过长', 'File too large · 文件过大']) {
+  for (const heading of ['消息过长 · Message too large', '文件过大 · File too large']) {
     assert.ok(shell.includes(heading), `the shell says: ${heading}`);
   }
-  assert.ok(C.pacTooLargeText('Message', 1, 2).startsWith('Message too large · 消息过长'), 'and so does the component');
-  assert.ok(C.pacTooLargeText('File', 1, 2).startsWith('File too large · 文件过大'));
+  assert.ok(C.pacTooLargeText('Message', 1, 2).startsWith('消息过长 · Message too large'), 'and so does the component');
+  assert.ok(C.pacTooLargeText('File', 1, 2).startsWith('文件过大 · File too large'));
 });
 
 test('the component measures UTF-8 BYTES, not characters — 中文 is 3 bytes and the cap is in bytes', () => {
@@ -178,12 +178,12 @@ test('the pre-flight counts the WHOLE payload — an app\'s context prefix is wh
 
 test('the notice is bilingual, names BOTH sizes, and reads the code — never the prose', () => {
   const msg = C.pacTooLargeText('Message', 1_500_000, BODY_LIMITS.chat);
-  assert.match(msg, /Message too large · 消息过长/, 'the exact bilingual heading the task names');
+  assert.match(msg, /消息过长 · Message too large/, 'the exact bilingual heading the task names');
   assert.match(msg, /1\.4 MB/, 'how big it actually is');
   assert.match(msg, new RegExp(`max ${humanBytes(BODY_LIMITS.chat)}`), 'and how big it may be');
   assert.match(msg, /Shorten it|请缩短/, 'plus what to do about it');
   const file = C.pacTooLargeText('File', 30 * 1024 * 1024, BODY_LIMITS.upload);
-  assert.match(file, /File too large · 文件过大/, 'the attachment surface reuses the same sentence with a file heading (R3)');
+  assert.match(file, /文件过大 · File too large/, 'the attachment surface reuses the same sentence with a file heading (R3)');
   // Detection: the machine-readable code first, the 413 status as a fallback, and NEVER a
   // prose match — a reworded or translated message must not silently become a success.
   assert.equal(C.pacTooLargeLimit({ ok: false, code: CODE_TOO_LARGE, limit: 4242 }), 4242);
