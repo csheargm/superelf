@@ -16,6 +16,7 @@ before(async () => {
   port = await freePort(); root = mkWebRoot({ port, extraConfig: { users: [
     { id: 'owner', name: 'Owner', role: 'owner', token: OWNER_TOKEN, workspace: 'workspace' },
     { id: 'zoe', name: 'Zoe', role: 'member', token: ZOE_TOKEN, workspace: 'workspace-zoe', status: 'pending' },
+    { id: 'zed', name: 'Zed', role: 'member', token: 'zed-token-0123456789abcdefghijkl', workspace: 'workspace-zed', status: 'pending' },   // stays waiting
   ] } }); web = startWeb(root); await waitReady(port);
   browser = await chromium.launch();
 });
@@ -99,5 +100,20 @@ test('F5-8: removing a member keeps Settings open and the list updates', { skip,
     await page.waitForFunction(() => !document.querySelector('[data-del="kit"]'));
     assert.match(dialogs[0].message, /^移除/, 'the confirm is 中文 first');
     assert.equal(await page.evaluate(() => document.querySelector('#cfg').open), true, 'Settings is still open');
+  } finally { await ctx.close(); }
+});
+
+test('Add member labels read 中文 first; a waiting row has no Reset password button', { skip, timeout: 60000 }, async () => {
+  await fetch(`http://127.0.0.1:${port}/api/admin/users`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${OWNER_TOKEN}` }, body: JSON.stringify({ id: 'ava', name: 'Ava' }) });
+  const { ctx, page } = await openSettings();
+  try {
+    const ph = (s) => page.getAttribute(s, 'placeholder');
+    assert.equal(await ph('#nId'), '用户名（如 mia）· id');
+    assert.equal(await ph('#nName'), '名字 · Name');
+    assert.equal(await ph('#nYear'), '出生年份 · Birth year');
+    await page.waitForSelector('[data-approve="zed"]');
+    assert.equal(await page.locator('[data-pw="zed"]').count(), 0, 'pending: nothing to reset yet');
+    assert.equal(await page.locator('[data-del="zed"]').count(), 1, 'pending: can still be removed');
+    assert.equal(await page.locator('[data-pw="ava"]').count(), 1, 'CONTROL: an active member keeps the button');
   } finally { await ctx.close(); }
 });
