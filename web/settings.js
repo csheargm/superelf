@@ -547,6 +547,7 @@ async function loadFamily(){
     if(!confirm(`移除 ${b.dataset.del}？对方会被登出，资料仍留在电脑上 · Remove ${b.dataset.del}? They are signed out; their data stays on disk.`)) return;
     const g=await relayJson(api('/api/admin/users/'+b.dataset.del,{method:'DELETE'}),'data');
     if(!g.ok) alert(g.text);
+    else if(g.data&&g.data.warning) alert(`已移除，但对方的文件夹没能移开。重新用这个用户名前，请先自己改名或删除它 · ${g.data.warning}`);   // privacy: the next account with this name would inherit it
     loadFamily();
   });
   // Self sign-ups wait for the owner (cfg.require_approval); this is the owner's only way to let them in (F5-3).

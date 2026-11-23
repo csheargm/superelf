@@ -49,3 +49,23 @@ test('F5-2: the owner resets a member password; the old one and old sessions sto
   assert.equal((await call('/api/login', { token: null, body: { username: 'ann', password: 'ann-first-pass-1' } })).status, 401, 'old password refused');
   assert.equal((await call('/api/login', { token: null, body: { username: 'ann', password: 'ann-new-pass-22' } })).status, 200, 'new password works');
 });
+
+test('a reset sent with a refused role change changes nothing (GPT review 2026-11-22)', async () => {
+  const list = await (await call('/api/admin/users')).json();
+  const owner = (list.users || list).find((u) => u.role === 'owner');
+  assert.ok(owner, 'the seeded owner is listed');
+  const r = await call(`/api/admin/users/${owner.id}`, { method: 'PUT', body: { password: 'owner-new-pass-1', role: 'member' } });
+  assert.equal(r.status, 400, 'an owner cannot demote themself');
+  const login = await call('/api/login', { token: null, body: { username: owner.id, password: 'owner-new-pass-1' } });
+  assert.equal(login.status, 401, 'the refused request did not set the new password');
+  assert.equal((await call('/api/ping')).status, 200, 'and the owner is still signed in');
+});
+
+test('adding a member whose old folder is still on disk is refused, never reused (GPT review 2026-11-22)', async () => {
+  const fs = await import('node:fs'); const path = await import('node:path');
+  fs.mkdirSync(path.join(root, 'workspace-zed'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'workspace-zed', 'private.md'), 'left behind');
+  const r = await call('/api/admin/users', { body: { id: 'zed', name: 'Zed' } });
+  assert.equal(r.status, 409);
+  assert.match((await r.json()).error, /still exists/);
+});

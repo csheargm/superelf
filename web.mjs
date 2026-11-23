@@ -2602,6 +2602,9 @@ const server = http.createServer(async (req, res) => {
           birthYear: Number(b.birthYear) || null, token: crypto.randomBytes(24).toString('base64url'),
           rel: `workspace-${id}`, workspace: path.join(ROOT, `workspace-${id}`),
           passHash: b.password ? hashPassword(b.password) : null, status: 'active' };
+        // A leftover folder (a removed member's, when setting it aside failed) would hand their private
+        // data to this new account — refuse rather than reuse it (GPT review 2026-11-22).
+        if (fs.existsSync(rec.workspace)) return send(res, 409, 'application/json', JSON.stringify({ error: `${path.basename(rec.workspace)} 文件夹还在，请先改名或删除 · the folder ${path.basename(rec.workspace)} still exists; rename or delete it first` }));
         provisionWorkspace(rec);
         await upsertUser(rec);
         audit('create', { who: id, name: rec.name, by: user.id });
@@ -2618,7 +2621,6 @@ const server = http.createServer(async (req, res) => {
           // Owner resets a member's password (Settings "重设密码 · Reset password", F5-2): checked before
           // anything is written; every session of theirs is signed out so the old password's reach ends.
           if (b.password !== undefined && passwordError(b.password)) return send(res, 400, 'application/json', JSON.stringify({ error: passwordError(b.password) }));
-          if (b.password !== undefined) { target.passHash = hashPassword(String(b.password)); cfg.sessions.destroyUser(id); audit('password-reset', { who: id, by: user.id }); }
           const prof = loadProfileForUpdate(target.workspace, { name: target.name }); // read-before-write: never rebuild a member's profile from a failed read
           if (typeof b.name === 'string' && b.name.trim()) { prof.name = b.name.trim().slice(0, 60); target.name = prof.name; }
           if (b.birthYear !== undefined) { prof.birthYear = Number(b.birthYear) || null; target.birthYear = prof.birthYear; }
@@ -2631,7 +2633,12 @@ const server = http.createServer(async (req, res) => {
           }
           prof.role = target.role;
           saveProfile(target.workspace, prof);
+          // The new password takes effect only once every check above passed and the profile saved:
+          // a refused role change must not leave a half-applied reset (GPT review, 2026-11-22).
+          const reset = b.password !== undefined;
+          if (reset) target.passHash = hashPassword(String(b.password));
           await upsertUser(target);
+          if (reset) { cfg.sessions.destroyUser(id); audit('password-reset', { who: id, by: user.id }); }
           return send(res, 200, 'application/json', '{"ok":true}');
         }
         if (req.method === 'DELETE') {
