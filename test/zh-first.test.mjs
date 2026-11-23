@@ -14,8 +14,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SKIP_APPS = new Set(['church', 'rise']);   // not part of this sweep (owner-managed apps)
 const HAN = /[一-鿿]/;
 const CJK = /[　-〿㐀-鿿＀-￯]/;
