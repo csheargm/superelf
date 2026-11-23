@@ -62,3 +62,17 @@ test('offline with nothing saved says it cannot load, not "None shared yet."; an
   assert.match(off, /家庭应用暂时无法加载 · Family Apps cannot load right now/);
   await ctx.close();
 });
+
+// GPT review: a 401/403 is the server refusing, not offline — the saved list is dropped and never redisplayed.
+test('a refused /api/family-apps (403) drops the saved list instead of showing it as offline', { skip, timeout: 60000 }, async () => {
+  const ctx = await browser.newContext(); const page = await ctx.newPage();
+  await page.goto(`http://127.0.0.1:${port}/`);
+  await signIn(page, 'kid', 'kid-pass-12345');
+  assert.match(await family(page), /Chores/, 'CONTROL: the online list is saved');
+  await page.route('**/api/family-apps', (r) => r.fulfill({ status: 403, contentType: 'application/json', body: '{"error":"forbidden"}' }));
+  const denied = await family(page);
+  assert.doesNotMatch(denied, /Chores/); assert.doesNotMatch(denied, /上次保存的列表/, 'no saved-list mark');
+  assert.match(denied, /Family Apps cannot load right now/);
+  assert.equal(await page.evaluate(() => localStorage.getItem('pa_family')), null, 'the saved list is gone');
+  await ctx.close();
+});

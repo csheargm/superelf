@@ -726,7 +726,7 @@ async function ensureToken(){
   }
   $('#dot').classList.add('ok');
 }
-async function logout(){ try{ await api('/api/logout',{method:'POST'}); }catch{} try{ await swSignedOut(window.caches,(u)=>fetch(u,{method:'POST',credentials:'same-origin'})); }catch(err){ alert('未能清除已保存的应用页面 · Could not clear saved app pages — '+(err&&err.message||err)); } localStorage.removeItem('pa_session'); location.reload(); }
+async function logout(){ try{ await api('/api/logout',{method:'POST'}); }catch{} try{ await swSignedOut(window.caches,(u)=>fetch(u,{method:'POST',credentials:'same-origin'})); }catch(err){ alert('未能清除已保存的应用页面 · Could not clear saved app pages — '+(err&&err.message||err)); } localStorage.removeItem('pa_session'); try{ localStorage.removeItem(SW_FAMILY_KEY); }catch{ /* blocked storage: nothing was kept */ } location.reload(); }
 
 /* ── New-feature key registry: maps feature-key → version added ── */
 // Update this when shipping new UI features; markNew() + PANewDot.mark() use these keys.
@@ -1240,8 +1240,9 @@ async function loadFamilyApps(){
   if(window.PADemoAuth){ const d=$('#dFamily'); d.textContent=''; const n=document.createElement('span'); n.id='dFamilyDemo'; n.style.cssText='color:var(--muted);font-size:13px'; n.textContent=DEMO_FAMILY_NOTE; d.appendChild(n); return; }
   // Offline (F5-7): the list from the last online load, marked as such — never "None shared yet." for a list we could not read.
   let apps=[], offline=false;
-  try{ const r=await api('/api/family-apps'); if(!r.ok) throw new Error('HTTP '+r.status); apps=await r.json(); if(!Array.isArray(apps)) throw new Error('bad list'); rememberFamily({apps}); }
-  catch{ offline=true; apps=recallFamily().apps||null; }   // R5: the failure is shown below (the offline mark, or the could-not-load line)
+  let denied=false;   // 401/403 is the server saying no, not offline: the saved list is dropped, never shown (GPT review)
+  try{ const r=await api('/api/family-apps'); if(r.status===401||r.status===403){ denied=true; try{ localStorage.removeItem(SW_FAMILY_KEY); }catch{ /* blocked storage: nothing was kept */ } } if(!r.ok) throw new Error('HTTP '+r.status); apps=await r.json(); if(!Array.isArray(apps)) throw new Error('bad list'); rememberFamily({apps}); }
+  catch{ offline=!denied; apps=denied?null:(recallFamily().apps||null); }   // R5: the failure is shown below (the offline mark, or the could-not-load line)
   let myNames=new Set(); try{ (await (await api('/api/apps')).json()).forEach(a=>myNames.add(a.name)); }catch{ (PASW.recall(SW_APPS_KEY)||[]).forEach(a=>myNames.add(a.name)); }
   const el=$('#dFamily');
   if(!apps){ el.innerHTML=`<span style="color:var(--muted);font-size:13px">${FAMILY_UNREADABLE}</span>`; return; }
