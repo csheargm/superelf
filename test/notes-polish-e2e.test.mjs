@@ -129,3 +129,21 @@ test('F3-01: with the list docked, the FIRST click on a header button works (Dra
     await ctx.close();
   }
 });
+
+test('F3-06: a first-use tip clears its control\'s whole bar, and the first press elsewhere dismisses it (seen)', { skip, timeout: 90000 }, async () => {
+  await seed();
+  const ctx = await newContext({ viewport: { width: 700, height: 850 } }); const page = await ctx.newPage();
+  await (await openDocked(page)).evaluate(() => PATips.reset());   // earlier tests in this file dismissed tips on this account
+  const frame = await openDocked(page);   // no click on the way in: a press would dismiss the tip
+  await frame.waitForSelector('.pat-tip.on', { timeout: 10000 });
+  const m = await frame.evaluate(() => { const tip = document.querySelector('.pat-tip.on'); const id = tip.dataset.tip; const t = tip.getBoundingClientRect();
+    const bars = [...document.querySelectorAll('.pan-top,.pac-dhead,.pac-lsearch')].map((b) => b.getBoundingClientRect()).filter((b) => b.width && b.height);
+    const over = bars.some((b) => t.top < b.bottom - 1 && t.bottom > b.top + 1 && t.left < b.right && t.right > b.left);
+    return { id, over }; });
+  assert.equal(m.over, false, `the tip ${m.id} covers no bar`);
+  const fr = await page.locator('#fr').boundingBox();
+  await page.mouse.click(fr.x + fr.width - 40, fr.y + fr.height - 120);          // empty paper
+  await frame.waitForFunction(() => !document.querySelector('.pat-tip'), null, { timeout: 3000 });
+  await frame.waitForFunction((id) => (PATips.seen() || []).includes(id), m.id, { timeout: 3000 });
+  await ctx.close();
+});
