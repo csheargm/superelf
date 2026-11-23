@@ -6,20 +6,20 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { ROOT, startHarness, runApp, until, settle } from './helpers-app.mjs';
-import { searchBible, BIBLE_DATA_DIR } from '../lib/bible.mjs';
+import { searchBible, bibleSearchWire, BIBLE_DATA_DIR } from '../lib/bible.mjs';
 
 const DATA = path.join(ROOT, BIBLE_DATA_DIR);
 const EXPORTS = ['runSearch', '_booted:()=>_booted', 'el:(id)=>document.getElementById(id)'];
 const tipsStub = () => ({ register() {} });
 
-// The shell's bible-search answer comes from the REAL searchBible, as web.mjs serves it.
+// The shell's bible-search answer is the REAL wire reply web.mjs serves (bibleSearchWire).
 async function boot(app) {
   const h = await startHarness('bible');
   const asked = [];
   const relay = Object.assign(async (m) => {
     if (m.kind !== 'bible-search') return h.relay(m);
     asked.push(m.q);
-    return { ok: true, id: m.id, results: searchBible(DATA, m.q) };
+    return { ok: true, id: m.id, results: bibleSearchWire(DATA, m.q) };
   }, { faults: h.relay.faults });
   const A = runApp(app, relay, EXPORTS, { clampTimers: true, globals: { PATips: tipsStub() } });
   await until(() => A._booted(), 'boot');
@@ -30,6 +30,14 @@ async function boot(app) {
 test('searchBible: one Chinese character searches 和合本; one Latin letter does not', () => {
   assert.ok(searchBible(DATA, '爱').hits.length > 0, '爱 finds verses');
   assert.deepEqual(searchBible(DATA, 'a').hits, []);
+});
+
+test('bible-search wire stays a plain array (apps installed before the fix call .map on it)', () => {
+  const wire = bibleSearchWire(DATA, 'the');
+  assert.ok(Array.isArray(wire), 'an array, not {hits, more}');
+  assert.equal(wire.length, 61, 'one past the 60 cap says there is more');
+  assert.equal(bibleSearchWire(DATA, 'so loved the world').length < 61, true);
+  assert.deepEqual(bibleSearchWire(DATA, 'a'), []);
 });
 
 for (const app of ['bible (template)', 'bible (live)']) {

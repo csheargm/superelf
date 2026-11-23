@@ -653,7 +653,7 @@ async function runSearch(){
   // A search that FAILED is not a search with no hits — "No results." for a 401/500/dropped
   // connection is the same lie one level up (V6 re-audit). Say which one it was.
   if(!(r&&r.ok)){ box.innerHTML='<div style="padding:14px;color:var(--muted)">Search failed · 搜索失败 — '+esc((r&&r.error)||'try again 请重试')+'</div>'; return; }
-  const hits=(r.results&&r.results.hits)||[], more=!!(r.results&&r.results.more);   // lib/bible.mjs searchBible
+  const all=Array.isArray(r.results)?r.results:((r.results&&r.results.hits)||[]), hits=all.slice(0,60), more=all.length>60||!!(r.results&&r.results.more);   // lib/bible.mjs bibleSearchWire: an array, one past the 60 cap when there is more
   if(!hits.length){ box.innerHTML='<div style="padding:14px;color:var(--muted)">No results · 无结果</div>'; return; }
   const re=q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   box.innerHTML=hits.map(v=>{

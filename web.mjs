@@ -25,7 +25,7 @@ import { readJsonState, readJsonForUpdate, FILE_OK, FILE_ABSENT, FILE_UNREADABLE
 import { saveAppData, restoreAppData, appDataFile, noLinkOnTheWay, APP_DATA_DIR, UPLOADS_DIR } from './lib/appdata.mjs';
 import { loadProfile, loadProfileForUpdate, saveProfile, ageFromYear, sanitizeHealthThresholds, effectiveHealthThresholds, emailOk } from './lib/users.mjs';
 import { promote, rollback, unshare, listShared, fork, copyNoLinks, LINKED_SOURCE, FORK_REFUSED } from './lib/sharedapps.mjs';
-import { getChapter, searchBible, BIBLE_DATA_DIR } from './lib/bible.mjs';
+import { getChapter, bibleSearchWire, BIBLE_DATA_DIR } from './lib/bible.mjs';
 import { listBriefings, getBriefing, saveBriefing, pruneBriefings, pendingActions, runJob } from './lib/autonomy.mjs';
 import { settleProposals, annotateBriefing, expireStaleActions, sweepStrandedApprovals, isFlagSuppressed, recordReminderRetirement } from './lib/actions.mjs';
 import { decideAction, withUserLock } from './lib/decide.mjs';
@@ -1727,7 +1727,7 @@ const server = http.createServer(async (req, res) => {
       }
     }
     if (req.method === 'GET' && p === '/api/bible-search') {
-      try { return send(res, 200, 'application/json', JSON.stringify(searchBible(BIBLE_DATA, url.searchParams.get('q')))); }
+      try { return send(res, 200, 'application/json', JSON.stringify(bibleSearchWire(BIBLE_DATA, url.searchParams.get('q')))); }
       catch (e) { return send(res, 400, 'application/json', JSON.stringify({ error: e.message })); }
     }
     if (req.method === 'GET' && p === '/api/bible') {
