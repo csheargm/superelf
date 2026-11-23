@@ -44,7 +44,7 @@ const WEB = fs.readFileSync(path.join(ROOT, 'web.mjs'), 'utf8');
 const CONFIG = fs.readFileSync(path.join(ROOT, 'lib', 'config.mjs'), 'utf8');
 
 test('the member lane drops the permission bypass — where the boundary starts', () => {
-  assert.match(CONFIG, /cfg\.member_args = cfg\.member_args \|\| \['--permission-mode', 'acceptEdits'\];/,
+  assert.match(CONFIG, /cfg\.member_args = cfg\.member_args \|\| \['--permission-mode', 'acceptEdits', '--strict-mcp-config'\];/,
     'members run under acceptEdits');
   assert.ok(!/member_args[^\n]*dangerously-skip-permissions/.test(CONFIG),
     'and never with the bypass');
