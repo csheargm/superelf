@@ -129,7 +129,10 @@
   color:var(--muted,#888);font-size:13px;font-weight:600;-webkit-tap-highlight-color:transparent}
 .pan-hmode.on{background:color-mix(in srgb,var(--accent,#0f6355) 14%,transparent);color:var(--accent,#0f6355)}
 .pan-hmode .pan-mlbl{font-size:12px}
-@media (max-width:520px){ .pan-hmode .pan-mlbl{display:none} }   /* on a phone the glyph carries it */
+@media (max-width:520px){ .pan-hmode .pan-mlbl{display:none} }
+/* Below 900px (iPad portrait beside the docked list, the app bar's Home · A- · A+ in the row) the header wraps
+   onto a 2nd line instead of pushing Print off the right edge (F3-02); barClearance reads its height. */
+@media (max-width:900px){ .pan-top{flex-wrap:wrap;row-gap:4px} }   /* TODO(R4 seam): the header CSS → its own part */   /* on a phone the glyph carries it */
 /* A control row that its tab has not asked for. !important because the dock/drag machinery
    writes inline styles onto these bars and would otherwise win. */
 .pan-bar.pan-off{display:none!important}
