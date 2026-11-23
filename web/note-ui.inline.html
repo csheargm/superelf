@@ -2817,10 +2817,12 @@
     // The link a range starts in. A range can start at (element, index) — around a whole link —
     // rather than in its text, which is how the selection sits right after createLink.
     // WebKit (Safari) leaves a selection over a link starting at the END of the text before it
-    // ("Visit |" → "example"), so a non-empty range whose start is a text node's end begins at the next node.
+    // ("Visit |" → "example"), so a non-empty range whose start is a text node's end begins at the next node — but only when it also ends in that link (else it is a new link).
     // TODO(R4): this file is over budget; the link strip (linkIn … applyLink) is the seam to split into its own inline module.
     function linkAtRange(r){ let n=r&&r.startContainer; if(n&&n.nodeType===1&&n.childNodes[r.startOffset]) n=n.childNodes[r.startOffset];
-      else if(n&&n.nodeType===3&&r.startOffset===n.length&&!r.collapsed){ let m=n; while(m&&m!==textLayer&&!m.nextSibling) m=m.parentNode; if(m&&m!==textLayer) n=m.nextSibling; }
+      else if(n&&n.nodeType===3&&r.startOffset===n.length&&!r.collapsed){ let m=n; while(m&&m!==textLayer&&!m.nextSibling) m=m.parentNode;
+        const a=m&&m!==textLayer?linkIn(m.nextSibling):null, e=r.endContainer;   // that link only if the range also ENDS in it
+        return a&&(a.contains(e)||(e===a.parentNode&&e.childNodes[r.endOffset-1]===a))?a:null; }
       return linkIn(n); }
     // Under the button, or above it when the bar rides the keyboard: measured against the VISUAL
     // viewport, the one the iOS keyboard shrinks.

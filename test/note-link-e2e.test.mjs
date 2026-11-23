@@ -100,6 +100,31 @@ test('on a phone the address strip fits the screen, though the docked bar is a s
   await ctx.close();
 });
 
+test('a selection that starts at the end of the text before a link: the link only if the range ends in it', { skip, timeout: 60000 }, async () => {
+  // WebKit starts a selection over a link at the END of "Visit ". Such a range is the link only when
+  // it also ends inside it; one that runs on into " today" is a NEW link over that text, not an edit.
+  const ctx = await newContext(); const page = await ctx.newPage();
+  const frame = await openJournal(page);
+  await textMode(frame);
+  await page.waitForTimeout(200);                                            // T mode's own caret-to-end lands first
+  const form = async (endIn, endAt) => {
+    await frame.evaluate(([endIn, endAt]) => { const tl = document.querySelector('.pan-textlayer'); tl.focus();
+      const a = tl.querySelector('a'), before = a.previousSibling, end = endIn === 'link' ? a.firstChild : a.nextSibling;
+      const r = document.createRange(); r.setStart(before, before.length); r.setEnd(end, endAt === 'end' ? end.length : endAt);
+      getSelection().removeAllRanges(); getSelection().addRange(r); }, [endIn, endAt]);
+    await frame.locator('.pan-flink').click();
+    assert.equal(await linking(frame), true, `the strip opened (flash: "${await flashText(frame)}")`);
+    const out = [await frame.locator('.pan-linkurl').inputValue(), await frame.locator('.pan-linkrm').isVisible()];
+    await page.keyboard.press('Escape');
+    return out;
+  };
+  assert.deepEqual(await form('link', 'end'), [TARGET, true], 'start before, end at the link\'s end: edit that link');
+  assert.deepEqual(await form('link', 3), [TARGET, true], 'start before, end inside the link: edit that link');
+  assert.deepEqual(await form('after', 'end'), ['', false], 'runs on into " today": a new link, not the old one');
+  assert.ok((await layerHtml(frame)).includes(`Visit ${SAVED} today`), 'nothing changed');
+  await ctx.close();
+});
+
 test('edit a link (prefilled), Remove it; javascript: is refused at the button and again at the shell', { skip, timeout: 90000 }, async () => {
   const ctx = await newContext(); const page = await ctx.newPage();
   const errors = []; page.on('pageerror', (e) => errors.push(String(e)));
