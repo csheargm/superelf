@@ -531,12 +531,12 @@ async function loadFamily(){
     `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)">
       <span style="flex:1;min-width:0;overflow-wrap:anywhere">${esc(u.name)} <small style="color:var(--muted)">${u.status==='pending'?'等待批准 · Waiting for approval':u.role}${u.age!=null?' · age '+u.age:''}</small></span>
       ${u.status==='pending'?`<button class="primary" data-approve="${esc(u.id)}">批准 · Approve</button>`:''}
-      ${u.id!=='owner'?`<button class="plain" data-pw="${esc(u.id)}">重设密码 · Reset password</button><button class="plain" data-del="${esc(u.id)}">×</button>`:''}
+      ${u.id!=='owner'?`${u.status==='pending'?'':`<button class="plain" data-pw="${esc(u.id)}">重设密码 · Reset password</button>`}<button class="plain" data-del="${esc(u.id)}">×</button>`:''}
     </div>`).join('')+
     `<div style="margin-top:10px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px">
-      <input id="nId" placeholder="id (e.g. mia)" style="${FIELD}">
-      <input id="nName" placeholder="Name" style="${FIELD}">
-      <input id="nYear" placeholder="Birth year" inputmode="numeric" style="${FIELD}">
+      <input id="nId" placeholder="用户名（如 mia）· id" style="${FIELD}">
+      <input id="nName" placeholder="名字 · Name" style="${FIELD}">
+      <input id="nYear" placeholder="出生年份 · Birth year" inputmode="numeric" style="${FIELD}">
       <input id="nPass" type="password" autocomplete="new-password" placeholder="起始密码（可不填）· Starting password (optional)" style="${FIELD}">
       <button class="primary" id="addU" style="padding:6px">Add member</button>
     </div>`;

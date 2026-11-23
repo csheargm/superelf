@@ -636,9 +636,11 @@ let UID=null;
 // → true | false | 'offline' (the node could not be reached at all: a fetch that threw, never a refused token).
 // signal: the offline re-check. Its failure changes nothing (the shell is already offline) and so can never
 // undo a newer success; its abort is the re-check deadline.
+const ACCOUNT_REMOVED_CODE='account_removed', ACCOUNT_REMOVED_TEXT='你的账号已被移除 · Your account was removed';   // R3: = lib/auth.mjs ACCOUNT_REMOVED_CODE, pinned by test/removed-member-e2e.test.mjs
+let accountRemoved=false;
 async function ping(signal){ if(!T) return false; const t0=T; let r; try{ r=await api('/api/ping',signal?{signal}:{}); }catch{ if(T===t0&&!signal) PAOffline.noteNet(false); return 'offline'; } if(T!==t0) return false;   // the session changed while this ping ran: its answer is not ours to apply
   if(signal){ let j0; try{ j0=await r.clone().json(); }catch{ return false; } if(T!==t0||!j0||!((r.ok&&typeof j0.ok==='boolean')||r.status===401)) return false; }   // a re-check needs the NODE: its ping reply or its 401 bad-token; a gateway error or HTML page does not count
-  PAOffline.noteNet(true); try{ const j=await r.json(); if(T!==t0) return false; if(j.ok){ UID=j.uid; PASW.remember(SW_UID_KEY,j.uid); const h1=document.querySelector('h1'); if(j.name) h1.textContent=j.name+'’s '+(h1.dataset.product||'管家'); else if(h1.dataset.product) h1.textContent=h1.dataset.product; } return j.ok; }catch{ return false; } }
+  PAOffline.noteNet(true); try{ const j=await r.json(); if(T!==t0) return false; accountRemoved=r.status===401&&j.code===ACCOUNT_REMOVED_CODE; if(accountRemoved){ T=null; try{ localStorage.removeItem('pa_session'); localStorage.removeItem(SW_UID_KEY); }catch{ /* blocked storage: nothing was kept to reopen offline */ } } if(j.ok){ UID=j.uid; PASW.remember(SW_UID_KEY,j.uid); const h1=document.querySelector('h1'); if(j.name) h1.textContent=j.name+'’s '+(h1.dataset.product||'管家'); else if(h1.dataset.product) h1.textContent=h1.dataset.product; } return j.ok; }catch{ return false; } }
 // Offline is set by one failed request, and only a later success clears it. On a screen that makes no
 // requests (the home grid) that never came, so the line stayed on with the network back (owner 2026-11-21).
 // While offline and visible, ask the node again on a short beat, on return to the app and on 'online'.
@@ -690,7 +692,7 @@ async function ensureToken(){
     for(;;){ const done=await new Promise((d)=>{ $('#setup').showModal(); $('#setupBtn').onclick=async(ev)=>{ ev.preventDefault(); if(await doSetup()){ $('#setup').close(); d(true); } }; }); if(done && await ping()) break; }
     $('#dot').classList.add('ok'); return;
   }
-  setLoginMode(false);
+  setLoginMode(false); if(accountRemoved) $('#loginErr').textContent=ACCOUNT_REMOVED_TEXT;   // only this browser's own (removed) session gets the code
   for(;;){
     const done=await new Promise((d)=>{ $('#login').showModal(); $('#loginBtn').onclick=async(ev)=>{ ev.preventDefault(); if(await doAuth()){ $('#login').close(); d(true); } }; });
     if(done && await ping()) break;
