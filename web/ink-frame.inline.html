@@ -166,6 +166,67 @@
     for(const ps of byBid.values()){ const m=ps.length>1&&clusterShift(ps,env); if(m) for(const [p,at] of m) moved.set(p,at); }
     return moved.size?placed.map(p=>moved.has(p)?{g:p.g,at:moved.get(p),orphan:p.orphan}:p):placed;
   }
+  // ── A circle round printed words keeps them, and the note drawn from it comes along (owner, Romans
+  //    7:4, 2026-11-22: an oval round "叫我们结果子给神" written in iPad portrait sat in empty space under
+  //    the line in landscape, its arrow and note with it). WHY: its top edge reached into the row above,
+  //    so the words under its box (PAInkAnchor.pickChars) took nearly the whole line, and on a wider
+  //    column that range starts at the far left. Read-time only, and only on a column that is not the
+  //    one it was written on: there the ENCLOSURE (a big stroke that closes on itself) is re-measured on
+  //    a hidden copy of the line at the written width — only characters whose middle lies inside its box
+  //    count (a comma it grazes, a row it reaches into, is not circled) — and drawn at its written offset from those words; line-frame writing that touches it (or
+  //    touches writing that touches it), as written, moves with it as one group. Stored records are never
+  //    rewritten; at the written width nothing changes. The written width is a record's ww/fw, accepted
+  //    only when the record's stored anchor width (w) measures the same there.
+  const ENC_GAP=0.35;   // a stroke whose ends are this close (x its box diagonal) is closed: a circle, not an arc
+  function isEnclosure(g){
+    if(isLine(g)||g.verse==null||g.strokes.length!==1||g.strokes[0].t==='highlighter') return false;
+    const p=g.strokes[0].p, b=bboxOf(p.map(q=>({x:q[0],y:q[1]})));
+    if(p.length<8||isSmall({w:b.r-b.l,h:b.b-b.t})) return false;
+    const a=p[0], z=p[p.length-1]; return Math.hypot(a[0]-z[0],a[1]-z[1])<=ENC_GAP*Math.hypot(b.r-b.l,b.b-b.t);
+  }
+  // The widths the chapter's ink says it was written at, the record's own first.
+  function widthsOf(g,groups){ const out=[]; for(const w of [g.ww,...groups.map(x=>x.ww||x.fw)]) if(w>0&&!out.some(v=>Math.abs(v-w)<=EPS_W)) out.push(w); return out; }
+  // The enclosure as written, on the first width it verifies at: {W, box (line px), s, e, dx, dy, w}.
+  function encWritten(g,groups,el,env){
+    for(const W of widthsOf(g,groups)){ const r=env.enclosedAt(el,W,g); if(r) return Object.assign({W},r); }
+    return null;
+  }
+  // Placed members of the enclosure's group: line-frame writing of its line chained to it within NEAR,
+  // compared on the written frame ({fx,fy} from the line's top-left, unscaled).
+  function followers(enc,a,placed,lr){
+    const boxes=[enc.box], out=[]; let grew=true;
+    const cand=placed.filter(p=>p.at&&!p.orphan&&p.g.bid==null&&sameLine(p.g,a.g)&&(isLine(p.g)?!(p.g.fw>0)||Math.abs(p.g.fw-enc.W)<=EPS_W:p.g!==a.g&&isSmall(extentOf(p.g))))
+      .map(p=>{ const fx=(p.at.ox-lr.left)/p.at.s, fy=(p.at.oy-lr.top)/p.at.s, e=extentOf(p.g); return {p,fx,fy,box:{l:fx,t:fy,r:fx+e.w,b:fy+e.h}}; });
+    while(grew){ grew=false; for(const c of cand) if(!out.includes(c)&&boxes.some(b=>gap(b,c.box)<=NEAR)){ out.push(c); boxes.push(c.box); grew=true; } }
+    return out;
+  }
+  function nowEncloses(g,el,env,w,key){
+    const k=key+'@'+Math.round(w), m=env.nowMemo.get(g); if(m&&m.k===k) return m.v;
+    const v=!!env.enclosedAt(el,w,g); env.nowMemo.set(g,{k,v}); return v;
+  }
+  // placed: [{g,at,orphan}] after shiftClusters. Returns the SAME array unless an enclosure moved.
+  function followEnclosures(placed,groups,env){
+    const moved=new Map();
+    for(const a of placed){
+      if(!a.at||a.orphan||moved.has(a)||!isEnclosure(a.g)) continue;
+      const el=env.lineEl(a.g.verse,a.g.lang); if(!el) continue;
+      const lr=env.local(el.getBoundingClientRect()), key=widthsOf(a.g,groups).join(','), memo=env.encMemo.get(a.g);   // keyed by the widths: new ink re-measures
+      const enc=memo&&memo.key===key?memo.enc:encWritten(a.g,groups,el,env); if(!memo||memo.key!==key) env.encMemo.set(a.g,{key,enc});
+      if(!enc||Math.abs(env.colW(lr)-enc.W)<=EPS_W) continue;   // the written width: drawn exactly as stored
+      // No ww: W is a guess from other ink. If the record already encloses its words here, this may be the
+      // written width (a one-row run measures the same at any width), so it is drawn as stored.
+      if(a.g.ww==null&&nowEncloses(a.g,el,env,env.colW(lr),key)) continue;
+      const rr=env.runNow(el,enc.s,enc.e); if(!rr) continue;
+      const k=enc.w>0&&rr.width>0?rr.width/enc.w:1, at={ox:rr.left+enc.dx*k,oy:rr.top+enc.dy*k,s:k};
+      moved.set(a,at);
+      // The note keeps its written size and offset (the oval's scale), shrunk about the oval only when it
+      // would run past the column, as a line's writing is (placeLine).
+      const fol=followers(enc,a,placed,lr).filter(c=>!moved.has(c.p)), room=lr.left+env.colW(lr)-at.ox;
+      const right=Math.max(0,...fol.map(c=>(c.box.r-enc.box.l)*k)), f=right>room&&room>0?room/right:1;
+      for(const c of fol) moved.set(c.p,{ox:at.ox+(c.fx-enc.box.l)*k*f,oy:at.oy+(c.fy-enc.box.t)*k*f,s:k*f});
+    }
+    return moved.size?placed.map(p=>moved.has(p)?{g:p.g,at:moved.get(p),orphan:p.orphan}:p):placed;
+  }
   // The DOM side of places(), built once per attached list. colW: the text column now (the list less the
   // line's inset on both sides); wholeOf: the record was pinned to its whole line; measureAt: a range's
   // run on a hidden copy of the line at width w (null w: today's line), relative to the line's top-left.
@@ -177,8 +238,23 @@
       try{ const r=o.measurer(c).anchorRect(s,e,gw), cr=c.getBoundingClientRect(); return r&&r.width>0?{left:r.left-cr.left,top:r.top-cr.top}:null; }
       finally{ if(w) c.parentNode.removeChild(c); }
     }
-    return {lineEl:o.lineEl,local:o.local,colW,measureAt,wholeOf,extentOf,memo:new WeakMap()};
+    // An enclosure on a hidden copy of the line at width W: null unless its stored run measures g.w there
+    // (W is not the written width) or no character's middle lies inside its box (none: an underline, a tick).
+    function enclosedAt(el,W,g){
+      const c=el.cloneNode(true); c.style.cssText='position:absolute;visibility:hidden;left:0;top:0;width:'+W+'px'; el.parentNode.appendChild(c);
+      try{ const m=o.measurer(c), cr=c.getBoundingClientRect(); if(m.text.slice(g.charStart,g.charEnd)!==g.quote) return null;
+        const run=m.anchorRect(g.charStart,g.charEnd,g.w); if(!run||Math.abs(run.width-g.w)>EPS_W) return null;
+        const e=extentOf({strokes:g.strokes.map(st=>Object.assign({},st,{w:0}))}), l=run.left+g.dx, t=run.top+g.dy, box={l,t,r:l+e.w,b:t+e.h};
+        let s=-1,f=-1; for(let i=g.charStart;i<g.charEnd;i++){ const q=m.charRect(i); if(!q||!(q.width>0)) continue; const cx=q.left+q.width/2, cy=q.top+q.height/2;
+          if(cy>=box.t&&cy<=box.b&&cx>=box.l&&cx<=box.r){ if(s<0) s=i; f=i+1; } }
+        if(s<0) return null; const r=o.trimRange(m.text,{start:s,end:f}), nr=m.runRect(r.start,r.end); if(!nr) return null;
+        return {s:r.start,e:r.end,dx:l-nr.left,dy:t-nr.top,w:nr.width,box:{l:l-cr.left,t:t-cr.top,r:box.r-cr.left,b:box.b-cr.top}};
+      }finally{ c.parentNode.removeChild(c); }
+    }
+    // The words on ONE row now, else null: one oval cannot ring two rows (it keeps today's placement).
+    const runNow=(el,s,e)=>{ const m=o.measurer(el), r=m.runRect(s,e), u=m.rangeRect(s,e); return r&&r.width>0&&u&&u.height<=r.height*1.5?o.local(r):null; };
+    return {lineEl:o.lineEl,local:o.local,colW,measureAt,wholeOf,extentOf,enclosedAt,runNow,memo:new WeakMap(),encMemo:new WeakMap(),nowMemo:new WeakMap()};
   }
-  window.PAInkFrame={env,NEAR,isSmall,bboxOf,isScrub,hitGroups,extentOf,SCRUB,ERASE_HIT,BURST_MS,SMALL,NEIGHBOR,isLine,sameLine,handwriting,writtenWidth,placeLine,joinsBurst,frameOf,places,toLine,EPS_W,clusterOf,relOf,widthChanged,shiftClusters};
+  window.PAInkFrame={env,NEAR,isSmall,bboxOf,isScrub,hitGroups,extentOf,SCRUB,ERASE_HIT,BURST_MS,SMALL,NEIGHBOR,isLine,sameLine,handwriting,writtenWidth,placeLine,joinsBurst,frameOf,places,toLine,EPS_W,clusterOf,relOf,widthChanged,shiftClusters,ENC_GAP,isEnclosure,followEnclosures};
 })();
 </script>
