@@ -1481,15 +1481,16 @@ function relayText(f,sentBytes,what){
   // NOT the `sent` clause: nothing was sent, so naming a "sent" size here would contradict
   // the sentence it sits in. The size is stated as what is still waiting on the device.
   if(e.code==='network') return 'Connection failed · 连接失败 — it never left this device · 未发出'+(sentBytes?' ('+relaySize(sentBytes)+' waiting · 待发送)':'')+'. Retry when you are back online · 恢复网络后重试。';
-  if(e.code==='server-error') return 'Server error · 服务器错误'+(e.status?' ('+e.status+')':'')+' — '+w.en+' '+w.did+'. Nothing on this device was changed · 本机内容未受影响。';
+  // No HTTP status in any line below: a code is jargon to a newcomer (overnight QA F1-4); 中文 first.
+  if(e.code==='server-error') return '服务器错误 · Server error — '+w.en+' '+w.did+'. Nothing on this device was changed · 本机内容未受影响。';
   if(e.code==='not-found') return 'Not found · 未找到 — '+w.en+' '+w.did+'。';
   if(e.code==='relay-error') return 'App shell error · 外壳出错 — '+w.en+' '+w.did+'. Reload and retry · 请重新加载后重试'+(e.error?' ('+e.error+')':'')+'。';
   // bad-request (incl. the 408 an unfinished body earns) and anything without a code: the
   // server's own reason is the most specific thing available, so it is shown verbatim
   // rather than replaced by a house sentence that would say less (R5). 'cancelled' lands here
   // too: its error, RELAY_CANCELLED, already is the whole sentence.
-  return (e.code==='bad-request'?'Rejected · 请求被拒绝'+(e.status?' ('+e.status+')':'')+' — ':'')
-    +String(e.error||'Request rejected · 请求被拒绝')+'。';
+  return (e.code==='bad-request'?'请求被拒绝 · Rejected — ':'')
+    +String(e.error||'请求被拒绝 · Request rejected')+'。';
 }
 // Attach that sentence to a failure reply. EVERY broker kind answers through this, so an
 // app that only knows how to print a string still shows the specific reason — the fix for

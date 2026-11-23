@@ -17,3 +17,11 @@ test('F1-1: a wrong setup code shows the server reason, not "Signed out"', async
   assert.match(g.text, /初始化码错误/, 'the server reason is shown');
   assert.doesNotMatch(g.text, /Signed out|登录已过期/, 'a setup attempt is not an expired session');
 });
+
+test('F1-4: error lines are 中文 first and carry no HTTP status code', async () => {
+  for (const [status, body] of [[400, { error: '用户名无效 · bad username' }], [429, { error: '稍后再试 · slow down' }], [500, {}], [503, {}]]) {
+    const g = await R.relayJson(reply(status, body), 'request');
+    assert.doesNotMatch(g.text, /\(\d{3}\)|\b[45]\d\d\b/, `${status}: no HTTP code in "${g.text}"`);
+    assert.match(g.text, /^[^A-Za-z]*[㐀-鿿]/, `${status}: 中文 first in "${g.text}"`);
+  }
+});
