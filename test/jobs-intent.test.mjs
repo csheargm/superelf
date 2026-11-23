@@ -75,7 +75,7 @@ test('main chat offers the draft; an APP chat never does', () => {
   const WEB = fs.readFileSync(path.join(ROOT, 'web.mjs'), 'utf8');
   // origin.fromApp rather than `app`: it is also true when the relay header is present and the
   // slug forged empty (lib/agent-origin.mjs; driven over HTTP in test/app-agent-confinement.test.mjs).
-  assert.match(WEB, /if \(!origin\.fromApp && looksLikeJob\(message\)\.job\)/,
+  assert.match(WEB, /if \(!origin\.fromApp && agentAllowed\(user\) && looksLikeJob\(message\)\.job\)/,   // agentAllowed: the resolver runs the agent CLI, so a member not opted in never reaches it (F4-2)
     'a job appearing out of an app\'s own chat would be a surprise');
   assert.match(WEB, /line\(\{ type: 'job-draft'/, 'the draft is streamed to the client');
   // Offered, never created: the person presses Create.

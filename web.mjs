@@ -13,6 +13,7 @@ import { makeSigninGate, authConfig } from './lib/demo-auth.mjs';
 import { makeDemoRoutes } from './lib/demo-routes.mjs';
 import { loadConfig, configPath, fastLaneGuard, GUARD_DEFAULT_SURFACE, agentCapabilities, appContract, REPLY_LANGUAGE_RULE, OVERRIDABLE_PROMPT_MAX } from './lib/config.mjs';
 import { runClaude } from './lib/runner.mjs';
+import { agentAllowed, lanesFor, memberLane, NO_PLAIN_LANE_TEXT } from './lib/member-lanes.mjs';
 import { cancelOnClose, createTurnCancel, createTurnStops } from './lib/turn-stop.mjs';
 import { watchConfig } from './lib/config-watch.mjs';
 import { oneShotBaseArgs, oneShotModel, yieldSettings } from './lib/one-shot.mjs';
@@ -499,7 +500,7 @@ function provisionWorkspace(rec) {
   if (!existingProfile) saveProfile(rec.workspace, { name: rec.name, role: rec.role, birthYear: rec.birthYear || null, about: '', prefs: '' });
 }
 
-function publicUser(u) { const p = loadProfile(u.workspace) || {}; return { id: u.id, name: displayName(u), role: u.role, status: u.status || 'active', hasPin: !!u.passHash, birthYear: p.birthYear ?? u.birthYear ?? null, age: ageFromYear(p.birthYear ?? u.birthYear, thisYear()) }; }
+function publicUser(u) { const p = loadProfile(u.workspace) || {}; return { id: u.id, name: displayName(u), role: u.role, agent: agentAllowed(u), status: u.status || 'active', hasPin: !!u.passHash, birthYear: p.birthYear ?? u.birthYear ?? null, age: ageFromYear(p.birthYear ?? u.birthYear, thisYear()) }; }
 
 if (!cfg.web_token) {
   cfg.web_token = crypto.randomBytes(24).toString('base64url');
@@ -1293,7 +1294,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
   // same paused-by-default rule the editor and the resolver already follow.
   // `origin.fromApp`, not `app`: an app request whose slug is forged empty still carries the
   // relay's header, and must not reach this resolver in the owner's unrestricted lane.
-  if (!origin.fromApp && looksLikeJob(message).job) {
+  if (!origin.fromApp && agentAllowed(user) && looksLikeJob(message).job) {   // the resolver runs the agent CLI (F4-2)
     try {
       const prof = loadProfile(wsDir(user)) || {};
       const out = await resolvePrompt(message, {
@@ -1328,6 +1329,10 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
   let { lane: chosen, status: laneStatus } = pickChatLane({
     chatModels: cfg.chat_models, model: oneShot ? oneShotModel(cfg, model) : model, hasImage, visionDefault: cfg.vision_default,
     confined: agentConfined(user, origin), gone: modelHealth.gone() });
+  // F4-2: a member the owner has not opted in never reaches an agent lane (lib/member-lanes.mjs).
+  const ml = memberLane(user, chosen, cfg.chat_models, (m) => laneServed(m, modelHealth.gone()));
+  if (ml.status) laneStatus = ml.status;
+  chosen = ml.lane;
   if (laneStatus) line({ type: 'status', text: laneStatus });
   let fellBack = false;   // lib/chat-outcome.mjs: ONE retry on the agent lane for an app turn a fast lane left blank
   try {
@@ -1335,7 +1340,8 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
     const appsBefore = snapshotApps(appsDir(user));   // lib/app-postcheck.mjs: scan only what this turn writes
     // TODO(R4 seam): the retry loop and the lane dispatch inside it leave chat() together (see the seam named below).
     for (;;) {
-    if (chosen && chosen.provider === 'ollama') {
+    if (ml.blocked) r = { ok: false, text: NO_PLAIN_LANE_TEXT };   // no plain lane for this member: said, never the agent
+    else if (chosen && chosen.provider === 'ollama') {
       // Fast lane: text-only Ollama model. Stateless, so send recent history for context.
       // Global honesty guard + the app's own directive (e.g. the Bible app's "reply in Chinese
       // with English keywords") — as SYSTEM messages so fast-lane models actually follow the
@@ -1452,7 +1458,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
       // conversation turn resumes the session it had (or none) and its history block carries these turns.
       if (r.sessionId && !oneShot) convo.sessionId = r.sessionId;
     }
-    if (!isBlankAnswer(r) || !shouldFallBackToAgent({ lane: chosen, fromApp: origin.fromApp, alreadyFellBack: fellBack })) break;
+    if (!isBlankAnswer(r) || !agentAllowed(user) || !shouldFallBackToAgent({ lane: chosen, fromApp: origin.fromApp, alreadyFellBack: fellBack })) break;
     console.log(chatTurnLogLine({ app: tag, lane: chosen, ok: false, textLen: 0, ms: Date.now() - startedAt, code: 'empty' }));
     line({ type: 'status', text: fallbackStatusText(chosen) });
     chosen = null; fellBack = true;   // null = the Claude agent lane (PA_CHAT_LANE); confined exactly as any app turn there
@@ -1469,7 +1475,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
     const appWarn = blank ? '' : appBuildWarnings(appsDir(user), appsBefore);
     if (appWarn) { r = { ...r, text: `${r.text}\n\n${appWarn}` }; line({ type: 'status', text: appWarn }); }
     // by: the lane that ACTUALLY answered (a confined turn's GPT pick runs on Claude), shown under the answer.
-    const by = chosen ? chosen.label : 'Claude';
+    const by = ml.blocked ? '' : chosen ? chosen.label : 'Claude';
     const mdMsg = { role: 'md', text: r.text || '', ms: turnMs, by, ...(blank ? { failed: true } : {}) };
     convo.messages.push(mdMsg);
     // Over the cap the oldest turns are ARCHIVED beside the conversation, never
@@ -1487,7 +1493,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
     }
     // Multi-LLM assessment ("Verify · 校验"): detached — the stream ends now, results
     // attach to this turn (mdMsg.assess) and the app polls the existing convo GET.
-    if (assess) line({ type: 'assess', ...startAssess(user, convo, mdMsg, message, chosen ? chosen.id : 'claude', app, system, origin) });
+    if (assess && agentAllowed(user)) line({ type: 'assess', ...startAssess(user, convo, mdMsg, message, chosen ? chosen.id : 'claude', app, system, origin) });
     line({ type: 'done', ok: r.ok, text: blank ? '' : (r.text || ''), by });
   } catch (e) {
     console.log(chatTurnLogLine({ app: tag, lane: chosen, ok: false, textLen: 0, ms: Date.now() - startedAt, code: e.code || e.status || e.name, fellBack }));
@@ -2076,7 +2082,7 @@ const server = http.createServer(async (req, res) => {
     // Models offered in the composer's chooser (id + label only; server maps id → provider/model).
     // A lane gone from Ollama (lib/model-health.mjs) is not offered — the scheduled model-check
     // and any gone answer a turn meets keep this list current without a config edit or a restart.
-    if (req.method === 'GET' && p === '/api/models') { const gone = modelHealth.gone(); return send(res, 200, 'application/json', JSON.stringify((cfg.chat_models || []).filter((m) => laneServed(m, gone)).map((m) => ({ id: m.id, label: m.label, group: m.group || '', provider: m.provider || '', vision: m.provider === 'claude' || m.provider === 'codex' || m.id === cfg.vision_default })))); }   // vision: the summary sheet says whether page images will be seen (note-features.md I)
+    if (req.method === 'GET' && p === '/api/models') { const gone = modelHealth.gone(); return send(res, 200, 'application/json', JSON.stringify(lanesFor(user, cfg.chat_models || []).filter((m) => laneServed(m, gone)).map((m) => ({ id: m.id, label: m.label, group: m.group || '', provider: m.provider || '', vision: m.provider === 'claude' || m.provider === 'codex' || m.id === cfg.vision_default })))); }   // vision: the summary sheet says whether page images will be seen (note-features.md I)
 
     // Health metrics — the iPhone Shortcut POSTs a day's data here; apps read them
     // back. v1 (flat day row) and v2 (schema:"health.v2" samples) share the endpoint
@@ -2628,6 +2634,7 @@ const server = http.createServer(async (req, res) => {
           const prof = loadProfileForUpdate(target.workspace, { name: target.name }); // read-before-write: never rebuild a member's profile from a failed read
           if (typeof b.name === 'string' && b.name.trim()) { prof.name = b.name.trim().slice(0, 60); target.name = prof.name; }
           if (b.birthYear !== undefined) { prof.birthYear = Number(b.birthYear) || null; target.birthYear = prof.birthYear; }
+          if (typeof b.agent === 'boolean') target.agent = b.agent;   // "AI 工具 · Agent tools" opt-in (F4-2, lib/member-lanes.mjs)
           if (b.role) {
             const owners = cfg.users.filter((u) => u.role === 'owner').length;
             const wouldRemoveLastOwner = target.role === 'owner' && b.role !== 'owner' && owners === 1;

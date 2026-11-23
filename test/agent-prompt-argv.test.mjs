@@ -30,7 +30,7 @@ before(async () => {
   port = await freePort();
   root = mkWebRoot({ port, extraConfig: { task_timeout_minutes: 1, users: [
     { id: 'owner', name: 'Owner', role: 'owner', token: OWNER_TOKEN, workspace: 'workspace' },
-    { id: 'kid', name: 'Kid', role: 'member', token: MEMBER_TOKEN, workspace: 'workspace-kid' },
+    { id: 'kid', name: 'Kid', role: 'member', token: MEMBER_TOKEN, workspace: 'workspace-kid', agent: true },   // opted in to agent tools (F4-2)
   ] } });
   argvLog = path.join(root, 'argv.ndjson');
   const bin = path.join(root, 'fake-claude.mjs');
