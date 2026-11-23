@@ -13,7 +13,7 @@ import { makeSigninGate, authConfig } from './lib/demo-auth.mjs';
 import { makeDemoRoutes } from './lib/demo-routes.mjs';
 import { loadConfig, configPath, fastLaneGuard, GUARD_DEFAULT_SURFACE, agentCapabilities, appContract, REPLY_LANGUAGE_RULE, OVERRIDABLE_PROMPT_MAX } from './lib/config.mjs';
 import { runClaude } from './lib/runner.mjs';
-import { agentAllowed, lanesFor, memberLane, NO_PLAIN_LANE_TEXT } from './lib/member-lanes.mjs';
+import { agentAllowed, lanesFor, memberLane, NO_PLAIN_LANE_TEXT, AGENT_OFF_TEXT } from './lib/member-lanes.mjs';
 import { cancelOnClose, createTurnCancel, createTurnStops } from './lib/turn-stop.mjs';
 import { watchConfig } from './lib/config-watch.mjs';
 import { oneShotBaseArgs, oneShotModel, yieldSettings } from './lib/one-shot.mjs';
@@ -2037,7 +2037,8 @@ const server = http.createServer(async (req, res) => {
       // The writer lanes (lib/research-writer.mjs): Claude with no tools in the user's confined app-lane argv, Codex read-only.
       // TODO(R4 seam): with the notes routes → lib/notes-routes.mjs.
       const fuOrigin = { fromApp: true }, fuMs = writerLaneMs(cfg.summary_followup_item_timeout_ms);   // a share of the item deadline, so a hung lane leaves time to fall back
-      const agents = { claude: (q) => enqueue(() => runAgent(q, agentArgs(user, writerClaudeBase(cfg, memberArgsOf(user, fuOrigin)), fuOrigin), wsDir(user), fuMs)),
+      // F4-2: a member without Agent tools gets the plain (Ollama) writer steps only; the chain skips absent agents.
+      const agents = !agentAllowed(user) ? {} : { claude: (q) => enqueue(() => runAgent(q, agentArgs(user, writerClaudeBase(cfg, memberArgsOf(user, fuOrigin)), fuOrigin), wsDir(user), fuMs)),
         codex: (q, model) => enqueue(() => runCodex({ prompt: q, cwd: wsDir(user), model: model || undefined, timeoutMs: fuMs })) };
       const fuDeps = followupDeps({ cfg, runResearch, streamOllama, agents });
       const r = await buildFollowup(b.text, fuDeps);
@@ -2747,6 +2748,8 @@ const server = http.createServer(async (req, res) => {
       // No slug: an ask has no conversation to tag, and an app's agent writes nothing (ADR 0019).
       const origin = { fromApp: true };
       if (typeof message !== 'string' || !message.trim()) return send(res, 400, 'application/json', '{"error":"empty message"}');
+      // F4-2: the ask runs the agent CLI, so a member without Agent tools is refused, said plainly (never the agent).
+      if (!agentAllowed(user)) return send(res, 200, 'application/json', JSON.stringify({ ok: false, text: AGENT_OFF_TEXT }));
       res.writeHead(200, { 'content-type': 'application/json', 'x-content-type-options': 'nosniff' });
       res.flushHeaders?.();
       const beat = setInterval(() => { if (!res.writableEnded) res.write(' '); }, 20000); // whitespace heartbeat; JSON.parse ignores leading spaces
