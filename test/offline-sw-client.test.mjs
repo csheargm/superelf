@@ -28,7 +28,7 @@ function frameStub() {
 }
 // A fake navigator.serviceWorker: register → a registration with an active worker that logs
 // what it is posted and answers through the page's message listener, as the browser would.
-function harness({ sw = 'yes', waiting = false, controlled = true, config = null, pages = {}, chapterBytes = 10, storage = new Map() } = {}) {
+function harness({ sw = 'yes', waiting = false, controlled = true, config = null, pages = {}, chapterBytes = 10, storage = new Map(), metered = false, now = 0 } = {}) {
   const clock = fakeClock(), log = { posted: [], probes: [], fetched: [] }, fr = frameStub();
   let pageListener = null, msgListeners = [], answer = (m) => m;
   const worker = { postMessage: (m) => { log.posted.push(m); const a = answer(m); if (a) Promise.resolve().then(() => pageListener && pageListener({ data: a })); } };
@@ -42,7 +42,8 @@ function harness({ sw = 'yes', waiting = false, controlled = true, config = null
     probeFrame: (u) => { const p = { url: u, removed: 0, remove: () => { p.removed++; } }; log.probes.push(p); return p; },
     onMessage: (fn) => { msgListeners.push(fn); return () => { msgListeners = msgListeners.filter((f) => f !== fn); }; },
     storage: storage ? { getItem: (k) => (storage.has(k) ? storage.get(k) : null), setItem: (k, v) => storage.set(k, v) } : null,
-    setTimeout: clock.setTimeout, clearTimeout: clock.clearTimeout };
+    setTimeout: clock.setTimeout, clearTimeout: clock.clearTimeout,
+    metered: () => (typeof metered === 'function' ? metered() : metered), idle: async () => { log.idled = (log.idled || 0) + 1; }, now: () => now };
   const c = makeSwClient(d);
   return { c, d, fr, log, clock, storage, setAnswer: (fn) => { answer = fn; }, probeArrives: () => msgListeners.forEach((f) => f({ pa: 'pa-sw-probe' })) };
 }
@@ -269,4 +270,37 @@ test('signed-out: both the cache forget and the cookie sign-out run; either fail
 test('the shell enters the signed-out state through swSignedOut: at sign-out and at a boot with no live session', () => {
   assert.match(SHELL, /async function logout\(\)\{[^\n]*swSignedOut\(window\.caches/);
   assert.match(SHELL, /async function ensureToken\(\)\{[^]*?await swSignedOut\(window\.caches[^]*?setup-status/);
+});
+
+// F3-15 (owner 2026-11-23): first the book being read + today's reading; the rest only idle and off a metered link.
+test('F3-15: the remembered book and today\'s reading go first; the rest follows after idle, never twice', async () => {
+  const config = { apps: [], bible_cap_bytes: 1e9, bible: [2, 3, 1] };   // 6 chapters; day 4 → book 2 ch 3
+  const storage = new Map([['pa_bible_book', '3']]);
+  const h = harness({ config, storage, now: 4 * 86400000 });
+  h.setAnswer((m) => (m.kind === 'pa-bible-status' ? { kind: 'pa-bible-status', done: false } : { kind: 'pa-bundle', ok: true }));
+  await started(h);
+  assert.equal(await h.c.prefetch('u1'), 'done');
+  const ch = h.log.fetched.filter((u) => u.startsWith('/api/bible?')).map((u) => u.replace(/.*book=(\d+)&chapter=(\d+)/, '$1:$2'));
+  assert.deepEqual(ch.slice(0, 2), ['3:1', '2:3'], 'book 3 (remembered), then the daily chapter');
+  assert.deepEqual(ch.slice(2), ['1:1', '1:2', '2:1', '2:2'], 'then the rest, none fetched twice');
+  assert.equal(h.log.idled, 1, 'the bulk pass waited for idle');
+});
+test('F3-15: on a metered link the prefetch stops after the first set — "partial", never "done" (R14)', async () => {
+  const h = harness({ config: { apps: [], bible_cap_bytes: 1e9, bible: [2, 3, 1] }, metered: true });
+  h.setAnswer((m) => (m.kind === 'pa-bible-status' ? { kind: 'pa-bible-status', done: false } : { kind: 'pa-bundle', ok: true }));
+  await started(h);
+  assert.equal(await h.c.prefetch('u1'), 'partial');
+  const ch = h.log.fetched.filter((u) => u.startsWith('/api/bible?'));
+  assert.deepEqual(ch, ['/api/bible?book=1&chapter=1'], 'no remembered book (John is absent from this corpus): only the daily chapter');
+  assert.ok(!h.log.posted.some((m) => m.kind === 'pa-bible-done'), 'the worker is NOT told done');
+});
+test('F3-15: the shell\'s daily chapter is the Bible app\'s dailyRead rule; the broker remembers the book read', () => {
+  for (const f of ['workspace/apps/bible/index.html', 'workspace.example/apps/bible/index.html']) {
+    const src = fs.readFileSync(path.join(ROOT, f), 'utf8');
+    assert.match(src, /let idx=Math\.floor\(Date\.now\(\)\/86400000\)%totalChapters;/, `${f}: the rule the shell mirrors`);
+  }
+  const shell = fs.readFileSync(path.join(ROOT, 'web', 'index.html'), 'utf8');
+  assert.match(shell, /m\.kind==='bible'\)\{\n\s+if\(typeof PASW!=='undefined'&&PASW\.noteBook\) PASW\.noteBook\(m\.book\);/);
+  const h = harness(); h.c.noteBook(5); h.c.noteBook('x'); h.c.noteBook(0);
+  assert.equal(h.c.recall('pa_bible_book'), 5, 'only a real book number is remembered');
 });

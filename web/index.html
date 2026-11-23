@@ -1881,6 +1881,7 @@ window.addEventListener('message',async(e)=>{
     } else if(m.kind==='bible-search'){
       reply(await relayCall('/api/bible-search?q='+encodeURIComponent(m.q||''),undefined,'json','results'));
     } else if(m.kind==='bible'){
+      if(typeof PASW!=='undefined'&&PASW.noteBook) PASW.noteBook(m.book);   // the book being read goes first in the offline prefetch (F3-15, web/sw-client.js)
       reply(await relayCall('/api/bible?book='+encodeURIComponent(m.book)+'&chapter='+encodeURIComponent(m.chapter),undefined,'json','data'));
     } else if(m.kind==='chat'){
       // Relay the real chat pipeline (persistence, sessions, streaming) to the app.

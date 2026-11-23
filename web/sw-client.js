@@ -30,7 +30,8 @@ const swEsc=(s)=>String(s).replace(/[&<>"]/g,(c)=>({'&':'&amp;','<':'&lt;','>':'
 // fetchText(url) → the HTML (any status, so the worker's offline page shows in the frame) or throws;
 // fetchJson(url) → parsed JSON (authenticated) or throws; fetchBytes(url) → byte count or throws;
 // probeFrame(url) → {remove()} a hidden sandboxed iframe; onMessage(fn) → unsubscribe;
-// storage → localStorage or null; setTimeout/clearTimeout.
+// storage → localStorage or null; setTimeout/clearTimeout; metered() → true on Save-Data / cellular;
+// idle() → resolves when the page is idle; now() → ms (optional, tests).
 // The feature probe: does the worker serve a sandboxed iframe's navigation? A hidden frame
 // navigates to the URL only the worker answers; its page posts back. Silence by the deadline →
 // the srcdoc route. Resolves with the route.
@@ -54,6 +55,28 @@ function swFrameLoad(d,route,uid,slug){
     .catch((err)=>{ if(fr.getAttribute('data-app')===url) fr.srcdoc='<!doctype html><meta charset="utf-8"><p>'+SW_OPEN_FAILED_TXT+' — '+swEsc(err&&err.message||err)+'</p>'; });   // the reason reaches the user (R5)
   return url;
 }
+// F3-15 (owner 2026-11-23): a first visit no longer pulls all 1189 chapters at once. FIRST: the book
+// being read (the last one the Bible asked the broker for, remembered per device; John before any) and
+// today's daily reading. THEN the rest of the corpus, only once the page is idle and only off a metered
+// link (no Save-Data, not cellular): a phone on mobile data stops at 'partial' and tries again next boot.
+const SW_BIBLE_BOOK_KEY='pa_bible_book';     // localStorage: the 1-based book the Bible app last opened (broker kind 'bible')
+const SW_DEFAULT_BOOK=43;                    // John: the Bible app's first-ever chapter is John 3
+const SW_IDLE_MS=30000;                      // no requestIdleCallback (Safari): wait this long before the bulk pass
+const SW_DAY_MS=86400000;
+// Today's daily reading, 1-based [book, chapter]: the SAME rule as the Bible app's dailyRead()
+// (workspace/apps/bible/index.html — one chapter per day by day index since the epoch); test/offline-sw-client.test.mjs pins both.
+function swDailyChapter(counts,now){
+  const total=counts.reduce((a,n)=>a+n,0); if(!total) return null;
+  let idx=Math.floor(now/SW_DAY_MS)%total;
+  for(let b=0;b<counts.length;b++){ if(idx<counts[b]) return [b+1,idx+1]; idx-=counts[b]; }
+  return null;
+}
+function swFirstChapters(counts,book,now){
+  const b=Number.isInteger(book)&&counts[book-1]>0?book:SW_DEFAULT_BOOK, out=[];
+  for(let c=1;c<=(counts[b-1]||0);c++) out.push([b,c]);
+  const day=swDailyChapter(counts,now); if(day&&!out.some(([x,y])=>x===day[0]&&y===day[1])) out.push(day);
+  return out;
+}
 // After an online boot: the app pages, then the Bible corpus, chapter by chapter, under the byte
 // cap the node's config sets — read now, not at load. The worker remembers a finished corpus for
 // this build, so a later boot asks once and moves on. A stop short of the end is never reported
@@ -69,10 +92,21 @@ async function swPrefetch(d,ctx,uid){
   const counts=Array.isArray(cfg.bible)?cfg.bible:[];
   if(!counts.some((n)=>n>0)) return status.bible='no-corpus';
   let bytes=0;
-  for(let b=1;b<=counts.length;b++) for(let c=1;c<=counts[b-1];c++){
-    try{ bytes+=await d.fetchBytes(swBibleUrl(b,c)); }
+  const first=swFirstChapters(counts,Number(ctx.recall(SW_BIBLE_BOOK_KEY)),d.now?d.now():Date.now()), got=new Set();
+  const fetchOne=async(b,c)=>{
+    try{ bytes+=await d.fetchBytes(swBibleUrl(b,c)); got.add(b+':'+c); }
     catch(err){ status.error=String(err&&err.message||err); return status.bible='failed'; }
     if(bytes>cfg.bible_cap_bytes){ status.error='圣经预取已达字节上限 · Bible prefetch stopped at the byte cap'; return status.bible='capped'; }
+    return '';
+  };
+  for(const [b,c] of first){ const stop=await fetchOne(b,c); if(stop) return stop; }
+  const metered=()=>!!(d.metered&&d.metered());
+  if(metered()) return status.bible='partial';
+  if(d.idle) await d.idle();
+  if(metered()) return status.bible='partial';
+  for(let b=1;b<=counts.length;b++) for(let c=1;c<=counts[b-1];c++){
+    if(got.has(b+':'+c)) continue;
+    const stop=await fetchOne(b,c); if(stop) return stop;
   }
   const w=ctx.worker(); if(w) w.postMessage({kind:SW_BIBLE_DONE_KIND,bytes});
   return status.bible='done';
@@ -134,7 +168,8 @@ function makeSwClient(d){
   // Per-device memory for a boot with no node: the last sign-in and app list (JSON, localStorage).
   const remember=(k,v)=>{ try{ d.storage&&d.storage.setItem(k,JSON.stringify(v)); }catch(_){ /* private mode or full: the next online boot remembers again */ } };
   const recall=(k)=>{ try{ return d.storage?JSON.parse(d.storage.getItem(k)||'null'):null; }catch(_){ return null; /* an unreadable entry reads as nothing remembered */ } };
-  return { start, probe, frameLoad:(uid,slug)=>swFrameLoad(d,route,uid,slug), prefetch:(uid)=>swPrefetch(d,{status,ask,worker},uid),
+  return { start, probe, frameLoad:(uid,slug)=>swFrameLoad(d,route,uid,slug), prefetch:(uid)=>swPrefetch(d,{status,ask,worker,recall},uid),
+    noteBook:(b)=>{ if(Number.isInteger(b)&&b>0) remember(SW_BIBLE_BOOK_KEY,b); },
     remember, recall, route:()=>route, status:()=>({...status}) };
 }
 const PASW=makeSwClient({
@@ -149,5 +184,8 @@ const PASW=makeSwClient({
   onMessage:(fn)=>{ const h=(e)=>fn(e.data); window.addEventListener('message',h); return ()=>window.removeEventListener('message',h); },
   storage:(()=>{ try{ return window.localStorage; }catch(_){ return null; /* storage blocked: nothing remembered, nothing breaks */ } })(),
   setTimeout:(fn,ms)=>setTimeout(fn,ms), clearTimeout:(t)=>clearTimeout(t),
+  // F3-15: the bulk corpus pass waits for an idle page and skips a metered link (Save-Data / cellular / 2g).
+  metered:()=>{ const c=navigator.connection; return !!(c&&(c.saveData||c.type==='cellular'||/2g/.test(c.effectiveType||''))); },
+  idle:()=>new Promise((res)=>{ if(typeof requestIdleCallback==='function') requestIdleCallback(()=>res(),{timeout:SW_IDLE_MS}); else setTimeout(res,SW_IDLE_MS); }),
 });
 /* ══ PA_SW_CLIENT_END ══ */
