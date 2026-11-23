@@ -90,3 +90,14 @@ test('F5-5: on a phone the Add member row fits — Settings never scrolls sidewa
     assert.ok(m.right <= m.vw, `the Add member row ends on screen (${m.right} > ${m.vw})`);
   } finally { await ctx.close(); }
 });
+
+test('F5-8: removing a member keeps Settings open and the list updates', { skip, timeout: 60000 }, async () => {
+  await fetch(`http://127.0.0.1:${port}/api/admin/users`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${OWNER_TOKEN}` }, body: JSON.stringify({ id: 'kit', name: 'Kit' }) });
+  const { ctx, page, dialogs } = await openSettings();
+  try {
+    await page.click('[data-del="kit"]');
+    await page.waitForFunction(() => !document.querySelector('[data-del="kit"]'));
+    assert.match(dialogs[0].message, /^移除/, 'the confirm is 中文 first');
+    assert.equal(await page.evaluate(() => document.querySelector('#cfg').open), true, 'Settings is still open');
+  } finally { await ctx.close(); }
+});

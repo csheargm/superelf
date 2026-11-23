@@ -538,7 +538,15 @@ async function loadFamily(){
       <input id="nPass" type="password" autocomplete="new-password" placeholder="起始密码（可不填）· Starting password (optional)" style="${FIELD}">
       <button class="primary" id="addU" style="padding:6px">Add member</button>
     </div>`;
-  box.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{ if(confirm('Remove '+b.dataset.del+"? (their data stays on disk)")){ await api('/api/admin/users/'+b.dataset.del,{method:'DELETE'}); loadFamily(); } });
+  // preventDefault: these buttons sit inside Settings' <form method="dialog">, so a bare click also
+  // submitted it and closed the whole Settings page (F5-8).
+  box.querySelectorAll('[data-del]').forEach(b=>b.onclick=async(e)=>{
+    e.preventDefault();
+    if(!confirm(`移除 ${b.dataset.del}？对方会被登出，资料仍留在电脑上 · Remove ${b.dataset.del}? They are signed out; their data stays on disk.`)) return;
+    const g=await relayJson(api('/api/admin/users/'+b.dataset.del,{method:'DELETE'}),'data');
+    if(!g.ok) alert(g.text);
+    loadFamily();
+  });
   // Self sign-ups wait for the owner (cfg.require_approval); this is the owner's only way to let them in (F5-3).
   box.querySelectorAll('[data-approve]').forEach(b=>b.onclick=async(e)=>{
     e.preventDefault();
