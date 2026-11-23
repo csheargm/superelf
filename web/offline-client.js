@@ -11,7 +11,8 @@
 // The one state line (§5) lives in #offLine; deps come in so test/offline-queue.test.mjs runs
 // makeOffline on an in-memory IndexedDB and a fake line.
 const OFF_DB='pa-offline', OFF_DB_VERSION=1, OFF_WRITES='writes', OFF_FILES='files';
-const OFF_TXT_OFFLINE='Offline · 离线 — saving on this iPad · 保存在此 iPad';
+// 'this device', never 'this iPad': the same shell runs on a phone and a desktop (F5-6).
+const OFF_TXT_OFFLINE='Offline · 离线 — saving on this device · 保存在本设备';
 // Offline while the device itself has a network: the usual cause is the VPN (owner 2026-11-21: Tailscale
 // quietly needed a re-sign-in). Shown only then, so a real no-network day keeps the short line.
 const OFF_TXT_CHECK_VPN=' · check Tailscale or the node · 请检查 Tailscale 或节点';   // 'or the node': a plain-LAN install has no VPN
@@ -20,9 +21,9 @@ const OFF_TXT_SYNCING='Syncing · 同步中';     // online with a queue, the dr
 const OFF_TXT_SYNC_FAIL='Sync failed · 同步失败 — ';   // + the node's sentence; a tap on the line retries
 const OFF_TXT_RETRY=' · tap to retry · 点按重试';
 const OFF_NEEDS_NODE='Needs the home node · 需要家中节点';
-const OFF_TXT_FULL='This iPad is full · 本机存储已满 — not saved · 未保存';
-const OFF_TXT_NOT_KEPT='Could not keep it on this iPad · 无法保存在此 iPad';
-const OFF_TXT_NOT_HERE='Not on this iPad · 此 iPad 上没有 — open it once online · 联网后打开一次';
+const OFF_TXT_FULL='This device is full · 本设备存储已满 — not saved · 未保存';
+const OFF_TXT_NOT_KEPT='Could not keep it on this device · 无法保存在本设备';
+const OFF_TXT_NOT_HERE='Not on this device · 本设备上没有 — open it once online · 联网后打开一次';
 const OFF_WARM_KEY='pa_offline_warm';          // localStorage (PASW.remember): the warm cap from the last online read of the config
 const OFF_LOCAL_ORIGIN_KEY='pa_local_origin';  // localStorage (PASW.remember): config local_origin from that same read, for a boot with no public node (web/offline-origin.js)
 const OFF_TXT_HOME='Home node · 家中节点';
