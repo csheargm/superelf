@@ -109,6 +109,7 @@ form#f > *{ pointer-events:auto; }
 #updBar.on + #offLine.on{ transform:translate(-50%,calc(100% + .4em)); }   /* both lit: the state line sits under the update line */
 button.primary{ background:var(--accent); color:#fff; border:none; border-radius:10px; padding:0 16px; font:inherit; cursor:pointer; }
 #send{ border-radius:999px; width:36px; height:36px; padding:0; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+#send.stop{ font-size:14px; }
 button.plain{ background:none; border:1px solid var(--line); border-radius:8px; padding:4px 10px; color:var(--muted); font:inherit; cursor:pointer; }
 #frame{ position:fixed; inset:0; background:var(--bg); display:none; flex-direction:column; z-index:9; }
 #frame iframe{ flex:1; border:0; width:100%; }
@@ -338,7 +339,7 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
   <div id="frow">
     <button class="ibtn" id="plus" type="button" title="Attach">+</button>
     <input id="box" placeholder="Ask, or: create an app that…" autocomplete="off">
-    <button class="primary" id="send">↑</button>
+    <button class="primary" id="send" type="button" title="发送 · Send" aria-label="发送 · Send">↑</button>
   </div>
 </form>
 <input type="file" id="filein-photo" multiple hidden accept="image/*">
@@ -2385,6 +2386,22 @@ function pollForResult(id, afterMs, statusEl, outEl, onSettled){
   },4000);
 }
 
+// Stop · 停止 (F4-3). While a turn runs and the composer is empty, the send button is Stop and asks
+// the server to end that conversation's turn (POST /api/chat/stop; lib/turn-stop.mjs); the stream
+// then ends with "已取消 · Cancelled". Typing turns it back into Send, and Enter always sends — the
+// server queues a follow-up behind the running turn. TODO(R4 seam): leaves with submitSend for a composer module.
+const SEND_LABEL='发送 · Send', STOP_LABEL='停止 · Stop';
+let turnsRunning=0;
+function paintSendBtn(){
+  const b=$('#send'), stop=turnsRunning>0&&!$('#box').value.trim()&&!attachments.length;
+  b.classList.toggle('stop',stop); b.textContent=stop?'■':'↑'; b.title=stop?STOP_LABEL:SEND_LABEL; b.setAttribute('aria-label',b.title);
+}
+async function stopTurn(){
+  if(!convoId) return;   // the turn has not named its conversation yet; the button stays, a second tap reaches it
+  try{ const r=await api('/api/chat/stop',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({convoId})});
+    if(!r.ok) throw new Error('HTTP '+r.status); }
+  catch(e){ add('err','⚠ 无法停止 · Could not stop — '+((e&&e.message)||'')); }   // R5: said, never silent
+}
 /* ── Send ── */
 // A send made before the running one has learned its conversation id would go out with
 // convoId=null and start a NEW conversation, losing all context. It waits for the {type:'convo'}
@@ -2394,11 +2411,15 @@ let convoIdWait=null;
 async function submitSend(){
   const q=$('#box').value.trim();
   if(!q&&!attachments.length) return;
+  turnsRunning++; paintSendBtn();
+  try{ await sendTurn(q); }finally{ turnsRunning--; paintSendBtn(); }
+}
+async function sendTurn(q){
   lastPromptText=q;
   const fileAtts=attachments.filter(a=>a.path).map(a=>({name:a.name,path:a.path}));
   const attsBefore=attachments.slice();          // buildMessage() clears the composer; a rejected send puts it back
   const msg=buildMessage(q||'(see attached files)');
-  $('#box').value='';
+  $('#box').value=''; paintSendBtn();   // emptied by code, no input event: Stop shows now
   const shown=q||(attachments.length?`[${attachments.length} file(s)]`:'');
   const userEl=add('me',shown); if(q) addActions(userEl,'prompt',q); renderAtts(userEl,fileAtts);
   const status=add('status',''); let out=null, acc='', rlast=0;
@@ -2476,6 +2497,8 @@ async function submitSend(){
 }
 
 $('#f').onsubmit=(e)=>{ e.preventDefault(); submitSend(); };
+$('#send').onclick=()=>{ if($('#send').classList.contains('stop')) stopTurn(); else submitSend(); };
+$('#box').addEventListener('input',paintSendBtn);
 
 /* ── Shell composer: model pill + Verify toggle ── */
 let SHELL_CURMODEL=null, shellVerifyOn=false;

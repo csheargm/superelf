@@ -12,7 +12,8 @@ import { injectDemoBoot } from './lib/demo-boot.mjs';
 import { makeSigninGate, authConfig } from './lib/demo-auth.mjs';
 import { makeDemoRoutes } from './lib/demo-routes.mjs';
 import { loadConfig, configPath, fastLaneGuard, GUARD_DEFAULT_SURFACE, agentCapabilities, appContract, REPLY_LANGUAGE_RULE, OVERRIDABLE_PROMPT_MAX } from './lib/config.mjs';
-import { runClaude, killChild } from './lib/runner.mjs';
+import { runClaude } from './lib/runner.mjs';
+import { cancelOnClose, createTurnCancel, createTurnStops } from './lib/turn-stop.mjs';
 import { watchConfig } from './lib/config-watch.mjs';
 import { oneShotBaseArgs, oneShotModel, yieldSettings } from './lib/one-shot.mjs';
 import { safeJoin, slugOk, tokenOk, dataContentType, readBody, writeFileAtomic, renameWithRetry, decodeBase64Strict, bodyErrorResponse, BODY_LIMITS } from './lib/webutil.mjs';
@@ -1041,15 +1042,8 @@ const CHAT_CANCELLED = Object.freeze({ ok: false, text: '已取消 · Cancelled'
 // studio gave up after 5 min and the server ran on — retries piled up three claude processes
 // holding every enqueue slot. A CONVERSATION turn is never stopped here: the composer's
 // pollForResult relies on the server finishing a turn whose stream dropped.
-function cancelOnClose(res) {
-  const ac = new AbortController();
-  let child = null;
-  res.on('close', () => { if (!res.writableEnded) ac.abort(); });
-  ac.signal.addEventListener('abort', () => { if (child) killChild(child); }, { once: true });
-  // Forgotten once it exits, so a late cancel never signals a pid the OS may have reused.
-  const onChild = (c) => { child = c; c.once('close', () => { if (child === c) child = null; }); };
-  return { signal: ac.signal, onChild };
-}
+// cancelOnClose and the composer's Stop registry live in lib/turn-stop.mjs (F4-3).
+const turnStops = createTurnStops();
 
 // Stream an Ollama chat completion, re-emitting tokens via onDelta. Text-only and
 // stateless (we pass recent history each call) — the composer's fast lane.
@@ -1220,11 +1214,16 @@ async function chat(req, res, user, body) {
   const convoId = typeof b.convoId === 'string' ? b.convoId : '';
   // Installed BEFORE the lock: a oneShot caller that leaves while queued fires 'close' before the
   // lock frees, and a listener added after it would never hear it (the queued turn then ran anyway).
-  const cancel = b.oneShot === true ? cancelOnClose(res) : null;
-  return withConvoTurn(convoLocks, { userId: user.id, convoId, onQueued: () => {
+  // A conversation turn gets a handle too, fired only by an explicit Stop (POST /api/chat/stop).
+  let unstop = null;
+  const cancel = b.oneShot === true ? cancelOnClose(res)
+    : { ...createTurnCancel(), nameConvo: (id) => { unstop = turnStops.register(user.id, id, cancel); } };
+  try {
+    return await withConvoTurn(convoLocks, { userId: user.id, convoId, onQueued: () => {
     res.writeHead(200, CHAT_HEAD); res.flushHeaders?.();
     res.write(JSON.stringify({ type: 'status', text: QUEUED_TURN_TEXT }) + '\n');
   } }, (hold) => chatTurn(req, res, user, b, hold, cancel));
+  } finally { if (unstop) unstop(); }
 }
 
 async function chatTurn(req, res, user, body, hold, cancel = null) {
@@ -1279,6 +1278,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
   if (!res.headersSent) { res.writeHead(200, CHAT_HEAD); res.flushHeaders?.(); }   // a queued turn opened it already
   const alive = () => !res.writableEnded && !res.destroyed;
   const line = (o) => { if (alive()) res.write(JSON.stringify(o) + '\n'); };
+  if (cancel && cancel.nameConvo) cancel.nameConvo(convo.id);   // a conversation turn: the composer's Stop can name it now
   line({ type: 'convo', id: convo.id, title: convo.title, ...(replaced ? { replaced: true, requested: String(convoId).slice(0, 64) } : {}) });
   const beat = setInterval(() => line({ type: 'ping' }), 20000); // keep iOS Safari from aborting on idle
   // ── Chat → job ─────────────────────────────────────────────────────────────────────────
@@ -1359,9 +1359,9 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
           history[history.length - 1].images = b64;   // the last turn is always the just-pushed user message (message validated non-blank at entry)
         }
       }
-      const text = await streamOllama({ url: cfg.ollama_url, model: chosen.model, messages: history,
-        onDelta: (t) => line({ type: 'delta', text: t }) });
-      r = { ok: true, text };
+      const text = await streamOllama({ url: cfg.ollama_url, model: chosen.model, messages: history, signal: cancel ? cancel.signal : undefined,
+        onDelta: (t) => line({ type: 'delta', text: t }) }).catch((e) => { if (cancel && cancel.signal.aborted) return null; throw e; });   // a Stop is not an error (F4-3)
+      r = text === null ? CHAT_CANCELLED : { ok: true, text };
     } else if (chosen && chosen.provider === 'research') {
       // Research lane（联网研究）: Tavily finds → Firecrawl reads → the configured fast
       // lane reasons over ONLY the fetched excerpts (lib/research.mjs; deps injected
@@ -1389,7 +1389,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
       // LIVE cfg on every turn, so a config.json edit applies to the next one (docs/adr/0011).
       const baseArgs = oneShot ? oneShotBaseArgs(tierArgs, cfg.one_shot_args, memberArgsOf(user, origin)) : tierArgs;
       const extraArgs = agentArgs(user, baseArgs, origin);   // owner's own chat: unrestricted. an app's turn or a member's: no skip-permissions.
-      const cancelled = () => !!cancel && cancel.signal.aborted;   // chat() installs it for oneShot only: a conversation turn is never stopped
+      const cancelled = () => !!cancel && cancel.signal.aborted;   // a oneShot caller that left, or the composer's explicit Stop (lib/turn-stop.mjs)
         // The SAME resolved skill the fast lanes get (profile override → config → built-in).
         // It was resolved only inside the ollama branch, so an app's directive applied on one
         // lane and vanished on another — the same question answered two ways.
@@ -1428,8 +1428,8 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
       r = await enqueue(async () => {
         if (cancelled()) return CHAT_CANCELLED;   // still queued when its caller left: never spawn
         let x = await runClaude({ ...opts, prompt: histPrompt });
-        // Only a conversation turn resumes, and it is never cancelled, so no retry follows a cancel.
-        if (!x.ok && opts.resumeId && /No conversation found/i.test(x.text || '')) x = await runClaude({ ...opts, resumeId: null, prompt: histPrompt });
+        // No retry after a Stop: the killed child's error is not a dead session.
+        if (!x.ok && !cancelled() && opts.resumeId && /No conversation found/i.test(x.text || '')) x = await runClaude({ ...opts, resumeId: null, prompt: histPrompt });
         return x;
       });
       // A killed child "answers" with its raw stream-json so far — never store that as a reply.
@@ -2720,6 +2720,8 @@ const server = http.createServer(async (req, res) => {
     // rejection and the request simply HUNG: no status, no body, no timeout.
     // The same invisible-failure shape as the defect it was added to report.
     if (req.method === 'POST' && p === '/api/chat') { await chat(req, res, user, await readBody(req, BODY_LIMITS.chat)); return; }
+    if (req.method === 'POST' && p === '/api/chat/stop') { const b = (await readBody(req, BODY_LIMITS.control)) || {};   // the composer's Stop · 停止 (F4-3)
+      return send(res, 200, 'application/json', JSON.stringify({ ok: true, stopped: typeof b.convoId === 'string' && turnStops.stop(user.id, b.convoId) })); }
     // /api/ask is APP-ONLY: its one caller is the shell broker's 'ask' kind. So it is confined
     // whoever is signed in, marker or not — the relay's header is still sent, and checked by
     // test/app-agent-confinement.test.mjs, but this route does not depend on it.

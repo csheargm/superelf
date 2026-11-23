@@ -211,7 +211,7 @@ test('the relay marks EVERY agent-reaching broker kind through the one helper', 
 });
 
 test('the composer never sends the marker', () => {
-  const s = SHELL.slice(SHELL.indexOf('async function submitSend()'));
+  const s = SHELL.slice(SHELL.indexOf('async function sendTurn('));   // submitSend's turn body (F4-3 wrapped it for the Stop button)
   const fn = s.slice(0, s.indexOf('\n}\n'));
   assert.ok(/api\('\/api\/chat'/.test(fn), 'CONTROL: this is the composer\'s chat call');
   assert.ok(!/appAgentInit|APP_ORIGIN/.test(fn), 'the composer must not mark itself as an app');
