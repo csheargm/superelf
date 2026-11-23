@@ -189,9 +189,9 @@
     // that sits over a note's first lines or a group header never stands in the way twice (F3-06). Not swallowed.
     document.addEventListener('pointerdown',e=>{ if(cur&&shown&&!(cur.tip.contains&&cur.tip.contains(e.target))) dismiss(); },true);
     document.addEventListener('scroll',onScroll,true);
-    // dismissOnUse: the first press / key on the page (outside the tip, whose own click already dismisses).
+    // dismissOnUse: a key press also dismisses it (a press already dismisses every tip, above).
     const used=e=>{ if(cur&&cur.t.dismissOnUse&&!(e&&e.target&&cur.tip.contains&&cur.tip.contains(e.target))) dismiss(); };
-    document.addEventListener('pointerdown',used,true); document.addEventListener('keydown',used,true);
+    document.addEventListener('keydown',used,true);
   }
   window.addEventListener('resize',()=>{ if(cur) follow(); else later(check); });
   window.PATips={register,check,reset,dismiss,PREF,CLOSE,

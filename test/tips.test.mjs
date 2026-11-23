@@ -333,7 +333,7 @@ test('priority: after a tip was dismissed this open, a late priority tip waits f
 });
 
 // F2-07 (owner 2026-11-23): the app-bar tip leaves at the first interaction anywhere, remembered for good.
-test('dismissOnUse: the first press or key on the page dismisses it and stores it seen; an ordinary tip stays (control)', async () => {
+test('dismissOnUse: the first press or key on the page dismisses it and stores it seen; an ordinary tip stays on a key (control)', async () => {
   for (const ev of ['pointerdown', 'keydown']) {
     const p = page(meWith());
     p.T.register({ id: 'bar', anchor: anchorAt(100), text: '栏 · Bar', dismissOnUse: true });
@@ -343,6 +343,6 @@ test('dismissOnUse: the first press or key on the page dismisses it and stores i
   }
   const q = page(meWith());
   q.T.register({ id: 'plain', anchor: anchorAt(100), text: '普通 · Plain' });
-  await flush(); q.fireDoc('pointerdown');
-  assert.equal(q.T.current(), 'plain', 'without the flag a page press leaves the tip');
+  await flush(); q.fireDoc('keydown');
+  assert.equal(q.T.current(), 'plain', 'without the flag a key press leaves the tip (any press dismisses every tip, F3-06)');
 });
