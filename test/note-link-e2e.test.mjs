@@ -22,7 +22,10 @@ after(teardown);
 
 test('select a word, Link, type an address, Apply: the note on disk holds the link — and after a reload too', { skip, timeout: 90000 }, async () => {
   const ctx = await newContext(); const page = await ctx.newPage();
-  const errors = []; page.on('pageerror', (e) => errors.push(String(e)));
+  // WebKit reports each fetch a reload cuts off as a page error ("Fetch API cannot load … due to
+  // access control checks"): that is the navigation, not the app. Only those, only during the reload, are set aside.
+  const errors = []; let reloading = false;
+  page.on('pageerror', (e) => { if (!(reloading && /^Fetch API cannot load .*\/api\/\S+ due to access control checks\.$/.test(String(e)))) errors.push(String(e)); });
   let frame = await openJournal(page);
   await textMode(frame);
   await frame.locator('.pan-textlayer').click();
@@ -40,8 +43,8 @@ test('select a word, Link, type an address, Apply: the note on disk holds the li
   await onDisk((h) => h.includes(`Visit ${SAVED} today`), 'the sanitized link on disk');
   await indexed();
 
-  await page.reload();
-  frame = await openJournal(page);
+  reloading = true; await page.reload();
+  frame = await openJournal(page); reloading = false;
   assert.ok((await layerHtml(frame)).includes(SAVED), 'the link survives a reload, with target/rel');
 
   // Read state: a mostly-text note reopens in Text (editing), so leave it the way a user does —

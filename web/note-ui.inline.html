@@ -2816,7 +2816,12 @@
     function linkIn(n){ if(n&&n.nodeType===3) n=n.parentNode; const a=n&&n.closest?n.closest('a[href]'):null; return a&&textLayer.contains(a)?a:null; }
     // The link a range starts in. A range can start at (element, index) — around a whole link —
     // rather than in its text, which is how the selection sits right after createLink.
-    function linkAtRange(r){ let n=r&&r.startContainer; if(n&&n.nodeType===1&&n.childNodes[r.startOffset]) n=n.childNodes[r.startOffset]; return linkIn(n); }
+    // WebKit (Safari) leaves a selection over a link starting at the END of the text before it
+    // ("Visit |" → "example"), so a non-empty range whose start is a text node's end begins at the next node.
+    // TODO(R4): this file is over budget; the link strip (linkIn … applyLink) is the seam to split into its own inline module.
+    function linkAtRange(r){ let n=r&&r.startContainer; if(n&&n.nodeType===1&&n.childNodes[r.startOffset]) n=n.childNodes[r.startOffset];
+      else if(n&&n.nodeType===3&&r.startOffset===n.length&&!r.collapsed){ let m=n; while(m&&m!==textLayer&&!m.nextSibling) m=m.parentNode; if(m&&m!==textLayer) n=m.nextSibling; }
+      return linkIn(n); }
     // Under the button, or above it when the bar rides the keyboard: measured against the VISUAL
     // viewport, the one the iOS keyboard shrinks.
     function placeLinkPop(){ const r=linkBtn.getBoundingClientRect(), pw=linkPop.offsetWidth, ph=linkPop.offsetHeight, vv=window.visualViewport;
