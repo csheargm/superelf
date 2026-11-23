@@ -35,7 +35,7 @@ const SAFE_EMAIL_DOMAIN = /(^|\.)(example(\.(com|org|net))?|invalid|test|localho
 const SAFE_TS_LABELS = new Set(['tailnet', 'tailnet-name', 'tail1234']);
 // Private, loopback, link-local, documentation and broadcast ranges are not anyone's machine.
 // Fixture IPs in tests (resolvers, made-up clients). Exact strings only; a real address is not here.
-const FAKE_IPS = new Set(['100.64.0.0', '1.1.1.1', '2.2.2.2', '9.9.9.9', '100.1.2.3', '100.5.5.5', '100.64.0.7']);
+const FAKE_IPS = new Set(['100.64.0.0', '1.1.1.1', '2.2.2.2', '9.9.9.9', '100.1.2.3', '100.5.5.5', '100.64.0.7', '100.9.9.9']);
 const PRIVATE_V4 = /^(0|10|127|255)\.|^192\.168\.|^169\.254\.|^172\.(1[6-9]|2\d|3[01])\.|^192\.0\.2\.|^198\.51\.100\.|^203\.0\.113\./;
 
 const KEY_SHAPES = [
