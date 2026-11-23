@@ -2543,6 +2543,7 @@ $('#reload').onclick=()=>{ try{ sessionStorage.setItem('pa_refreshing','1'); }ca
   if(!convoId) showEmptyState();
   if(refreshing){ try{ sessionStorage.removeItem('pa_refreshing'); }catch{} $('#reload').classList.remove('spin'); }
   reopenAfterUpdate();   // the app that was open when PAUpdate reloaded the page (web/update.js)
+  openFromLink();        // a direct app link opened while signed out (F2-11, web/update.js)
   PASW.prefetch(UID);    // background: the app pages and the Bible corpus into the bundle (web/sw-client.js)
   // Apply new-feature dots on shell elements after login
   markNewSel('#settings','ver-changelog');
