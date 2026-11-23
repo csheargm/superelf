@@ -80,9 +80,11 @@ jobs:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED
     steps: &steps
-      # No test reads git history (the history-shaped tests inject a fake git), so the default
-      # shallow clone is enough.
+      # The ink tests load pinned older engines with `git show <sha>:path` as their honest
+      # control (R14), so CI needs full history, not the default shallow clone.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
