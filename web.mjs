@@ -1864,6 +1864,8 @@ const server = http.createServer(async (req, res) => {
       if (!slugOk(slug)) return send(res, 400, 'application/json', '{"error":"bad name"}');
       const dir = ownAppDir(user, slug);
       if (!dir) return send(res, 400, 'application/json', LINKED_APP);
+      // Not theirs (or mistyped): say so instead of a 200 for nothing deleted (F4-5).
+      if (!fs.existsSync(dir)) return send(res, 404, 'application/json', '{"error":"没有这个应用 · No such app"}');
       fs.rmSync(dir, { recursive: true, force: true });
       return send(res, 200, 'application/json', '{"ok":true}');
     }
