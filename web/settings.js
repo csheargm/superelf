@@ -483,7 +483,7 @@ function markNewSel(sel,key){ markNew($(sel),key); }
   }
 })();
 $('#settings').onclick=async()=>{ await loadProfile(); if(ME.role==='owner'){ await loadFamily(); await loadShelf(); $('#auditBtn').style.display='inline-block'; } $('#cfg').showModal(); };
-$('#auditBtn').onclick=async(e)=>{ e.preventDefault(); let rows=[]; try{ rows=await (await api('/api/admin/audit')).json(); }catch{} alert(rows.slice(0,20).map(r=>`${(r.at||'').slice(5,16)}  ${r.ev}  ${r.who||''}${r.ok===false?' (failed)':''}`).join('\n')||'No activity yet.'); };
+$('#auditBtn').onclick=(e)=>{ e.preventDefault(); showActivityLog(); };   // web/activity-log.js (F5-10)
 $('#pSave').onclick=async(e)=>{
   e.preventDefault();
   const body={name:$('#pName').value,about:$('#pAbout').value,prefs:$('#pPrefs').value,briefingEmail:$('#pBriefEmail').value,briefingRetainDays:parseInt($('#pRetainDays').value,10)||30, postcode:$('#pPostcode').value.trim(),
