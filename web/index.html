@@ -1303,7 +1303,7 @@ async function relayReminderRemove(m,deps){
      {ok:false, code:'bad-request',  error, status}                  other 4xx, or a path this shell refuses
      {ok:false, code:'relay-error',  error}                          a fault inside this shell — still NOT 'not-found'
      {ok:false, code:'cancelled',    error}                          the app withdrew it (chat-cancel) — NOT 'network' */
-const DEMO_SIGNIN_CODE='demo_signin', DEMO_SIGNIN_EVENT='pa-demo-signin';   // R3: = SIGNIN_CODE (lib/demo-auth.mjs) and SIGNIN_EVENT (lib/demo-boot.mjs), pinned by test/demo-signin-prompt.test.mjs
+const DEMO_SIGNIN_CODE='demo_signin', DEMO_SIGNIN_EVENT='pa-demo-signin', DEMO_SIGNIN_ANSWER='登录后获得回答 · Sign in to get an answer';   // R3: = SIGNIN_CODE (lib/demo-auth.mjs) and SIGNIN_EVENT (lib/demo-boot.mjs), pinned by test/demo-signin-prompt.test.mjs
 const RELAY_NOT_FOUND='not found';                              // the legacy error string, pinned once (R3)
 const RELAY_CANCELLED='已取消 · Cancelled';                      // == PAC_CANCELLED in web/chat-ui.inline.html (test/chat-cancel.test.mjs)
 /* ── The noun table（名词表）— WHAT was refused ─────────────────────────────────────────
@@ -2433,7 +2433,11 @@ async function submitSend(){
     // removed, a .msg.err line), and the message goes back into the composer.
     if(!res.ok){
       const f=await relayHttpFail(res);
-      stopEl(); status.remove(); userEl.remove();
+      stopEl(); status.remove();
+      // Demo guest (F1-8): the question stays in the chat, with an inline button that opens the sign-in.
+      if(f.signin){ const b=document.createElement('button'); b.type='button'; b.className='demo-answer'; b.textContent=DEMO_SIGNIN_ANSWER;
+        b.onclick=()=>dispatchEvent(new Event(DEMO_SIGNIN_EVENT)); add('err','⚠ '+relayText(f,sentBytes)).appendChild(b); return; }
+      userEl.remove();
       add('err','⚠ '+relayText(f,sentBytes));
       restoreComposer(q,attsBefore);
       return;
