@@ -11,8 +11,8 @@ export const FRAME = fs.readFileSync(path.join(ROOT, 'web', 'ink-frame.inline.ht
 // ── a DOM with a layout: CW px per character, RH px per row, rows wrap at the list's width ──────
 export const CW = 10, RH = 24, PADL = 12;
 const VNUM = 20, GAP = 6, PADT = 8;
-// `src`: the component source to run (a mutation control hands a rewritten copy; default the shipped one).
-export function makeDom({ width = 400, childrenCount = false, src = COMPONENT } = {}) {
+// `src`/`frame`: the component sources to run (a control hands an older or rewritten copy; default the shipped ones).
+export function makeDom({ width = 400, childrenCount = false, src = COMPONENT, frame = FRAME } = {}) {
   const L = { width, cw: CW, scrollTop: 0, listeners: new Map(), prevented: [], stopped: 0, raf: [], timers: [] };
   const cols = () => Math.max(1, Math.floor((L.width - 2 * PADL) / L.cw));
   const rowsOf = (text, c = cols()) => Math.max(1, Math.ceil(text.length / c));
@@ -83,7 +83,7 @@ export function makeDom({ width = 400, childrenCount = false, src = COMPONENT } 
   const window = { devicePixelRatio: 2, innerWidth: width, innerHeight: 600, addEventListener: (t, f) => L.listeners.set('w:' + t, f), removeEventListener() {}, requestAnimationFrame: (f) => L.raf.push(f) };
   const setTimeout = (f) => L.timers.push(f);
   // eslint-disable-next-line no-new-func
-  new Function('window', 'document', 'setTimeout', scriptOf(FRAME) + '\n' + scriptOf(src))(window, document, setTimeout);
+  new Function('window', 'document', 'setTimeout', scriptOf(frame) + '\n' + scriptOf(src))(window, document, setTimeout);
   const ev = (type, extra) => Object.assign({ type, preventDefault() { L.prevented.push(type); }, stopPropagation() { L.stopped++; }, stopImmediatePropagation() { L.stopped++; } }, extra);
   const fire = (key, e) => { const f = L.listeners.get(key); if (!f) throw new Error('no listener ' + key); return f(e); };
   const flush = () => { while (L.raf.length || L.timers.length) { (L.raf.shift() || L.timers.shift())(); } };

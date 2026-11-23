@@ -126,6 +126,34 @@
     return {verse:g.verse,lang:g.lang,frame:'line',fx:Math.round((at.ox-line.left)/s*100)/100,fy:Math.round((at.oy-line.top)/s*100)/100,fw:Math.round(colW*100)/100,
       strokes:g.strokes.map(st=>Object.assign({},st,{w:Math.round(st.w*k*100)/100,p:st.p.map(p=>[Math.round(p[0]*k*100)/100,Math.round(p[1]*k*100)/100,p[2]])}))};
   }
+  // ── A word that crosses onto another line (owner, 2026-11-22: written in landscape, the dot of an "i"
+  //    fell on the next line; in portrait the two lines moved apart and so did the word). The record is
+  //    TAGGED when written — {bid, rel:[rx,ry,rk], ww} added, nothing else changed — and only moved on a
+  //    column that is not the one it was written on (ww): there it keeps its written offset from the
+  //    cluster's anchor (the record with this bid and no rel). Never re-measured, never guessed (fc2940c).
+  const EPS_W=1;   // px: a column this close to the written one IS the written one (the drawing is untouched)
+  function clusterOf(prev,now,g,ext,box){
+    if(!(prev&&prev.g&&now-prev.t<=BURST_MS&&isSmall(prev.ext)&&isSmall(ext)&&gap(prev.box,box)<=NEAR)) return null;
+    if(prev.g.bid!=null) return prev.g.bid;
+    return sameLine(prev.g,g)?null:prev.t;   // a burst that changes line starts a cluster; one line alone needs none
+  }
+  // The written offset of a stroke drawn at box origin with scale cs, from the anchor's place `a` then.
+  const relOf=(box,cs,a)=>[Math.round((box.l-a.ox)/a.s*100)/100,Math.round((box.t-a.oy)/a.s*100)/100,Math.round(cs/a.s*1e4)/1e4];
+  function widthChanged(g,env){
+    const el=g.ww>0&&env.lineEl(g.verse,g.lang); if(!el) return false;
+    return Math.abs(env.colW(env.local(el.getBoundingClientRect()))-g.ww)>EPS_W;
+  }
+  // placed: [{g,at,orphan}]. Returns the SAME array unless some cluster spans lines on a changed width.
+  function shiftClusters(placed,env){
+    const byBid=new Map(), moved=new Map();
+    for(const p of placed){ if(p.g.bid==null||!p.at) continue; if(!byBid.has(p.g.bid)) byBid.set(p.g.bid,[]); byBid.get(p.g.bid).push(p); }
+    for(const ps of byBid.values()){
+      const a=ps.find(p=>!p.g.rel); if(!a||ps.length<2||ps.every(p=>sameLine(p.g,a.g))||!ps.some(p=>widthChanged(p.g,env))) continue;
+      for(const p of ps){ if(p===a||!Array.isArray(p.g.rel)) continue; const [rx,ry,rk]=p.g.rel;
+        moved.set(p,{ox:a.at.ox+rx*a.at.s,oy:a.at.oy+ry*a.at.s,s:a.at.s*rk}); }
+    }
+    return moved.size?placed.map(p=>moved.has(p)?{g:p.g,at:moved.get(p),orphan:p.orphan}:p):placed;
+  }
   // The DOM side of places(), built once per attached list. colW: the text column now (the list less the
   // line's inset on both sides); wholeOf: the record was pinned to its whole line; measureAt: a range's
   // run on a hidden copy of the line at width w (null w: today's line), relative to the line's top-left.
@@ -139,6 +167,6 @@
     }
     return {lineEl:o.lineEl,local:o.local,colW,measureAt,wholeOf,extentOf,memo:new WeakMap()};
   }
-  window.PAInkFrame={env,NEAR,isSmall,bboxOf,isScrub,hitGroups,extentOf,SCRUB,ERASE_HIT,BURST_MS,SMALL,NEIGHBOR,isLine,sameLine,handwriting,writtenWidth,placeLine,joinsBurst,frameOf,places,toLine};
+  window.PAInkFrame={env,NEAR,isSmall,bboxOf,isScrub,hitGroups,extentOf,SCRUB,ERASE_HIT,BURST_MS,SMALL,NEIGHBOR,isLine,sameLine,handwriting,writtenWidth,placeLine,joinsBurst,frameOf,places,toLine,EPS_W,clusterOf,relOf,widthChanged,shiftClusters};
 })();
 </script>

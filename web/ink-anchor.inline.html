@@ -194,12 +194,17 @@
     function toWriting(g,at,L,t0,box){
       const ext=extentOf(g), prev=last&&groups.includes(last.g)?last:null; last={g:null,t:Date.now(),ext,box};   // an erased or undone stroke seeds nothing
       const burst=Frame.joinsBurst(prev,t0,g,ext,box), lr=local(L.el.getBoundingClientRect()), cw=colW(lr);
+      // TODO(R4 split): the cluster tag (bid/rel/ww, PAInkFrame.clusterOf) → its own helper with toWriting.
+      const bid=Frame.clusterOf(prev,t0,g,ext,box), aRec=bid==null?null:prev.g.bid==null?prev.g:groups.find(x=>x.bid===bid&&!x.rel);
+      const aAt=aRec&&(placements().find(p=>p.g===aRec)||{}).at, tag=(r,cs)=>Object.assign(r,{ww:round2(cw)},bid==null?{}:{bid},aAt?{rel:Frame.relOf(box,cs,aAt)}:{});
+      if(bid!=null&&prev.g.bid==null) swap=[prev.g,Object.assign({},prev.g,{bid})];   // the anchor: a new record, never edited in place
       // A BIG stroke over the whole line (an underline of the verse, a bracket) is a mark on it, never writing.
-      if(!burst&&!(Frame.isSmall(ext)&&env.wholeOf(g,L.el))){ last.g=g; return g; }
+      if(!burst&&!(Frame.isSmall(ext)&&env.wholeOf(g,L.el))){ last.g=tag(g,1); return g; }
       const placed=Frame.places(groups,env); let s=1; for(const [x,a] of placed) if(Frame.sameLine(x,g)){ s=a.s; break; }
-      if(burst&&!Frame.isLine(prev.g)){ const i=groups.indexOf(prev.g), pa=i>=0&&placements().find(p=>p.g===prev.g);
-        if(pa&&pa.at) swap=[prev.g,Frame.toLine(prev.g,pa.at,lr,s,cw)]; }   // applied in the stroke's own commit: one undo step
-      last.g=Frame.toLine(g,at,lr,s,cw); return last.g;
+      if(burst&&!Frame.isLine(prev.g)){ const i=groups.indexOf(prev.g), pa=i>=0&&placements().find(p=>p.g===prev.g), keep={};
+        for(const k of ['ww','bid','rel']) if(prev.g[k]!=null) keep[k]=prev.g[k];
+        if(pa&&pa.at) swap=[prev.g,Object.assign(Frame.toLine(prev.g,pa.at,lr,s,cw),keep)]; }   // applied in the stroke's own commit: one undo step
+      last.g=tag(Frame.toLine(g,at,lr,s,cw),s); return last.g;
     }
     const env=Frame.env({container,lineEl,local,measurer,trimRange}), colW=env.colW;
     const strokesOf=(pts,box)=>({strokes:[Object.assign({p:pts.map(p=>[round2(p.x-box.l),round2(p.y-box.t),round2(p.p)]),c:pen.c,w:pen.w,t:pen.t},pen.t==='highlighter'?{a:pen.a}:{})]});
@@ -219,8 +224,9 @@
         const rr=m.text.length?m.anchorRect(r.start,r.end,g.w):null, rect=rr&&rr.width>0?local(rr):local(el.getBoundingClientRect());
         out.push({g,at:place(g,rect),orphan:false});
       }
-      layoutBucket(container,bucket,out.filter(p=>p.orphan),local);
-      return out;
+      const fin=Frame.shiftClusters(out,env);   // a word across two lines stays one word on another width
+      layoutBucket(container,bucket,fin.filter(p=>p.orphan),local);
+      return fin;
     }
     // Two passes, the pad's compose order: every highlighter stroke first, then the ink over it. A
     // stroke with no t (written before the pen sheet) is a pen stroke.

@@ -613,3 +613,7 @@ Without it they now FAIL (R14), not pass as `# pass 0 / # fail 0`. To run them:
 - Waiting list (lib/demo-waitlist-ui.mjs): the form lives in the demo shell, so a first-time visitor
   from a network over `new_users_per_ip_per_day` (or when `total_disk_gb` is reached) gets the quota page instead of the form, though
   `POST /api/waitlist` needs no session. Fix: a tiny standalone `/join` page. (GPT review 2026-11-22)
+- Ink cross-line words (PAInkFrame.clusterOf/shiftClusters): notes written before the bid/rel/ww tag have
+  none, so a word split over two lines in them still comes apart in portrait; they are never moved, so the
+  original writing stays exactly as written. A word written slowly (more than BURST_MS between strokes)
+  across two lines is not tagged either. (2026-11-22)
