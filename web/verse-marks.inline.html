@@ -38,8 +38,8 @@ mark.pvm.pvm-hl-pink{background:rgba(255,120,160,.36)}
   const LANGS=Object.freeze({en:'.ven',zh:'.vzh'});        // the host's text lines, by language
   // User-facing text, English then 中文 (the repo's PANote.SEARCH_TXT style). `chip` is what the
   // host's ☰ list row shows for a mark-only verse, so it is exported here and nowhere else (R3).
-  const TXT=Object.freeze({ mark:'Highlight · 高亮', underline:'Underline · 下划线', remove:'Remove · 移除',
-    chip:'Highlight 高亮', orphan:'text changed · 经文已更新', color:{yellow:'Yellow · 黄',green:'Green · 绿',pink:'Pink · 粉'} });
+  const TXT=Object.freeze({ mark:'高亮 · Highlight', underline:'下划线 · Underline', remove:'移除 · Remove',
+    chip:'Highlight 高亮', orphan:'经文已更新 · text changed', color:{yellow:'黄 · Yellow',green:'绿 · Green',pink:'粉 · Pink'} });
   const keyOf=n=>'v'+n;
   const isRange=m=>!!(m&&typeof m.quote==='string'&&m.quote.length&&Number.isInteger(m.start)&&Number.isInteger(m.end));
   const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -117,7 +117,7 @@ mark.pvm.pvm-hl-pink{background:rgba(255,120,160,.36)}
   // A control that must not collapse the native selection when tapped (WebKit collapses it on
   // pointerdown): the sheet's buttons and the host's Mark control, through this ONE helper.
   const armControl=el=>{ el.addEventListener('pointerdown',e=>e.preventDefault()); return el; };
-  // The sheet, opened from the host's one `Mark · 标记` control; any entry applies and closes it.
+  // The sheet, opened from the host's one `标记 · Mark` control; any entry applies and closes it.
   // The selection is read ONCE at open and handed to every entry, so a tap that collapses it
   // still marks the range the user had.
   function makeSheet(sheetItems,selection){

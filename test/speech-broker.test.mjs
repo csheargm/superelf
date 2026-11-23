@@ -78,15 +78,15 @@ test('speechReason renders every common failure bilingually, and never returns a
 
 test('speechReason still names an unknown token rather than swallowing it', () => {
   const s = speechReason('some-new-webkit-code', true);
-  assert.match(s, /Speech failed · 语音识别失败/);
+  assert.match(s, /语音识别失败 · Speech failed/);
   assert.match(s, /some-new-webkit-code/, 'an unrecognised token is still reported, not hidden');
-  assert.match(speechReason(undefined, true), /Speech failed · 语音识别失败/);
+  assert.match(speechReason(undefined, true), /语音识别失败 · Speech failed/);
   assert.equal(/\(\)/.test(speechReason(undefined, true)), false, 'no empty parens when there is no token');
 });
 
 test('FUNCTIONAL: run the real mapper — a speech failure reaches the app with a rendered sentence', () => {
   for (const f of [
-    { ok: false, code: 'unsupported', done: true, error: 'Speech not supported · 不支持语音识别' },
+    { ok: false, code: 'unsupported', done: true, error: '不支持语音识别 · Speech not supported' },
     { ok: false, code: 'speech-error', done: true, error: speechReason('not-allowed', true) },
   ]) {
     const out = relayFail(f, 0, 'content');

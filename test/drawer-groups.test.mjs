@@ -26,7 +26,7 @@ const rows = () => [
   { id: 'd', title: 'Advent two', created: at(2025, 12, 15, 18), doc: { path: 'entry-d.json' } },
   { id: 'e', title: 'Thanks', created: at(2025, 11, 27), doc: { path: 'entry-e.json' } },
   { id: 'f', title: 'A chat', created: at(2025, 12, 1) },
-  { id: 's', title: 'This month · 本月 Jan 2026', created: at(2026, 1, 8), doc: { path: 'entry-s.json' } },   // a saved summary, by its title (PASummaryTitle)
+  { id: 's', title: '本月 · This month Jan 2026', created: at(2026, 1, 8), doc: { path: 'entry-s.json' } },   // a saved summary, by its title (PASummaryTitle)
   { id: 't', title: 'Tagged', created: at(2025, 12, 20), doc: { path: 'entry-t.json' } },                    // a #summary page (the index's tag)
   { id: 'u', title: 'Flagged', created: at(2025, 11, 1), summary: true, doc: { path: 'entry-u.json' } },     // the host's own flag
   { id: 'n', title: 'No time', doc: { path: 'entry-n.json' } },
@@ -78,18 +78,18 @@ const G = (() => { const w = {}; new Function('window', 'document', script(GROUP
 
 test('header: ＋, the Summarize slot and ONE ⋯ (no Sort / Select / Refresh buttons); the sheet offers Sort, Select, Refresh; Select enters multi-select, Sort flips the order and writes noteSort', async () => {
   const top = /'<div class="pac-top">[\s\S]*?'<\/div>'\+\n/.exec(CHAT)[0];
-  assert.match(top, /pac-dnew/); assert.match(top, /<span class="pac-dhead"><\/span>/); assert.match(top, /class="pac-new pac-dmore" title="More · 更多"/);
+  assert.match(top, /pac-dnew/); assert.match(top, /<span class="pac-dhead"><\/span>/); assert.match(top, /class="pac-new pac-dmore" title="更多 · More"/);
   assert.doesNotMatch(top, /pac-dsort|pac-dsel|pac-drefresh/);
   const D = await drawer();
   const labels = await pickMore(D.d, '');
-  assert.deepEqual(labels, ['Sort by last edited · 按修改时间排序', 'Select · 多选', 'Refresh · 刷新'], 'the default order is by creation, so the entry offers the other one; no hidden tags, no Show hidden');
+  assert.deepEqual(labels, ['按修改时间排序 · Sort by last edited', '多选 · Select', '刷新 · Refresh'], 'the default order is by creation, so the entry offers the other one; no hidden tags, no Show hidden');
   await pickMore(D.d, 'Select');
   assert.ok(D.el('.pac-list').classList.contains('pac-multi'), 'multi-select entered from the sheet');
-  assert.deepEqual(await pickMore(D.d, 'Done'), ['Sort by last edited · 按修改时间排序', 'Done · 完成', 'Refresh · 刷新'], 'in the mode the entry reads Done');
+  assert.deepEqual(await pickMore(D.d, 'Done'), ['按修改时间排序 · Sort by last edited', '完成 · Done', '刷新 · Refresh'], 'in the mode the entry reads Done');
   assert.equal(D.el('.pac-list').classList.contains('pac-multi'), false);
   await pickMore(D.d, 'Sort');
   assert.deepEqual(D.sent.filter((m) => m.kind === 'set-app-settings').map((m) => m.prefs), [{ noteSort: 'updated' }], 'the order goes to the app prefs, merged into the object the shell answered');
-  assert.deepEqual((await pickMore(D.d, '')).slice(0, 1), ['Sort by date created · 按创建时间排序'], 'and the entry now offers the way back');
+  assert.deepEqual((await pickMore(D.d, '')).slice(0, 1), ['按创建时间排序 · Sort by date created'], 'and the entry now offers the way back');
 });
 
 test('groups: ★ Bookmarked, Summaries, then the months newest first; the current month open, older months closed; the day headers inside an open month; rows without a time last', async () => {
@@ -101,11 +101,11 @@ test('groups: ★ Bookmarked, Summaries, then the months newest first; the curre
   assert.deepEqual(rowsUnder(html, '2026-01'), ['a'], 'the current month: open (b and s went to their own groups)');
   assert.deepEqual(rowsUnder(html, '2025-12'), [], 'an older month: closed by default');
   assert.deepEqual(rowsUnder(html, 'none'), [], 'no date: closed by default');
-  assert.match(html, /data-g="pins"[^>]*>(?:<span class="pac-lgcaret">▾<\/span>)★ Bookmarked · 收藏<span class="pac-lgn">1<\/span>/);
-  assert.match(html, /▾<\/span>Summaries · 总结<span class="pac-lgn">3<\/span>/);
-  assert.match(html, /▾<\/span>2026 · Jan 一月<span class="pac-lgn">1<\/span>/, 'the month header: year · English 中文');
+  assert.match(html, /data-g="pins"[^>]*>(?:<span class="pac-lgcaret">▾<\/span>)★ 收藏 · Bookmarked<span class="pac-lgn">1<\/span>/);
+  assert.match(html, /▾<\/span>总结 · Summaries<span class="pac-lgn">3<\/span>/);
+  assert.match(html, /▾<\/span>2026 · Jan 一月<span class="pac-lgn">1<\/span>/, 'English 中文 · the month header: year');
   assert.match(html, /▸<\/span>2025 · Dec 十二月<span class="pac-lgn">3<\/span>/, 'a closed month still counts its rows (c, d and the chat f; t is a summary)');
-  assert.match(html, /▸<\/span>No date · 无日期<span class="pac-lgn">1<\/span>/);
+  assert.match(html, /▸<\/span>无日期 · No date<span class="pac-lgn">1<\/span>/);
   assert.ok(html.indexOf('class="pac-lday"') > html.indexOf('data-g="2026-01"') && html.indexOf('class="pac-lday"') < html.indexOf('data-id="a"'), 'the day header sits under the month header, above its row');
   assert.doesNotMatch(html.slice(0, html.indexOf('data-g="2026-01"')), /pac-lday/, 'the fixed groups list their rows plainly');
   assert.equal(G.MONTHS_EN.join(), D.win.PASummaryTitle.MONTHS.join(), 'one month-name list with the summaries');
@@ -162,13 +162,13 @@ test('Summarize · 总结 in the header opens the same sheet as the bar\'s, with
   const H = { run: async () => true, saveNote: async () => ({ ok: true }), onLink() {} };
   const D = await drawer({ summary: H });
   const head = D.el('.pac-dhead');
-  assert.deepEqual(head.children.map((k) => [k.className, k.textContent]), [['pac-lbulksum pac-dsum', 'Summarize · 总结']]);
+  assert.deepEqual(head.children.map((k) => [k.className, k.textContent]), [['pac-lbulksum pac-dsum', '总结 · Summarize']]);
   head.children[0].onclick(); await tick(20);
   const sheet = D.d.el.children.filter((k) => /^pac-modal pac-msheet/.test(k.className)).pop();
   assert.ok(sheet, 'the summary sheet opened in the drawer host');
   const sel = sheet.children[0].children.find((k) => k.className === 'pds-p');
-  assert.equal(sel.textContent, 'Selected · 已选 (0)'); assert.equal(sel.disabled, true, 'greyed: nothing ticked');
-  assert.equal(sheet.children[0].children.filter((k) => k.className === 'pds-p').some((k) => k['@aria-pressed'] === 'true' && k.textContent.startsWith('This month')), true, 'the month preset is the one chosen instead');
+  assert.equal(sel.textContent, '已选 · Selected (0)'); assert.equal(sel.disabled, true, 'greyed: nothing ticked');
+  assert.equal(sheet.children[0].children.filter((k) => k.className === 'pds-p').some((k) => k['@aria-pressed'] === 'true' && k.textContent.includes('This month')), true, 'the month preset is the one chosen instead');
   const N = await drawer();
   assert.deepEqual(N.el('.pac-dhead').children, [], 'no hooks, no header button');
 });
@@ -179,7 +179,7 @@ test('CONTROL: without the component the drawer draws the day list as before, th
   assert.deepEqual(ids(D.rows()), ['a', 's', 'b', 't', 'd', 'c', 'f', 'e', 'u', 'n'], 'every row, newest first, no groups');
   assert.match(D.rows(), /^<div class="pac-lday">/);
   assert.equal(D.jump(), undefined);
-  assert.deepEqual(await pickMore(D.d, ''), ['Sort by last edited · 按修改时间排序', 'Select · 多选', 'Refresh · 刷新']);
+  assert.deepEqual(await pickMore(D.d, ''), ['按修改时间排序 · Sort by last edited', '多选 · Select', '刷新 · Refresh']);
   assert.match(CHAT, /const groups=window\.PADrawerGroups\?window\.PADrawerGroups\.attach\(\{host,rows,box:qi,items:\(\)=>_items,prefs,redraw:\(\)=>draw\(\),esc,days:dayHtml,ts:sortTs,tags:it=>tags\?tags\.tagsOf\(it\):\[\]\}\):null;/, 'the one-line hook');
   assert.match(CHAT, /rows\.innerHTML=groups\?groups\.html\(shown,rowHtml,!!f\):dayHtml\(shown,rowHtml\);/, 'the list html asks the component, flat on a search');
   assert.ok(CHAT.indexOf('window.PADrawerGroups.attach({host,rows,') < CHAT.indexOf("rows.addEventListener('click',e=>{"), 'its header-tap listener comes before the row-click one');
@@ -193,13 +193,13 @@ test('shift-range in select mode is measured in the DRAWN order — group by gro
   await pickMore(D.d, 'Select');
   // Drawn: pins [b], sums [s, t, u], 2026-01 [a]; Dec/Nov/none closed. The pre-group sort is a, s, b, t, d, c, f, e, u, n.
   D.tapRow('b'); D.tapRow('a', true); await tick(5);
-  assert.match(D.el('.pac-lbulkn').textContent, /^5 selected/, 'b → a sweeps the three summaries between them in the drawn order');
+  assert.match(D.el('.pac-lbulkn').textContent, /^已选 5 · 5 selected/, 'b → a sweeps the three summaries between them in the drawn order');
   // Open December and sweep from a down into it: the sort order would reach d, c, f only after t; the drawn order has them under a.
   await pickMore(D.d, 'Done'); D.tapGroup('2025-12'); await tick(5); await pickMore(D.d, 'Select');
   D.tapRow('a'); D.tapRow('f', true); await tick(5);
-  assert.match(D.el('.pac-lbulkn').textContent, /^4 selected/, 'a, d, c, f — nothing from the closed months and nothing from the groups above a');
+  assert.match(D.el('.pac-lbulkn').textContent, /^已选 4 · 4 selected/, 'a, d, c, f — nothing from the closed months and nothing from the groups above a');
   D.tapRow('e', true); await tick(5);
-  assert.match(D.el('.pac-lbulkn').textContent, /^4 selected/, 'a row in a CLOSED group is not drawn, so a range to it selects nothing more');
+  assert.match(D.el('.pac-lbulkn').textContent, /^已选 4 · 4 selected/, 'a row in a CLOSED group is not drawn, so a range to it selects nothing more');
   assert.match(CHAT, /_shown=groups\?groups\.drawn\(\):shown;/, 'the drawer records the component\'s drawn order');
 });
 

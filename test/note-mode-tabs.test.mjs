@@ -29,8 +29,8 @@ test('the resting header is the tabs and nothing else', () => {
   assert.match(bar[0], /data-mode="draw"/, 'Draw is a mode tab');
   assert.match(bar[0], /data-mode="text"/, 'Text is a mode tab');
   // Both are bilingual and labelled, like every other control here.
-  assert.match(bar[0], /title="Draw · 手写"/);
-  assert.match(bar[0], /title="Text · 文字"/);
+  assert.match(bar[0], /title="手写 · Draw"/);
+  assert.match(bar[0], /title="文字 · Text"/);
 });
 
 test('T moved to the header — it is not in both places', () => {

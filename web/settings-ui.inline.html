@@ -93,31 +93,31 @@
       // No shell (opened standalone, or a harness): report it rather than hanging for ever on a
       // promise nothing will ever settle (R5).
       try{ parent.postMessage(Object.assign({pa:'req',id:id},o),'*'); }
-      catch(err){ delete _wait[id]; res({ok:false,error:'no shell · 无法连接外壳'}); }
+      catch(err){ delete _wait[id]; res({ok:false,error:'无法连接外壳 · no shell'}); }
     });
   }
 
   var TXT={
-    title:'Settings · 设置',
-    gear:'Settings · 设置',
-    prefs:'Preferences (JSON) · 偏好设置',
-    prefsHint:'This app’s own settings, stored on your account · 保存在你的账号上',
-    prompt:'App system prompt · 应用系统提示',
-    effective:'In force now · 当前生效',
-    override:'Your override · 你的覆盖设置',
-    overrideHint:'Leave blank to use the default above · 留空则使用上面的默认值',
-    save:'Save · 保存', cancel:'Cancel · 取消',
-    saving:'Saving… · 保存中…', saved:'Saved · 已保存',
-    badJson:'Not valid JSON · JSON 格式无效: ',
-    notObj:'Preferences must be a JSON object · 偏好必须是 JSON 对象',
-    loadFail:'Could not load settings · 无法加载设置: ',
-    saveFail:'Not saved · 未保存: '
+    title:'设置 · Settings',
+    gear:'设置 · Settings',
+    prefs:'偏好设置 · Preferences (JSON)',
+    prefsHint:'保存在你的账号上 · This app’s own settings, stored on your account',
+    prompt:'应用系统提示 · App system prompt',
+    effective:'当前生效 · In force now',
+    override:'你的覆盖设置 · Your override',
+    overrideHint:'留空则使用上面的默认值 · Leave blank to use the default above',
+    save:'保存 · Save', cancel:'取消 · Cancel',
+    saving:'保存中… · Saving…', saved:'已保存 · Saved',
+    badJson:'JSON 格式无效 · Not valid JSON: ',
+    notObj:'偏好必须是 JSON 对象 · Preferences must be a JSON object',
+    loadFail:'无法加载设置 · Could not load settings: ',
+    saveFail:'未保存 · Not saved: '
   };
   // Where the prompt in force came from. The app's OWN prompt is the one it sends with each
   // turn; naming the source is the difference between "why is it answering like that" and a
   // box of text with no provenance.
-  var SRC={ profile:'your override · 你的覆盖设置', config:'this node’s default · 本节点默认',
-            app:'the app’s own · 应用自带', none:'none · 无' };
+  var SRC={ profile:'你的覆盖设置 · your override', config:'本节点默认 · this node’s default',
+            app:'应用自带 · the app’s own', none:'无 · none' };
 
   // Text is set with textContent, never the markup-parsing alternative: every string that lands
   // in this panel — a system prompt, a preferences blob, a failure reason — is user- or

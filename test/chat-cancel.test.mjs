@@ -1,6 +1,6 @@
 // oneShot + chat-cancel — the CLIENT half: PAChat.complete and the shell's chat relay.
 //
-// SCAR (measured 2026-10-12, real CLI): the Journal's "Design with AI · AI设计" went through
+// SCAR (measured 2026-10-12, real CLI): the Journal's "AI设计 · Design with AI" went through
 // PAChat.complete → the shell's chat relay → /api/chat → `claude -p --model sonnet`. With extended
 // thinking on, Sonnet drafted the whole SVG inside its thinking, hit the 32,000-token output cap
 // with no text and never answered (4 runs of 4). The studio gave up after 5 minutes with a
@@ -91,7 +91,7 @@ test('chat-cancel aborts the RIGHT in-flight fetch: the server sees that connect
     const doneA = B.done('pac1');
     assert.equal(doneA.ok, false);
     assert.equal(doneA.code, 'cancelled');
-    assert.equal(doneA.error, 'Cancelled · 已取消');
+    assert.equal(doneA.error, '已取消 · Cancelled');
     assert.doesNotMatch(B.said('pac1'), NETWORK_SENTENCE, 'a Cancel is never reported as a broken connection');
     // A cancel of an id that was never sent is the same harmless no-op.
     await B.post({ id: 'pac5', kind: 'chat-cancel', chatId: 'pac99' });
@@ -140,14 +140,14 @@ test('PAChat.complete over the REAL broker: oneShot sent, ONE chat-cancel on abo
   await withShell(async ({ B, seen }) => {
     const { complete, posted } = loadComplete((m, reply) => B.route(m, reply));
     const ac = new AbortController();
-    const p = complete('hold-design', { label: 'Stationery · 信纸', signal: ac.signal });
+    const p = complete('hold-design', { label: '信纸 · Stationery', signal: ac.signal });
     await until(() => B.out.some((x) => x.ev && x.ev.type === 'convo'), 'the answer to start streaming');
     assert.equal(posted[0].kind, 'chat');
     assert.equal(posted[0].oneShot, true, 'complete() always marks its request one-shot');
     assert.equal(seen[0].body.oneShot, true, 'and the shell carried it to the server');
     ac.abort(); ac.abort();
     const r = await within(p, 'complete() to answer the cancel');
-    assert.deepEqual(r, { ok: false, text: '', error: 'Cancelled · 已取消', convoId: 'cv-hold-design' });
+    assert.deepEqual(r, { ok: false, text: '', error: '已取消 · Cancelled', convoId: 'cv-hold-design' });
     assert.equal(keys(r), SHAPE, 'exactly the four fields');
     const cancels = posted.filter((m) => m.kind === 'chat-cancel');
     assert.equal(cancels.length, 1, 'exactly one chat-cancel, however often the signal is poked');
@@ -164,7 +164,7 @@ test('PAChat.complete with an ALREADY-aborted signal posts nothing and answers t
   const { complete, posted } = loadComplete(() => {});   // a shell that never answers: only `posted` matters
   const ac = new AbortController(); ac.abort();
   const r = await within(complete('design it', { signal: ac.signal }), 'complete() to answer without the shell', 1000);
-  assert.deepEqual(r, { ok: false, text: '', error: 'Cancelled · 已取消', convoId: null });
+  assert.deepEqual(r, { ok: false, text: '', error: '已取消 · Cancelled', convoId: null });
   assert.equal(posted.length, 0, 'no chat — a job that is cancelled on arrival still starts claude');
 });
 
@@ -177,7 +177,7 @@ test('PAChat.complete answers an abort AT ONCE, even from a shell that never win
   await until(() => posted.length === 1, 'the chat to be posted');
   await new Promise((r) => setTimeout(r, 0));
   ac.abort();
-  assert.deepEqual(await within(p, 'complete() to answer the abort', 1000), { ok: false, text: '', error: 'Cancelled · 已取消', convoId: 'cv1' });
+  assert.deepEqual(await within(p, 'complete() to answer the abort', 1000), { ok: false, text: '', error: '已取消 · Cancelled', convoId: 'cv1' });
   assert.deepEqual(posted.map((m) => m.kind), ['chat', 'chat-cancel']);
 });
 

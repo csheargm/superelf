@@ -60,7 +60,7 @@ test('Bible: own bar replaces the shell bar; A+ steps the shell setting; scroll 
     assert.equal(await page.evaluate(() => FS_STEPS[fsIdx]), fs0, 'one in-app A+ = one shell step');
     await frame.waitForFunction((v) => getComputedStyle(document.documentElement).getPropertyValue('--fs').trim() === String(v), fs0);
     assert.ok(fs1 > fs0);
-    assert.match(await frame.locator('#nav .paab-up').getAttribute('title'), /long-press to reset · 长按恢复默认/, 'titles from the shell (one source)');
+    assert.match(await frame.locator('#nav .paab-up').getAttribute('title'), /长按恢复默认 · long-press to reset/, 'titles from the shell (one source)');
     assert.equal(await barHidden(frame, '#nav'), false);
     await frame.evaluate(() => { PAAppBar.show(); document.getElementById('verses').scrollTop = 400; });
     await frame.waitForTimeout(150);

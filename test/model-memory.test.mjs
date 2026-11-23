@@ -79,7 +79,7 @@ test('an unknown lane is REFUSED, not stored — and costs no round trip', async
   const { appModel, setAppModel, calls } = loadStore();
   const r = await setAppModel('bible', 'gpt-9');
   assert.equal(r.ok, false);
-  assert.match(r.error, /unknown model · 未知模型/);
+  assert.match(r.error, /未知模型 · unknown model/);
   assert.equal(appModel('bible'), null, 'and nothing was written');
   assert.equal(calls.length, 0, 'an obvious mistake is caught before the network, not by it');
 });
@@ -99,7 +99,7 @@ test('a failed WRITE is reported, and is NOT remembered locally', async () => {
   const refused = loadStore({ respond: async () => ({ ok: false, status: 400, json: async () => ({ error: 'Unknown model · 未知模型: mistral' }) }) });
   const r = await refused.setAppModel('bible', 'mistral');
   assert.equal(r.ok, false, 'a refusal is REPORTED');
-  assert.match(r.error, /could not save · 无法保存/);
+  assert.match(r.error, /无法保存 · could not save/);
   assert.match(r.error, /未知模型/, "and carries the SERVER's reason, not a generic one");
   assert.equal(refused.appModel('bible'), null, 'and nothing is remembered locally');
   assert.equal(refused.me.appModels, undefined, 'the profile object is untouched');
@@ -108,7 +108,7 @@ test('a failed WRITE is reported, and is NOT remembered locally', async () => {
   const offline = loadStore({ respond: async () => { throw new Error('Failed to fetch'); } });
   const r2 = await offline.setAppModel('bible', 'mistral');
   assert.equal(r2.ok, false, 'a dropped request is REPORTED too');
-  assert.match(r2.error, /could not save · 无法保存/);
+  assert.match(r2.error, /无法保存 · could not save/);
   assert.equal(offline.appModel('bible'), null, 'and again nothing is remembered');
 
   // A non-2xx whose body is not JSON must still report, not throw.

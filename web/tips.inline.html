@@ -33,7 +33,7 @@
   if(window.PATips) return;
   const PREF='tipsSeen';
   const EDGE_PX=8, GAP_PX=6;                  // viewport margin; space between anchor and tip
-  const CLOSE='Dismiss · 关闭';
+  const CLOSE='关闭 · Dismiss';
   const regs=[];                              // [{id, anchor, text, when}] in registration order
   const MAX_W_PX=320;                         // tip width cap, also bounded by the viewport
   let seen=null, failed=false, loading=null, cur=null, shown=false, waiting=false, chain=Promise.resolve();

@@ -20,7 +20,7 @@ const BIBLE_DONE_KIND='pa-bible-done';
 const SKIP_KIND='pa-skip';
 const BIBLE_DONE_PATH='/__pa/bible-done'; // a synthetic entry: the corpus for this build is complete
 const SHELL_URLS=['/','/manifest.webmanifest'];   // what a cold open needs before any app page
-const OFFLINE_HTML='<!doctype html><meta charset="utf-8"><p style="font:15px system-ui;padding:24px">Offline · 离线 — this page is not saved on this device yet · 此页尚未保存在本机</p>';
+const OFFLINE_HTML='<!doctype html><meta charset="utf-8"><p style="font:15px system-ui;padding:24px">离线 · Offline — 此页尚未保存在本机 · this page is not saved on this device yet</p>';
 const PROBE_CSP="sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline'";
 let build='';   // told by the shell; after a worker restart the one cache left names it (currentCache)
 

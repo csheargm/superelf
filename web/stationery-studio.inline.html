@@ -9,7 +9,7 @@
 window.PAStationeryStudio=(function(){
   'use strict';
   const S=window.PAStationery;
-  const LABEL='Stationery · 信纸';              // the chat list's chip for these turns
+  const LABEL='信纸 · Stationery';              // the chat list's chip for these turns
   const SAFE={x:80,y:100,w:656,h:860};          // what the AI is asked to keep clear, and what a kept design declares
   const PIC_MAX_W=2550, PIC_MAX_H=3300;         // 8.5x11 in at 300 dpi: print-sharp, already the page aspect
   const PIC_DECODE_EDGE=4096;                   // a 4:3 decode at this edge is 12.6M px, inside iOS's 16.7M canvas cap
@@ -19,8 +19,8 @@ window.PAStationeryStudio=(function(){
   const DEFAULT_FADE=0.3, MAX_FADE=0.8;         // a photo under ink starts lightened; the slider stops at 80%
   const NAME_MAX=60;
   const AI_WAIT_MS=5*60*1000;                   // an answer that never ends (no 'done') still ENDS, with a name (R5)
-  const TIMEOUT='no answer after '+AI_WAIT_MS/60000+' minutes · 超时未回答';
-  const CANCELLED='Cancelled · 已取消';          // the caller stopped the turn (reset, a newer run, Cancel)
+  const TIMEOUT='超时未回答 · no answer after '+AI_WAIT_MS/60000+' minutes';
+  const CANCELLED='已取消 · Cancelled';          // the caller stopped the turn (reset, a newer run, Cancel)
 
   // ── The prompt: the shared template contract, built FROM the sanitizer's own lists (R3) ───
   function contract(){
@@ -68,16 +68,16 @@ window.PAStationeryStudio=(function(){
   async function run(ai,prompt,o){
     let r; try{ r=await turn(ai,prompt,o); }
     catch(e){ const why=(e&&e.message)||String(e);
-      return {ok:false,convoId:null,reason:why===CANCELLED?why:'AI request failed · AI 请求失败 — '+why}; }
+      return {ok:false,convoId:null,reason:why===CANCELLED?why:'AI 请求失败 · AI request failed — '+why}; }
     const convoId=(r&&r.convoId)||(o&&o.convoId)||null;
-    if(!r||!r.ok) return {ok:false,convoId,reason:(r&&(r.error||r.text))||'The AI gave no answer · AI 未回答'};
+    if(!r||!r.ok) return {ok:false,convoId,reason:(r&&(r.error||r.text))||'AI 未回答 · The AI gave no answer'};
     const raw=extractSvg(r.text);
-    if(!raw) return {ok:false,convoId,reason:'The answer had no <svg> · 回答中没有 SVG'};
+    if(!raw) return {ok:false,convoId,reason:'回答中没有 SVG · The answer had no <svg>'};
     // sanitize(); a design refused only for a SIZE (an element over its own limit, or the render-cost budget) comes back
     // simplified, with a note (ADR 0003 amendment 5)
     const v=S.simplify(raw);
     if(v.ok) return {ok:true,svg:v.svg,convoId,reason:'',note:v.note||''};
-    return {ok:false,convoId,reason:v.over?v.reason:'Rejected · 已拒绝 — '+v.reason};   // over: nothing fitted, a plain message
+    return {ok:false,convoId,reason:v.over?v.reason:'已拒绝 · Rejected — '+v.reason};   // over: nothing fitted, a plain message
   }
   const design=(ai,desc,o)=>run(ai,designPrompt(desc),o);
   const tweak=(ai,svg,how,o)=>run(ai,tweakPrompt(svg,how),o);   // the CURRENT svg travels with the instruction
@@ -91,12 +91,12 @@ window.PAStationeryStudio=(function(){
   }
   // draft = {svg, name, base?} -> {ok, id, base, ref} | {ok:false, reason}. The store re-checks the SVG.
   async function keep(store,draft){
-    const name=String(draft.name||'').trim().slice(0,NAME_MAX)||'My stationery · 我的信纸';
+    const name=String(draft.name||'').trim().slice(0,NAME_MAX)||'我的信纸 · My stationery';
     const base=draft.base||slug(name), id=nextId(base);
     const tpl={id,name:name+' · '+id.slice(base.length+1),group:'stationery',audience:'any',svg:draft.svg,
       lines:null,safe:Object.assign({},SAFE),dark:false};
     const r=await store.saveMine(tpl);
-    return r.ok?{ok:true,id,base,ref:{id,source:'mine'}}:{ok:false,reason:r.error||'Not saved · 未保存'};
+    return r.ok?{ok:true,id,base,ref:{id,source:'mine'}}:{ok:false,reason:r.error||'未保存 · Not saved'};
   }
 
   // ── Pictures ─────────────────────────────────────────────────────────────────────────────
@@ -138,13 +138,13 @@ window.PAStationeryStudio=(function(){
     const c=o||{}; let last=null;
     for(const scale of c.edge?[1]:PIC_TRIES){
       let img; try{ img=await pageImage(file,Object.assign({},c,{scale})); }
-      catch(e){ return {ok:false,reason:(e&&e.message)||'Could not read the picture · 无法读取图片'}; }
+      catch(e){ return {ok:false,reason:(e&&e.message)||'无法读取图片 · Could not read the picture'}; }
       const f=window.PAPhoto.toFile(img.dataUrl,'stationery-'+Date.now()+(img.png?'.png':'.jpg'));
       const r=await upload(f,{maxEdge:0,name:f.name,what:'Photo'});
       if(r&&r.ok) return {ok:true,path:r.path,w:img.w,h:img.h,png:img.png};
       last=r; if(window.PAPhoto.fits(f.size)) break;          // refused for another reason: shrinking will not help
     }
-    return {ok:false,reason:(last&&(last.text||last.error))||'Upload failed · 上传失败'};
+    return {ok:false,reason:(last&&(last.text||last.error))||'上传失败 · Upload failed'};
   }
   // Recreate · AI 重绘: the picture goes to the AI as an ATTACHMENT (uploaded, by path), and the
   // answer takes the SAME run() — sanitize included — as a typed description.

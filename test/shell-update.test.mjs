@@ -165,7 +165,7 @@ test('frameWin and frameApp read frameRef: a srcdoc app counts as open; about:bl
 test('the wiring in the composed shell: polls while visible, lights ↺, one bar line outside the inert header, reopens the app after boot', () => {
   assert.ok(SHELL_PARTS.some(([m, f]) => m === '/* PA_UPDATE_JS */' && f === 'update.js'), 'update.js is a shell part');
   assert.equal(UPDATE_POLL_MS, 15 * 60 * 1000);
-  assert.equal(UPDATE_READY_TXT, 'Update ready · 有新版本 — tap to reload');
+  assert.equal(UPDATE_READY_TXT, '有新版本 · Update ready — 点按刷新 · tap to reload');
   const wiring = BLOCK.slice(BLOCK.indexOf('const PAUpdate=makeUpdate('));
   assert.match(wiring, /document\.addEventListener\('visibilitychange',\(\)=>\{ if\(document\.visibilityState==='visible'\) PAUpdate\.check\(\); \}\);/);
   assert.match(wiring, /setInterval\(\(\)=>\{ if\(document\.visibilityState==='visible'\) PAUpdate\.check\(\); \},UPDATE_POLL_MS\);/);

@@ -127,7 +127,7 @@ test('harness fidelity: the extracted relay core is real code from web/index.htm
     assert.equal(typeof R.relayCall, 'function');
     assert.equal(typeof R.relayHttpFail, 'function');
     assert.equal(R.RELAY_NOT_FOUND, 'not found', 'the legacy error string stays pinned in ONE place (R3)');
-    assert.match(R.RELAY_TOO_LARGE_MSG, /Message too large · 消息过长/, 'bilingual');
+    assert.match(R.RELAY_TOO_LARGE_MSG, /消息过长 · Message too large/, 'bilingual');
     assert.equal(R.relayBodyBytes('中文'), 6, 'sizes are UTF-8 BYTES — what the caps count — not characters');
   });
 });
@@ -149,7 +149,7 @@ test('READ failures are distinguishable: 404 / 401 / 403 / 500 / 400 / dead sock
     assert.equal(boom.code, 'server-error'); assert.equal(boom.status, 500);
     assert.equal(bad.code, 'bad-request'); assert.equal(bad.status, 400);
     assert.equal(dead.code, 'network');
-    assert.match(dead.error, /network unreachable · 网络不可达/);
+    assert.match(dead.error, /网络不可达 · network unreachable/);
     assert.equal(dead.status, undefined, 'a request that never reached the server has no status to report');
 
     // THE property that stops the data loss: exactly ONE of these means "there is nothing
@@ -260,7 +260,7 @@ test('chat: an oversize 413 is now NDJSON-readable (server side), and a 401 stil
   });
 });
 
-test('chat 413: the shell maps it to a bilingual "Message too large · 消息过长" WITH the limit and the real size', async () => {
+test('chat 413: the shell maps it to a bilingual "消息过长 · Message too large" WITH the limit and the real size', async () => {
   await withServer(async ({ base, R }) => {
     const body = JSON.stringify({ message: oversize(BODY_LIMITS.chat) });
     const res = await fetch(base + '/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body });
@@ -283,14 +283,14 @@ test('chat 413: the shell maps it to a bilingual "Message too large · 消息过
     assert.doesNotMatch(down, /too large|过长/);
     assert.match(down, /服务器错误/);
     const off = R.relayText({ ok: false, code: 'network' });
-    assert.match(off, /never left this device · 未发出/, 'a network failure says the message was NOT sent');
+    assert.match(off, /未发出 · it never left this device/, 'a network failure says the message was NOT sent');
   });
 });
 
 test('the upload surface reuses the SAME mapper with a file-shaped heading (R3: one mapping, two headings)', async () => {
   await withServer(async ({ R }) => {
     const shown = R.relayText({ ok: false, code: 'too-large', limit: BODY_LIMITS.upload }, 1024, R.RELAY_TOO_LARGE_FILE);
-    assert.match(shown, /File too large · 文件过大/);
+    assert.match(shown, /文件过大 · File too large/);
     assert.match(shown, new RegExp(`max ${humanBytes(BODY_LIMITS.upload)}`));
   });
 });

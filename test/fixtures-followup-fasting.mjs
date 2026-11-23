@@ -3,7 +3,7 @@
 // "Fasting research". Written for the tests and the quality proof; no owner file is read.
 import { TODO_HEADING } from '../lib/summary-followup.mjs';
 export const FASTING_TODO = 'Fasting research';
-export const FASTING_SUMMARY = `AI summary · AI 总结 — This week · 本周 Nov 9–15, 2026 #summary #ai
+export const FASTING_SUMMARY = `AI summary · AI 总结 — 本周 · This week Nov 9–15, 2026 #summary #ai
 
 ## Small-business owners weekly meeting
 - Theme: the God of abundance — watch God multiply what we bring [1]

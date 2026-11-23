@@ -20,7 +20,7 @@ import { ROOT, FP, loadStill, loadStudio, svg, LG, unevenStops, heartsOf, XmlDom
 
 const NEON = fs.readFileSync(path.join(ROOT, 'test', 'fixtures', 'stationery-rejected-region.svg'), 'utf8');
 const S = loadStill();
-const REJECTED = 'Rejected · 已拒绝 — ';
+const REJECTED = '已拒绝 · Rejected — ';
 const BIG_NOTE = note('oversized shadows and glows', '过大的阴影和发光效果');
 
 // ── 1. The size limits: cut down, not thrown away ─────────────────────────────────────────────────────────────
@@ -82,7 +82,7 @@ test('limits and the budget add up; a later step of the same kind names it once'
   const stray = S.simplify(svg('<rect width="9" height="9" fill="#fcc" numOctaves="99"/>'));   // on no filter: draws nothing, dropped
   assert.deepEqual([stray.ok, stray.svg && /numOctaves/.test(stray.svg)], [true, false], stray.reason);
 });
-test('a limit no step can take out keeps its own reason, shown after "Rejected · 已拒绝" (a <use> names the filter)', async () => {
+test('a limit no step can take out keeps its own reason, shown after "已拒绝 · Rejected" (a <use> names the filter)', async () => {
   const d = svg(`<defs>${BIG}</defs><use href="#big"/><circle r="9" filter="url(#big)"/>`), a = S.sanitize(d);
   assert.equal(a.limit, true);
   assert.deepEqual(S.simplify(d), { ok: false, reason: 'filter region too large', cost: a.cost });
@@ -224,7 +224,7 @@ test('a refused gradient step is undone with every attribute as it was (the step
 });
 
 // ── 4. A step that throws on the limits' path is shown after "Rejected", in both languages ──────────────────────
-test('simplify never throws (R5) on the limits\' path either: the limit\'s own reason, after "Rejected · 已拒绝"', async () => {
+test('simplify never throws (R5) on the limits\' path either: the limit\'s own reason, after "已拒绝 · Rejected"', async () => {
   const T = loadStill({ mutate: san('run:fitFilters}', "run:()=>{ throw new Error('boom'); }}") }), d = limited(BIG), a = T.sanitize(d);
   assert.deepEqual(T.simplify(d), { ok: false, reason: 'filter region too large', cost: a.cost });
   assert.deepEqual(await loadStudio(T).design(answer(d), 'x'), { ok: false, convoId: 'c1', reason: REJECTED + 'filter region too large' });
@@ -265,7 +265,7 @@ test('MUTATION: each new guard, removed, is caught', async () => {
   assert.equal(count(L(M.pairs, GRAD_FIRST).simplify(G_REFUSED).svg, /fill="url\(#lg\)"/g), 0, 'pairs: so does a refused gradient step');
   const over = svg('<g opacity="0.5"><circle cx="40" cy="40" r="9" fill="#fcc"/></g>'.repeat(460)), why = S.sanitize(over).reason;
   const shownFirst = await loadStudio(L(M.catch, san('run:flatten}', "run:()=>{ throw new Error('boom'); }}"))).design(answer(over), 'x');
-  assert.equal(shownFirst.reason, why, 'catch: the `over` refusal is shown plain — English only, no "Rejected · 已拒绝" (the R13 finding)');
+  assert.equal(shownFirst.reason, why, 'catch: the `over` refusal is shown plain — English only, no "已拒绝 · Rejected" (the R13 finding)');
   const bar = L(M.limitBar).simplify(svg(`<defs>${BIG}</defs><circle r="9" filter="url(#big)"/><circle cx="50" cy="50" r="20" fill="#c33" opacity="0.5"/>`
     + '<path fill="none" stroke="#000" stroke-dasharray="0.01" d="M0 0H816"/>'.repeat(3)));
   assert.equal(bar.note, note('oversized shadows and glows, see-through layers, dashes', '过大的阴影和发光效果、半透明图层、虚线'), 'limitBar: a fold that saved nothing is named');

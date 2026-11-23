@@ -82,7 +82,7 @@
   // in the editor than everywhere else. A missing component is REPORTED, never silently patched.
   function loadImg(file,maxEdge){
     if(!(window.PAPhoto&&window.PAPhoto.toCanvas))
-      return Promise.reject(new Error('PAPhoto is required to read the photo · 需要 PAPhoto 读取图片'));
+      return Promise.reject(new Error('需要 PAPhoto 读取图片 · PAPhoto is required to read the photo'));
     return window.PAPhoto.toCanvas(file,maxEdge);
   }
 
@@ -128,7 +128,7 @@
         '</div>'+
         '<div style="display:flex;gap:8px;padding:12px 16px 28px;background:#111">'+
           '<button id="psc-cancel" style="padding:10px 14px;border-radius:10px;border:none;background:#444;color:#fff;font-size:15px">Cancel</button>'+
-          '<button id="psc-skip" style="flex:1;padding:10px;border-radius:10px;border:none;background:#444;color:#fff;font-size:15px">Skip · 原图</button>'+
+          '<button id="psc-skip" style="flex:1;padding:10px;border-radius:10px;border:none;background:#444;color:#fff;font-size:15px">原图 · Skip</button>'+
           '<button id="psc-crop" style="flex:1;padding:10px;border-radius:10px;border:none;background:#0a7a5a;color:#fff;font-size:15px;font-weight:600">Crop &amp; Enhance</button>'+
         '</div>';
       document.body.appendChild(ov);
@@ -177,7 +177,7 @@
       ov.querySelector('#psc-skip').onclick=()=>done({ok:true,file});
       ov.querySelector('#psc-crop').onclick=async()=>{
         const btn=ov.querySelector('#psc-crop');
-        btn.textContent='Processing… · 处理中'; btn.disabled=true;
+        btn.textContent='处理中 · Processing…'; btn.disabled=true;
         await new Promise(r=>setTimeout(r,60));   // flush repaint before blocking loop
         try{
           const[ow,oh]=outSize(corners,1600);

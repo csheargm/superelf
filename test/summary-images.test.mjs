@@ -46,8 +46,8 @@ test('pick: important ink only, among the rows\' files, newest row first then pa
   assert.deepEqual(I.pick(PAGES, rows()), { pages: [{ path: 'entry-a.json', scope: '', page: 1, ts: at(2026, 11, 9) }, { path: 'entry-b.json', scope: '', page: 0, ts: at(2026, 11, 2) }], total: 2 }, 'a\'s page 0 has no marked ink; entry-x is not a row');
   const many = Array.from({ length: 9 }, (_, i) => ({ path: 'entry-a.json', scope: '', page: 8 - i, inkImportant: true }));
   const p = I.pick(many, rows()); assert.equal(p.pages.length, PAGE_IMAGES_MAX); assert.equal(p.total, 9); assert.deepEqual(p.pages.map((x) => x.page), [0, 1, 2, 3, 4, 5], 'page order inside a row');
-  assert.deepEqual(I.plan({ pages: PAGES, rows: rows() }).line, ' · 2 page images · 2 页图片');
-  assert.deepEqual(I.plan({ pages: many, rows: rows() }).line, ' · 6 page images · 6 页图片 (max 6 · 最多 6)', 'the cap is said when it bit');
+  assert.deepEqual(I.plan({ pages: PAGES, rows: rows() }).line, ' · 2 页图片 · 2 page images');
+  assert.deepEqual(I.plan({ pages: many, rows: rows() }).line, ' · 6 页图片 · 6 page images (最多 6 · max 6)', 'the cap is said when it bit');
   assert.deepEqual(I.plan({ pages: [], rows: rows() }), { pages: [], total: 0, lane: { id: 'claude', label: 'Claude', vision: true }, line: '' }, 'nothing to picture: nothing said');
   assert.deepEqual(I.pick(null, null), { pages: [], total: 0 });
   assert.deepEqual(I.YEAR_KEYS, ['year', 'lastYear']);
@@ -64,7 +64,7 @@ test('lane: the first served preferred provider (claude before codex, whatever t
   assert.deepEqual(mk(LANES.slice(0, 2), { id: 'glmflash', label: 'GLM Flash' }).lane(), { id: 'glmflash', label: 'GLM Flash', vision: true }, 'the vision default is an Ollama lane that sees');
   assert.equal(mk([], null).lane(), null, 'no lanes at all');
   const I = mk(LANES.slice(0, 1));
-  assert.deepEqual(I.plan({ pages: PAGES, rows: rows() }), { pages: [], total: 2, lane: { id: 'deepseek', label: 'DeepSeek', vision: false }, line: ' · DeepSeek cannot see images · DeepSeek 无法看图 — text only · 仅发送文字' }, 'no pages are fetched for a lane that cannot see them');
+  assert.deepEqual(I.plan({ pages: PAGES, rows: rows() }), { pages: [], total: 2, lane: { id: 'deepseek', label: 'DeepSeek', vision: false }, line: ' · DeepSeek 无法看图 · DeepSeek cannot see images — 仅发送文字 · text only' }, 'no pages are fetched for a lane that cannot see them');
   assert.deepEqual(I.SUMMARY_LANE_PREF, ['claude', 'codex']);
   assert.match(I.PROMPT, /trust the image\. · .*以图片为准。$/);
 });
@@ -77,7 +77,7 @@ test('fetch: one broker ask per page, the file names as the rail\'s attachments;
   assert.deepEqual(asks, [{ kind: 'note-page-image', path: 'entry-a.json', scope: '', page: 1 }, { kind: 'note-page-image', path: 'n.json', scope: 'v16', page: 0 }]);
   const f = await I.fetch([{ path: 'a', page: 0 }, { path: 'a', page: 9 }, { path: 'a', page: 2 }]);
   assert.equal(f.ok, false); assert.equal(f.error, 'no ink on this page'); assert.equal(asks.length, 4, 'stopped at the failure');
-  assert.deepEqual(await loadImages({}).fetch([{ path: 'a', page: 0 }]), { ok: false, images: [], error: 'no broker · 无通道' });
+  assert.deepEqual(await loadImages({}).fetch([{ path: 'a', page: 0 }]), { ok: false, images: [], error: '无通道 · no broker' });
   assert.deepEqual(await I.fetch([]), { ok: true, images: [] });
 });
 
@@ -102,7 +102,7 @@ async function drawer({ lanes = LANES, ask = async (m) => ({ ok: true, path: `up
 test('the sheet: the line names the preferred agent lane and the page images; Send renders them through `note-page-image`, adds the trust-the-image sentence to the prompt and hands images + model to the host\'s run', async () => {
   const D = await drawer();
   await D.api().open(); await D.api().choose('month');
-  assert.equal(D.line(), 'Send 3 pages · 55 characters to Claude · 发送 3 页 · 55 字到 Claude (off this Mac · 离开本机) · 2 page images · 2 页图片', 'Claude, though the chooser\'s current lane is the first in the list (DeepSeek)');
+  assert.equal(D.line(), '发送 3 页 · 55 字到 Claude · Send 3 pages · 55 characters to Claude (离开本机 · off this Mac) · 2 页图片 · 2 page images', 'Claude, though the chooser\'s current lane is the first in the list (DeepSeek)');
   assert.equal(D.PAChat.lane().id, 'deepseek', 'the chooser itself is untouched');
   assert.equal(await D.api().send(), true);
   assert.deepEqual(D.calls.asks, [{ kind: 'note-page-image', path: 'entry-a.json', scope: '', page: 1 }, { kind: 'note-page-image', path: 'entry-b.json', scope: '', page: 0 }], 'newest row first');
@@ -110,20 +110,20 @@ test('the sheet: the line names the preferred agent lane and the page images; Se
   assert.equal(t.model, 'claude'); assert.equal(t.scope, 'summary:2026-11');
   assert.deepEqual(t.images, [{ name: 'notes_h_p1.png', path: 'uploads/pages/notes_h_p1.png' }, { name: 'notes_h_p0.png', path: 'uploads/pages/notes_h_p0.png' }]);
   assert.equal(t.message.startsWith(D.window.PADrawerSummary.SUMMARY_PROMPT + ' ' + D.window.PASummaryImages.PROMPT + '\n\n## 2026-11-02'), true, 'the sentence joins the prompt, before the notes');
-  assert.match(D.window.PADrawerSummary.SUMMARY_PROMPT, /under the heading "Open to-dos · 待办"/, 'the prompt names the to-do heading the node extracts (ADR 0027)');
+  assert.match(D.window.PADrawerSummary.SUMMARY_PROMPT, /under the heading "待办 · Open to-dos"/, 'the prompt names the to-do heading the node extracts (ADR 0027)');
 });
 
 test('CONTROL: a lane without vision → text only, said on the line, no render asked, no images, no model override; a render failure stops the send and is said', async () => {
   const D = await drawer({ lanes: LANES.slice(0, 1) });
   await D.api().open(); await D.api().choose('month');
-  assert.equal(D.line(), 'Send 3 pages · 55 characters to DeepSeek · 发送 3 页 · 55 字到 DeepSeek (off this Mac · 离开本机) · DeepSeek cannot see images · DeepSeek 无法看图 — text only · 仅发送文字');
+  assert.equal(D.line(), '发送 3 页 · 55 字到 DeepSeek · Send 3 pages · 55 characters to DeepSeek (离开本机 · off this Mac) · DeepSeek 无法看图 · DeepSeek cannot see images — 仅发送文字 · text only');
   assert.equal(await D.api().send(), true);
   assert.deepEqual(D.calls.asks, []); assert.deepEqual(D.calls.run[0].images, []); assert.equal(D.calls.run[0].model, 'deepseek', 'the current lane, named');
   assert.equal(D.calls.run[0].message.includes('trust the image'), false);
   const F = await drawer({ ask: async () => ({ ok: false, code: 'render_failed', error: 'EACCES' }) });
   await F.api().open(); await F.api().choose('month');
   assert.equal(await F.api().send(), false);
-  assert.equal(F.line(), 'Page images failed · 页图片失败 — EACCES'); assert.deepEqual(F.calls.run, [], 'nothing sent without its pictures (R5)');
+  assert.equal(F.line(), '页图片失败 · Page images failed — EACCES'); assert.deepEqual(F.calls.run, [], 'nothing sent without its pictures (R5)');
   assert.equal(F.api().state().busy, false, 'a retry stays possible');
 });
 

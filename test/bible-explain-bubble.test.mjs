@@ -33,10 +33,10 @@ test('a taller composer re-pins a log that was at the bottom', () => {
 test('note title: book + chapter with no selection; verse ref + first words with one', async () => {
   const fs = await import('node:fs'); const vm = await import('node:vm');
   const S = fs.readFileSync(new URL('../workspace/apps/bible/index.html', import.meta.url), 'utf8');
-  const code = S.slice(S.indexOf('function scopeRef(){'), S.indexOf('\n', S.indexOf("return `${en} \\u00b7 ${zh} `+scopeRef()")));
+  const code = S.slice(S.indexOf('function scopeRef(){'), S.indexOf('\n', S.indexOf("return `${zh} `+scopeRef()")));
   const ctx = { BOOKS: [['Romans', '罗马书', 16]], bookIdx: 0, chapter: 3, selV: new Set(), VERSES: [{ n: 4, en: 'Certainly not! Let God be true and every man a liar.' }] };
   vm.runInNewContext(code.replace('const TITLE_WORDS', 'var TITLE_WORDS') + ';this.t=scopeTitle;', ctx);
-  assert.equal(ctx.t(), 'Romans · 罗马书 3');
+  assert.equal(ctx.t(), '罗马书 3 · Romans');
   ctx.selV.add(4);
-  assert.equal(ctx.t(), 'Romans · 罗马书 3:4 — Certainly not! Let God be…');
+  assert.equal(ctx.t(), '罗马书 3:4 · Romans — Certainly not! Let God be…');
 });

@@ -11,7 +11,7 @@
 //     stamp is a hint, the bytes are the truth — review finding 3);
 //   · changed on one side only (the other equals the base, byte for byte) → that side's page, no copy;
 //   · changed on both → the later `updated` wins and the loser is appended as a new page headed
-//     'Conflict copy · 冲突副本 (<from>, MM-DD HH:mm)'. Nothing is lost; the owner deletes a page.
+//     '冲突副本 · Conflict copy (<from>, MM-DD HH:mm)'. Nothing is lost; the owner deletes a page.
 //   · a tombstone ({deleted:true}, the Journal's delete) wins over the other side when that side
 //     still holds the base's bytes (nothing moved there), and loses to a notebook edited since the
 //     base: a deletion is cheap to redo, an edit is not (review finding 2). With no base the edit
@@ -20,8 +20,8 @@
 // metadata, the note itself carries the content. Any other JSON: the local text wins (LWW by file).
 // With no base (a path never read online on this device) every same-id difference counts as changed
 // on both sides — a copy rather than a silent loss.
-const OFF_CONFLICT_TITLE='Conflict copy · 冲突副本';
-const OFF_FROM_LOCAL='iPad', OFF_FROM_REMOTE='home node · 家中节点';
+const OFF_CONFLICT_TITLE='冲突副本 · Conflict copy';
+const OFF_FROM_LOCAL='iPad', OFF_FROM_REMOTE='家中节点 · home node';
 const mergeUpd=(o)=>Number(o&&o.updated)||0;
 const mergeIsNotebook=(o)=>!!(o&&typeof o==='object'&&Array.isArray(o.pages));
 const mergeIsIndex=(o)=>!!(o&&typeof o==='object'&&Array.isArray(o.entries));
@@ -78,7 +78,8 @@ function mergeIndex(local,remote,base){
 // read before it went away (null when unknown). → {text, merged:false} when the node did not move
 // (the same bytes as the base: the local text goes up as it is), else {text, merged:true, copies, kind}.
 function mergeOffline(localText,remoteText,baseText,opts){
-  const parse=(t,what)=>{ try{ return JSON.parse(t); }catch(err){ throw new Error('cannot read the '+what+' file · 无法读取'+what+'文件: '+(err&&err.message||err)); } };
+  const WHAT_ZH={base:'基准',node:'节点',local:'本机'};
+  const parse=(t,what)=>{ try{ return JSON.parse(t); }catch(err){ throw new Error('无法读取'+WHAT_ZH[what]+'文件 · cannot read the '+what+' file: '+(err&&err.message||err)); } };
   const base=baseText==null?null:parse(baseText,'base');
   const remote=parse(remoteText,'node');
   if(base&&remoteText===baseText) return {text:localText,merged:false};   // an equal stamp alone is no proof (finding 3)

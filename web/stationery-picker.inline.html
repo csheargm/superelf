@@ -40,14 +40,14 @@ window.PAStationeryPicker=(function(){
   const THUMB_W=44, THUMB_H=57, PREV_W=120, PREV_H=155;    // CSS px, page aspect
   const TICK_MS=1000;                                       // how often a waiting AI run repaints its elapsed time
   const ZOOM_PAGES=2;                                       // an enlarged draft is at most 2 page widths (1632 px): sharp on any screen, bounded memory
-  // "Working… · 处理中…"; with an AI run's elapsed seconds, "Working… 1:12 · 处理中…".
-  const working=(s)=>'Working… '+(s==null?'':Math.floor(s/60)+':'+String(s%60).padStart(2,'0')+' ')+'· 处理中…';
-  const T={ ai:'✨ Design with AI · AI 设计', pic:'🖼 From a picture · 用图片', describe:'Describe the stationery… · 描述你想要的信纸…',
-    go:'Design · 设计', busy:working(), tweak:'Tweak · 调整', how:'What to change… · 想怎么调整…', keep:'Keep · 保存', cancel:'Cancel · 取消',
-    again:'Try again · 重试', name:'Name · 名称', kept:'Saved to My templates · 已保存到我的模板', choose:'Choose a picture · 选择图片',
-    bg:'Use as background · 作为背景', redo:'Recreate with AI · AI 重绘', fade:'Fade · 淡化', zoom:'Tap to enlarge · 点按放大',
-    stays:'Pictures you import stay in your own notes · 导入的图片只保存在你自己的笔记里。',
-    pdf:'PDFs are not supported: screenshot a PDF page instead · 不支持 PDF：请先截图再导入。' };
+  // "处理中… · Working…"; with an AI run's elapsed seconds, "处理中… · Working… 1:12".
+  const working=(s)=>'处理中… · Working…'+(s==null?'':' '+Math.floor(s/60)+':'+String(s%60).padStart(2,'0'));
+  const T={ ai:'✨ AI 设计 · Design with AI', pic:'🖼 用图片 · From a picture', describe:'描述你想要的信纸… · Describe the stationery…',
+    go:'设计 · Design', busy:working(), tweak:'调整 · Tweak', how:'想怎么调整… · What to change…', keep:'保存 · Keep', cancel:'取消 · Cancel',
+    again:'重试 · Try again', name:'名称 · Name', kept:'已保存到我的模板 · Saved to My templates', choose:'选择图片 · Choose a picture',
+    bg:'作为背景 · Use as background', redo:'AI 重绘 · Recreate with AI', fade:'淡化 · Fade', zoom:'点按放大 · Tap to enlarge',
+    stays:'导入的图片只保存在你自己的笔记里。 · Pictures you import stay in your own notes',
+    pdf:'不支持 PDF：请先截图再导入。 · PDFs are not supported: screenshot a PDF page instead' };
   const mk=(tag,cls,txt)=>{ const e=document.createElement(tag); if(cls) e.className=cls; if(txt!=null) e.textContent=txt; return e; };
   const btn=(cls,txt,fn)=>{ const b=mk('button','pst-btn'+(cls?' '+cls:''),txt); b.type='button'; b.addEventListener('click',fn); return b; };
   const dpr=()=>Math.min(3,window.devicePixelRatio||1);
@@ -86,7 +86,7 @@ window.PAStationeryPicker=(function(){
       x.addEventListener('click',async()=>{
         if(!window.PATwoTap.press(x)) return;
         const r=await h.store.deleteMine(t.id);
-        if(!r.ok) say(msg,(r.error||'Not deleted · 未删除'),true); });   // success: the list rebuilds without it
+        if(!r.ok) say(msg,(r.error||'未删除 · Not deleted'),true); });   // success: the list rebuilds without it
       c.appendChild(x); }
     return c;
   }

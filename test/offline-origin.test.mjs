@@ -95,7 +95,7 @@ test('the shell as served: api() prefixes API_BASE with the same Bearer; PAOrigi
   assert.match(SHELL, /fetchBuild:async\(o\)=>\{ try\{ const r=await fetch\(o\+ORIGIN_BUILD_URL,\{cache:'no-store'\}\)/, 'the question is never answered from a cache (web/sw.js hard rule)');
   assert.match(SHELL, /localOrigin:\(\)=>\{ const v=PASW\.recall\(OFF_LOCAL_ORIGIN_KEY\);/, 'the remembered config value');
   assert.match(SHELL, /if\(typeof cfg\.local_origin==='string'\) d\.remember\(OFF_LOCAL_ORIGIN_KEY,cfg\.local_origin\);/, 'remembered on every online read of the config');
-  assert.equal(SHELL.split("'Home node · 家中节点'").length, 2, 'the sentence is written once (R3)');
+  assert.equal(SHELL.split("'家中节点 · Home node'").length, 2, 'the sentence is written once (R3)');
 });
 
 // ── The broker as shipped (R6): the public name dead, the home name up — a queued save drains to the
@@ -115,12 +115,12 @@ test('broker flow: public dead, home name up with the same build → the drain l
     const { B, line, clock } = broker(publicUrl, localUrl);
     await B.post({ id: 1, kind: 'save-data', path: 'entry-e1.json', data: nb(10) }); await settle();
     assert.equal(B.reply(1).offline, true, 'the public name refused the connection: queued');
-    assert.equal(line.textContent, 'Offline · 离线 — saving on this device · 保存在本设备 · check Tailscale or the node · 请检查 Tailscale 或节点 · 1 to sync · 待同步');
+    assert.equal(line.textContent, '离线 · Offline — 保存在本设备 · saving on this device · 请检查 Tailscale 或节点 · check Tailscale or the node · 待同步 1 · 1 to sync');
     B.triggers.online[0](); await settle(200);
     assert.deepEqual(local.posts, ['data/notes/entry-e1.json'], 'the queued save went to the home name');
     assert.equal(local.auth, 'Bearer test-token', 'the same session token');
     assert.equal(B.base(), localUrl);
-    assert.equal(line.textContent, 'Home node · 家中节点');
+    assert.equal(line.textContent, '家中节点 · Home node');
     clock.advance(ORIGIN_NOTE_MS); assert.equal(line.textContent, '', 'briefly');
     await B.post({ id: 2, kind: 'save-data', path: 'entry-e1.json', data: nb(20) }); await settle();
     assert.equal(B.reply(2).ok, true); assert.equal(B.reply(2).offline, undefined, 'saved on the node, not queued');
@@ -153,7 +153,7 @@ test('broker flow: a home name with a DIFFERENT build is never used (the save st
     await B.post({ id: 1, kind: 'save-data', path: 'entry-e1.json', data: nb(10) }); await settle();
     assert.equal(await B.sync.drain(), 'unreachable');
     assert.deepEqual(other.posts, []); assert.equal(B.base(), ''); assert.equal(B.origin.status().last, 'different-build');
-    assert.equal(line.textContent, 'Offline · 离线 — saving on this device · 保存在本设备 · check Tailscale or the node · 请检查 Tailscale 或节点 · 1 to sync · 待同步');
+    assert.equal(line.textContent, '离线 · Offline — 保存在本设备 · saving on this device · 请检查 Tailscale 或节点 · check Tailscale or the node · 待同步 1 · 1 to sync');
     assert.equal(f.rows('pa-offline', 'writes').length, 1);
     const { B: C } = broker(publicUrl, null);
     await C.post({ id: 1, kind: 'save-data', path: 'entry-e1.json', data: nb(10) }); await settle();

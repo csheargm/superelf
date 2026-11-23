@@ -25,7 +25,7 @@ for (const app of ['notes (template)', 'notes (live)']) {
       const gate = (src) => src.replace('const splitOn=()=>!!(window.PASplit&&PASplit.available&&PASplit.gateOpen());', 'const splitOn=()=>true;');
       const A = runApp(app, h.relay, ['DATA', 'S', 'SUMMARY_HOOKS', 'boot'], { clampTimers: true, mutate: gate });
       await until(() => A.S.entries.length === 1, 'boot to load the index');
-      const html = '<div>AI summary · AI 总结 — 2026-10 #summary #ai</div><p>October was <b>wet</b>.</p>';
+      const html = '<div>AI 总结 · AI summary — 2026-10 #summary #ai</div><p>October was <b>wet</b>.</p>';
       const r = await A.SUMMARY_HOOKS.saveNote({ title: 'Summary · 总结 2026-10', html, period: '2026-10', convoId: 'c-77' });
       assert.equal(r.ok, true); assert.ok(r.id, 'the new entry id');
       const idx = JSON.parse(fs.readFileSync(h.file('journal.json'), 'utf8'));
@@ -37,22 +37,22 @@ for (const app of ['notes (template)', 'notes (live)']) {
       assert.equal(nb.pages.length, 1); assert.equal(nb.pages[0].pageHtml, html, 'page 0 is the first line + the converted answer');
       assert.deepEqual(nb.pages[0].strokes, []); assert.deepEqual(nb.pages[0].images, []);
       assert.equal(fs.readFileSync(h.file('entry-e0.json'), 'utf8'), JSON.stringify(NOTEBOOK), 'the other note is untouched');
-      assert.equal(await A.SUMMARY_HOOKS.monthSummary('2026-10', 'Summary · 总结 2026-10'), 'AI summary · AI 总结 — 2026-10 #summary #ai October was wet .', 'the saved text, tags stripped');
-      assert.equal(await A.SUMMARY_HOOKS.monthSummary('2026-10', 'Last month · 上月 Oct 2026'), 'AI summary · AI 总结 — 2026-10 #summary #ai October was wet .', 'found by its period, whatever the title reads today');
+      assert.equal(await A.SUMMARY_HOOKS.monthSummary('2026-10', 'Summary · 总结 2026-10'), 'AI 总结 · AI summary — 2026-10 #summary #ai October was wet .', 'the saved text, tags stripped');
+      assert.equal(await A.SUMMARY_HOOKS.monthSummary('2026-10', '上月 · Last month Oct 2026'), 'AI 总结 · AI summary — 2026-10 #summary #ai October was wet .', 'found by its period, whatever the title reads today');
       assert.equal(await A.SUMMARY_HOOKS.monthSummary('2026-09', 'Summary · 总结 2026-09'), null, 'no such month');
       // A by-id save (its run's follow-up or re-save) updates exactly that entry: page 0's text replaced, the ink and page 2 kept.
       const nb1 = JSON.parse(fs.readFileSync(h.file('entry-' + r.id + '.json'), 'utf8')); nb1.pages[0].strokes = [{ t: 'pen', p: [[1, 2]] }]; nb1.pages.push({ id: 'p1', strokes: [], pageHtml: '<div>my own notes</div>', images: [] });
       h.put('entry-' + r.id + '.json', nb1);   // the owner wrote on the summary since
-      const html2 = '<div>AI summary · AI 总结 — 2026-10 #summary #ai</div><p>October, again.</p>';
-      const r2 = await A.SUMMARY_HOOKS.saveNote({ id: r.id, title: 'Last month · 上月 Oct 2026', html: html2, period: '2026-10', scope: 'summary:2026-10', convoId: 'c-78' });
+      const html2 = '<div>AI 总结 — 2026-10 #summary #ai · AI summary</div><p>October, again.</p>';
+      const r2 = await A.SUMMARY_HOOKS.saveNote({ id: r.id, title: '上月 · Last month Oct 2026', html: html2, period: '2026-10', scope: 'summary:2026-10', convoId: 'c-78' });
       assert.deepEqual(r2, { ok: true, id: r.id }, 'the same entry');
       const idx2 = JSON.parse(fs.readFileSync(h.file('journal.json'), 'utf8'));
       assert.equal(idx2.entries.length, idx.entries.length, 'no second entry');
       const e2 = idx2.entries.find((x) => x.id === r.id);
-      assert.equal(e2.title, 'Last month · 上月 Oct 2026'); assert.equal(e2.chat, 'c-78'); assert.ok(e2.updated > e2.created, 'updated now');
+      assert.equal(e2.title, '上月 · Last month Oct 2026'); assert.equal(e2.chat, 'c-78'); assert.ok(e2.updated > e2.created, 'updated now');
       const nb2 = JSON.parse(fs.readFileSync(h.file('entry-' + r.id + '.json'), 'utf8'));
       assert.equal(nb2.pages[0].pageHtml, html2, 'page 0 text replaced'); assert.deepEqual(nb2.pages[0].strokes, nb1.pages[0].strokes, 'the ink on it kept'); assert.equal(nb2.pages[1].pageHtml, '<div>my own notes</div>', 'the second page kept');
-      const r3 = await A.SUMMARY_HOOKS.saveNote({ title: 'This month · 本月 Nov 2026', html: '<div>Nov</div>', period: '2026-11', scope: 'summary:2026-11', convoId: null });
+      const r3 = await A.SUMMARY_HOOKS.saveNote({ title: '本月 · This month Nov 2026', html: '<div>Nov</div>', period: '2026-11', scope: 'summary:2026-11', convoId: null });
       assert.ok(r3.ok && r3.id !== r.id, 'CONTROL: another period is another entry'); assert.equal(JSON.parse(fs.readFileSync(h.file('journal.json'), 'utf8')).entries.length, idx.entries.length + 1);
       const sent = await A.SUMMARY_HOOKS.run({ scope: 'summary:2026-10', label: 'Summary · 总结 2026-10', message: 'PROMPT\n\n## 2026-10-01' });
       assert.notEqual(sent, false, 'the turn was handed to the rail');
@@ -81,7 +81,7 @@ for (const app of ['notes (template)', 'notes (live)']) {
       const pad = A.captured.pads[0], rail = A.captured.splits[0], chat = A.captured.panels.find((p) => p.kind === 'chat').chat;
       assert.equal(rail.isCollapsed('chat'), true, 'boot: the last-edited note opens alone (pref off)');
       // The summary thread is on screen (the sheet's turn went through run).
-      await A.SUMMARY_HOOKS.run({ scope: 'summary:2026-11', label: 'This month · 本月 Nov 2026', message: 'PROMPT' });
+      await A.SUMMARY_HOOKS.run({ scope: 'summary:2026-11', label: '本月 · This month Nov 2026', message: 'PROMPT' });
       assert.equal(rail.isCollapsed('chat'), false); assert.equal(chat.openedKey, 'summary:2026-11');
       await A.SUMMARY_HOOKS.onLink({ id: 'e1', page: 1 });
       assert.equal(A.curId(), 'e1', 'the linked note is the open one');
@@ -90,7 +90,7 @@ for (const app of ['notes (template)', 'notes (live)']) {
       assert.equal(rail.isCollapsed('chat'), false, 'the rail is NOT collapsed by the link (the bug: the summary vanished)');
       assert.equal(chat.openedKey, 'summary:2026-11', 'and NOT switched to the note\'s own conversation (the openAi pref path never runs here)');
       // The back pill's way home is the same hook with the summary note's id: the rail stays again.
-      const r = await A.SUMMARY_HOOKS.saveNote({ title: 'This month · 本月 Nov 2026', html: '<div>s</div>', period: '2026-11', scope: 'summary:2026-11', convoId: 'c-9' });
+      const r = await A.SUMMARY_HOOKS.saveNote({ title: '本月 · This month Nov 2026', html: '<div>s</div>', period: '2026-11', scope: 'summary:2026-11', convoId: 'c-9' });
       assert.equal(A.curId(), r.id, 'saving opened the summary note'); assert.equal(rail.isCollapsed('chat'), false); assert.equal(chat.openedKey, 'summary:2026-11', 'the thread that wrote it stays beside it');
       await A.SUMMARY_HOOKS.onLink({ id: 'e0', page: 0 }); await A.SUMMARY_HOOKS.onLink({ id: r.id, page: 0 });
       assert.equal(A.curId(), r.id); assert.equal(chat.openedKey, 'summary:2026-11'); assert.equal(rail.isCollapsed('chat'), false);

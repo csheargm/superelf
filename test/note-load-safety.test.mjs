@@ -92,7 +92,7 @@ function startServer({ cap = CAP, dir }) {
       if (hit(state.fault, rel)) {
         if (state.fault.code === 'network') { req.socket.destroy(); return; }
         if (state.fault.code === 'legacy') return send(400, 'text/plain', 'error'); // the shape that shipped during the incident
-        return send(500, 'application/json', '{"ok":false,"error":"save failed · 保存失败","code":"write_failed"}');
+        return send(500, 'application/json', '{"ok":false,"error":"保存失败 · save failed","code":"write_failed"}');
       }
       const f = appDataFile(dir, rel, { namespace: false });   // REAL path rule; this stand-in relay sends bare paths
       if (!f) return send(400, 'application/json', '{"error":"bad path"}');
@@ -214,7 +214,7 @@ test('control: the extracted halves are real code, and they compose', () => {
   assert.equal(typeof G.makeSaveGuard, 'function');
   assert.equal(typeof G.mdToHtml, 'function');
   assert.equal(typeof G.sanitize, 'function');
-  assert.match(G.LOAD_TXT.locked, /Could not open · 无法打开/, 'the locked-note message is bilingual');
+  assert.match(G.LOAD_TXT.locked, /无法打开 · Could not open/, 'the locked-note message is bilingual');
   // The one mapping the whole class turns on: the incident's reply must NOT be an absence.
   assert.equal(G.LOAD.fromBroker({ ok: false, error: 'not found' }).status, 'failed',
     'a code-less "not found" is exactly what a 401/500/network drop used to look like — it may never mean "empty"');
@@ -357,7 +357,7 @@ test('an oversize notebook is rejected LOUDLY and destroys nothing', async (t) =
 
     const r = await pad.guard.flush();
     assert.equal(r.ok, false, 'the write is rejected for its size');
-    assert.match(pad.banner(), /Not saved · 未保存/, 'and the user is told — the thing that was missing in the incident');
+    assert.match(pad.banner(), /未保存 · Not saved/, 'and the user is told — the thing that was missing in the incident');
     assert.equal(strokesOf(pad.disk()), 40, 'the last good file is frozen but intact');
     assert.ok(strokesOf(pad.nb) > 40, 'and nothing was dropped from the pad');
     assert.equal(fs.readdirSync(dir).length, 1, 'nothing was written to any second path either');

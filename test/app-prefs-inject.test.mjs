@@ -94,8 +94,8 @@ test('both A-/A+ pairs advertise the long-press reset, bilingually, from one sou
   // A long-press nobody knows about is not a feature. The buttons exist TWICE (main header and
   // app frame bar); the title is set in fsBind so four attributes cannot drift apart (R3).
   const SHELL = readShell(ROOT);
-  assert.match(SHELL, /const FS_RESET_HINT=' — long-press to reset · 长按恢复默认';/);
-  assert.match(SHELL, /function fsTitle\(d\)\{ return \(d<0\?'Smaller text · 缩小字号':'Larger text · 放大字号'\)\+FS_RESET_HINT; \}/);
+  assert.match(SHELL, /const FS_RESET_HINT=' — 长按恢复默认 · long-press to reset';/);
+  assert.match(SHELL, /function fsTitle\(d\)\{ return \(d<0\?'缩小字号 · Smaller text':'放大字号 · Larger text'\)\+FS_RESET_HINT; \}/);
   assert.match(SHELL, /b\.title=fsTitle\(d\);/);
   // The app's own A-/A+ (ADR 0032) get the same titles through prefs, not a copy.
   assert.match(SHELL, /fsTitles:\[fsTitle\(-1\),fsTitle\(1\)\]/);

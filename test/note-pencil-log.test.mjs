@@ -350,7 +350,7 @@ test('a refused or throwing save is SAID, never swallowed (R5)', async () => {
 test('the entry exists only when the host wired saveLog — and sits in the ink popover, not the toolbar', () => {
   const pad = runPad();
   assert.equal(pad.sendLogBtn._listeners('click').length, 0, 'no hook, no entry wired');
-  const markup = ENGINE.match(/\(opts\.saveLog\?'<button type="button" class="pan-photoopt pan-sendlog">[^\n]*Send Pencil log · 发送笔迹日志/);
+  const markup = ENGINE.match(/\(opts\.saveLog\?'<button type="button" class="pan-photoopt pan-sendlog">[^\n]*发送笔迹日志 · Send Pencil log/);
   assert.ok(markup, 'the button is rendered only behind opts.saveLog');
   const pop = ENGINE.indexOf("'<div class=\"pan-pop pan-inkpop\">'"), end = ENGINE.indexOf("'<div class=\"pan-pop pan-paperpop\">'");
   assert.ok(markup.index > pop && markup.index < end, 'inside the ink popover');

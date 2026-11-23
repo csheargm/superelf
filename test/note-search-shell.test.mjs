@@ -32,7 +32,7 @@ test('note-search relays to /api/note-search with the FRAME\'s slug and the enco
 });
 
 test('a server failure reaches the app with a code and a rendered sentence', async () => {
-  const S = await stand(() => ({ status: 500, body: { ok: false, error: 'search failed · 搜索失败', code: 'search_failed' } }));
+  const S = await stand(() => ({ status: 500, body: { ok: false, error: '搜索失败 · search failed', code: 'search_failed' } }));
   try {
     const B = loadShellBroker(S.base, { app: 'notes' });
     const r = await new Promise((done) => B.route({ id: 8, kind: 'note-search', q: 'x' }, done));
@@ -72,8 +72,8 @@ test('PANote.search goes through PAStore.ask and resolves an outcome, never a th
   assert.deepEqual(await S3.search('祷告'), { ok: true, hits: [{ ...HITS[0], boxes: [[0.1, 0.2, 0.5, 0.05]] }], truncated: false, pending: 0, ocr: '', reason: '', terms: ['祷告'] }, 'phase 3: hits keep their boxes, terms pass through as strings only');
   assert.deepEqual(await P.search('   '), { ok: true, hits: [] }, 'an empty query asks nothing');
   assert.equal(asked.length, 1);
-  const F = loadSearch({ ask: async () => ({ ok: false, code: 'server-error', text: 'Search failed · 搜索失败 (500)' }) });
-  assert.deepEqual(await F.search('x'), { ok: false, error: 'Search failed · 搜索失败 (500)', code: 'server-error' }, 'the shell\'s sentence is kept');
+  const F = loadSearch({ ask: async () => ({ ok: false, code: 'server-error', text: '搜索失败 (500) · Search failed' }) });
+  assert.deepEqual(await F.search('x'), { ok: false, error: '搜索失败 (500) · Search failed', code: 'server-error' }, 'the shell\'s sentence is kept');
   const N = loadSearch(undefined);
   const none = await N.search('x');
   assert.equal(none.ok, false); assert.equal(none.code, 'no-broker'); assert.equal(none.error, P.SEARCH_TXT.failed);
@@ -90,8 +90,8 @@ test('a reply to a superseded query is marked stale', async () => {
 
 test('the where-labels are exported once, bilingual, with phase 2\'s names reserved', () => {
   const P = loadSearch(undefined);
-  assert.deepEqual(P.SEARCH_TXT, { transcript: 'Transcript · 转写', tag: 'Tag 标签', typed: 'Text 文本', ink: 'Ink 手写', photo: 'Photo 图片', failed: 'Search unavailable · 搜索不可用', searching: 'Searching… 搜索中', more: 'Only the best matches are shown · 仅显示最相关的笔记',
-    pending: 'Transcribing {n} pages · 正在识别 {n} 页', noOcr: 'Handwriting search needs the Mac node · 手写搜索需要 Mac 节点', ocrFailed: 'Handwriting transcription failed on this node · 本机手写识别失败' });
+  assert.deepEqual(P.SEARCH_TXT, { transcript: '转写 · Transcript', tag: 'Tag 标签', typed: 'Text 文本', ink: 'Ink 手写', photo: 'Photo 图片', failed: '搜索不可用 · Search unavailable', searching: 'Searching… 搜索中', more: '仅显示最相关的笔记 · Only the best matches are shown',
+    pending: '正在识别 {n} 页 · Transcribing {n} pages', noOcr: '手写搜索需要 Mac 节点 · Handwriting search needs the Mac node', ocrFailed: '本机手写识别失败 · Handwriting transcription failed on this node' });
   assert.equal((ENGINE.match(/SEARCH_TXT=/g) || []).length, 1);
   assert.match(ENGINE, /\n    search:searchNotes, SEARCH_TXT,\n/, 'both on the PANote export');
   assert.ok(Object.isFrozen(P.SEARCH_TXT));

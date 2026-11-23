@@ -1,6 +1,6 @@
 // A signed-out demo visitor's AI request · 演示未登录的 AI 请求. The demo's AI gate (lib/demo-auth.mjs)
 // answers 401 {code: SIGNIN_CODE, error: DEMO_SIGNIN}; the shell's ONE failure mapper (web/index.html
-// RELAY-CORE, run here as served) must show that sentence — not "Signed out · 登录已过期" — and fire
+// RELAY-CORE, run here as served) must show that sentence — not "登录已过期 · Signed out" — and fire
 // SIGNIN_EVENT, which the demo boot (lib/demo-boot.mjs) answers by opening its sign-in popover.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -29,7 +29,7 @@ test('a demo sign-in refusal reads "sign in to use AI" and asks the demo to open
 test('CONTROL / owner node: a plain 401 is unchanged — "Signed out", no event', async () => {
   fired.length = 0;
   const f = R.relayFail(await R.relayHttpFail(reply(401, { error: 'bad token' })), 0, 'message');
-  assert.match(f.text, /Signed out · 登录已过期/);
+  assert.match(f.text, /登录已过期 · Signed out/);
   assert.deepEqual(fired, []);
 });
 

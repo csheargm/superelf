@@ -292,7 +292,7 @@ test('orphan bucket: a quote that vanished or a verse that is gone sits in the l
   v16.en.childNodes = [{ nodeType: 3, data: 'For God loved everyone so much' }]; I.render(); dom.flush();
   const b = dom.bucketEl();
   assert.ok(b && dom.container.children.at(-1) === b, 'the bucket is appended after the verses');
-  assert.equal(b.children[0].textContent, M.BUCKET_TXT); assert.match(M.BUCKET_TXT, /^Ink whose text changed · 经文已改动的笔迹$/, 'English then 中文');
+  assert.equal(b.children[0].textContent, M.BUCKET_TXT); assert.match(M.BUCKET_TXT, /^经文已改动的笔迹 · Ink whose text changed$/, '中文 then English');
   let pl = I.placements();
   assert.deepEqual(pl.map((p) => p.orphan), [false, true]);
   assert.deepEqual(pl[1].at, bucketAt(dom), 'the orphan draws at the bucket\'s first row, scale 1');

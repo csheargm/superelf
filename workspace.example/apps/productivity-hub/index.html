@@ -677,7 +677,7 @@ let state = {
 // new day schedules one) would replace the real file with them.
 const hubFile = PAStore.file('productivity-hub.json', {
   shape: d => (d && typeof d === 'object' && !Array.isArray(d)) ? '' : 'not a saved state',
-  unreadable: why => 'Data file unreadable · 数据文件无法读取 (' + why + ')',
+  unreadable: why => '数据文件无法读取 · Data file unreadable (' + why + ')',
 });
 function setStatus(text) { document.getElementById('status').textContent = text; }
 
@@ -828,7 +828,7 @@ async function armPomoAlarm() {
   // blocked, yet sound:true still rings), or not armed at all. Saying "alarm set" for the
   // middle case would overstate it; saying nothing for it would hide a blocked permission.
   setPomoNote(r && r.ok === false ? (r.text || r.error || 'Alarm not set.')
-    : (r && r.banner === false ? 'Alarm will ring, but notifications are blocked · 会响铃，但通知被阻止' : ''));
+    : (r && r.banner === false ? '会响铃，但通知被阻止 · Alarm will ring, but notifications are blocked' : ''));
 }
 function cancelPomoAlarm() { setPomoNote(''); return paNotifyCancel(POMO_TAG); }
 // Preview plays through the SHELL too — the same code path that will ring for real, so what
@@ -1210,16 +1210,16 @@ function importData() {
         const data = JSON.parse(text);
         // Checked BEFORE it touches the live state: a bad file must not be autosaved over the good one.
         if (!data || typeof data !== 'object' || Array.isArray(data) || ['tasks', 'notes'].some(k => k in data && !Array.isArray(data[k]))
-          || ('pomo' in data && (!data.pomo || typeof data.pomo !== 'object'))) { setDataMsg('Not a Productivity Hub file · 不是本应用的数据文件'); return; }
+          || ('pomo' in data && (!data.pomo || typeof data.pomo !== 'object'))) { setDataMsg('不是本应用的数据文件 · Not a Productivity Hub file'); return; }
         if (Array.isArray(data.tasks)) data.tasks = data.tasks.map(t => ({ ...t, id: Number(t && t.id) }));   // handlers look ids up as numbers
         if (data.pomo) data.pomo = { ...state.pomo, ...data.pomo, durations: { ...state.pomo.durations, ...(data.pomo.durations || {}) }, timer: { ...state.pomo.timer, ...(data.pomo.timer || {}) } };
         const prev = JSON.parse(JSON.stringify(state));
         Object.assign(state, data);
-        try { applyAll(); } catch (err) { Object.assign(state, prev); applyAll(); setDataMsg('Not a Productivity Hub file · 不是本应用的数据文件'); return; }   // restored: never autosaved
+        try { applyAll(); } catch (err) { Object.assign(state, prev); applyAll(); setDataMsg('不是本应用的数据文件 · Not a Productivity Hub file'); return; }   // restored: never autosaved
         // "Imported" only once it is saved; the status line says why when it is not.
-        saveState().then(ok => setDataMsg(ok ? 'Imported · 已导入' : 'Import not saved · 导入未保存'));
-      } catch(e) { setDataMsg('Invalid JSON file · JSON 文件无效'); }
-    }).catch(() => setDataMsg('Invalid JSON file · JSON 文件无效'));   // unreadable file: say so
+        saveState().then(ok => setDataMsg(ok ? '已导入 · Imported' : '导入未保存 · Import not saved'));
+      } catch(e) { setDataMsg('JSON 文件无效 · Invalid JSON file'); }
+    }).catch(() => setDataMsg('JSON 文件无效 · Invalid JSON file'));   // unreadable file: say so
   };
   inp.click();
 }
@@ -1231,7 +1231,7 @@ function importData() {
 // window.confirm() returns false at once in the app sandbox, so "Reset all data?" silently
 // cancelled every reset.
 const DELETE_ARM_MS = PATwoTap.MS;
-const RESET_ARMED_LABEL = 'Reset all data? · 清空所有数据?';
+const RESET_ARMED_LABEL = '清空所有数据? · Reset all data?';
 function resetAll(btn) {
   if (!PATwoTap.press(btn, { label: RESET_ARMED_LABEL, ms: DELETE_ARM_MS })) return;
   setDataMsg('');                 // an earlier "Imported" no longer describes the data

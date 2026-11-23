@@ -192,7 +192,7 @@ html.pas-open>body>*:not(.pas-rail):not(.pac-drawerhost):not(.pac-lb){margin-rig
     rail.setAttribute('role','complementary');
     if(o.label) rail.setAttribute('aria-label',o.label);
 
-    var vdiv=mkDiv('pas-vdiv','vertical','Resize panel · 调整面板宽度'); rail.appendChild(vdiv);
+    var vdiv=mkDiv('pas-vdiv','vertical','调整面板宽度 · Resize panel'); rail.appendChild(vdiv);
 
     var chrome={}, shut={}, host={}, api={}, headEl={}, slotEl={}, zoomEl={}, dockEl={}, titleEl={}, zone={}, hdivs=[], maxed=null;
     // Both zone containers are built BEFORE the slot loop, because that loop appends each slot
@@ -202,7 +202,7 @@ html.pas-open>body>*:not(.pas-rail):not(.pac-drawerhost):not(.pac-lb){margin-rig
     // pays nothing and pushes nothing.
     var dockb=document.createElement('div'); dockb.className='pas-dockb';
     dockb.setAttribute('role','complementary');
-    var bdiv=mkDiv('pas-bdiv','horizontal','Resize panel · 调整面板高度'); dockb.appendChild(bdiv);
+    var bdiv=mkDiv('pas-bdiv','horizontal','调整面板高度 · Resize panel'); dockb.appendChild(bdiv);
     var zoneEl={right:rail, bottom:dockb};
     var bh=clampB(o.bottomHeight!=null?o.bottomHeight:DEF_BH);
     // DELETED HERE (R1): an inline first-divider build guarded on `zone[sl.key]==='right'`, read
@@ -220,7 +220,7 @@ html.pas-open>body>*:not(.pas-rail):not(.pac-drawerhost):not(.pac-lb){margin-rig
       var htxt=document.createElement('span'); htxt.className='pas-head-t';
       htxt.textContent=sl.title||sl.key;
       var zoom=document.createElement('button'); zoom.className='pas-zoom'; zoom.type='button';
-      zoom.textContent='⤢'; zoom.setAttribute('aria-label',sl.zoomLabel||'Full screen · 全屏');
+      zoom.textContent='⤢'; zoom.setAttribute('aria-label',sl.zoomLabel||'全屏 · Full screen');
       // stopPropagation: the header itself toggles collapse, and a maximise that also collapsed
       // the thing it just enlarged would be a button that appears to do nothing.
       zoom.onclick=function(e){ e.stopPropagation(); toggleMax(sl.key); };
@@ -248,7 +248,7 @@ html.pas-open>body>*:not(.pas-rail):not(.pac-drawerhost):not(.pac-lb){margin-rig
     document.body.appendChild(dockb);
 
     function mkHDiv(key){
-      var d=mkDiv('pas-hdiv','horizontal','Resize section · 调整区域高度'); d.dataset.for=key; return d;
+      var d=mkDiv('pas-hdiv','horizontal','调整区域高度 · Resize section'); d.dataset.for=key; return d;
     }
 
     var floating=function(k){ return !!(chrome[k]&&chrome[k].isFloating()); };   // a floating slot is in no zone
@@ -497,7 +497,7 @@ html.pas-open>body>*:not(.pas-rail):not(.pac-drawerhost):not(.pac-lb){margin-rig
     function setDockLabel(key){
       var toBottom=zone[key]==='right';
       dockEl[key].textContent=toBottom?'⤓':'⤒';
-      dockEl[key].setAttribute('aria-label',toBottom?'Move to bottom · 移到下方':'Move to side · 移到右侧');
+      dockEl[key].setAttribute('aria-label',toBottom?'移到下方 · Move to bottom':'移到右侧 · Move to side');
     }
 
     // Declared BEFORE the mount loop on purpose: a slot's mount() receives this handle, and with

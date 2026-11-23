@@ -134,7 +134,7 @@ test('R14: a design refused for SAFETY is refused unchanged, though it is also o
     assert.equal(a.ok, false, what); assert.notEqual(a.over, true, `${what}: refused before the budget is read`);
     assert.deepEqual(S.simplify(design), a, `${what}: sanitize()’s own refusal, unchanged`);
     const r = await loadStudio(S).design(answer(design), 'x');
-    assert.deepEqual(r, { ok: false, convoId: 'c1', reason: 'Rejected · 已拒绝 — ' + a.reason }, `${what}: nothing drawable`);
+    assert.deepEqual(r, { ok: false, convoId: 'c1', reason: '已拒绝 · Rejected — ' + a.reason }, `${what}: nothing drawable`);
   }
   for (const [what, design] of Object.entries(OTHER)) assert.deepEqual(S.simplify(design), S.sanitize(design), what);
 });
@@ -148,13 +148,13 @@ test('nothing fits: the plain message, not "Rejected", and nothing to draw', asy
 });
 
 // R13 round 1: the catch returned the refusal WITH `over`, and the studio shows an `over` result plain — so the person read
-// the English-only cost reason, with no Chinese. Now the reason comes back without the flag, after "Rejected · 已拒绝".
+// the English-only cost reason, with no Chinese. Now the reason comes back without the flag, after "已拒绝 · Rejected".
 const THROWS = (s) => s.replace("run:flatten}", "run:()=>{ throw new Error('boom'); }}");
-test('simplify never throws (R5): a step that throws leaves sanitize()’s own reason, shown after "Rejected · 已拒绝"', async () => {
+test('simplify never throws (R5): a step that throws leaves sanitize()’s own reason, shown after "已拒绝 · Rejected"', async () => {
   const S = loadStill({ mutate: THROWS }), design = svg(LAYERS), a = S.sanitize(design);
   assert.equal(a.over, true);
   assert.deepEqual(S.simplify(design), { ok: false, reason: a.reason, cost: a.cost }, 'no `over`: that flag means "nothing fits"');
-  assert.deepEqual(await loadStudio(S).design(answer(design), 'x'), { ok: false, convoId: 'c1', reason: 'Rejected · 已拒绝 — ' + a.reason });
+  assert.deepEqual(await loadStudio(S).design(answer(design), 'x'), { ok: false, convoId: 'c1', reason: '已拒绝 · Rejected — ' + a.reason });
 });
 
 // ── The user flow (R6): the picker, its studio and the engine, as PANote mounts them for the Journal ────────

@@ -39,7 +39,7 @@ test('family: the second tap on Delete removes the member and saves', async () =
     app.run('deleteMember()');
     await settle();
     assert.equal(writesTo(h, FAMILY_FILE), 0, 'one tap only asks — nothing is written');
-    assert.equal(btn.textContent, 'Delete? · 删除?');
+    assert.equal(btn.textContent, '删除? · Delete?');
     app.run('deleteMember()');
     await until(() => readJson(h.file(FAMILY_FILE)).members.length === 1, 'the delete is saved');
     assert.deepEqual(readJson(h.file(FAMILY_FILE)).members.map((m) => m.id), ['b']);
@@ -96,7 +96,7 @@ for (const dir of ['workspace/apps', 'shared-apps']) {
       // save from boot, which is a legitimate write of the same tasks.
       assert.equal(app.run('state.tasks.length'), 1, 'two taps 3 s apart are two first taps — nothing is wiped');
       assert.equal(readJson(h.file(HUB_FILE)).tasks.length, 1);
-      assert.equal(btn.textContent, 'Reset all data? · 清空所有数据?');
+      assert.equal(btn.textContent, dir === 'shared-apps' ? 'Reset all data? · 清空所有数据?' : '清空所有数据? · Reset all data?');   // shared-apps: the shelf snapshot, until promoted
       tap();
       await until(() => readJson(h.file(HUB_FILE)).tasks.length === 0, 'the reset is saved');
       assert.equal(btn.textContent, 'Reset all data');
@@ -110,10 +110,10 @@ for (const dir of ['workspace/apps', 'shared-apps']) {
     try {
       const app = await bootHub(h);
       await pickFile(app, '{not json');
-      assert.equal(app.els['data-msg'].textContent, 'Invalid JSON file · JSON 文件无效');
+      assert.equal(app.els['data-msg'].textContent, dir === 'shared-apps' ? 'Invalid JSON file · JSON 文件无效' : 'JSON 文件无效 · Invalid JSON file');
       assert.equal(writesTo(h, HUB_FILE), 0, 'a bad file writes nothing');
       await pickFile(app, JSON.stringify({ tasks: [{ id: 7, text: 'Imported task', done: false }] }));
-      await until(() => app.els['data-msg'].textContent === 'Imported · 已导入', '"Imported" once the import is saved');
+      await until(() => app.els['data-msg'].textContent === (dir === 'shared-apps' ? 'Imported · 已导入' : '已导入 · Imported'), '"Imported" once the import is saved');
       await until(() => readJson(h.file(HUB_FILE)).tasks[0]?.id === 7, 'the import is saved');
       const btn = Object.assign(el('reset'), { textContent: 'Reset all data' });
       app.run('resetAll')(btn); app.run('resetAll')(btn);

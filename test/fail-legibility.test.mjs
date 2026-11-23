@@ -106,7 +106,7 @@ test('CONTROL: the PRE-FIX surface collapses every failure class to ONE string �
     { ok: false, code: 'network' },
     { ok: false, code: 'server-error', status: 500 },
     { ok: false, code: 'not-found', status: 404 },
-    { ok: false, code: 'bad-request', status: 400, error: 'invalid base64 data · 无效的 base64 数据' },
+    { ok: false, code: 'bad-request', status: 400, error: '无效的 base64 数据 · invalid base64 data' },
   ];
   const pre = new Set(classes.map(preFix));
   assert.equal(pre.size, 1, 'the pre-fix surface really is one indistinguishable sentence');
@@ -142,9 +142,9 @@ test('(e) an oversized PHOTO reads as a photo, with the cap — end to end over 
     const f = await R.relayHttpFail(res);                    // the SHIPPED broker mapping
     assert.equal(f.code, 'too-large');
     const shown = shownFor(f, R.relayBodyBytes(body), 'IMG_0001.HEIC');
-    assert.match(shown, /Photo too large · 照片过大/, 'the noun is PHOTO — not "File", and certainly not "Upload failed"');
+    assert.match(shown, /照片过大 · Photo too large/, 'the noun is PHOTO — not "File", and certainly not "Upload failed"');
     assert.match(shown, new RegExp(`max ${humanBytes(BODY_LIMITS.upload)}`), 'the cap is named in the sentence');
-    assert.match(shown, /sent · 已发送/, 'and so is what was actually sent');
+    assert.match(shown, /已发送 \S+ \S+ · \S+ \S+ sent/, 'and so is what was actually sent');
     assert.match(shown, /请选择更小的照片或裁剪后重试/, 'it says what to DO, bilingually');
   });
 });
@@ -167,14 +167,14 @@ const E = loadEngine();
 
 test('(e) the PAD refuses an oversized photo in the SHELL\'s own words, and names the cap', () => {
   const shown = E.PHOTO_TXT.big(E.UPLOAD_MAX_BYTES) + E.PHOTO_TXT.bigAct;
-  assert.match(shown, /Photo too large · 照片过大/, 'the same sentence the shell produces — one dialect, not two');
+  assert.match(shown, /照片过大 · Photo too large/, 'the same sentence the shell produces — one dialect, not two');
   assert.equal(E.PHOTO_TXT.big(E.UPLOAD_MAX_BYTES).startsWith(R.RELAY_NOUNS.photo.head), true,
     `the pad's heading IS the shell's heading (${R.RELAY_NOUNS.photo.head})`);
   assert.match(shown, /\(max \d+(\.\d+)? MB\)/, 'and it states the CAP: ' + shown);
   assert.match(shown, /请选择更小的照片或裁剪后重试/, 'with the action, bilingually');
   // THE PRE-FIX SURFACE, reproduced so the assertions above have teeth (R14): it named the photo's
   // size, in a second dialect, and never said what would fit.
-  const preFix = 'Photo too large · 图片过大 — pick a smaller one 请选择较小的图片' + ' (12MB)';
+  const preFix = '图片过大 · Photo too large — pick a smaller one 请选择较小的图片' + ' (12MB)';
   assert.doesNotMatch(preFix, /max /, 'the pre-fix message named no cap…');
   assert.notEqual(preFix.split(' —')[0], R.RELAY_NOUNS.photo.head, '…and did not match the shell');
 });
@@ -204,7 +204,7 @@ test('(e) the apps forward the SHELL\'s rendered sentence, not the raw server er
   const entries = Object.entries(APP_SRC);
   assert.ok(entries.length >= 2, 'CONTROL: there are app sources to check, so this cannot pass empty');
   for (const [rel, src] of entries) {
-    assert.match(src, /const why=\(r&&\(r\.text\|\|r\.error\)\)\|\|'upload rejected · 上传被拒绝';/,
+    assert.match(src, /const why=\(r&&\(r\.text\|\|r\.error\)\)\|\|'上传被拒绝 · upload rejected';/,
       `${rel}: the photo failure prefers the shell's rendered sentence`);
     assert.ok(!/Number\.isFinite\(r\.limit\)\)\?' \('\+Math\.round\(r\.limit\/1048576\)\+'MB max\)'/.test(src),
       `${rel}: and no longer re-renders the cap in a dialect of its own (R3)`);
@@ -213,9 +213,9 @@ test('(e) the apps forward the SHELL\'s rendered sentence, not the raw server er
 
 test('(e) the SAME route with a non-image filename says "File", from ONE inference point', () => {
   const f = { ok: false, code: 'too-large', status: 413, limit: BODY_LIMITS.upload };
-  assert.match(shownFor(f, 4096, 'notes.pdf'), /File too large · 文件过大/);
-  assert.match(shownFor(f, 4096, 'photo.jpeg'), /Photo too large · 照片过大/);
-  assert.match(shownFor(f, 4096, 'scan.HEIF'), /Photo too large · 照片过大/, 'case-insensitive, and HEIF counts');
+  assert.match(shownFor(f, 4096, 'notes.pdf'), /文件过大 · File too large/);
+  assert.match(shownFor(f, 4096, 'photo.jpeg'), /照片过大 · Photo too large/);
+  assert.match(shownFor(f, 4096, 'scan.HEIF'), /照片过大 · Photo too large/, 'case-insensitive, and HEIF counts');
   assert.equal(R.relayWhatForFile('a.webp'), 'photo');
   assert.equal(R.relayWhatForFile('a.zip'), 'file');
   assert.equal(R.relayWhatForFile(''), 'file', 'a missing name degrades to the neutral noun, never to a wrong one');
@@ -231,8 +231,8 @@ test('(e) a 401 on the upload route reads NOTHING like a size rejection — real
     const f = await R.relayHttpFail(res);
     assert.equal(f.code, 'unauthorized');
     const shown = shownFor(f, 512, 'IMG_0001.jpg');
-    assert.match(shown, /Signed out · 登录已过期/);
-    assert.match(shown, /Photo not uploaded · 未上传/, 'it says what happened to the photo — the user knows it is still on their device');
+    assert.match(shown, /登录已过期 · Signed out/);
+    assert.match(shown, /未上传 · Photo not uploaded/, 'it says what happened to the photo — the user knows it is still on their device');
     assert.doesNotMatch(shown, /too large|过大|max /, 'and never suggests the photo was too big');
   });
 });
@@ -245,8 +245,8 @@ test('(e) a dropped connection says the photo never left the device — distinct
     assert.ok(f, 'the socket really was destroyed with no answer');
     assert.equal(f.code, 'network');
     const shown = shownFor(f, 1024, 'IMG_0001.jpg');
-    assert.match(shown, /Connection failed · 连接失败/);
-    assert.match(shown, /never left this device · 未发出/, 'the honest statement: nothing was uploaded');
+    assert.match(shown, /连接失败 · Connection failed/);
+    assert.match(shown, /未发出 · it never left this device/, 'the honest statement: nothing was uploaded');
     assert.doesNotMatch(shown, /过大|max /);
   });
 });
@@ -258,8 +258,8 @@ test('(e) the seven failure classes of ONE upload are seven different bilingual 
     network: { ok: false, code: 'network' },
     'server-error': { ok: false, code: 'server-error', status: 500 },
     'not-found': { ok: false, code: 'not-found', status: 404 },
-    'bad-request': { ok: false, code: 'bad-request', status: 400, error: 'invalid base64 data · 无效的 base64 数据' },
-    'relay-error': { ok: false, code: 'relay-error', error: 'could not decode the attachment · 附件解码失败' },
+    'bad-request': { ok: false, code: 'bad-request', status: 400, error: '无效的 base64 数据 · invalid base64 data' },
+    'relay-error': { ok: false, code: 'relay-error', error: '附件解码失败 · could not decode the attachment' },
   };
   const seen = new Map();
   for (const [name, f] of Object.entries(classes)) {
@@ -281,16 +281,16 @@ test('(e) a failed READ never claims something was "not saved" — the wrong sid
   // same category of lie the incident was made of: a sentence that describes the opposite
   // of what happened sends them to fix the wrong thing.
   const f = { ok: false, code: 'unauthorized', status: 401 };
-  assert.match(R.relayText(f, 0, 'content'), /not loaded · 未加载/);
+  assert.match(R.relayText(f, 0, 'content'), /内容未加载 · Content not loaded/);
   assert.doesNotMatch(R.relayText(f, 0, 'content'), /未保存/);
-  assert.match(R.relayText(f, 0, 'note'), /not saved · 未保存/, 'a failed WRITE does say "not saved"');
-  assert.match(R.relayText(f, 0, 'photo'), /not uploaded · 未上传/);
-  assert.match(R.relayText(f, 0, 'message'), /not sent · 未发送/);
+  assert.match(R.relayText(f, 0, 'note'), /笔记未保存 · Note not saved/, 'a failed WRITE does say "not saved"');
+  assert.match(R.relayText(f, 0, 'photo'), /照片未上传 · Photo not uploaded/);
+  assert.match(R.relayText(f, 0, 'message'), /消息未发送 · Message not sent/);
   // …and the broker picks the read noun for read kinds, the payload noun for writes.
   const broker = codeOnly(SHELL.slice(SHELL.indexOf('/* ── Broker (for sandboxed apps) ── */'), SHELL.indexOf('/* ── Chat log helpers ── */')));
   assert.match(broker, /m\.kind==='save-data'\?'note':'content'/, 'reads fall through to the read noun, not to a write noun');
   // Even the shell's own pre-request refusals are bilingual — an app cannot act on 'bad path'.
-  assert.match(codeOnly(SHELL), /error:'bad path · 路径无效'/);
+  assert.match(codeOnly(SHELL), /error:'路径无效 · bad path'/);
 });
 
 /* ════════════════════════════════════════════════════════════════════════════════════════
@@ -364,7 +364,7 @@ test('R3 source pin: the shell\'s own chrome answers through the mapper too, not
   const chrome = codeOnly(SHELL);
   // These four write paths used to print one house sentence for a 413, a 401 and a dead
   // socket — and two of them threw on a text/plain 4xx, showing the user nothing at all.
-  assert.equal(/'Save failed · 保存失败'/.test(chrome), false, 'the settings sentence that hid the code is gone');
+  assert.equal(/'保存失败 · Save failed'/.test(chrome), false, 'the settings sentence that hid the code is gone');
   assert.equal(/\|\|'Fork failed'/.test(chrome), false, 'and the fork one');
   assert.equal(/\|\|'Failed\.'/.test(chrome), false, 'and the sign-in one');
   assert.ok(chrome.split('relayJson(').length - 1 >= 6, 'every one of those call sites goes through relayJson');
@@ -375,7 +375,7 @@ test('R3 source pin: the shell\'s own chrome answers through the mapper too, not
 // the same helper block, so it is the shipped arrow, not a retyped copy.
 function loadFailText() {
   const from = COMPONENT.indexOf('    failText:(reply,o)=>');
-  const endMark = "'Request failed · 请求失败 — no reason given · 未给出原因'; },";
+  const endMark = "'请求失败 · Request failed — 未给出原因 · no reason given'; },";
   const to = COMPONENT.indexOf(endMark);
   assert.ok(from > 0 && to > from, 'PAChat.failText must stay one findable expression');
   const helpersFrom = COMPONENT.indexOf('  const PAC_LIMITS=');
@@ -390,15 +390,15 @@ test('(e) the seam other components use: PAChat.failText never answers a generic
   // 1. The shell already rendered the sentence — it wins, so every surface says the same thing.
   const fromShell = R.relayFail({ ok: false, code: 'unauthorized', status: 401 }, 0, 'photo');
   assert.equal(failText(fromShell, { what: 'Photo' }), fromShell.text);
-  assert.match(failText(fromShell, { what: 'Photo' }), /Signed out · 登录已过期/);
+  assert.match(failText(fromShell, { what: 'Photo' }), /登录已过期 · Signed out/);
   // 2. A shell that forwarded only the bare 413 code still gets the size sentence, with the cap.
   const bare = { ok: false, code: CODE_TOO_LARGE, status: 413, limit: BODY_LIMITS.upload };
   const sized = failText(bare, { what: 'Photo', bytes: 24 * 1024 * 1024 });
-  assert.match(sized, /Photo too large · 照片过大/);
+  assert.match(sized, /照片过大 · Photo too large/);
   assert.match(sized, new RegExp(`max ${humanBytes(BODY_LIMITS.upload)}`));
   // 3. Even a reply with nothing usable is bilingual and says a reason is missing — never "failed".
-  assert.match(failText({ ok: false }, {}), /Request failed · 请求失败/);
-  assert.match(failText({ ok: false }, {}), /no reason given · 未给出原因/);
+  assert.match(failText({ ok: false }, {}), /请求失败 · Request failed/);
+  assert.match(failText({ ok: false }, {}), /未给出原因 · no reason given/);
   // …and the caps it publishes are the caps the server enforces.
   assert.match(COMPONENT, /limits:Object\.freeze\(\{\.\.\.PAC_LIMITS\}\)/, 'the exposed caps are the pinned constant, copied so an app cannot raise it');
   assert.equal(C.PAC_LIMITS.upload, BODY_LIMITS.upload);
@@ -406,7 +406,7 @@ test('(e) the seam other components use: PAChat.failText never answers a generic
 });
 
 test('(2) an oversized meal photo is a 413 with the code, the cap and a sentence — not an uncoded 400', async () => {
-  // ROUND-3 LEFTOVER: lib/meals.mjs answered `photo too large · 照片过大` with NO code, NO
+  // ROUND-3 LEFTOVER: lib/meals.mjs answered `照片过大 · photo too large` with NO code, NO
   // limit and HTTP 400 — to any client that is indistinguishable from "that file is not an
   // image". Real server, real route, real photo guard, throwaway workspace.
   await withWeb(async ({ port, root }) => {
@@ -418,7 +418,7 @@ test('(2) an oversized meal photo is a 413 with the code, the cap and a sentence
     const j = await res.json();
     assert.equal(j.code, CODE_TOO_LARGE, 'the same code as every other route (R3)');
     assert.equal(j.limit, MAX_PHOTO_BYTES, 'with the photo cap — which is NOT the body cap');
-    assert.match(j.error, /Photo too large · 照片过大/);
+    assert.match(j.error, /Photo too large · 照片过大/);   // lib/meals.mjs: server text, outside the 中文-first UI sweep
     assert.match(j.error, new RegExp(`max ${humanBytes(MAX_PHOTO_BYTES)}`));
     assert.equal(fs.existsSync(path.join(root, 'workspace', 'uploads')), false, 'nothing stored for a refused photo');
 
@@ -541,7 +541,7 @@ test('(3) a poll that fails is CLASSIFIED, never swallowed — R5', async () => 
   H.poll('c1', 1000, H.el, null, () => {});
   await H.tick();
   assert.equal(H.alive(), false, 'an expired session is terminal — retrying it 45 times is a lie');
-  assert.match(H.el.textContent, /Signed out · 登录已过期/, 'and it says so, in the ONE mapper\'s words');
+  assert.match(H.el.textContent, /登录已过期 · Signed out/, 'and it says so, in the ONE mapper\'s words');
   assert.equal(H.el.className, 'msg err');
 
   // A transient network failure is NOT terminal: the laptop may still be finishing the run.

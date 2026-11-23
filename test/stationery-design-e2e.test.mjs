@@ -1,4 +1,4 @@
-// The Journal's "Design with AI · AI设计", END TO END through every part the 2026-10-12 fix touched:
+// The Journal's "AI设计 · Design with AI", END TO END through every part the 2026-10-12 fix touched:
 //   picker (Design / Cancel · 取消) → studio → PAChat.complete (chat-ui) → the shell's broker relay
 //   → the REAL web.mjs → `claude`.
 //
@@ -27,7 +27,7 @@ import { mountStudio, loadComplete, svg } from './helpers-stationery.mjs';
 import { loadShellBroker } from './helpers-shell-broker.mjs';
 
 const GOOD = svg('<rect width="816" height="1056" fill="#fffaf2"/><circle cx="60" cy="60" r="30" fill="#f2b8c6"/>');
-const CANCELLED = 'Cancelled · 已取消';
+const CANCELLED = '已取消 · Cancelled';
 const THINKING_OFF = JSON.stringify({ alwaysThinkingEnabled: false });
 const SLOW = { timeoutMs: 15000 };   // a fresh node start for the fake can take seconds on a loaded machine
 

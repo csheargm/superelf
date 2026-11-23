@@ -2,7 +2,7 @@
      docs/plans/note-features.md F, ADR 0025). Inlined by web.mjs into any page carrying the
      PA_SUMMARY_REFS_UI marker: drawer-summary carries it ABOVE its own script, so every drawer that
      summarises has it with no app code. Split out of PADrawerSummary (R4): that file builds the turn,
-     this one owns (1) the numbering of the notes in a turn and their `Important · 重点` block, (2) the
+     this one owns (1) the numbering of the notes in a turn and their `重点 · Important` block, (2) the
      refs a turn leaves behind — [n] → {id, page} — remembered per summary scope for the session, (3) the
      note-link scheme `?note=<id>&page=<p>` (relative: it names a note of THIS app, never a way out of it;
      PANote's sanitizer keeps exactly this shape through parseLink), (4) linkifyHtml, which turns a
@@ -15,7 +15,7 @@
      Owner 2026-11-11: a link reads `[2] Roof · 2026-11-09` (label: the note's title, 40 chars, and its day — left
      out when the title already says that date, `New Note 新笔记 · 11/10 10:28`, or is a summary's period title),
      so the reader knows what it names; the host's onLink leaves the rail alone and the BACK PILL
-     (`← Back to summary · 返回总结`, one fixed element this file owns) returns to the summary note the
+     (`← 返回总结 · Back to summary`, one fixed element this file owns) returns to the summary note the
      tapped link came from — the note decorate saved for that scope (noteSaved), else the last one saved.
      Driven for real by test/summary-refs.test.mjs and test/drawer-summary.test.mjs. -->
 <style id="psr-style">
@@ -25,7 +25,7 @@
 <script id="psr-script">
 (function(){
   if(window.PASummaryRefs) return;
-  const TXT=Object.freeze({ important:'Important · 重点', back:'← Back to summary · 返回总结' });   // the block's heading (section adds the colon) and the prompt's name for the marked points; the pill
+  const TXT=Object.freeze({ important:'重点 · Important', back:'← 返回总结 · Back to summary' });   // the block's heading (section adds the colon) and the prompt's name for the marked points; the pill
   const TITLE_MAX=40;   // a link's label keeps this much of the note's title
   // ── The note-link scheme (ADR 0025) ── the ONE spelling, parsed by the same regexp everywhere.
   const NOTE_LINK_RE=/^\?note=([^&#\s]+)&page=(\d{1,4})$/;

@@ -4,11 +4,11 @@
     <label>Name<br><input id="pName" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></label>
     <label>About you (the assistant reads this)<br><textarea id="pAbout" rows="2" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></textarea></label>
     <label>Reply style — how should the assistant talk to you?<br><input id="pPrefs" placeholder="Short and plain, no preamble · bullet points · be direct" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></label>
-    <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:14px"><input type="checkbox" id="pAutoUpdate"> Auto-update shared apps · 自动更新共享应用</label>
+    <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:14px"><input type="checkbox" id="pAutoUpdate"> 自动更新共享应用 · Auto-update shared apps</label>
     <div id="pAge" style="color:var(--muted);font-size:13px;margin-bottom:10px"></div>
-    <label id="pBriefWrap">简报邮箱 · Briefing email<br><input id="pBriefEmail" type="email" autocomplete="email" placeholder="blank = off · 留空则不发送" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></label>
-    <label>简报保留天数 · Briefing history (days · 天, default 30)<br><input id="pRetainDays" type="number" min="1" max="3650" placeholder="30" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></label>
-    <label id="pZipWrap">邮编 · Postcode (for local data like pollen 用于花粉等本地数据)<br><input id="pPostcode" placeholder="blank = ask each time · 留空则每次询问" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></label>
+    <label id="pBriefWrap">简报邮箱 · Briefing email<br><input id="pBriefEmail" type="email" autocomplete="email" placeholder="留空则不发送 · blank = off" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></label>
+    <label>简报保留天数（天，默认 30） · Briefing history (days, default 30)<br><input id="pRetainDays" type="number" min="1" max="3650" placeholder="30" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></label>
+    <label id="pZipWrap">邮编 · Postcode (for local data like pollen 用于花粉等本地数据)<br><input id="pPostcode" placeholder="留空则每次询问 · blank = ask each time" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></label>
     <details id="advWrap" style="border:1px solid var(--line);border-radius:8px;padding:0 10px;margin:2px 0 10px">
       <summary style="cursor:pointer;padding:9px 0;color:var(--muted);font-size:13px">Advanced · AI system prompts</summary>
       <div style="padding:2px 0 10px">
@@ -19,29 +19,29 @@
       </div>
     </details>
     <details id="healthWrap" style="border:1px solid var(--line);border-radius:8px;padding:0 10px;margin:2px 0 10px">
-      <summary style="cursor:pointer;padding:9px 0;color:var(--muted);font-size:13px">Health setup · 健康接入</summary>
+      <summary style="cursor:pointer;padding:9px 0;color:var(--muted);font-size:13px">健康接入 · Health setup</summary>
       <div style="padding:2px 0 10px">
-        <div style="color:var(--muted);font-size:12px;margin-bottom:8px">Open this page ON YOUR IPHONE and copy — then paste into the health-upload Shortcut you build. The phone must be on Tailscale (the upload needs it anyway). · 在 iPhone 上打开本页并复制，粘贴到你自建的健康上传快捷指令；手机需连接 Tailscale。</div>
+        <div style="color:var(--muted);font-size:12px;margin-bottom:8px">在 iPhone 上打开本页并复制，粘贴到你自建的健康上传快捷指令；手机需连接 Tailscale。 · Open this page ON YOUR IPHONE and copy — then paste into the health-upload Shortcut you build. The phone must be on Tailscale (the upload needs it anyway).</div>
         <div id="healthSetupTxt" style="font-size:12px;word-break:break-all;margin-top:8px;color:var(--text)"></div>
       </div>
     </details>
     <details id="agentMailWrap" style="display:none;border:1px solid var(--line);border-radius:8px;padding:0 10px;margin:2px 0 10px">
-      <summary style="cursor:pointer;padding:9px 0;color:var(--muted);font-size:13px">Agent email · 管家邮箱</summary>
+      <summary style="cursor:pointer;padding:9px 0;color:var(--muted);font-size:13px">管家邮箱 · Agent email</summary>
       <div style="padding:2px 0 10px">
         <div style="color:var(--muted);font-size:12px;margin-bottom:8px">The agent's own address — briefings and reminders are emailed from it. · 管家自己的邮箱地址，简报和提醒由它发出。</div>
         <div id="agentAddr" style="font-size:13px;word-break:break-all;color:var(--text)"></div>
       </div>
     </details>
     <details id="jobsWrap" style="border:1px solid var(--line);border-radius:8px;padding:0 10px;margin:2px 0 10px">
-      <summary style="cursor:pointer;padding:9px 0;color:var(--muted);font-size:13px">Jobs · 任务</summary>
-      <div id="jobsList" style="padding:2px 0 10px;font-size:13px">Loading · 加载中…</div>
-      <div style="padding:0 0 10px"><button type="button" class="plain" id="jobNew" style="font-size:12px;padding:4px 10px">+ New job · 新建任务</button></div>
+      <summary style="cursor:pointer;padding:9px 0;color:var(--muted);font-size:13px">任务 · Jobs</summary>
+      <div id="jobsList" style="padding:2px 0 10px;font-size:13px">加载中… · Loading</div>
+      <div style="padding:0 0 10px"><button type="button" class="plain" id="jobNew" style="font-size:12px;padding:4px 10px">新建任务 · + New job</button></div>
       <div id="jobEdit" style="display:none;padding:0 0 12px;font-size:13px"></div>
       <div id="jobRunOut" style="display:none;font-size:13px"></div>
     </details>
     <details id="nodeCfgWrap" style="display:none;border:1px solid var(--line);border-radius:8px;padding:0 10px;margin:2px 0 10px">
-      <summary style="cursor:pointer;padding:9px 0;color:var(--muted);font-size:13px">Node settings · 节点设置</summary>
-      <div id="nodeCfgList" style="padding:2px 0 10px;font-size:13px">Loading · 加载中…</div>
+      <summary style="cursor:pointer;padding:9px 0;color:var(--muted);font-size:13px">节点设置 · Node settings</summary>
+      <div id="nodeCfgList" style="padding:2px 0 10px;font-size:13px">加载中… · Loading</div>
     </details>
     <div id="family" style="display:none;border-top:1px solid var(--line);padding-top:12px;margin-top:6px"></div>
     <div id="shelf" style="display:none;border-top:1px solid var(--line);padding-top:12px;margin-top:6px"></div>

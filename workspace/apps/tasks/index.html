@@ -62,8 +62,8 @@ function setStatus(msg){ document.getElementById('status').textContent=msg; }
 const tasksFile=PAStore.file('tasks.md',{
   parse:(text)=>text,
   shape:(d)=>(typeof d==='string'?'':'no text'),
-  unreadable:(why)=>'Tasks unreadable · 任务无法读取 ('+why+')',
-  failed:(text)=>'Could not load tasks · 任务未能读取: '+text,
+  unreadable:(why)=>'任务无法读取 · Tasks unreadable ('+why+')',
+  failed:(text)=>'任务未能读取 · Could not load tasks: '+text,
 });
 
 function parseLines(src){

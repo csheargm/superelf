@@ -257,7 +257,7 @@ test('a failed LOAD forgets the last confirmed bytes — the next write is never
     await pad.guard.flush();
     assert.equal(pad.saves(), 1);
 
-    pad.guard.lock('read failed · 读取失败', 'load_failed');  // the store could not be read
+    pad.guard.lock('读取失败 · read failed', 'load_failed');  // the store could not be read
     pad.guard.seed(pad.st.nb, true);                         // …then a retry succeeded
     pad.guard.touch();
     assert.deepEqual(await pad.guard.flush(), { ok: true }, 'written, because nothing may be assumed durable across a lock');

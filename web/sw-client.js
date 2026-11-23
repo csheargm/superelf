@@ -20,7 +20,7 @@ const SW_OFFLINE_CONFIG_URL='/api/offline-config';   // lib/offline.mjs OFFLINE_
 const SW_ROUTE_SRC='src', SW_ROUTE_SRCDOC='srcdoc';
 const SW_UID_KEY='pa_uid';                   // localStorage: who signed in last, for a boot with no node (ensureToken)
 const SW_APPS_KEY='pa_apps';                 // localStorage: the app list from the last online load (loadApps)
-const SW_OPEN_FAILED_TXT='Could not open · 无法打开';
+const SW_OPEN_FAILED_TXT='无法打开 · Could not open';
 const swAppUrl=(uid,slug)=>`/app/${encodeURIComponent(uid)}/${encodeURIComponent(slug)}/`;
 // The build id inside the footer line '<app name> · v<semver>+N · <build>' (web/update.js reads the same line).
 const swBuildOf=(footer)=>{ const m=String(footer||'').match(/\bv\d[^ ]* · (.+)$/); return m?m[1].trim():''; };
@@ -72,7 +72,7 @@ async function swPrefetch(d,ctx,uid){
   for(let b=1;b<=counts.length;b++) for(let c=1;c<=counts[b-1];c++){
     try{ bytes+=await d.fetchBytes(swBibleUrl(b,c)); }
     catch(err){ status.error=String(err&&err.message||err); return status.bible='failed'; }
-    if(bytes>cfg.bible_cap_bytes){ status.error='Bible prefetch stopped at the byte cap · 圣经预取已达字节上限'; return status.bible='capped'; }
+    if(bytes>cfg.bible_cap_bytes){ status.error='圣经预取已达字节上限 · Bible prefetch stopped at the byte cap'; return status.bible='capped'; }
   }
   const w=ctx.worker(); if(w) w.postMessage({kind:SW_BIBLE_DONE_KIND,bytes});
   return status.bible='done';

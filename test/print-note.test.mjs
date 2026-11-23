@@ -348,7 +348,7 @@ test('ink that would vanish on white is reported, not silently dropped', () => {
   assert.match(E, /lightInk:\(p\.strokes\|\|\[\]\)\.filter\(st=>inkLum\(st\.c\)>LIGHT_INK\)\.length/, 'and counts it per page');
   // Only a problem on white: against the note's own tint those strokes read fine.
   assert.match(P, /if\(paper&&pg\.lightInk\) warn\.lightInk=true;/, 'reported only when printing on white');
-  assert.match(P, /lightInk:'Very light ink will not show on white paper · 浅色墨迹在白纸上看不见'/, 'bilingual, like every other message');
+  assert.match(P, /lightInk:'浅色墨迹在白纸上看不见 · Very light ink will not show on white paper'/, 'bilingual, like every other message');
 });
 
 test('the print setting is a device preference that defaults ON', () => {

@@ -26,7 +26,7 @@ test('it reads as a switch: it says what it will DO, and carries the state it ac
   // A control labelled with the current state instead of the next action is the classic
   // ambiguity — "Off" next to a job that is already off is unreadable.
   assert.match(SHELL, /data-on="\$\{r\.paused\?'1':'0'\}"/, 'the row hands the handler the state');
-  assert.match(SHELL, /\$\{r\.paused\?'On · 开启':'Off · 关闭'\}/, 'and the label is the action, not the state');
+  assert.match(SHELL, /\$\{r\.paused\?'开启 · On':'关闭 · Off'\}/, 'and the label is the action, not the state');
 });
 
 test('the switch sends the one field the server accepts for a built-in', () => {
@@ -43,7 +43,7 @@ test('a refusal shows the SERVER\'s sentence', () => {
   // would flatten them and leave the user guessing (R5).
   const fn = /const tb=e\.target\.closest\('\[data-togglejob\]'\);[\s\S]*?\n  \}/.exec(SHELL);
   assert.match(fn[0], /\(await r\.json\(\)\)\.error/, 'the reason is read off the response');
-  assert.match(fn[0], /alert\(m\|\|'Could not change that job · 无法更改该任务'\)/, 'with a fallback only when there is none');
+  assert.match(fn[0], /alert\(m\|\|'无法更改该任务 · Could not change that job'\)/, 'with a fallback only when there is none');
   assert.match(fn[0], /tb\.disabled=true;/, 'and the button cannot be double-fired while in flight');
 });
 

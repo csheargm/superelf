@@ -35,12 +35,12 @@ test('both sides changed the same page: the later updated wins, the loser is app
   assert.equal(copy.updated, 35, 'the copy keeps the loser\'s stamp');
   const title = mergeTitle(OFF_FROM_REMOTE, 35);
   assert.equal(copy.pageHtml, `<p><b>${title}</b></p><p>theirs <b>&</b></p>`, 'headed, then the loser\'s own text untouched');
-  assert.match(title, /^Conflict copy · 冲突副本 \(home node · 家中节点, \d\d-\d\d \d\d:\d\d\)$/);
-  assert.equal(OFF_CONFLICT_TITLE, 'Conflict copy · 冲突副本');
+  assert.match(title, /^冲突副本 · Conflict copy \(家中节点 · home node, \d\d-\d\d \d\d:\d\d\)$/);
+  assert.equal(OFF_CONFLICT_TITLE, '冲突副本 · Conflict copy');
   // The other way round: the node's page is newer, the iPad's edit becomes the copy.
   const r2 = mergeNotebook(nb(40, [page('a', 36)]), nb(50, [page('a', 50)]), base, { newId });
   assert.equal(r2.nb.pages[0].updated, 50);
-  assert.match(r2.nb.pages[1].pageHtml, new RegExp(`^<p><b>Conflict copy · 冲突副本 \\(${OFF_FROM_LOCAL}, `));
+  assert.match(r2.nb.pages[1].pageHtml, new RegExp(`^<p><b>冲突副本 · Conflict copy \\(${OFF_FROM_LOCAL}, `));
 });
 
 test('same page, same bytes: one page, no copy; changed on one side only (the other equals the base byte for byte): that side, no copy', () => {
@@ -107,7 +107,7 @@ test('mergeOffline: the node unchanged since the base → the local text as it i
   assert.equal(idx.kind, 'index'); assert.equal(JSON.parse(idx.text).entries.length, 2);
   const file = mergeOffline('{"list":[1]}', '{"list":[2]}', null);
   assert.deepEqual(file, { text: '{"list":[1]}', merged: true, copies: 0, kind: 'file' });
-  assert.throws(() => mergeOffline(local, 'not json', null), /cannot read the node file · 无法读取node文件/);
+  assert.throws(() => mergeOffline(local, 'not json', null), /无法读取节点文件 · cannot read the node file/);
   assert.throws(() => mergeOffline('nope', moved, null), /cannot read the local file/);
 });
 

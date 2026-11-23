@@ -22,7 +22,7 @@ test('a network failure names the model and the next step, 中文 first, no "fet
 });
 
 test('any other error keeps its own message (already a sentence, e.g. a damaged chat file)', () => {
-  assert.equal(turnErrorText(null, new Error('this conversation could not be read · 无法读取该对话')), 'this conversation could not be read · 无法读取该对话');
+  assert.equal(turnErrorText(null, new Error('无法读取该对话 · this conversation could not be read')), '无法读取该对话 · this conversation could not be read');
   assert.equal(turnErrorText(null, 'plain'), 'plain');
 });
 

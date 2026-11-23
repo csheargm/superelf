@@ -71,7 +71,7 @@ const { SUMMARY_PROMPT, YEAR_NOTE } = (() => { const w = {}; loadRefs(w, { creat
 test('the multi-select bar gets ONE Summarize button beside Delete, only when the host passes hooks (CONTROL: none without)', async () => {
   const D = await drawer();
   const btns = D.bar().children.map((k) => [k.className, k.textContent]);
-  assert.deepEqual(btns, [['pac-lbulksum', 'Summarize · 总结']], 'appended to the bulk bar; the Cancel/Delete buttons are in its innerHTML');
+  assert.deepEqual(btns, [['pac-lbulksum', '总结 · Summarize']], 'appended to the bulk bar; the Cancel/Delete buttons are in its innerHTML');
   const N = await drawer({ hooks: { none: true } });
   assert.deepEqual(N.bar().children, [], 'no hooks, no button');
   assert.equal(N.api(), null);
@@ -89,10 +89,10 @@ test('presets pick rows by their created date, the Selected preset by the ticks;
     assert.deepEqual(D.api().state().rows.map((r) => r.id), ids, key); assert.equal(D.api().state().id, id, key + ' period id');
   }
   await D.api().choose('month');
-  assert.equal(D.line(), 'Send 3 pages · 51 characters to Claude · 发送 3 页 · 51 字到 Claude (off this Mac · 离开本机)', 'typed + ink of a\'s two pages and b\'s one; photo text left out');
+  assert.equal(D.line(), '发送 3 页 · 51 字到 Claude · Send 3 pages · 51 characters to Claude (离开本机 · off this Mac)', 'typed + ink of a\'s two pages and b\'s one; photo text left out');
   assert.equal(D.send().disabled, false);
   await D.api().togglePhoto(true);
-  assert.equal(D.line(), 'Send 3 pages · 62 characters to Claude · 发送 3 页 · 62 字到 Claude (off this Mac · 离开本机)', 'the tick adds the photo text; no second ask');
+  assert.equal(D.line(), '发送 3 页 · 62 字到 Claude · Send 3 pages · 62 characters to Claude (离开本机 · off this Mac)', 'the tick adds the photo text; no second ask');
   assert.equal(D.calls.fetched.length, 7, 'one ask per preset choice (six choices + the open), none for the tick');
 });
 
@@ -102,10 +102,10 @@ test('Send runs exactly ONE rail turn under summary:<period> with the constant p
   assert.equal(await D.api().send(), true);
   assert.equal(D.calls.run.length, 1); assert.deepEqual(D.calls.completed, [], 'a month is one turn: no map step');
   const t = D.calls.run[0];
-  assert.equal(t.scope, 'summary:2026-11'); assert.equal(t.label, 'This month · 本月 Nov 2026', 'the label is the human title (PASummaryTitle), never the id');
-  assert.equal(t.message, SUMMARY_PROMPT + '\n\n## 2026-11-02\n\n### [1] Rent\nRent paid\n\n## 2026-11-09\n\n### [2] Roof\nImportant · 重点:\n- call #landlord\nRain on the roof\nfix gutter\ncall #landlord', 'days in order, notes numbered, a note\'s important lines in a block before its pages (page order)');
+  assert.equal(t.scope, 'summary:2026-11'); assert.equal(t.label, '本月 · This month Nov 2026', 'the label is the human title (PASummaryTitle), never the id');
+  assert.equal(t.message, SUMMARY_PROMPT + '\n\n## 2026-11-02\n\n### [1] Rent\nRent paid\n\n## 2026-11-09\n\n### [2] Roof\n重点 · Important:\n- call #landlord\nRain on the roof\nfix gutter\ncall #landlord', 'days in order, notes numbered, a note\'s important lines in a block before its pages (page order)');
   assert.deepEqual(D.win.PASummaryRefs.refsOf('summary:2026-11'), [{ n: 1, id: 'b', page: 0, title: 'Rent', day: '2026-11-02' }, { n: 2, id: 'a', page: 1, title: 'Roof', day: '2026-11-09' }], 'the refs the turn left: [2] → note a, its first page with an important line, its day (the link text)');
-  assert.match(SUMMARY_PROMPT, /Important · 重点 .*like \[2\]\. · .*如 \[2\]。$/, 'the prompt asks for weight on the marked points and a source number after each, in both languages');
+  assert.match(SUMMARY_PROMPT, /重点 · Important .*like \[2\]\. · .*如 \[2\]。$/, 'the prompt asks for weight on the marked points and a source number after each, in both languages');
   assert.equal(D.api().state(), null, 'closed');
   assert.equal(D.d.el.querySelector('.pac-list').classList.contains('pac-multi'), false, 'select mode ended');
 });
@@ -113,10 +113,10 @@ test('Send runs exactly ONE rail turn under summary:<period> with the constant p
 test('a year is built from months: a saved month summary is reused (asked by period AND its note title), the others are mapped through PAChat.complete in order, then the year turn runs in the rail; the line says the turns', async () => {
   const D = await drawer({ hooks: { monthSummary: async (p, title) => { D.calls.month.push([p, title]); return p === '2026-10' ? 'October summary text' : null; } } });
   await D.api().open(); await D.api().choose('year');
-  assert.deepEqual(D.calls.month, [['2026-03', 'Month · 月 Mar 2026'], ['2026-10', 'Last month · 上月 Oct 2026'], ['2026-11', 'This month · 本月 Nov 2026']]);
-  assert.equal(D.line(), 'Send 4 pages · 82 characters to Claude · 发送 4 页 · 82 字到 Claude (off this Mac · 离开本机) · 3 turns · 3 轮', 'March (11 characters, 1 page) + November (51, 3 pages) are sent; October\'s 20 saved characters ride instead of its page');
+  assert.deepEqual(D.calls.month, [['2026-03', '月 · Month Mar 2026'], ['2026-10', '上月 · Last month Oct 2026'], ['2026-11', '本月 · This month Nov 2026']]);
+  assert.equal(D.line(), '发送 4 页 · 82 字到 Claude · Send 4 pages · 82 characters to Claude (离开本机 · off this Mac) · 3 轮 · 3 turns', 'March (11 characters, 1 page) + November (51, 3 pages) are sent; October\'s 20 saved characters ride instead of its page');
   assert.equal(await D.api().send(), true);
-  assert.deepEqual(D.calls.completed.map(([m, o]) => [m.slice(SUMMARY_PROMPT.length + 2, SUMMARY_PROMPT.length + 15), o.label]), [['## 2026-03-03', 'Month · 月 Mar 2026'], ['## 2026-11-02', 'This month · 本月 Nov 2026']], 'two maps, chronological, each labelled');
+  assert.deepEqual(D.calls.completed.map(([m, o]) => [m.slice(SUMMARY_PROMPT.length + 2, SUMMARY_PROMPT.length + 15), o.label]), [['## 2026-03-03', '月 · Month Mar 2026'], ['## 2026-11-02', '本月 · This month Nov 2026']], 'two maps, chronological, each labelled');
   assert.equal(D.calls.run.length, 1);
   const t = D.calls.run[0]; assert.equal(t.scope, 'summary:2026');
   assert.ok(t.message.startsWith(SUMMARY_PROMPT + '\n' + YEAR_NOTE + '\n\n## 2026-03\n\n### [1] 2026-03\nSUM '), 'the year turn carries the month texts under numbered month headings');
@@ -132,10 +132,10 @@ test('a single turn is capped at TURN_MAX_CHARS and the trim is said on the line
   const D = await drawer({ fetch: async () => ({ ok: true, pages: PAGES.concat([{ path: 'entry-g.json', scope: '', page: 0, src: { typed: big, ink: '', photo: '' } }]) }),
     items: () => rows().concat([{ id: 'g', title: 'Long', created: at(2026, 10, 20), doc: { path: 'entry-g.json' } }]) });
   await D.api().open(); await D.api().choose('lastMonth');
-  assert.match(D.line(), / · trimmed · 已截断$/);
+  assert.match(D.line(), / · 已截断 · trimmed$/);
   await D.api().send();
   const m = D.calls.run[0].message;
-  assert.ok(m.endsWith('[Trimmed to 80000 characters · 已截断至 80000 字]'));
+  assert.ok(m.endsWith('[已截断至 80000 字 · Trimmed to 80000 characters]'));
   assert.ok(m.length < SUMMARY_PROMPT.length + 80000 + 60, 'the body is cut at the cap');
 });
 
@@ -144,18 +144,18 @@ test('CONTROL: cancel sends nothing; a failed or absent note-text reply is said 
   assert.deepEqual(D.calls.run, []); assert.deepEqual(D.calls.completed, []); assert.equal(D.api().state(), null);
   assert.equal(await D.api().send(), false, 'nothing to send after cancel');
   const F = await drawer({ fetch: async () => ({ ok: false, error: 'Signed out' }) }); await F.api().open();
-  assert.equal(F.line(), 'Could not read the notes · 无法读取笔记 — Signed out'); assert.equal(F.send().disabled, true);
+  assert.equal(F.line(), '无法读取笔记 · Could not read the notes — Signed out'); assert.equal(F.send().disabled, true);
   assert.equal(await F.api().send(), false); assert.deepEqual(F.calls.run, []);
   const T = await drawer({ fetch: async () => { throw new Error('network'); } }); await T.api().open();
-  assert.match(T.line(), /^Could not read the notes · 无法读取笔记 — network/, 'a throw is a failure too');
+  assert.match(T.line(), /^无法读取笔记 · Could not read the notes — network/, 'a throw is a failure too');
   const E = await drawer({ items: () => [] }); await E.api().open();
-  assert.equal(E.line(), 'No notes in this period · 此时期没有笔记'); assert.deepEqual(E.calls.fetched, [], 'no rows, no ask');
+  assert.equal(E.line(), '此时期没有笔记 · No notes in this period'); assert.deepEqual(E.calls.fetched, [], 'no rows, no ask');
   const M = await drawer({ complete: async () => ({ ok: false, error: 'lane down' }) }); await M.api().open(); await M.api().choose('year');
   assert.equal(await M.api().send(), false);
   assert.equal(M.calls.completed.length, 1, 'stopped at the first failed month'); assert.deepEqual(M.calls.run, [], 'the rail never ran');
-  assert.equal(M.line(), 'Month summary failed · 月总结失败 2026-03 — lane down'); assert.equal(M.send().disabled, false, 'retry possible');
+  assert.equal(M.line(), '月总结失败 · Month summary failed 2026-03 — lane down'); assert.equal(M.send().disabled, false, 'retry possible');
   const B = await drawer({ hooks: { run: async () => false } }); await B.api().open(); await B.api().choose('month');
-  assert.equal(await B.api().send(), false); assert.equal(B.line(), 'Still answering · 正在回答中');
+  assert.equal(await B.api().send(), false); assert.equal(B.line(), '正在回答中 · Still answering');
 });
 
 test('Save as note: only under an answer in a summary scope with a saveNote hook; the host gets the human title, the first line + mdToHtml(answer), the period, the scope and the thread; a refusal is said on the button', async () => {
@@ -165,18 +165,18 @@ test('Save as note: only under an answer in a summary scope with a saveNote hook
   assert.equal(S.decorate(bar, 'x', { key: 'note:1', convo: () => 'c1', hooks: { saveNote: async () => ({ ok: true }) } }), null, 'a note thread gets no button');
   assert.equal(S.decorate(bar, 'x', { key: 'summary:2026-11', convo: () => 'c1', hooks: null }), null, 'no hook, no button');
   const b = S.decorate(bar, '# Nov\n- rent', { key: 'summary:2026-11', convo: () => 'c1', hooks: { saveNote: async (o) => { D.calls.saved.push(o); return { ok: true }; } } });
-  assert.equal(b.textContent, 'Save as note · 存为笔记'); assert.deepEqual(bar.children, [b]);
+  assert.equal(b.textContent, '存为笔记 · Save as note'); assert.deepEqual(bar.children, [b]);
   await b.onclick();
-  assert.deepEqual(D.calls.saved, [{ title: 'This month · 本月 Nov 2026 · 11/10 12:00', html: '<div>AI summary · AI 总结 — This month · 本月 Nov 2026 #summary #ai</div><p># Nov\n- rent</p>', period: '2026-11', scope: 'summary:2026-11', convoId: 'c1' }]);
-  assert.equal(b.textContent, 'Saved · 已存'); assert.equal(b.disabled, true);
+  assert.deepEqual(D.calls.saved, [{ title: '本月 · This month Nov 2026 · 11/10 12:00', html: '<div>AI 总结 · AI summary — 本月 · This month Nov 2026 #summary #ai</div><p># Nov\n- rent</p>', period: '2026-11', scope: 'summary:2026-11', convoId: 'c1' }]);
+  assert.equal(b.textContent, '已存 · Saved'); assert.equal(b.disabled, true);
   // With the turn's refs remembered, the saved html carries the [n] as note links (the sanitizer keeps the scheme).
   D.win.PASummaryRefs.remember('summary:2026-11', [{ n: 2, id: 'a', page: 1, title: 'Roof', day: '2026-11-09' }]);
   const b2 = S.decorate(mkEl('div'), 'Fix the gutter [2] and pay [9]', { key: 'summary:2026-11', convo: () => 'c1', hooks: { saveNote: async (o) => { D.calls.saved.push(o); return { ok: true }; } } });
   await b2.onclick();
-  assert.equal(D.calls.saved[1].html, '<div>AI summary · AI 总结 — This month · 本月 Nov 2026 #summary #ai</div><p>Fix the gutter <a href="?note=a&amp;page=1">[2] Roof · 2026-11-09</a> and pay [9]</p>', '[2] is linked to note a page 1 and says which note; [9] names no note and stays text');
+  assert.equal(D.calls.saved[1].html, '<div>AI 总结 · AI summary — 本月 · This month Nov 2026 #summary #ai</div><p>Fix the gutter <a href="?note=a&amp;page=1">[2] Roof · 2026-11-09</a> and pay [9]</p>', '[2] is linked to note a page 1 and says which note; [9] names no note and stays text');
   const r = S.decorate(mkEl('div'), 'x', { key: 'summary:2026', convo: () => null, hooks: { saveNote: async () => ({ ok: false, error: 'disk full' }) } });
   await r.onclick();
-  assert.equal(r.textContent, 'Not saved · 未保存 — disk full'); assert.equal(r.disabled, false, 'a retry stays possible');
+  assert.equal(r.textContent, '未保存 · Not saved — disk full'); assert.equal(r.disabled, false, 'a retry stays possible');
 });
 
 test('refs belong to the turn actually SENT: a plan that is re-planned or cancelled remembers nothing, and a bubble painted from the first turn keeps its links through a later plan (enhance and Save as note alike)', async () => {
@@ -197,7 +197,7 @@ test('refs belong to the turn actually SENT: a plan that is re-planned or cancel
   assert.equal(S.enhance(bubble, 'summary:2026-11'), false); assert.doesNotMatch(bubble.innerHTML, /zz/);
   const b = D.win.PADrawerSummary.decorate(mkEl('div'), 'Call [2]', { el: bubble, key: 'summary:2026-11', convo: () => 'c1', hooks: { saveNote: async (o) => { D.calls.saved.push(o); return { ok: true }; } } });
   await b.onclick();
-  assert.equal(D.calls.saved.at(-1).html, '<div>AI summary · AI 总结 — This month · 本月 Nov 2026 #summary #ai</div><p>Call <a href="?note=a&amp;page=1">[2] Roof · 2026-11-09</a></p>', 'the saved note links with the bubble\'s own refs, not the scope\'s newer ones');
+  assert.equal(D.calls.saved.at(-1).html, '<div>AI 总结 · AI summary — 本月 · This month Nov 2026 #summary #ai</div><p>Call <a href="?note=a&amp;page=1">[2] Roof · 2026-11-09</a></p>', 'the saved note links with the bubble\'s own refs, not the scope\'s newer ones');
 });
 
 test('AUTO-SAVE: the answer of the turn the sheet sent is saved by itself when it has streamed (fresh), once; a re-run of the period saves a NEW note (no id), a tap re-saves its own note by id; a replayed thread or a follow-up is saved only by the tap', async () => {
@@ -213,8 +213,8 @@ test('AUTO-SAVE: the answer of the turn the sheet sent is saved by itself when i
   const b1 = S.decorate(mkEl('div'), 'Call [2]', { el: bubble, key: 'summary:2026-11', convo: () => 'c1', hooks: H, fresh: true, prompt: sent() });
   assert.ok(b1.pending, 'saving at once'); assert.equal(await b1.pending, true);
   assert.equal(D.calls.saved.length, 1);
-  assert.deepEqual(D.calls.saved[0], { title: 'This month · 本月 Nov 2026 · 11/10 12:00', html: '<div>AI summary · AI 总结 — This month · 本月 Nov 2026 #summary #ai</div><p>Call <a href="?note=a&amp;page=1">[2] Roof · 2026-11-09</a></p>', period: '2026-11', scope: 'summary:2026-11', convoId: 'c1' }, 'the same entry a tap would save, links included');
-  assert.equal(b1.textContent, 'Saved · 已存'); assert.equal(b1.disabled, true);
+  assert.deepEqual(D.calls.saved[0], { title: '本月 · This month Nov 2026 · 11/10 12:00', html: '<div>AI 总结 · AI summary — 本月 · This month Nov 2026 #summary #ai</div><p>Call <a href="?note=a&amp;page=1">[2] Roof · 2026-11-09</a></p>', period: '2026-11', scope: 'summary:2026-11', convoId: 'c1' }, 'the same entry a tap would save, links included');
+  assert.equal(b1.textContent, '已存 · Saved'); assert.equal(b1.disabled, true);
   assert.equal(Rf.backTarget(), null); Rf.open('?note=a&page=1'); assert.equal(Rf.backTarget(), 'n-1', 'the saved note is where the back pill returns (noteSaved)');
   // A follow-up answer in the same thread (fresh, but the pending save was consumed): the tap only.
   const b2 = S.decorate(mkEl('div'), 'More', { el: {}, key: 'summary:2026-11', convo: () => 'c1', hooks: H, fresh: true });
@@ -236,8 +236,8 @@ test('AUTO-SAVE failure is said on the button, the answer stays, a retry is poss
   await D.api().open(); await D.api().choose('month'); await D.api().send();
   const b = S.decorate(mkEl('div'), 'Answer', { el: {}, key: 'summary:2026-11', convo: () => 'c1', hooks: H, fresh: true, prompt: D.calls.run[0].message });
   assert.equal(await b.pending, false);
-  assert.equal(b.textContent, 'Not saved · 未保存 — disk full'); assert.equal(b.disabled, false, 'the button stays live for a retry');
-  fail = false; await b.onclick(); assert.equal(b.textContent, 'Saved · 已存'); assert.equal(D.calls.saved.length, 2);
+  assert.equal(b.textContent, '未保存 · Not saved — disk full'); assert.equal(b.disabled, false, 'the button stays live for a retry');
+  fail = false; await b.onclick(); assert.equal(b.textContent, '已存 · Saved'); assert.equal(D.calls.saved.length, 2);
   await b.onclick(); assert.equal(D.calls.saved[2].id, 'n1', 'a re-tap updates the note its first good save answered, never a third note'); assert.equal(D.calls.saved[1].id, undefined, 'a failed save minted no id');
   const T = await drawer({ hooks: { saveNote: H.saveNote, run: async () => { throw new Error('boom'); } } });
   await T.api().open(); await T.api().choose('month'); assert.equal(await T.api().send(), false);
@@ -267,10 +267,10 @@ test('AUTO-SAVE is bound to the turn sent: a sheet turn that ended without an an
 
 test('a saved summary note is NOT a source of a new summary — by the host flag, its title (new or raw W form), its first line (new or raw period) or #summary; an ordinary note keeps its brackets (CONTROL)', async () => {
   const extra = [
-    { path: 'entry-s.json', scope: '', page: 0, src: { typed: 'AI summary · AI 总结 — 2026-10 #summary #ai\nRoof fixed [1] and rent [12]', ink: '', photo: '' } },
+    { path: 'entry-s.json', scope: '', page: 0, src: { typed: 'AI 总结 · AI summary — 2026-10 #summary #ai\nRoof fixed [1] and rent [12]', ink: '', photo: '' } },
     { path: 'entry-c.json', scope: '', page: 1, src: { typed: 'see [3] later', ink: '', photo: '' } },
-    { path: 'entry-h.json', scope: '', page: 0, src: { typed: 'AI summary · AI 总结 — 2026-10-01..2026-10-07 #summary #ai\nWeek [2] done', ink: '', photo: '' } },
-    { path: 'entry-n.json', scope: '', page: 0, src: { typed: 'AI summary · AI 总结 — Last month · 上月 Oct 2026 #summary #ai\nNew form', ink: '', photo: '' } },
+    { path: 'entry-h.json', scope: '', page: 0, src: { typed: 'AI 总结 · AI summary — 2026-10-01..2026-10-07 #summary #ai\nWeek [2] done', ink: '', photo: '' } },
+    { path: 'entry-n.json', scope: '', page: 0, src: { typed: 'AI 总结 · AI summary — 上月 · Last month Oct 2026 #summary #ai\nNew form', ink: '', photo: '' } },
     { path: 'entry-f.json', scope: '', page: 0, src: { typed: 'Flagged by the host', ink: '', photo: '' } },
     { path: 'entry-t.json', scope: '', page: 0, src: { typed: 'Edited first line\nstill tagged #summary here', ink: '', photo: '' } },
     { path: 'entry-u.json', scope: '', page: 0, src: { typed: 'Weekly recap #summary\nTagged on line one', ink: '', photo: '' } },
@@ -286,7 +286,8 @@ test('a saved summary note is NOT a source of a new summary — by the host flag
   assert.ok(m.includes('still tagged #summary here'), 'a note that only MENTIONS #summary in its body is the owner\'s own note: a source (review 2026-11-11)');
   for (const w of ['AI summary', 'Roof fixed', 'Week', 'New form', 'Flagged', 'Tagged on line one']) assert.ok(!m.includes(w), 'no summary note enters the turn: ' + w);
   const S = D.win.PADrawerSummary;
-  assert.ok(S.FIRST_LINE_RE.test('AI summary · AI 总结 — This week · 本周 Nov 9–15, 2026 #summary #ai') && S.FIRST_LINE_RE.test('AI summary · AI 总结 — 2026-W46 #summary #ai'), 'both first-line forms are read');
+  assert.ok(S.FIRST_LINE_RE.test('AI 总结 · AI summary — 本周 · This week Nov 9–15, 2026 #summary #ai') && S.FIRST_LINE_RE.test('AI 总结 · AI summary — 2026-W46 #summary #ai')
+    && S.FIRST_LINE_RE.test('AI summary · AI 总结 — 本周 · This week Nov 9–15, 2026 #summary #ai'), 'both first-line forms are read');
   assert.equal(S.isSummaryNote({ title: 'Summary · 总结 2026-W46' }, 'x'), true, 'the raw old title'); assert.equal(S.isSummaryNote({ title: 'Roof' }, 'Roof'), false, 'CONTROL');
   assert.equal(D.api().state(), null);
 });

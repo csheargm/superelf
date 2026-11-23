@@ -335,7 +335,7 @@ test('D2 — the app talks to the node ONLY through the broker', () => {
   assert.match(meals, /kind:'meal-photo'/, 'the write goes through the broker');
   assert.match(meals, /kind:'meals'/, 'and so does the read');
   assert.ok(!/\bfetch\(|XMLHttpRequest/.test(meals), 'an app never reaches the network directly');
-  assert.match(meals, /No meals logged yet · 暂无记录/, 'and the empty state is bilingual and explicit');
+  assert.match(meals, /暂无记录 · No meals logged yet/, 'and the empty state is bilingual and explicit');
 });
 
 test('D3 — the photo is read, downscaled and pre-flighted by PAPhoto, not by a fourth private copy', () => {

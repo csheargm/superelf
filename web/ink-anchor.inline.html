@@ -40,12 +40,12 @@
 (function(){
   if(window.PAInkAnchor) return;
   const CLS='pia-ink';
-  const TIP='Write on the verses with Apple Pencil; scrub back and forth over ink to erase it · 用 Apple Pencil 直接在经文上书写；来回涂抹即可擦除';
+  const TIP='用 Apple Pencil 直接在经文上书写；来回涂抹即可擦除 · Write on the verses with Apple Pencil; scrub back and forth over ink to erase it';
   const LINES=Object.freeze([['en','.ven'],['zh','.vzh']]);   // the host's text lines, by language (PAVerseMarks' LANGS)
   const DEFAULT_PEN=Object.freeze({c:'#0f6355',w:2.2,t:'pen'});   // the accent; a host may pass its own `pen`
   // The ⚙ sheet's device line (the Journal's DEV_READOUT idea): what to screenshot on each iPad instead of
   // describing it. Viewport, dpr, the shell's A-/A+ scale, the live text column and the ink count.
-  const READOUT_LABEL='Device readout · 设备读数';
+  const READOUT_LABEL='设备读数 · Device readout';
   const READOUT=m=>'Device 设备: '+m.w+'×'+m.h+' px · dpr '+m.dpr+' · A '+(Math.round(m.fs*100)/100)+' · text '+Math.round(m.textW)+'px · ink 笔迹 '+m.n+' · orphan 孤立 '+m.orphans;
   const PAD=4, MIN_COVER=0.3;                                     // px above/below a stroke box, and how much of a character it must cover, to count the character
   const round2=n=>Math.round(n*100)/100;
@@ -130,7 +130,7 @@
 
   // ── The orphan bucket: a labelled row under the last verse holding every group that has no place
   //    on the text. English then 中文; one string, read by the host's tests.
-  const BUCKET_TXT='Ink whose text changed · 经文已改动的笔迹', BUCKET_CLS='pia-bucket', LABEL_H=22, ROW_GAP=8, BUCKET_PADX=8;
+  const BUCKET_TXT='经文已改动的笔迹 · Ink whose text changed', BUCKET_CLS='pia-bucket', LABEL_H=22, ROW_GAP=8, BUCKET_PADX=8;
   function makeBucket(){ const b=document.createElement('div'); b.className=BUCKET_CLS; const l=document.createElement('div'); l.className=BUCKET_CLS+'-l'; l.textContent=BUCKET_TXT; b.appendChild(l); return b; }
   // Sizes the bucket for `orphans` ([{g,at:null}]) and fills their `at`: stacked rows at scale 1. Empty → the bucket leaves the DOM.
   function layoutBucket(container,bucket,orphans,local){

@@ -186,7 +186,7 @@ test('both Bible copies carry the marker, the hook, the fab entry, the chip and 
     assert.match(src, /PAVerseMarks\.armControl\(document\.getElementById\('top-mark'\)\)\.onclick=/, `${app}: the Mark control keeps the selection through its tap`);
     assert.match(src, /d\.onclick=\(\)=>\{ const r=VM\.selection\(\); if\(!\(r&&r\.n===v\.n&&selV\.has\(v\.n\)\)\) selectVerse\(v\.n,d\); \};/, `${app}: the click guard checks the range is in THIS verse`);
     assert.equal((src.match(/PAVerseMarks\.TXT\.mark\b/g) || []).length, 1, `${app}: the label comes from the component once`);
-    assert.doesNotMatch(src, /Mark · 标记|Mark 标记|Highlight 高亮/, `${app}: no second copy of the component's strings (R3)`);
+    assert.doesNotMatch(src, /标记|Mark 标记|Highlight 高亮 · Mark/, `${app}: no second copy of the component's strings (R3)`);
   }
   const list = WEB.slice(WEB.indexOf('const PA_COMPONENTS = ['), WEB.indexOf('];', WEB.indexOf('const PA_COMPONENTS = [')));
   const entry = "{ marker: '<!--PA_VERSE_MARKS_UI-->', file: 'verse-marks.inline.html' },", vm = list.indexOf(entry);

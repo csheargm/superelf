@@ -1034,7 +1034,7 @@ async function runAgent(message, extraArgs, cwd, timeoutMs, systemPrompt) {
 // --effort stays the user's. lib/one-shot.mjs holds the rules; both values are read per turn,
 // never copied here (docs/adr/0011).
 // What a cancelled oneShot turn answers and stores, instead of the killed child's raw stream-json.
-const CHAT_CANCELLED = Object.freeze({ ok: false, text: 'Cancelled · 已取消' });   // == PAC_CANCELLED in web/chat-ui.inline.html (test/chat-cancel.test.mjs)
+const CHAT_CANCELLED = Object.freeze({ ok: false, text: '已取消 · Cancelled' });   // == PAC_CANCELLED in web/chat-ui.inline.html (test/chat-cancel.test.mjs)
 // A oneShot caller that goes away (the studio's Cancel or timeout aborts the shell relay's fetch,
 // which closes this socket) can no longer use the answer, so the run stops: the claude child is
 // killed, and a turn still queued never spawns one (chat() checks `signal`). Before this, the

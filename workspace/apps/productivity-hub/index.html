@@ -677,7 +677,7 @@ let state = {
 // new day schedules one) would replace the real file with them.
 const hubFile = PAStore.file('productivity-hub.json', {
   shape: d => (d && typeof d === 'object' && !Array.isArray(d)) ? '' : 'not a saved state',
-  unreadable: why => 'Data file unreadable · 数据文件无法读取 (' + why + ')',
+  unreadable: why => '数据文件无法读取 · Data file unreadable (' + why + ')',
 });
 function setStatus(text) { document.getElementById('status').textContent = text; }
 
@@ -828,7 +828,7 @@ async function armPomoAlarm() {
   // blocked, yet sound:true still rings), or not armed at all. Saying "alarm set" for the
   // middle case would overstate it; saying nothing for it would hide a blocked permission.
   setPomoNote(r && r.ok === false ? (r.text || r.error || 'Alarm not set.')
-    : (r && r.banner === false ? 'Alarm will ring, but notifications are blocked · 会响铃，但通知被阻止' : ''));
+    : (r && r.banner === false ? '会响铃，但通知被阻止 · Alarm will ring, but notifications are blocked' : ''));
 }
 function cancelPomoAlarm() { setPomoNote(''); return paNotifyCancel(POMO_TAG); }
 // Preview plays through the SHELL too — the same code path that will ring for real, so what
@@ -1211,8 +1211,8 @@ function importData() {
         Object.assign(state, data);
         applyAll();
         // "Imported" only once it is saved; the status line says why when it is not.
-        saveState().then(ok => setDataMsg(ok ? 'Imported · 已导入' : 'Import not saved · 导入未保存'));
-      } catch(e) { setDataMsg('Invalid JSON file · JSON 文件无效'); }
+        saveState().then(ok => setDataMsg(ok ? '已导入 · Imported' : '导入未保存 · Import not saved'));
+      } catch(e) { setDataMsg('JSON 文件无效 · Invalid JSON file'); }
     };
     reader.readAsText(file);
   };
@@ -1226,7 +1226,7 @@ function importData() {
 // window.confirm() returns false at once in the app sandbox, so "Reset all data?" silently
 // cancelled every reset.
 const DELETE_ARM_MS = PATwoTap.MS;
-const RESET_ARMED_LABEL = 'Reset all data? · 清空所有数据?';
+const RESET_ARMED_LABEL = '清空所有数据? · Reset all data?';
 function resetAll(btn) {
   if (!PATwoTap.press(btn, { label: RESET_ARMED_LABEL, ms: DELETE_ARM_MS })) return;
   setDataMsg('');                 // an earlier "Imported" no longer describes the data

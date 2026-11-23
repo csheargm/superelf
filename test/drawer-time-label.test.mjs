@@ -90,12 +90,12 @@ test('a row with no timestamp says so instead of inventing one', () => {
   for (const bad of [0, undefined, null, '', NaN, -1, 'nonsense']) {
     assert.equal(usableTs(bad), 0, `${String(bad)} is not a usable instant`);
     assert.equal(listTime(bad), '', `${String(bad)} must render no time`);
-    assert.equal(listDay(bad), 'No date · 无日期', `${String(bad)} must not claim a day`);
+    assert.equal(listDay(bad), '无日期 · No date', `${String(bad)} must not claim a day`);
   }
   // 1ms after the epoch is a REAL instant, so it must be reported as a day, not refused. Asserted
   // without naming the date: ts=1 falls on either side of Jan 1 1970 depending on the machine's
   // timezone, and a test that encodes the author's offset fails for the next person who runs it.
-  assert.notEqual(listDay(1), 'No date · 无日期', 'a real (if ancient) instant is still a day');
+  assert.notEqual(listDay(1), '无日期 · No date', 'a real (if ancient) instant is still a day');
   assert.match(listTime(1), /^\d{2}:\d{2}$/, 'and still has a clock time');
 });
 

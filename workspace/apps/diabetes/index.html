@@ -235,9 +235,9 @@ header p{font-size:13px;color:var(--muted);margin-top:2px;}
    `absent` is EARNED by the shell's own code:'not-found', never inferred from a missing field. */
 const DATA_PATH='readings.json';                     // {readings:[],a1c:[]}; the shell scopes it to data/diabetes/
 const STORE_NOT_FOUND='not-found';                   // == web/index.html relayCall's 404 code (pinned by test)
-const STORE_SHAPE_TXT='stored file has the wrong shape · 存储格式不符 — refusing to overwrite it 拒绝覆盖';
-const STORE_PARSE_TXT='stored file could not be parsed · 存储文件无法解析 — refusing to overwrite it 拒绝覆盖';
-const STORE_NOT_SAVED='Not saved · 未保存 — ';
+const STORE_SHAPE_TXT='存储格式不符 · stored file has the wrong shape — refusing to overwrite it 拒绝覆盖';
+const STORE_PARSE_TXT='存储文件无法解析 · stored file could not be parsed — refusing to overwrite it 拒绝覆盖';
+const STORE_NOT_SAVED='未保存 · Not saved — ';
 const blockedPaths=new Map();                        // path -> bilingual reason; a blocked path is NEVER written
 let DB={readings:[],a1c:[]};
 
@@ -261,7 +261,7 @@ async function storeRead(path,fallback,shapeOk){
     blockedPaths.delete(path); return v;
   }
   if(r.code===STORE_NOT_FOUND){ blockedPaths.delete(path); return fallback; }   // nothing stored yet: the one legitimate empty
-  return block((r.text||r.error||'could not read the store · 无法读取存储')+' — refusing to overwrite it 拒绝覆盖');
+  return block((r.text||r.error||'无法读取存储 · could not read the store')+' — refusing to overwrite it 拒绝覆盖');
 }
 // EVERY write goes through here: a path this session could not READ is a path it must not WRITE.
 async function storeWrite(path,text){
@@ -300,8 +300,8 @@ function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','
    one, and only the derived ones have to argue for themselves. */
 const READ_LOW='low';
 const provMark=(r)=>r&&r.src==='photo'
-  ?`<span class="prov" title="read from a photo · 由照片识别">📷${r.confidence===READ_LOW?'?':''}</span>`:'';
-const whenTxt=(r)=>(r&&r.tsGuessed)?'time not in the photo · 照片中无时间':fmtDt(r.ts);
+  ?`<span class="prov" title="由照片识别 · read from a photo">📷${r.confidence===READ_LOW?'?':''}</span>`:'';
+const whenTxt=(r)=>(r&&r.tsGuessed)?'照片中无时间 · time not in the photo':fmtDt(r.ts);
 
 function renderStatus(){
   const d=load();const card=document.getElementById('statusCard');
@@ -376,7 +376,7 @@ document.getElementById('inTs').value=nowLocal();
 /* ── Log glucose ── */
 // alert() is ignored in this sandbox exactly like confirm() — an out-of-range value used to do
 // NOTHING AT ALL, with no message anywhere. The refusal is on the page now.
-const RANGE_TXT='Enter a glucose value between 40 and 600 mg/dL · 请输入 40–600 mg/dL 之间的数值';
+const RANGE_TXT='请输入 40–600 mg/dL 之间的数值 · Enter a glucose value between 40 and 600 mg/dL';
 document.getElementById('addBtn').onclick=async()=>{
   const val=parseInt(document.getElementById('inVal').value,10);
   if(!val||val<40||val>600){storeMsg(RANGE_TXT);return;}
@@ -401,7 +401,7 @@ document.getElementById('histList').onclick=async e=>{
 
 /* ── HbA1c ── */
 document.getElementById('a1cDate').value=new Date().toISOString().slice(0,10);
-const A1C_RANGE_TXT='Enter an HbA1c between 4% and 15% · 请输入 4%–15% 之间的数值';
+const A1C_RANGE_TXT='请输入 4%–15% 之间的数值 · Enter an HbA1c between 4% and 15%';
 document.getElementById('a1cBtn').onclick=async()=>{
   const val=parseFloat(document.getElementById('a1cVal').value);
   if(!val||val<4||val>15){storeMsg(A1C_RANGE_TXT);return;}
@@ -435,7 +435,7 @@ function pa(kind,payload){
     // Silence is an ANSWER, not a hang: a shell that never replies must not leave a spinner
     // running for ever, and the caller must be able to tell that apart from a refusal (R5).
     t=setTimeout(()=>{window.removeEventListener('message',h);
-      res({ok:false,code:'timeout',error:'no answer from the app shell · 外壳无响应'});},120000);
+      res({ok:false,code:'timeout',error:'外壳无响应 · no answer from the app shell'});},120000);
     window.parent.postMessage({pa:'req',id,kind,...payload},'*');
   });
 }
@@ -456,7 +456,7 @@ const SCANS_PATH='scans.json';
 const SCAN_EDGE=1600, THUMB_EDGE=72, THUMB_QUALITY=0.6;
 // Reachable only if this page were served without PA_PHOTO_UI. A camera button that silently
 // does nothing is what makes an app look broken, so the missing piece is NAMED (R5).
-const NO_PHOTO_TXT='Photo component not loaded · 未加载照片组件';
+const NO_PHOTO_TXT='未加载照片组件 · Photo component not loaded';
 let imgData=null,imgThumb=null,scanHistory=[],allScans=[];
 const scansShapeOk=(v)=>Array.isArray(v);
 
@@ -565,7 +565,7 @@ async function addBubble(role,text){
 }
 
 document.getElementById('analyzeBtn').onclick=async()=>{
-  if(!imgData){storeMsg('Take or pick a photo first · 请先拍照或选择图片');return;}
+  if(!imgData){storeMsg('请先拍照或选择图片 · Take or pick a photo first');return;}
   // Whatever was photographed — a meter, a CGM screen, a lab report, a plate. The old default
   // asserted "Libre 3 CGM screenshot", which tells a vision model what to see before it looks.
   const q=document.getElementById('analyzeQ').value.trim()||
@@ -672,11 +672,11 @@ async function handleLogImage(p){
   document.getElementById('logFollowUp').style.display='none';
   logHistory=[]; extractedReadings=[]; logPhoto=null;
   const status=document.getElementById('logExtractStatus');
-  status.style.display='block'; status.textContent='Uploading · 上传中…';
+  status.style.display='block'; status.textContent='上传中… · Uploading';
   try{
     const up=await paOrThrow('upload',{name:p.name,data:p.data});
     logPhoto={path:up.path,name:p.name};
-    status.textContent='Reading the photo · 识别中…';
+    status.textContent='识别中… · Reading the photo';
     const fileRef=`\n\n[Attached file: ${p.name} — saved to workspace/${up.path}. Use the Read tool to view it.]`;
     const [extractResp, analysisResp] = await Promise.all([
       paOrThrow('ask',{message:EXTRACT_PROMPT+fileRef}),
@@ -689,7 +689,7 @@ async function handleLogImage(p){
     logHistory=[{role:'ai',text:analysisResp.text}];
     await addLogBubble('ai',analysisResp.text);
     document.getElementById('logFollowUp').style.display='flex';
-  }catch(err){ status.textContent='Could not read that photo · 无法识别照片 — '+((err&&err.message)||err); }   // R5
+  }catch(err){ status.textContent='无法识别照片 · Could not read that photo — '+((err&&err.message)||err); }   // R5
 }
 
 /* The model's JSON is UNTRUSTED OUTPUT, not a data structure. Every field is re-checked here,
@@ -722,13 +722,13 @@ function parseReadings(text){
   return extractedReadings;
 }
 function extractStatus(rows){
-  if(rows===null) return 'Could not read any numbers from that photo · 未能识别数值 — enter one below 可手动填写';
-  if(!rows.length) return 'No readings found in that photo · 照片中未发现读数 — enter one below 可手动填写';
+  if(rows===null) return '未能识别数值 · Could not read any numbers from that photo — enter one below 可手动填写';
+  if(!rows.length) return '照片中未发现读数 · No readings found in that photo — enter one below 可手动填写';
   renderExtracted();
   const low=rows.filter(r=>r.confidence===READ_LOW).length;
-  return `Found ${rows.length} reading${rows.length>1?'s':''} · 找到 ${rows.length} 条`
-    + (low?` — ${low} uncertain, left unticked · ${low} 条不确定，默认未勾选`:'')
-    + '. Check each one against the photo before saving · 保存前请核对.';
+  return `找到 ${rows.length} 条 · Found ${rows.length} reading${rows.length>1?'s':''}`
+    + (low?` — ${low} 条不确定，默认未勾选 · ${low} uncertain, left unticked`:'')
+    + '. 保存前请核对. · Check each one against the photo before saving';
 }
 
 /* The review step, and the reason the readings are STRUCTURED rather than left in the chat:
@@ -742,7 +742,7 @@ function renderExtracted(){
   el.innerHTML=extractedReadings.map((r,i)=>{
     const st=glucoseStatus(r.val,r.ctx);
     const low=r.confidence===READ_LOW;
-    const ts=r.tsGuessed?'no time in the photo · 照片中无时间'
+    const ts=r.tsGuessed?'照片中无时间 · no time in the photo'
       :new Date(r.ts).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
     return`<div class="ext-item${low?' lowc':''}">
       <input type="checkbox" id="ec${i}"${low?'':' checked'}>
@@ -750,7 +750,7 @@ function renderExtracted(){
       <div class="ext-info">
         <div class="ext-ctx">${esc(r.ctx)}${r.note?` — ${esc(r.note)}`:''}<span class="badge badge-${st.cls}">${st.label}</span></div>
         <div class="ext-time">${esc(ts)}</div>
-        ${low?'<div class="ext-why">uncertain reading · 识别不确定 — check it against the photo 请核对照片</div>':''}
+        ${low?'<div class="ext-why">识别不确定 · uncertain reading — 请核对照片 · check it against the photo</div>':''}
       </div>
     </div>`;
   }).join('');
@@ -780,11 +780,11 @@ document.getElementById('saveAllBtn').onclick=async()=>{
   // Reports what was STORED, not what was clicked: a write that failed must never be reported
   // as a save (R14 — the same honesty rule lib/health.mjs now keeps for ingest).
   if(await save(d)){
-    status.textContent=`Saved ${saved} reading${saved!==1?'s':''} · 已保存 ${saved} 条`;
+    status.textContent=`已保存 ${saved} 条 · Saved ${saved} reading${saved!==1?'s':''}`;
     document.getElementById('extractedList').style.display='none';
     extractedReadings=[];
   } else {
-    status.textContent=`Not saved · 未保存 — the readings are still listed above, try again 记录仍在上方，可重试`;
+    status.textContent=`未保存 · Not saved — the readings are still listed above, try again 记录仍在上方，可重试`;
   }
 };
 

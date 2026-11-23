@@ -1,6 +1,6 @@
 // Run now（立即运行）— the three things that made it unreadable.
 //
-// SCAR: a user pressed Run now and the row said "running · 运行中…" indefinitely. The job had
+// SCAR: a user pressed Run now and the row said "运行中… · running" indefinitely. The job had
 // finished minutes earlier. Three separate defects, and they compounded:
 //   1. the status element was captured by INDEX and re-rendering the list orphaned it, so the
 //      final update landed on a detached node while the visible row kept saying "running";
@@ -34,7 +34,7 @@ test('elapsed time is shown while it runs', () => {
   // `const tick=setInterval(...)` and my own control mutation — inserting a no-op `0||`,
   // which changes nothing — failed it. A test that breaks on a harmless edit reports
   // regressions that are not there.
-  assert.match(SHELL, /setInterval\([\s\S]{0,40}running · 运行中…[\s\S]{0,40}took\([\s\S]{0,30}\),\s*1000\s*\)/,
+  assert.match(SHELL, /setInterval\([\s\S]{0,40}运行中… · running[\s\S]{0,40}took\([\s\S]{0,30}\),\s*1000\s*\)/,
     'a counter updates the row with the elapsed time, about once a second, while it runs');
   assert.match(SHELL, /clearInterval\(tick\)/, 'and stops when the answer arrives');
   // took() is the shell's ONE elapsed formatter (R3) — the same one chat uses for "took Xs".
@@ -47,14 +47,14 @@ test('there is a real ceiling on the wait', () => {
     'the request is actually abortable');
   assert.match(SHELL, /signal:ac\.signal/, 'and the signal reaches fetch');
   assert.match(SHELL, /timedOut=ac\.signal\.aborted/, 'a timeout is distinguished from any other failure');
-  assert.match(SHELL, /gave up after \$\{elapsed\} · 超时未完成 — it may still finish/,
+  assert.match(SHELL, /超时未完成 · gave up after \$\{elapsed\} — 可能仍会完成，请重新打开查看 · it may still finish/,
     'and it says the job may still be running server-side, because it is — the ceiling is on the WAIT, not the job');
 });
 
 test('every terminal state reports how long it took', () => {
   // Otherwise a fast failure and a slow one read the same, and neither tells you whether it
   // was worth waiting.
-  for (const state of ['✓ ran · 已运行', 'ran again today · 已再次运行', 'no report today · 今日无简报']) {
+  for (const state of ['✓ 已运行 · ran', '已再次运行 · ran again today', '今日无简报 · no report today']) {
     const i = SHELL.indexOf(state);
     assert.ok(i > 0, `missing state: ${state}`);
     assert.ok(SHELL.slice(i, i + 40).includes('${elapsed}'), `${state} must carry the elapsed time`);
@@ -64,5 +64,5 @@ test('every terminal state reports how long it took', () => {
 test('a failure still reports the SERVER\'s reason', () => {
   // The row must not flatten a 409/400 into a generic "failed" — the server's sentence is the
   // only thing that tells the user what to change.
-  assert.match(SHELL, /✗ failed · 失败\$\{j&&j\.error\?': '\+j\.error:''\}/, 'the server error is shown when there is one');
+  assert.match(SHELL, /✗ 失败 · failed\$\{j&&j\.error\?': '\+j\.error:''\}/, 'the server error is shown when there is one');
 });

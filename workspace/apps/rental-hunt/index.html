@@ -539,7 +539,7 @@ let searchHistory = []; // [{loc, ts, count}]
 // failed or unreadable read searchHistory is still empty, and the next search would replace the list.
 const historyFile = PAStore.file('rental-hunt-history.json', {
   shape: d => Array.isArray(d) ? '' : 'not a history list',
-  unreadable: why => 'Search history unreadable · 搜索记录无法读取 (' + why + ')',
+  unreadable: why => '搜索记录无法读取 · Search history unreadable (' + why + ')',
 });
 function setStatus(t) { document.getElementById('status').textContent = t; }
 

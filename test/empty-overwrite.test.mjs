@@ -78,7 +78,7 @@ test('PATCH /api/apps/:slug/share: a damaged meta.json is refused, not flattened
   const dir = ws('apps/journal');
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'index.html'), '<!doctype html><title>Journal</title>');
-  const meta = { title: 'Journal · 日记', desc: 'handwriting notebook', forkedFrom: { uid: 'owner', slug: 'notes' } };
+  const meta = { title: '日记 · Journal', desc: 'handwriting notebook', forkedFrom: { uid: 'owner', slug: 'notes' } };
   fs.writeFileSync(path.join(dir, 'meta.json'), JSON.stringify(meta, null, 2));
   // CONTROL: a readable meta.json flips the flag and KEEPS every other field.
   const ok = await api(port, '/api/apps/journal/share', { method: 'PATCH', body: JSON.stringify({ shared: true }) });

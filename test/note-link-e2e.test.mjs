@@ -127,7 +127,7 @@ test('edit a link (prefilled), Remove it; javascript: is refused at the button a
   await frame.locator('.pan-flink').click();
   await page.keyboard.type('javascript:alert(1)');
   await page.keyboard.press('Enter');
-  assert.match(await flashText(frame), /Only web or email links · 只能用网页或邮件链接/);
+  assert.match(await flashText(frame), /只能用网页或邮件链接 · Only web or email links/);
   assert.equal(await linking(frame), true, 'the form stays open to fix the address');
   assert.doesNotMatch(await layerHtml(frame), /<a /);
   await page.keyboard.press('Escape');
@@ -137,7 +137,7 @@ test('edit a link (prefilled), Remove it; javascript: is refused at the button a
   p = await wordAt(page, frame, 'Visit');
   await page.mouse.click(p.x, p.y);
   await frame.locator('.pan-flink').click();
-  assert.match(await flashText(frame), /Select text to link · 请先选择文字/);
+  assert.match(await flashText(frame), /请先选择文字 · Select text to link/);
   assert.equal(await linking(frame), false);
 
   // The shell never takes the app's word for it: a javascript: ask straight to the broker is refused.

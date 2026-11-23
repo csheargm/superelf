@@ -55,11 +55,11 @@ test('first visit shows ONE tip beside the anchor, inside the viewport; dismiss 
   const me = meWith({ noteSort: 'created' });
   const p = page(me);
   const a = anchorAt(100);
-  p.T.register({ id: 'x-one', anchor: a, text: 'One · 一' });
+  p.T.register({ id: 'x-one', anchor: a, text: '一 · One' });
   await flush();
   const t = p.tip();
   assert.ok(t, 'the tip shows on the first visit');
-  assert.match(t.children[0].textContent, /One · 一/);
+  assert.match(t.children[0].textContent, /一 · One/);
   const r = t.getBoundingClientRect();
   assert.ok(!overlaps(r, a.getBoundingClientRect()), 'never covers its anchor');
   assert.ok(r.left >= 8 && r.right <= 375 - 8 && r.top >= 8 && r.bottom <= 812 - 8, 'inside the phone viewport');
@@ -68,14 +68,14 @@ test('first visit shows ONE tip beside the anchor, inside the viewport; dismiss 
   assert.deepEqual(me.appPrefs[SLUG], { noteSort: 'created', tipsSeen: ['x-one'] }, 'merged into the app prefs, nothing clobbered');
   assert.equal(me.systemPrompts.apps[SLUG], PROMPT, 'the prompt override survives (PAAppPrefs re-sends it)');
 
-  const p2 = page(me); p2.T.register({ id: 'x-one', anchor: anchorAt(100), text: 'One · 一' }); await flush();
+  const p2 = page(me); p2.T.register({ id: 'x-one', anchor: anchorAt(100), text: '一 · One' }); await flush();
   assert.equal(p2.tip(), undefined, 'second visit: no tip');
 });
 
 test('anchor at the bottom of an iPad screen: the tip goes above it, clamped to the right edge', async () => {
   const p = page(meWith(), { width: 1024, height: 768 });
   const a = fakeEl('button', { top: 730, left: 1000, width: 20, height: 30 });
-  p.T.register({ id: 'x-low', anchor: a, text: 'Low · 低' }); await flush();
+  p.T.register({ id: 'x-low', anchor: a, text: '低 · Low' }); await flush();
   const r = p.tip().getBoundingClientRect();
   assert.ok(r.bottom <= 730 && r.right <= 1024 - 8 && !overlaps(r, a.getBoundingClientRect()));
 });
@@ -83,16 +83,16 @@ test('anchor at the bottom of an iPad screen: the tip goes above it, clamped to 
 test('one at a time: the rest wait for the next open, in registration order', async () => {
   const me = meWith();
   const p = page(me);
-  p.T.register({ id: 'q1', anchor: anchorAt(100), text: 'First · 一' });
-  p.T.register({ id: 'q2', anchor: anchorAt(300), text: 'Second · 二' });
+  p.T.register({ id: 'q1', anchor: anchorAt(100), text: '一 · First' });
+  p.T.register({ id: 'q2', anchor: anchorAt(300), text: '二 · Second' });
   await flush();
   assert.equal([...p.doc.documentElement.children, ...p.body.children].filter((c) => c.classList.contains('pat-tip')).length, 1);
   assert.equal(p.T.current(), 'q1');
   p.tip().fire('click'); await p.T.whenIdle(); p.T.check(); await flush();
   assert.equal(p.tip(), undefined, 'not a second one on the same open');
   const p2 = page(me);
-  p2.T.register({ id: 'q1', anchor: anchorAt(100), text: 'First · 一' });
-  p2.T.register({ id: 'q2', anchor: anchorAt(300), text: 'Second · 二' });
+  p2.T.register({ id: 'q1', anchor: anchorAt(100), text: '一 · First' });
+  p2.T.register({ id: 'q2', anchor: anchorAt(300), text: '二 · Second' });
   await flush();
   assert.equal(p2.T.current(), 'q2', 'the next open shows the next tip');
 });
@@ -100,7 +100,7 @@ test('one at a time: the rest wait for the next open, in registration order', as
 test('a hidden anchor waits; check() after it appears shows the tip', async () => {
   const p = page(meWith());
   const a = fakeEl('button', { top: 0, left: 0, width: 0, height: 0 });
-  p.T.register({ id: 'h', anchor: () => a, text: 'Hidden · 隐藏' }); await flush();
+  p.T.register({ id: 'h', anchor: () => a, text: '隐藏 · Hidden' }); await flush();
   assert.equal(p.tip(), undefined);
   a.rect = { top: 50, left: 10, width: 40, height: 30 }; p.T.check(); await flush();
   assert.equal(p.T.current(), 'h');
@@ -108,7 +108,7 @@ test('a hidden anchor waits; check() after it appears shows the tip', async () =
 
 test('prefs cannot be read: no tip and no write (fail quiet, no repeated nagging)', async () => {
   const p = page(meWith(), { refuseRead: true });
-  p.T.register({ id: 'r', anchor: anchorAt(100), text: 'R · 读' }); await flush();
+  p.T.register({ id: 'r', anchor: anchorAt(100), text: '读 · R' }); await flush();
   assert.equal(p.tip(), undefined);
   assert.equal(p.writes.length, 0);
 });
@@ -120,12 +120,12 @@ test('Show tips again: the Settings link drops tipsSeen from the box; after Save
   const bd = fakeEl('div'), jTa = fakeEl('textarea'); jTa.value = JSON.stringify(me.appPrefs[SLUG]);
   const rows = p.win.PASettingsRows.mount(bd, jTa);
   assert.ok(rows, 'the section mounts where PATips is on the page');
-  const link = bd.children[0].children.find((c) => c.textContent === 'Show tips again · 重新显示提示');
+  const link = bd.children[0].children.find((c) => c.textContent === '重新显示提示 · Show tips again');
   assert.ok(link, 'the bilingual link is in the dialog');
   link.fire('click');
   assert.deepEqual(JSON.parse(jTa.value), { noteSort: 'created' });
   delete me.appPrefs[SLUG].tipsSeen;                       // what Save sends (the box), as the shell stores it
-  const p2 = page(me); p2.T.register({ id: 'x-one', anchor: anchorAt(100), text: 'One · 一' }); await flush();
+  const p2 = page(me); p2.T.register({ id: 'x-one', anchor: anchorAt(100), text: '一 · One' }); await flush();
   assert.equal(p2.T.current(), 'x-one');
 });
 
@@ -140,9 +140,9 @@ test('mutation control (R14): a dismissal that writes nothing shows the tip agai
   const src = TIPS_SRC.replace('chain=prefs().patch({[PREF]:all}); return chain;', 'return chain;');
   assert.notEqual(src, TIPS_SRC, 'the mutation matched');
   const me = meWith();
-  const p = page(me, { tipsSrc: src }); p.T.register({ id: 'm', anchor: anchorAt(100), text: 'M · 米' }); await flush();
+  const p = page(me, { tipsSrc: src }); p.T.register({ id: 'm', anchor: anchorAt(100), text: '米 · M' }); await flush();
   p.tip().fire('click'); await flush();
-  const p2 = page(me, { tipsSrc: src }); p2.T.register({ id: 'm', anchor: anchorAt(100), text: 'M · 米' }); await flush();
+  const p2 = page(me, { tipsSrc: src }); p2.T.register({ id: 'm', anchor: anchorAt(100), text: '米 · M' }); await flush();
   assert.equal(p2.T.current(), 'm', 'so the real test above is sensitive to the write');
 });
 
@@ -157,24 +157,24 @@ const FEATURES = [
   ['web/note-ui.inline.html', 'note-open-mode', 'TIP_OPEN_MODE'],
   ['web/drawer-groups.inline.html', 'drawer-bookmark', 'TIP'],
 ];
-test('each of the 8 recent features registers its tip in its own file, English then 中文', () => {
+test('each of the 8 recent features registers its tip in its own file, 中文 then English', () => {
   for (const [file, id, name] of FEATURES) {
     const src = read(file);
     assert.ok(src.includes(`PATips.register({id:'${id}`), `${file} registers ${id}`);
     const m = new RegExp(`(?:const |\\b)${name}[=:]'([^']+)'`).exec(src);
     assert.ok(m, `${file} defines ${name} once`);
-    const [en, zh] = m[1].split(' · ').length === 2 ? m[1].split(' · ') : [m[1].slice(0, m[1].lastIndexOf(' · ')), m[1].slice(m[1].lastIndexOf(' · ') + 3)];
-    assert.match(en, /^[\x20-\x7e⋯★·“”]+$/u, `${id}: English first`);
-    assert.match(zh, /[一-鿿]/u, `${id}: then 中文`);
+    const cut = m[1].indexOf(' · '), zh = m[1].slice(0, cut), en = m[1].slice(cut + 3);
+    assert.match(zh, /[一-鿿]/u, `${id}: 中文 first`);
+    assert.match(en, /^[\x20-\x7e⋯★·“”]+$/u, `${id}: then English`);
   }
-  assert.ok(read('web/ink-pen.inline.html').includes("'Pen tools: pen, highlighter, eraser, size and colour · 笔工具：笔、荧光笔、橡皮擦、粗细和颜色'"));
+  assert.ok(read('web/ink-pen.inline.html').includes("'笔工具：笔、荧光笔、橡皮擦、粗细和颜色 · Pen tools: pen, highlighter, eraser, size and colour'"));
 });
 
 // A shown tip follows its anchor (scroll / click / resize), and drops UNSEEN when the anchor is gone.
 const FOLLOW_OFF = TIPS_SRC.replace("document.addEventListener('scroll',onScroll,true);", '').replace("document.addEventListener('click',()=>{ follow(); later(check); },true);", "document.addEventListener('click',()=>later(check),true);");
 async function shownPage(id, a, opts = {}) {
   const raf = frames(); const p = page(meWith(), { raf, ...opts });
-  p.T.register({ id, anchor: () => a, text: 'F · 跟' });
+  p.T.register({ id, anchor: () => a, text: '跟 · F' });
   for (let i = 0; i < 4; i++) { await flush(); raf.run(); }   // check, two settle frames, the fade-in
   assert.equal(p.T.current(), id, 'precondition: the tip is shown'); return { p, raf };
 }
@@ -241,7 +241,7 @@ test('a long tip never exceeds the viewport width and stays inside it', async ()
   assert.notEqual(NO_MAXW, TIPS_SRC, 'the R14 mutation matched');
   for (const src of [TIPS_SRC, NO_MAXW]) {
     const p = page(meWith(), { width: 300, tipW: 600, tipsSrc: src });
-    p.T.register({ id: 'w', anchor: anchorAt(100, 250), text: 'W · 宽' }); await flush();
+    p.T.register({ id: 'w', anchor: anchorAt(100, 250), text: '宽 · W' }); await flush();
     const r = p.tip().getBoundingClientRect();
     assert.equal(r.left >= 8 && r.right <= 300 - 8, src === TIPS_SRC, src === TIPS_SRC ? 'inside' : 'R14: without the cap it overflows');
   }
@@ -251,7 +251,7 @@ test('the first show waits two animation frames after register', async () => {
   assert.notEqual(ONE_FRAME, TIPS_SRC, 'the R14 mutation matched');
   for (const src of [TIPS_SRC, ONE_FRAME]) {
     const raf = frames(); const p = page(meWith(), { raf, tipsSrc: src });
-    p.T.register({ id: 'f2', anchor: anchorAt(100), text: 'F · 帧' }); await flush();
+    p.T.register({ id: 'f2', anchor: anchorAt(100), text: '帧 · F' }); await flush();
     raf.run(); raf.run();                                   // check(), then one frame
     assert.equal(p.tip() === undefined, src === TIPS_SRC, src === TIPS_SRC ? 'not yet after one frame' : 'R14: one frame shows early');
     raf.run(); assert.equal(p.T.current(), 'f2', 'shown after the second frame');
@@ -280,7 +280,7 @@ test('anchor rendered after register: the observers re-check, the tip shows with
   assert.notEqual(NO_WATCH, TIPS_SRC, 'the R14 mutation matched');
   for (const src of [TIPS_SRC, NO_WATCH]) {
     const raf = frames(), MO = obsStub(), IO = obsStub(), p = page(meWith(), { raf, mo: MO, io: IO, tipsSrc: src });
-    p.T.register({ id: 'late', anchor: '.tag-strip', text: 'L · 晚' });
+    p.T.register({ id: 'late', anchor: '.tag-strip', text: '晚 · L' });
     for (let i = 0; i < 3; i++) { await flush(); raf.run(); }
     assert.equal(p.tip(), undefined, 'no anchor yet: no tip');
     const a = anchorAt(100); p.body.appendChild(a); p.doc.querySelector = (q) => (q === '.tag-strip' ? a : null);
@@ -295,18 +295,18 @@ test('anchor rendered after register: the observers re-check, the tip shows with
 // open, so a returning user hunted for Home. A priority tip goes first; the default order is unchanged.
 test('priority: a priority tip shows ahead of older unseen tips, even one already on screen; default order unchanged', async () => {
   const p = page(meWith());
-  p.T.register({ id: 'old-a', anchor: anchorAt(100), text: 'A · 甲' });
-  p.T.register({ id: 'old-b', anchor: anchorAt(200), text: 'B · 乙' });
+  p.T.register({ id: 'old-a', anchor: anchorAt(100), text: '甲 · A' });
+  p.T.register({ id: 'old-b', anchor: anchorAt(200), text: '乙 · B' });
   await flush();
   assert.equal(p.T.current(), 'old-a', 'control: without priority, registration order');
-  p.T.register({ id: 'home', anchor: anchorAt(300), text: 'Home · 主页', priority: true });
+  p.T.register({ id: 'home', anchor: anchorAt(300), text: '主页 · Home', priority: true });
   await flush();
   assert.equal(p.T.current(), 'home', 'the priority tip replaces the ordinary one this open');
   assert.deepEqual(p.T.seen(), [], 'the replaced tip was NOT marked seen: it shows on a later open');
   assert.deepEqual(p.T.registered().map((r) => r.id), ['home', 'old-a', 'old-b'], 'queued first');
   const q = page(meWith());
-  q.T.register({ id: 'home', anchor: anchorAt(300), text: 'Home · 主页', priority: true });
-  q.T.register({ id: 'old-a', anchor: anchorAt(100), text: 'A · 甲' });
+  q.T.register({ id: 'home', anchor: anchorAt(300), text: '主页 · Home', priority: true });
+  q.T.register({ id: 'old-a', anchor: anchorAt(100), text: '甲 · A' });
   await flush();
   assert.equal(q.T.current(), 'home', 'registered first or last, it shows first');
 });
@@ -319,15 +319,15 @@ test('priority: the app bar registers its Home tip with priority', () => {
 // used to free the slot, so two tips showed in one open. It now waits for the next open.
 test('priority: after a tip was dismissed this open, a late priority tip waits for the next open (one per open)', async () => {
   const p = page(meWith());
-  p.T.register({ id: 'old-a', anchor: anchorAt(100), text: 'A · 甲' });
+  p.T.register({ id: 'old-a', anchor: anchorAt(100), text: '甲 · A' });
   await flush();
   assert.equal(p.T.current(), 'old-a');
   p.tip().fire('click'); await p.T.whenIdle(); await flush();
-  p.T.register({ id: 'home', anchor: anchorAt(300), text: 'Home · 主页', priority: true });
+  p.T.register({ id: 'home', anchor: anchorAt(300), text: '主页 · Home', priority: true });
   await flush();
   assert.equal(p.tip(), undefined, 'no second tip this open');
   const q = page(meWith({ tipsSeen: ['old-a'] }));
-  q.T.register({ id: 'home', anchor: anchorAt(300), text: 'Home · 主页', priority: true });
+  q.T.register({ id: 'home', anchor: anchorAt(300), text: '主页 · Home', priority: true });
   await flush();
   assert.equal(q.T.current(), 'home', 'it shows on the next open');
 });

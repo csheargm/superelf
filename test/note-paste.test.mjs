@@ -233,7 +233,7 @@ test('audit: the photo-insert failure names its reason AND the cap, bilingually 
   assert.ok(!/flash\('Upload failed'\)/.test(ENGINE), 'the reasonless English-only message is gone');
   // ROUND 4: the pre-flight said 图片过大 while the shell said 照片过大, and it named the PHOTO'S
   // size instead of the LIMIT — so the message did not say what would fit. One wording, one number.
-  assert.match(ENGINE, /big:\(limit\)=>'Photo too large · 照片过大 \(max '\+photoMB\(limit\)\+'\)'/,
+  assert.match(ENGINE, /big:\(limit\)=>'照片过大 · Photo too large \(max '\+photoMB\(limit\)\+'\)'/,
     'the size refusal names the CAP, in the shell\'s own wording');
   assert.match(ENGINE, /flash\(PHOTO_TXT\.big\(PHOTO_MAX_BYTES\)\+PHOTO_TXT\.bigAct\)/, 'and the pre-flight uses it');
   assert.match(ENGINE, /flash\(PHOTO_TXT\.failed\+\(\(r&&\(r\.text\|\|r\.error\)\)\?' — '\+\(r\.text\|\|r\.error\):''\)\)/,

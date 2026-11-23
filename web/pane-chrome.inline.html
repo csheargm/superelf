@@ -52,8 +52,8 @@ html.pch-moving .pas-body{pointer-events:none}
   const MODES={docked:1,floating:1,max:1};
   // Float window limits, px. The first float takes DEF_W x DEF_H at the right of the viewport.
   const MIN_W=240, MIN_H=160, DEF_W=420, DEF_H=480, DEF_GAP=24, DEF_TOP=56;   // DEF_TOP: below an app's top bar (browser test: the first float covered the Note / Ask AI buttons)
-  const L_FLOAT='Float · 浮动', L_DOCK='Dock · 停靠', L_CLOSE='Close · 关闭';
-  const L_SAVE_ERR='Layout not saved · 布局未保存', L_READ_ERR='Layout not loaded · 布局未读取';
+  const L_FLOAT='浮动 · Float', L_DOCK='停靠 · Dock', L_CLOSE='关闭 · Close';
+  const L_SAVE_ERR='布局未保存 · Layout not saved', L_READ_ERR='布局未读取 · Layout not loaded';
   const root=document.documentElement;
   let front=null;   // the floating window on top (class pch-front); one per page, shared by every pane
   function raise(w){ if(front===w) return; if(front) front.classList.remove('pch-front'); w.classList.add('pch-front'); front=w; }

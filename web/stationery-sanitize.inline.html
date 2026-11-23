@@ -187,7 +187,7 @@ window.PAStationerySanitize=(function(){
   // and SHOWS the reason, so a throw here would strand a spinner or drop the rest of My templates (R5).
   function sanitize(svg,o){
     try{ return check(svg,o); }
-    catch(e){ return err('too complex to check · 过于复杂 — '+((e&&e.message)||String(e))); }
+    catch(e){ return err('过于复杂 · too complex to check — '+((e&&e.message)||String(e))); }
   }
   // simplify(svg) -> sanitize()'s result, with `note` (ADR 0003 amendment 5). A design refused ONLY for a size is not thrown
   // away: an element over its own limit (`limit`), or the render-cost budget (`over`), each set only after every other rule
@@ -195,13 +195,13 @@ window.PAStationerySanitize=(function(){
   // budget's steps (SIMPLIFY) take out the effects it prices, one kind at a time. EACH result goes through the whole check
   // again; the first that passes is the answer. A budget step that saves nothing, or that the check refuses, is undone, so
   // `note` names only what was taken out. Any other refusal is returned unchanged. A refusal simplify cannot get past is
-  // sanitize()'s own reason with no flag (shown after "Rejected · 已拒绝"); nothing fits the budget, or the call spent its one
+  // sanitize()'s own reason with no flag (shown after "已拒绝 · Rejected"); nothing fits the budget, or the call spent its one
   // work budget or passed its one deadline (stationery-simplify WORK, SIMPLIFY_MS): TOO_COMPLEX, the one result flagged `over`
   // (shown plain). Neither a limit nor the budget is loosened.
-  const TOO_COMPLEX='Too complex for the iPad to draw · 太复杂，iPad 画不动 — try again or ask for a simpler design · 请重试或要求简单些';
+  const TOO_COMPLEX='太复杂，iPad 画不动 · Too complex for the iPad to draw — 请重试或要求简单些 · try again or ask for a simpler design';
   const copy=(n)=>({name:n.name,attrs:n.attrs.map((a)=>a.slice()),kids:n.kids.map(copy)});   // depth <= MAX_DEPTH: parse() checked
   const noteOf=(s)=>{ s=s.filter((x,i)=>!s.slice(i+1).some((y)=>y.of&&y.of===x.of));      // a later step of one kind covers an earlier
-    return 'Simplified to draw fast, without '+s.map((x)=>x.en).join(', ')+' · 已简化：去掉了'+s.map((x)=>x.zh).join('、'); };
+    return '已简化：去掉了'+s.map((x)=>x.zh).join('、')+' · Simplified to draw fast, without '+s.map((x)=>x.en).join(', '); };
   function simplify(svg,o){
     // ONE work budget and ONE deadline for the WHOLE call, its first check too (R13 rounds 4 and 5). `o.clock`: the tests'. A
     // page served without the steps (web.mjs not restarted) has no meter: the try below refuses as before, shown().

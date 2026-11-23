@@ -204,7 +204,7 @@ test('the Settings UI actually displays it', () => {
   const SHELL = readShell(ROOT);
   assert.ok(SHELL.includes('id="jobRunOut"'), 'there is somewhere to show it');
   assert.match(SHELL, /j&&j\.ok&&j\.body/, 'and the reply body is read');
-  assert.match(SHELL, /Nothing to report today · 今日无需报告/, 'a silent run says so, rather than looking broken');
+  assert.match(SHELL, /今日无需报告 · Nothing to report today/, 'a silent run says so, rather than looking broken');
 });
 
 // ── Per-job model（每个任务指定模型）──────────────────────────────────────────────────────

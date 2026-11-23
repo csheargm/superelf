@@ -22,8 +22,9 @@ export const saveFails = (file) => ({ status: 500, only: file, on: 'put' });
 // attaches it as the real shell does, so an app that dropped it for its own words, or for the bare
 // error, fails here. A failed save is shown as the shell words it, so that one is anchored; a failed
 // read is wrapped.
-export const SHELL_READ_FAILED = /服务器错误 · Server error — Content not loaded · 未加载/;
-const shellSaveFailed = (noun) => new RegExp(`^服务器错误 · Server error — ${noun} not saved · 未保存`);
+export const SHELL_READ_FAILED = /服务器错误 · Server error — 内容未加载 · Content not loaded/;
+const NOUN_ZH = { Data: '数据', Note: '笔记' };
+const shellSaveFailed = (noun) => new RegExp(`^服务器错误 · Server error — ${NOUN_ZH[noun]}未保存 · ${noun} not saved`);
 export const SHELL_SAVE_FAILED = shellSaveFailed('Data');
 // A save-data request that names no `what` gets the shell's default noun, 'note': right for a PANote
 // host (Notes, Bible), wrong for an app's own raw save of anything else (Allergy, until it says 'data').

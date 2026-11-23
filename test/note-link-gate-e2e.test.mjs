@@ -29,7 +29,7 @@ test('only the listed apps open links: the same Journal under another slug is re
   await tab.close();
   frame = await openJournal(page, { slug: 'scratch' });
   const opened = []; ctx.on('page', (t) => opened.push(t.url()));
-  assert.deepEqual(await ask(frame, TARGET), { ok: false, text: 'This app cannot open links · 此应用不能打开链接' });
+  assert.deepEqual(await ask(frame, TARGET), { ok: false, text: '此应用不能打开链接 · This app cannot open links' });
   await page.waitForTimeout(300);
   assert.deepEqual(opened, [], 'nothing was opened');
   assert.deepEqual(errors, []);

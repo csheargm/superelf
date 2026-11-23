@@ -53,7 +53,7 @@ function makeSync(d){
     if(!committed){
       if(file) await d.db.put(OFF_FILES,{...file,prepared:text});   // the ts stays: a save under the POST is still told apart below
       const r=await d.post(row.slug,row.path,text);
-      if(!r||!r.ok){ if(r&&r.code==='network') return 'unreachable'; d.state({sync:'',fail:(r&&(r.error||r.code))||'no reply · 无回复'}); return 'failed'; }
+      if(!r||!r.ok){ if(r&&r.code==='network') return 'unreachable'; d.state({sync:'',fail:(r&&(r.error||r.code))||'无回复 · no reply'}); return 'failed'; }
     }
     // A save queued while the POST was in flight re-queued the row (a newer ts): it keeps its text
     // and its queued flag and takes the posted text as its base, or the next drain would drop it as

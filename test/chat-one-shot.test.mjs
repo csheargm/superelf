@@ -1,6 +1,6 @@
 // oneShot: one answer for a component, not a conversation · 组件的一次性回答
 //
-// THE BUG (measured 2026-10-12 with the real CLI): the Journal's "Design with AI · AI设计" sends
+// THE BUG (measured 2026-10-12 with the real CLI): the Journal's "AI设计 · Design with AI" sends
 // one request through PAChat.complete → the shell relay → /api/chat → `claude -p --model sonnet`.
 // With the user's adaptive thinking on, Sonnet drafted the whole SVG inside its thinking, hit the
 // 32,000-token output cap with zero text, retried, and never answered (4 of 4 runs, >10 min). With
@@ -42,7 +42,7 @@ const CONTRACT = appContract(ROOT);
 const APP = 'journal';
 // What the shell relay adds to every agent-reaching app request (web/index.html appAgentInit).
 const APP_HDR = { [APP_ORIGIN_HEADER]: APP_ORIGIN_VALUE };
-const CANCELLED_TEXT = 'Cancelled · 已取消';
+const CANCELLED_TEXT = '已取消 · Cancelled';
 
 // The fake streams what the real CLI streams before its answer (the init line, a text delta), so a
 // killed run leaves exactly the raw stream-json the server must never store. Instructions:

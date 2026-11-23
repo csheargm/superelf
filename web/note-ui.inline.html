@@ -472,22 +472,22 @@
   // document currently is, which is the same complaint as the font-size picker reporting a stale
   // value: a control that cannot be read is only half a control.
   const TXT_STYLES=[
-    ['h1','Title · 标题','font-size:1.35em;font-weight:700','Title'],
-    ['h2','Heading · 标题二','font-size:1.15em;font-weight:700','Heading'],
-    ['h3','Subheading · 小标题','font-weight:600','Sub'],
-    ['p','Body · 正文','','Body'],
-    ['pre','Monostyled · 等宽','font-family:ui-monospace,Menlo,monospace','Mono'],
-    ['blockquote','Block Quote · 引用','padding-left:.6em;border-left:3px solid currentColor;opacity:.75','Quote'],
+    ['h1','标题 · Title','font-size:1.35em;font-weight:700','Title'],
+    ['h2','标题二 · Heading','font-size:1.15em;font-weight:700','Heading'],
+    ['h3','小标题 · Subheading','font-weight:600','Sub'],
+    ['p','正文 · Body','','Body'],
+    ['pre','等宽 · Monostyled','font-family:ui-monospace,Menlo,monospace','Mono'],
+    ['blockquote','引用 · Block Quote','padding-left:.6em;border-left:3px solid currentColor;opacity:.75','Quote'],
   ];
   // [op, label]. Row/column edits only — a table is inserted by the same button when the caret
   // is NOT in one, which keeps it a single context-aware control rather than two that are each
   // wrong half the time.
   const TABLE_OPS=[
-    ['row+','Add row below · 下方加行'],
-    ['row-','Delete row · 删除行'],
-    ['col+','Add column right · 右侧加列'],
-    ['col-','Delete column · 删除列'],
-    ['kill','Delete table · 删除表格'],
+    ['row+','下方加行 · Add row below'],
+    ['row-','删除行 · Delete row'],
+    ['col+','右侧加列 · Add column right'],
+    ['col-','删除列 · Delete column'],
+    ['kill','删除表格 · Delete table'],
   ];
   const TABLE_COLS=3, TABLE_ROWS=3;                 // a new table, header row included
   const DASH_MARKER="'\u2013 '";                 // en dash + space, the marker Apple's Dashed List uses
@@ -766,9 +766,9 @@
     if(u.username||u.password) return null;                     // "https://bank.com@evil.com" hides where it goes
     return (own||u.hostname.includes('.'))?u.href:null;          // a bare word ("hello") is not a domain
   }
-  const LINK_TXT=Object.freeze({select:'Select text to link · 请先选择文字',
-    bad:'Only web or email links · 只能用网页或邮件链接', failed:'Link not changed · 链接未更改',
-    noShell:'Links open only inside superelf · 链接只能在 superelf 中打开'});
+  const LINK_TXT=Object.freeze({select:'请先选择文字 · Select text to link',
+    bad:'只能用网页或邮件链接 · Only web or email links', failed:'链接未更改 · Link not changed',
+    noShell:'链接只能在 superelf 中打开 · Links open only inside superelf'});
   const LINK_REQ='panlink';                    // the broker id of an open-url ask; its refusal comes back to onPrefs
   // The address a SELECTION is, when it is one. The owner pastes raw URLs into notes, often in
   // brackets with a colon after — "(https://…):" — and a drag takes those along. Ends are trimmed
@@ -1023,11 +1023,11 @@
   // save, that is the last line of defence here.
   const LOAD_STATUS={loaded:'loaded',absent:'absent',failed:'failed'};
   const LOAD_TXT={
-    locked:'Could not open · 无法打开 — not saving until it loads 载入成功前不会保存',
-    pending:'Not loaded yet · 尚未载入 — not saving 暂不保存',
-    unreadable:'Could not open · 无法打开 — the file could not be read 文件无法解析',
-    retry:'Retry · 重试',
-    safe:'Your note on the server has NOT been changed · 服务器上的笔记未被改动',
+    locked:'无法打开 · Could not open — not saving until it loads 载入成功前不会保存',
+    pending:'尚未载入 · Not loaded yet — not saving 暂不保存',
+    unreadable:'无法打开 · Could not open — the file could not be read 文件无法解析',
+    retry:'重试 · Retry',
+    safe:'服务器上的笔记未被改动 · Your note on the server has NOT been changed',
   };
   // The ONLY codes that mean "there is nothing there". Pinned against the shell broker's own
   // reply contract (web/index.html RELAY-CORE): it answers code:'not-found' with status 404 for a
@@ -1040,26 +1040,26 @@
     loaded:(data)=>({status:LOAD_STATUS.loaded,ok:true,data:data==null?null:data,error:'',code:''}),
     absent:()=>({status:LOAD_STATUS.absent,ok:true,data:null,error:'',code:'absent'}),
     failed:(error,code)=>({status:LOAD_STATUS.failed,ok:false,data:null,
-      error:String((error&&error.message)||error||'could not read · 无法读取'),code:String(code||'read_failed')}),
+      error:String((error&&error.message)||error||'无法读取 · could not read'),code:String(code||'read_failed')}),
     // Broker reply → outcome. ONLY an explicit not-found code (or a 404) is an absence: a relay
     // that answers `{ok:false,error:'not found'}` for a 401, a 500 and a fetch rejection alike is
     // exactly the bug this contract exists for, so a reply with NO code is a FAILURE.
     // Corrupt JSON is a failure too — "unparseable" is not "empty" (the Bible app's ANN_CORRUPT
     // block is the same rule, and it is the reason that app survived what the Journal did not).
     fromBroker(m){
-      if(!m||typeof m!=='object') return LOAD.failed('no reply from the store · 存储无响应','no_reply');
+      if(!m||typeof m!=='object') return LOAD.failed('存储无响应 · no reply from the store','no_reply');
       if(m.ok===true){
         if(typeof m.text==='string'){
           if(!m.text.trim()) return LOAD.absent();               // an empty file really is no content
           try{ return LOAD.loaded(JSON.parse(m.text)); }
-          catch(e){ return LOAD.failed('unreadable file · 文件无法解析 — '+((e&&e.message)||e),'corrupt'); }
+          catch(e){ return LOAD.failed('文件无法解析 · unreadable file — '+((e&&e.message)||e),'corrupt'); }
         }
         if('data' in m) return m.data==null?LOAD.absent():LOAD.loaded(m.data);
         return LOAD.absent();
       }
       const code=String(m.code||m.status||'').toLowerCase();
       if(LOAD_NOT_FOUND[code]) return LOAD.absent();
-      return LOAD.failed(m.error||'could not read · 无法读取',code||'read_failed');
+      return LOAD.failed(m.error||'无法读取 · could not read',code||'read_failed');
     },
     normalize(v){
       if(v&&typeof v==='object'&&typeof v.status==='string'){
@@ -1068,14 +1068,14 @@
         if(v.status===LOAD_STATUS.failed) return LOAD.failed(v.error,v.code);
       }
       if(v&&typeof v==='object'&&Array.isArray(v.pages)) return LOAD.loaded(v);   // a bare notebook: content in hand, nothing ambiguous
-      return LOAD.failed('load() did not report an outcome · 载入结果未知 — see PANote.LOAD','no_outcome');
+      return LOAD.failed('载入结果未知 · load() did not report an outcome — see PANote.LOAD','no_outcome');
     },
   };
 
   // Bilingual status strings — ONE source shared by the banner, the beforeunload warning AND the
   // apps' own save-failure messages (R3: exported as PANote.NOT_SAVED / PANote.SAVE_TXT, so every
   // surface that has to say "this did not save" says it the same way).
-  const NOT_SAVED='Not saved · 未保存', RETRYING='retrying 重试中';
+  const NOT_SAVED='未保存 · Not saved', RETRYING='retrying 重试中';
   const SAVE_TXT={
     notSaved:NOT_SAVED,
     retry:NOT_SAVED+' — '+RETRYING,
@@ -1084,16 +1084,16 @@
     // "still on this device" because that is now literally true and it is the only true thing to
     // say: the unsaved strokes live in this tab's notebook object and nowhere else, so the user's
     // one action is to go back to that note (the retry ladder is still running for it).
-    carried:'Earlier note not saved · 之前的笔记未保存 — still on this device 仍在本机，请勿关闭',
-    leave:'Unsaved handwriting · 有未保存的手写内容',
+    carried:'之前的笔记未保存 · Earlier note not saved — still on this device 仍在本机，请勿关闭',
+    leave:'有未保存的手写内容 · Unsaved handwriting',
     // OUTSTANDING (F2). The user came BACK to a note whose write never landed. It is not "retrying"
     // — the retry ladder for that note stopped when the pad was pointed away from it, and what the
     // pad now holds is what the SERVER holds — so this says only the true thing: the change that
     // did not land is not on the server. Cleared by a CONFIRMED write of THIS note, or by a tap.
-    outstanding:'Earlier change never saved · 之前的改动未保存 — not on the server 服务器上没有',
+    outstanding:'之前的改动未保存 · Earlier change never saved — not on the server 服务器上没有',
     // A store that answers ok:true while saying it wrote nothing. Not a confirmation, and never
     // allowed to clear a failure, reset the retry ladder or re-base the shrink floor (F2).
-    noop:'the store wrote nothing · 存储未写入任何内容',
+    noop:'存储未写入任何内容 · the store wrote nothing',
   };
   // ── Photo insert: the SIZE refusal, named (leftover (e), finished in round 4) ───────────────
   // The failure a user CAN act on — the picture is too big — must never read like the ones they
@@ -1113,14 +1113,14 @@
   const PHOTO_TXT={
     // Identical wording to the shell's RELAY_NOUNS.photo.head (web/index.html), pinned by test —
     // the same refusal must not read as two different things depending on which half caught it.
-    big:(limit)=>'Photo too large · 照片过大 (max '+photoMB(limit)+')',
+    big:(limit)=>'照片过大 · Photo too large (max '+photoMB(limit)+')',
     bigAct:' — pick a smaller photo, or crop it 请选择更小的照片或裁剪后重试',
-    failed:'Photo not added · 照片未添加',
-    broken:'Could not add photo · 无法添加照片',
+    failed:'照片未添加 · Photo not added',
+    broken:'无法添加照片 · Could not add photo',
     // Reachable only on a page that mounts this pad WITHOUT PAPhoto. Deliberately the heading
     // only — the full sentence belongs to chat-ui's PAC_NO_PHOTO and is not copied here (R3),
     // the same rule PAPhoto's own `bigNoChat` follows.
-    noComponent:'Photo unavailable · 无法添加照片 — the shared photo component did not load 未加载共享照片组件',
+    noComponent:'无法添加照片 · Photo unavailable — the shared photo component did not load 未加载共享照片组件',
   };
   // The ONE place a broker reply becomes a save outcome (R3). Anything that is not an explicit
   // ok:true is a failure — including `undefined`, which is what a fire-and-forget caller returns.
@@ -1143,8 +1143,8 @@
       // {ok:true} would otherwise have to learn about fields that are meaningless to it.
       : (m.warn ? {ok:true,warn:m.warn,bytes:m.bytes|0,limit:m.limit|0} : {ok:true}))
     // A failure keeps the shell's sentence (relayFail in web/index.html: what was refused, why, the
-    // cap). Dropping it here left Notes and the Bible showing "Not saved · 未保存 — <raw error>".
-    : {ok:false,error:String((m&&m.error)||'save rejected · 保存被拒绝'),...(m&&typeof m.text==='string'&&m.text?{text:m.text}:{})};
+    // cap). Dropping it here left Notes and the Bible showing "未保存 · Not saved — <raw error>".
+    : {ok:false,error:String((m&&m.error)||'保存被拒绝 · save rejected'),...(m&&typeof m.text==='string'&&m.text?{text:m.text}:{})};
   // TODO(R4): grows this over-budget file; the split seam is this DOM-free block (SAVE_TIMEOUT_MS
   // down to function Note()), which the tests already extract at exactly that boundary.
   // What a host's notice says for a save that did not land (R3): the shell's sentence when there is
@@ -1294,13 +1294,13 @@
     // Proven server behaviour this guards against: POST /api/save-data replaces a 44KB notebook
     // with `null` and answers 200 {"ok":true} — the server cannot detect this, so the client must.
     function regression(nb){
-      if(!nb||!Array.isArray(nb.pages)||!nb.pages.length) return 'refused: empty notebook · 拒绝写入空笔记';
+      if(!nb||!Array.isArray(nb.pages)||!nb.pages.length) return '拒绝写入空笔记 · refused: empty notebook';
       if(!base||shrinkOk) return '';
       const now=census(nb);
       if(now.count<base.count) return 'refused: pages '+base.count+'→'+now.count+' · 页数变少，拒绝覆盖';
       for(const id in base.pages){
         const b=base.pages[id], n=now.pages[id];
-        if(!n) return 'refused: a page disappeared · 页面丢失，拒绝覆盖';
+        if(!n) return '页面丢失，拒绝覆盖 · refused: a page disappeared';
         if(n.s<b.s) return 'refused: strokes '+b.s+'→'+n.s+' · 笔迹变少，拒绝覆盖';
         if(n.im<b.im) return 'refused: images '+b.im+'→'+n.im+' · 图片变少，拒绝覆盖';
         // TEXT counts too (V3 amplifier): the guard protected handwriting and images but not the
@@ -1458,7 +1458,7 @@
     };
   }
 
-  const TIP_OPEN_MODE='A note opens in Text when its page is typed, in Draw or Select when it is ink · 打字的页面以文字打开，手写的页面以手写或选择打开';   // TODO(R4 seam): first-use tip text (ADR 0030)
+  const TIP_OPEN_MODE='打字的页面以文字打开，手写的页面以手写或选择打开 · A note opens in Text when its page is typed, in Draw or Select when it is ink';   // TODO(R4 seam): first-use tip text (ADR 0030)
   function Note(host, opts){
     const PAGES=!!opts.pages;
     const hasTop=!!(opts.onHistory||opts.onClose||opts.title);
@@ -1475,21 +1475,21 @@
     if(PAGES) host.style.setProperty('--pan-toolsbottom','60px');
     host.innerHTML=
       (hasTop?'<div class="pan-top">'+
-        (opts.onHistory?'<button class="pan-hbtn pan-hist" title="Notes &amp; Chats · 笔记与对话" aria-label="Notes &amp; Chats">'+ico('menu')+'</button>':'<span style="width:30px"></span>')+
+        (opts.onHistory?'<button class="pan-hbtn pan-hist" title="笔记与对话 · Notes &amp; Chats" aria-label="Notes &amp; Chats">'+ico('menu')+'</button>':'<span style="width:30px"></span>')+
         '<div class="pan-htitle"></div>'+
-        (opts.onAsk?'<button class="pan-hask" title="Ask AI · 问一问" aria-label="Ask AI">'+ico('ask')+'</button>':'')+
-        '<button class="pan-hmode pan-mdraw" data-mode="draw" title="Draw · 手写" aria-pressed="false">'+ico('pen')+'<span class="pan-mlbl">Draw</span></button>'+
-        '<button class="pan-hmode pan-mtext" data-mode="text" title="Text · 文字" aria-pressed="false"><span class="pan-mico">T</span><span class="pan-mlbl">Text</span></button>'+
+        (opts.onAsk?'<button class="pan-hask" title="问一问 · Ask AI" aria-label="Ask AI">'+ico('ask')+'</button>':'')+
+        '<button class="pan-hmode pan-mdraw" data-mode="draw" title="手写 · Draw" aria-pressed="false">'+ico('pen')+'<span class="pan-mlbl">Draw</span></button>'+
+        '<button class="pan-hmode pan-mtext" data-mode="text" title="文字 · Text" aria-pressed="false"><span class="pan-mico">T</span><span class="pan-mlbl">Text</span></button>'+
         /* Page SETTINGS, not a mode. Template and Background were parked in the drawing row, which
            made them unreachable from Text mode even though a template is a property of the PAGE —
            the ruled lines a typed note sits on are the same ruled lines a written one does. */
-        (imgHooks?'<button class="pan-hphoto" title="Insert photo · 插入图片" aria-label="Insert photo">'+ico('photo')+'</button>':'')+
-        '<button class="pan-hmore" title="Page settings · 页面设置" aria-label="Page settings">'+ico('more')+'</button>'+
-        '<button class="pan-hprint" title="Print · 打印" aria-label="Print 打印">'+ico('print')+'</button>'+
+        (imgHooks?'<button class="pan-hphoto" title="插入图片 · Insert photo" aria-label="Insert photo">'+ico('photo')+'</button>':'')+
+        '<button class="pan-hmore" title="页面设置 · Page settings" aria-label="Page settings">'+ico('more')+'</button>'+
+        '<button class="pan-hprint" title="打印 · Print" aria-label="Print 打印">'+ico('print')+'</button>'+
         (opts.onClose?'<button class="pan-hx" title="Close" aria-label="Close">'+ico('close')+'</button>':'<span style="width:30px"></span>')+
       '</div>':'')+
       /* Save status — always in the DOM, so a rejected write can never fail to have a surface. */
-      '<div class="pan-save" role="status" aria-live="polite" title="Tap to retry · 点击重试"></div>'+
+      '<div class="pan-save" role="status" aria-live="polite" title="点击重试 · Tap to retry"></div>'+
       /* Locked-note curtain — always in the DOM, like the save pill, so a load that could not be
          trusted can never fail to have a surface. It also physically prevents drawing into a note
          that cannot be saved, which would only create more work to lose. */
@@ -1506,7 +1506,7 @@
         TOOLS.filter(t=>!(hasTop&&t[0]==='text')).map(t=>'<button class="pan-tbtn pan-tool" data-tool="'+t[0]+'" title="'+t[2]+'" aria-label="'+t[2]+'">'+(ICON[t[1]]?ico(t[1]):t[1])+'</button>').join('')+
         '<span class="pan-sep"></span>'+
         '<button class="pan-tbtn pan-inkbtn" title="Color &amp; size"><span class="pan-inkdot"></span></button>'+
-        (hasTop?'':'<button class="pan-tbtn pan-paperbtn" title="Paper &amp; background · 纸张与背景" aria-label="Paper and background">'+ico('paper')+'</button>')+
+        (hasTop?'':'<button class="pan-tbtn pan-paperbtn" title="纸张与背景 · Paper &amp; background" aria-label="Paper and background">'+ico('paper')+'</button>')+
         '<span class="pan-sep"></span>'+
         '<button class="pan-tbtn pan-undo" title="Undo" aria-label="Undo">'+ico('undo')+'</button>'+
         '<button class="pan-tbtn pan-redo" title="Redo" aria-label="Redo">'+ico('redo')+'</button>'+
@@ -1525,23 +1525,23 @@
         '</div>'+
         '<label class="pan-poprow" style="cursor:pointer;user-select:none;gap:8px;align-items:center">'+
           '<input type="checkbox" class="pan-fingercb" style="width:16px;height:16px;accent-color:var(--accent,#0a7a5a)">'+
-          '<span style="font-size:13px">Allow finger drawing · 允许手指</span>'+
+          '<span style="font-size:13px">允许手指 · Allow finger drawing</span>'+
         '</label>'+
         /* Print setting. Lives beside finger-draw because it is the same KIND of thing: a device
            preference the shell stores and broadcasts, not part of any note. Default ON — a printer
            laying a full-bleed paper tint over every sheet is almost never what someone wants. */
         '<label class="pan-poprow" style="cursor:pointer;user-select:none;gap:8px;align-items:center">'+
           '<input type="checkbox" class="pan-inkcb" checked style="width:16px;height:16px;accent-color:var(--accent,#0a7a5a)">'+
-          '<span style="font-size:13px">Print ink only, white paper · 仅打印墨迹（白纸）</span>'+
+          '<span style="font-size:13px">仅打印墨迹（白纸） · Print ink only, white paper</span>'+
         '</label>'+
         '<label class="pan-poprow" style="cursor:pointer;user-select:none;gap:8px;align-items:center">'+
           '<input type="checkbox" class="pan-noflipcb" checked style="width:16px;height:16px;accent-color:var(--accent,#0a7a5a)">'+
-          '<span style="font-size:13px">Disable swipe to flip page · 禁用滑动翻页</span>'+
+          '<span style="font-size:13px">禁用滑动翻页 · Disable swipe to flip page</span>'+
         '</label>'+
         /* Diagnostics, beside the other device-level Pencil settings rather than a toolbar button:
            the owner taps it right after the Pencil misbehaves (see the Pencil recorder). Shown only
            when the host wired opts.saveLog — a host with nowhere to put the file shows nothing. */
-        (opts.saveLog?'<button type="button" class="pan-photoopt pan-sendlog">'+ico('pen')+'<span class="pan-optlbl">Send Pencil log · 发送笔迹日志</span></button>':'')+
+        (opts.saveLog?'<button type="button" class="pan-photoopt pan-sendlog">'+ico('pen')+'<span class="pan-optlbl">发送笔迹日志 · Send Pencil log</span></button>':'')+
       '</div>'+
       // Paper popover: template picker (Basic / Notepads) + background-colour swatches. Reuses
       // the .pan-tbtn buttons and the .pan-sw swatch pattern from the ink popover (R3).
@@ -1551,7 +1551,7 @@
            unreachable from Text mode, and a paste was unreachable with nothing selected at all —
            you could copy handwriting, flip the page, and find nowhere to put it. */
 
-        '<button class="pan-photoopt pan-pgpaste" data-pg="paste" style="display:none">'+ico('paste')+'<span class="pan-optlbl">Paste · 粘贴</span></button>'+
+        '<button class="pan-photoopt pan-pgpaste" data-pg="paste" style="display:none">'+ico('paste')+'<span class="pan-optlbl">粘贴 · Paste</span></button>'+
         /* The page's TRANSCRIPT (what the node recognised of its ink and pictures) — read-only, opened by
            PANoteText (web/note-text.inline.html); a property of the PAGE, so it lives with the paper. */
         '<button class="pan-photoopt pan-pgtext" data-pg="text">'+ico('list')+'<span class="pan-optlbl">'+SEARCH_TXT.transcript+'</span></button>'+
@@ -1564,36 +1564,36 @@
            and a half-right mode on a writing surface is worse than no mode. The rendering path
            stays (it is exercised by tests and by print's sheet splitting) so that reinstating it
            is putting these two buttons back, not rebuilding it. See SEAMLESS_WITHDRAWN. */
-        '<div class="pan-customlbl">Template · 模板</div>'+
-        '<div class="pan-tplrow"><span class="pan-tplgrp">Basic · 基础</span>'+
+        '<div class="pan-customlbl">模板 · Template</div>'+
+        '<div class="pan-tplrow"><span class="pan-tplgrp">基础 · Basic</span>'+
           TEMPLATES.filter(t=>t[3]==='basic').map(t=>'<button class="pan-tbtn pan-tpl" data-tpl="'+t[0]+'" title="'+t[1]+'">'+t[2]+'</button>').join('')+
         '</div>'+
-        '<div class="pan-tplrow"><span class="pan-tplgrp">Notepads · 便签</span>'+
+        '<div class="pan-tplrow"><span class="pan-tplgrp">便签 · Notepads</span>'+
           TEMPLATES.filter(t=>t[3]==='pad').map(t=>'<button class="pan-tbtn pan-tpl" data-tpl="'+t[0]+'" title="'+t[1]+'">'+t[2]+'</button>').join('')+
         '</div>'+
         (STN?'<div class="pan-tplrow pan-strow"><span class="pan-tplgrp">信纸 · Stationery</span><div class="pst-list"></div></div>':'')+
-        '<div class="pan-customlbl">Background · 背景</div>'+
+        '<div class="pan-customlbl">背景 · Background</div>'+
         '<div class="pan-swgrid">'+
           PAPER_BGS.map(b=>'<button class="pan-sw pan-bgsw" data-bg="'+b[1]+'" style="background:'+b[1]+'" title="'+b[0]+'"></button>').join('')+
         '</div>'+
       '</div>'+
       (imgHooks?'<div class="pan-pop pan-photopop" style="min-width:190px">'+
-        '<button class="pan-photoopt" data-photo="library">'+ico('photo')+'<span class="pan-optlbl">Photo Library · 相册</span></button>'+
-        '<button class="pan-photoopt" data-photo="camera">'+ico('camera')+'<span class="pan-optlbl">Take Photo · 拍照</span></button>'+
-        '<button class="pan-photoopt" data-photo="scan">'+ico('scan')+'<span class="pan-optlbl">Scan Document · 扫描</span></button>'+
+        '<button class="pan-photoopt" data-photo="library">'+ico('photo')+'<span class="pan-optlbl">相册 · Photo Library</span></button>'+
+        '<button class="pan-photoopt" data-photo="camera">'+ico('camera')+'<span class="pan-optlbl">拍照 · Take Photo</span></button>'+
+        '<button class="pan-photoopt" data-photo="scan">'+ico('scan')+'<span class="pan-optlbl">扫描 · Scan Document</span></button>'+
         /* Only rendered when something has been copied — an always-visible Paste that does
            nothing is a control that teaches the user to distrust the menu. */
-        '<button class="pan-photoopt pan-pasteopt" data-photo="paste" style="display:none">'+ico('paste')+'<span class="pan-optlbl">Paste · 粘贴</span></button>'+
+        '<button class="pan-photoopt pan-pasteopt" data-photo="paste" style="display:none">'+ico('paste')+'<span class="pan-optlbl">粘贴 · Paste</span></button>'+
       '</div>':'')+
       /* Selected-image menu. ONE context-aware control instead of a handle per verb: the picture
          already carries a resize handle, and edit/copy/cut/delete would have made five things to
          aim at on a photo the size of a thumb. */
       '<div class="pan-pop pan-imgpop" style="min-width:200px">'+
-        '<button class="pan-photoopt" data-img="ask">'+ico('ask')+'<span class="pan-optlbl">Ask AI · 问一问</span></button>'+
-        '<button class="pan-photoopt" data-img="crop">'+ico('crop')+'<span class="pan-optlbl">Crop · 裁剪</span></button>'+
-        '<button class="pan-photoopt" data-img="copy">'+ico('copy')+'<span class="pan-optlbl">Copy · 复制</span></button>'+
-        '<button class="pan-photoopt" data-img="cut">'+ico('cut')+'<span class="pan-optlbl">Cut · 剪切</span></button>'+
-        '<button class="pan-photoopt del" data-img="delete">'+ico('trash')+'<span class="pan-optlbl">Delete · 删除</span></button>'+
+        '<button class="pan-photoopt" data-img="ask">'+ico('ask')+'<span class="pan-optlbl">问一问 · Ask AI</span></button>'+
+        '<button class="pan-photoopt" data-img="crop">'+ico('crop')+'<span class="pan-optlbl">裁剪 · Crop</span></button>'+
+        '<button class="pan-photoopt" data-img="copy">'+ico('copy')+'<span class="pan-optlbl">复制 · Copy</span></button>'+
+        '<button class="pan-photoopt" data-img="cut">'+ico('cut')+'<span class="pan-optlbl">剪切 · Cut</span></button>'+
+        '<button class="pan-photoopt del" data-img="delete">'+ico('trash')+'<span class="pan-optlbl">删除 · Delete</span></button>'+
       '</div>'+
       '<div class="pan-bar pan-pages"'+(PAGES?'':' style="display:none"')+'>'+   /* page nav opens expanded by default (tools bar stays collapsed) */
         '<button class="pan-grip" title="Pages · drag to move · tap to collapse" aria-label="Move or collapse page controls">'+ico('grip')+'</button>'+
@@ -1610,35 +1610,35 @@
         '<button class="pan-fmtbtn" data-cmd="bold" title="Bold" style="font-weight:800">B</button>'+
         '<button class="pan-fmtbtn" data-cmd="italic" title="Italic" style="font-style:italic">I</button>'+
         '<button class="pan-fmtbtn" data-cmd="underline" title="Underline" style="text-decoration:underline">U</button>'+
-        '<button class="pan-fmtbtn" data-cmd="strikeThrough" title="Strikethrough · 删除线" style="text-decoration:line-through">S</button>'+
-        '<button class="pan-fmtbtn pan-flink" title="Link · 链接" aria-label="Link">'+ico('link')+'</button>'+
+        '<button class="pan-fmtbtn" data-cmd="strikeThrough" title="删除线 · Strikethrough" style="text-decoration:line-through">S</button>'+
+        '<button class="pan-fmtbtn pan-flink" title="链接 · Link" aria-label="Link">'+ico('link')+'</button>'+
         '<span class="pan-sep"></span>'+
-        '<button class="pan-fmtbtn pan-fstyle" title="Paragraph style · 段落样式" aria-label="Paragraph style">Aa</button>'+
+        '<button class="pan-fmtbtn pan-fstyle" title="段落样式 · Paragraph style" aria-label="Paragraph style">Aa</button>'+
         '<span class="pan-sep"></span>'+
         '<select class="pan-fmtsize" title="Font size">'+
           TXT_SIZES.map(s=>'<option value="'+s+'"'+(s===TXT_PX?' selected':'')+'>'+s+'</option>').join('')+
         '</select>'+
         '<input type="color" class="pan-fmtcolor" value="'+COLORS[0]+'" title="Text colour">'+
-        '<button class="pan-fmtbtn pan-fhl" title="Highlight · 高亮" aria-label="Highlight">'+ico('highlighter')+'</button>'+
+        '<button class="pan-fmtbtn pan-fhl" title="高亮 · Highlight" aria-label="Highlight">'+ico('highlighter')+'</button>'+
         '<span class="pan-sep"></span>'+
         '<button class="pan-fmtbtn" data-cmd="insertUnorderedList" title="Bulleted list" aria-label="Bulleted list">'+ico('list')+'</button>'+
-        '<button class="pan-fmtbtn pan-ftable" title="Table · 表格" aria-label="Table">'+ico('table')+'</button>'+
-        '<button class="pan-fmtbtn pan-fdash" title="Dashed list · 短横线列表" aria-label="Dashed list">\u2013</button>'+
+        '<button class="pan-fmtbtn pan-ftable" title="表格 · Table" aria-label="Table">'+ico('table')+'</button>'+
+        '<button class="pan-fmtbtn pan-fdash" title="短横线列表 · Dashed list" aria-label="Dashed list">\u2013</button>'+
         '<button class="pan-fmtbtn" data-cmd="insertOrderedList" title="Numbered list">1.</button>'+
         '<span class="pan-sep"></span>'+
-        '<button class="pan-fmtbtn pan-fmtundo" title="Undo · 撤销" aria-label="Undo">'+ico('undo')+'</button>'+
-        '<button class="pan-fmtbtn pan-fmtredo" title="Redo · 重做" aria-label="Redo">'+ico('redo')+'</button>'+
+        '<button class="pan-fmtbtn pan-fmtundo" title="撤销 · Undo" aria-label="Undo">'+ico('undo')+'</button>'+
+        '<button class="pan-fmtbtn pan-fmtredo" title="重做 · Redo" aria-label="Redo">'+ico('redo')+'</button>'+
       '</div>'+
       // Highlight-colour popover for the T-mode formatting bar — reuses the .pan-swgrid/.pan-sw
       // swatch component + the shared COLORS palette (R3). The first chip clears the highlight (None).
       /* The selection's own menu — handwriting can now be copied, pasted onto another page and
          asked about, not only moved and deleted. Same row shape as the image menu. */
       '<div class="pan-pop pan-selpop" style="min-width:210px">'+
-        '<button class="pan-photoopt pan-selaskopt" data-sel="ask">'+ico('ask')+'<span class="pan-optlbl">Ask AI · 问一问</span></button>'+
-        '<button class="pan-photoopt" data-sel="copy">'+ico('copy')+'<span class="pan-optlbl">Copy · 复制</span></button>'+
-        '<button class="pan-photoopt" data-sel="cut">'+ico('cut')+'<span class="pan-optlbl">Cut · 剪切</span></button>'+
-        '<button class="pan-photoopt pan-selpasteopt" data-sel="paste" style="display:none">'+ico('paste')+'<span class="pan-optlbl">Paste · 粘贴</span></button>'+
-        '<button class="pan-photoopt del" data-sel="delete">'+ico('trash')+'<span class="pan-optlbl">Delete · 删除</span></button>'+
+        '<button class="pan-photoopt pan-selaskopt" data-sel="ask">'+ico('ask')+'<span class="pan-optlbl">问一问 · Ask AI</span></button>'+
+        '<button class="pan-photoopt" data-sel="copy">'+ico('copy')+'<span class="pan-optlbl">复制 · Copy</span></button>'+
+        '<button class="pan-photoopt" data-sel="cut">'+ico('cut')+'<span class="pan-optlbl">剪切 · Cut</span></button>'+
+        '<button class="pan-photoopt pan-selpasteopt" data-sel="paste" style="display:none">'+ico('paste')+'<span class="pan-optlbl">粘贴 · Paste</span></button>'+
+        '<button class="pan-photoopt del" data-sel="delete">'+ico('trash')+'<span class="pan-optlbl">删除 · Delete</span></button>'+
       '</div>'+
       '<div class="pan-pop pan-tablepop" style="min-width:215px">'+
         TABLE_OPS.map(o=>'<button class="pan-styleopt" data-tbl="'+o[0]+'">'+o[1]+'</button>').join('')+
@@ -1649,14 +1649,14 @@
       // The Link button's address field — a strip under the button, like the highlight swatches:
       // docked in a phone's title row the bar is a scrolling sliver with no room for a field.
       '<div class="pan-linkpop">'+
-        '<input class="pan-linkurl" type="url" inputmode="url" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="https://… · 网址" aria-label="Link address · 链接地址">'+
-        '<button class="pan-linkok">Apply · 应用</button><button class="pan-linkrm">Remove · 移除</button>'+
-        '<button class="pan-fmtbtn pan-linkx" title="Cancel · 取消" aria-label="Cancel">'+ico('close')+'</button>'+
+        '<input class="pan-linkurl" type="url" inputmode="url" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="网址 · https://…" aria-label="链接地址 · Link address">'+
+        '<button class="pan-linkok">应用 · Apply</button><button class="pan-linkrm">移除 · Remove</button>'+
+        '<button class="pan-fmtbtn pan-linkx" title="取消 · Cancel" aria-label="Cancel">'+ico('close')+'</button>'+
       '</div>'+
       '<div class="pan-hlpop">'+
-        '<div class="pan-customlbl">Highlight · 高亮</div>'+
+        '<div class="pan-customlbl">高亮 · Highlight</div>'+
         '<div class="pan-swgrid">'+
-          '<button class="pan-sw pan-hlnone" data-hl="none" title="None · 无" aria-label="No highlight"></button>'+
+          '<button class="pan-sw pan-hlnone" data-hl="none" title="无 · None" aria-label="No highlight"></button>'+
           swatchesHtml('hl')+
         '</div>'+
       '</div>';
@@ -2252,9 +2252,9 @@
     // note that lost handwriting was 6.54MB. "Straighten it a bit more" is worth that trade;
     // "undo my crop" is not offered, and undo covers the placement rather than the pixels.
     const EDIT_TXT={
-      unavailable:'Photo editor unavailable · 图片编辑器未加载',
-      fetching:'Opening the photo · 正在打开图片…',
-      noBytes:'Could not read this photo · 无法读取该图片',
+      unavailable:'图片编辑器未加载 · Photo editor unavailable',
+      fetching:'正在打开图片… · Opening the photo',
+      noBytes:'无法读取该图片 · Could not read this photo',
     };
     async function editImage(im){
       if(!im||!imgHooks) return;
@@ -2318,7 +2318,7 @@
     function syncPasteOpt(){ syncPasteRows(); }          // kept as the name other call sites use
 
     // ── The selected-image menu ───────────────────────────────────────────────────────────
-    const IMG_TXT={ copied:'Image copied · 已复制图片', cut:'Image cut · 已剪切图片' };
+    const IMG_TXT={ copied:'已复制图片 · Image copied', cut:'已剪切图片 · Image cut' };
     function openImgMenu(im,at){
       const pop=q('.pan-imgpop'); if(!pop||!im) return;
       const cropBtn=pop.querySelector('[data-img="crop"]');
@@ -2356,7 +2356,7 @@
     // flips it editable (.pan-txted): put the cursor and type;
     // text flows down and wraps at the page width. The page's HTML persists as page.pageHtml.
     let txtEdit=null;                                          // {el:region} while the T tool is active (region editable); null otherwise
-    const PH='Tap to type · 点按输入';    // placeholder for the empty page (shown only in the T tool)
+    const PH='点按输入 · Tap to type';    // placeholder for the empty page (shown only in the T tool)
     // Caret helper — place the cursor at the end of the region's content.
     function caretToEnd(el){ try{ const r=document.createRange(); r.selectNodeContents(el); r.collapse(false);
       const s=window.getSelection(); s.removeAllRanges(); s.addRange(r); }catch(_){ /* selection unavailable: region still editable, caret defaults */ } }
@@ -2409,7 +2409,7 @@
         r.insertNode(frag);
         if(last){ r.setStartAfter(last); r.collapse(true); s.removeAllRanges(); s.addRange(r); }
         return true;
-      }catch(err){ flash('Paste failed · 粘贴失败'); return false; }   // R5: a failed paste is never silent
+      }catch(err){ flash('粘贴失败 · Paste failed'); return false; }   // R5: a failed paste is never silent
     }
     // ── ONE paste handler per paste event (V6) ───────────────────────────────────────────────
     // ROUND-2 REGRESSION, removed here: this engine grew a markdown paste converter while an app
@@ -2466,7 +2466,7 @@
       if(range&&el){ try{ const s=window.getSelection(); s.removeAllRanges(); s.addRange(range); }
         catch(_){ /* the range detached while rendering: the caret stays where it is — the text still lands */ } }
       insertPaste(html?sanitizeHtml(html):fallback);
-      if(!html) flash('Pasted with the built-in formatter · 已用内置格式粘贴');
+      if(!html) flash('已用内置格式粘贴 · Pasted with the built-in formatter');
     }
     // The document-level claim (1). Guarded on the target so a paste anywhere else in the app —
     // a search box, a rename field — is untouched.
@@ -2580,7 +2580,7 @@
       const r=(savedRange&&el.contains(savedRange.commonAncestorContainer))?savedRange:null;
       if(!r){ endFmt(false); return; }                        // caret is not in the region — nothing to size
       const done=r.collapsed ? sizeBlock(r,px,el) : sizeRange(r,px);
-      if(!done){ flash('Select the text to resize · 请先选择要改变字号的文字'); endFmt(false); return; }
+      if(!done){ flash('请先选择要改变字号的文字 · Select the text to resize'); endFmt(false); return; }
       onTextInput();                                          // a scripted DOM edit fires no 'input'
       endFmt(false); }
     // Highlight (text background) the selection with the chosen colour — a marker over the words.
@@ -3002,9 +3002,9 @@
     // It could be moved, resized and deleted, and nothing else: no copy, no paste onto another
     // page, and no way to ask the AI what the writing says — which for a handwriting app is the
     // question people most want to ask of it.
-    const SEL_TXT={ copied:'Selection copied · 已复制', cut:'Selection cut · 已剪切',
-      empty:'Nothing to paste · 没有可粘贴的内容', tooBig:'Selection too large to send · 选区过大',
-      noUp:'Could not prepare the selection · 无法准备选区' };
+    const SEL_TXT={ copied:'已复制 · Selection copied', cut:'已剪切 · Selection cut',
+      empty:'没有可粘贴的内容 · Nothing to paste', tooBig:'选区过大 · Selection too large to send',
+      noUp:'无法准备选区 · Could not prepare the selection' };
     let _selClip=null;                                  // {strokes:[…], images:[…], w, h} in bbox-relative coords
     // The pad has two clipboards — a copied IMAGE and a copied SELECTION — and one Paste control.
     // Filling either clears the other, so "paste" always means the last thing copied rather than
@@ -3257,18 +3257,18 @@
     const reveal=window.PANoteReveal?window.PANoteReveal.attach({host,stage,pageInner,textLayer,flipTo,listen:listenG}):null;
     // The Transcript panel（转写）: the page settings' row opens it; it reads the node's index for the
     // note opts.doc() names (web/note-text.inline.html, carried by the PA_NOTE_TEXT_UI marker below).
-    const NO_TEXT_PANEL='Transcript is not on this page · 此页面没有转写';   // the component was not inlined (a page without the marker)
+    const NO_TEXT_PANEL='此页面没有转写 · Transcript is not on this page';   // the component was not inlined (a page without the marker)
     const textPanel=window.PANoteText?window.PANoteText.attach({host,doc:()=>(typeof opts.doc==='function'?opts.doc():null)}):null;
-    // "Send Pencil log · 发送笔迹日志" — in the ink popover only when the host wired opts.saveLog.
+    // "发送笔迹日志 · Send Pencil log" — in the ink popover only when the host wired opts.saveLog.
     const sendLogBtn=q('.pan-sendlog');
     if(sendLogBtn) sendLogBtn.addEventListener('click',async()=>{ closePops();
-      if(!plog){ flash('Pencil log unavailable · 笔迹日志不可用'); return; }
+      if(!plog){ flash('笔迹日志不可用 · Pencil log unavailable'); return; }
       const path='debug/pencil-log-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json';
       let r;
       try{ r=await opts.saveLog(path,JSON.stringify(plog.log())); }
       catch(err){ r={ok:false,error:String((err&&err.message)||err)}; }   // surfaced by the flash below (R5)
-      flash(r&&r.ok?'Pencil log saved · 笔迹日志已保存 — '+path
-                   :'Pencil log NOT saved · 笔迹日志未保存 — '+((r&&r.error)||'no reply · 无回应')); });
+      flash(r&&r.ok?'笔迹日志已保存 · Pencil log saved — '+path
+                   :'笔迹日志未保存 · Pencil log NOT saved — '+((r&&r.error)||'无回应 · no reply')); });
     /* ══ PA_PENCIL_LOG_END ══ */
     /* ══ PA_POINTER_ROUTING_BEGIN — cut out by routingSource() and driven for real by runPad() in test/helpers-panote-routing.mjs, for every suite that calls them ══ */
     // ── PALM REJECTION（掌拒）for the finger page-flip ──────────────────────────────────────
@@ -3808,7 +3808,7 @@
       return flushSave();                                       // the new page is on disk before anything else can happen
     }
     async function delPage(){
-      if(NB.pages.length<=1){ flash('Last page · 最后一页'); return; }
+      if(NB.pages.length<=1){ flash('最后一页 · Last page'); return; }
       await flushSave();
       const delId=page().id; delete undoStacks[delId]; delete redoStacks[delId];
       NB.pages.splice(cur,1); NB.updated=Date.now();
@@ -3828,7 +3828,7 @@
       if(saveBar){
         saveBar.classList.toggle('on',!!s.text);
         saveBar.textContent=s.text||'';
-        saveBar.title=s.error||'Tap to retry · 点击重试';
+        saveBar.title=s.error||'点击重试 · Tap to retry';
       }
       renderLock(s);
     }
@@ -3870,7 +3870,7 @@
         const k=opts.noteKey?String(opts.noteKey()||''):'';
         if(_sizeWarned===k) return; _sizeWarned=k;
         const mb=(n)=>(Number(n)/1048576).toFixed(1);
-        flash(`Note is large (${mb(r.bytes)}/${mb(r.limit)} MB) — start a new one soon · 笔记较大，建议尽快另起一篇`);
+        flash(`笔记较大，建议尽快另起一篇 · Note is large (${mb(r.bytes)}/${mb(r.limit)} MB) — start a new one soon`);
       },
       // No write of any kind until a load has reported an outcome (V1) — unconditional, because
       // "is there anything to lose?" is precisely the question a pad cannot answer before it has
@@ -4149,11 +4149,11 @@
     if(PAGES&&delBtn){
       let delConfirmTimer=0;
       delBtn.addEventListener('click',async()=>{
-        if(NB.pages.length<=1){ flash('Last page · 最后一页'); return; }
+        if(NB.pages.length<=1){ flash('最后一页 · Last page'); return; }
         if(!delBtn.classList.contains('pan-delconfirm')){
           // First tap: arm the confirmation
-          delBtn.classList.add('pan-delconfirm'); delBtn.title='Tap again to delete · 再点一次确认删除';
-          flash('Tap ✕ again to delete this page · 再点一次删除此页');
+          delBtn.classList.add('pan-delconfirm'); delBtn.title='再点一次确认删除 · Tap again to delete';
+          flash('再点一次删除此页 · Tap ✕ again to delete this page');
           clearTimeout(delConfirmTimer);
           delConfirmTimer=setTimeout(()=>{ delBtn.classList.remove('pan-delconfirm'); delBtn.title='Delete page'; }, 3000);
         } else {
@@ -4190,7 +4190,7 @@
         const f=picked.files[0];
         // The editor is offered on EVERY path, not just Scan. A library photo of a document is the
         // same picture as a camera one — only the picker differed — and it was previously
-        // impossible to straighten it at any point afterwards. PAScan's own "Skip · 原图" button
+        // impossible to straighten it at any point afterwards. PAScan's own "原图 · Skip" button
         // is the way out, so this costs one tap for someone who wanted the raw image.
         if(!window.PAScan){ if(mode==='scan') flash(EDIT_TXT.unavailable); addPhoto(f); return; }
         const corrected=await window.PAScan.correct(f);
@@ -4236,15 +4236,15 @@
       // assume, or the whole button binding dies on those pages.
       if(pb&&window.PANewDot) window.PANewDot.mark(pb,'note-print');
       if(pb) pb.addEventListener('click',async()=>{
-        if(!window.PAPrint){ flash('Print unavailable · 打印不可用'); return; }
+        if(!window.PAPrint){ flash('打印不可用 · Print unavailable'); return; }
         if(pb.disabled) return;
-        pb.disabled=true; flash('Preparing to print · 正在准备打印…');
+        pb.disabled=true; flash('正在准备打印… · Preparing to print');
         try{
           const r=await window.PAPrint.note({printInfo,printPrime,printPage},
             {title:(htitle&&htitle.textContent)||'', inkOnly:printInk});
-          if(!r.ok) flash(r.error||'Print failed · 打印失败');
+          if(!r.ok) flash(r.error||'打印失败 · Print failed');
           else if(r.notes&&r.notes.length) flash(r.notes[0]);
-        }catch(e){ flash('Print failed · 打印失败 — '+String((e&&e.message)||e)); }
+        }catch(e){ flash('打印失败 · Print failed — '+String((e&&e.message)||e)); }
         finally{ pb.disabled=false; }
       }); }
 
@@ -4398,8 +4398,8 @@
   // drawer needs no change when those hits arrive.
   // `pending` carries the count as {n}; `noOcr` is said when the node cannot transcribe at all and
   // `ocrFailed` when it could but failed lately (the drawer appends the node's reason).
-  const SEARCH_TXT=Object.freeze({ transcript:'Transcript · 转写', tag:'Tag 标签', typed:'Text 文本', ink:'Ink 手写', photo:'Photo 图片', failed:'Search unavailable · 搜索不可用', searching:'Searching… 搜索中', more:'Only the best matches are shown · 仅显示最相关的笔记',
-    pending:'Transcribing {n} pages · 正在识别 {n} 页', noOcr:'Handwriting search needs the Mac node · 手写搜索需要 Mac 节点', ocrFailed:'Handwriting transcription failed on this node · 本机手写识别失败' });
+  const SEARCH_TXT=Object.freeze({ transcript:'转写 · Transcript', tag:'Tag 标签', typed:'Text 文本', ink:'Ink 手写', photo:'Photo 图片', failed:'搜索不可用 · Search unavailable', searching:'Searching… 搜索中', more:'仅显示最相关的笔记 · Only the best matches are shown',
+    pending:'正在识别 {n} 页 · Transcribing {n} pages', noOcr:'手写搜索需要 Mac 节点 · Handwriting search needs the Mac node', ocrFailed:'本机手写识别失败 · Handwriting transcription failed on this node' });
   let _searchSeq=0;
   async function searchNotes(q){
     const my=++_searchSeq, query=String(q||'').trim();

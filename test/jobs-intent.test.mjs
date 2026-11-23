@@ -89,5 +89,5 @@ test('the shell shows it as a card with an explicit Create', () => {
   assert.match(SHELL, /function renderJobDraft/);
   assert.match(SHELL, /data-mkjob/, 'there is a Create button');
   assert.match(SHELL, /data-nojob/, 'and a way to decline');
-  assert.match(SHELL, /Created, paused · 已创建（暂停中）/, 'and it says the job is NOT armed yet');
+  assert.match(SHELL, /已创建（暂停中），请在设置 › 任务中开启 · Created, paused/, 'and it says the job is NOT armed yet');
 });

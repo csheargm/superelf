@@ -18,7 +18,7 @@
 // and, for Diabetes and Tasks, the workspace.example copy too.
 //
 // The screen (2026-10-12): PANote.saveOutcome used to keep a failed reply's `error` and drop its
-// `text`, so Notes and the Bible showed "Not saved · 未保存 — <raw error>" and never the shell's
+// `text`, so Notes and the Bible showed "未保存 · Not saved — <raw error>" and never the shell's
 // sentence; PANote's own save pill showed the raw error too. saveOutcome now carries `text`, the pill
 // shows it, and the hosts show PANote.notSavedText(r). The templates (workspace.example) are changed.
 // The owner's live copies (workspace/apps) are held back: a merge into main rewrites them on the live

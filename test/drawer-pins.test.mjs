@@ -38,7 +38,7 @@ function mkEl(tag) { const on = {}; return { tagName: String(tag).toUpperCase(),
 
 test('a pinned row shows ★ before its title; an unpinned one does not; the strip shows no ★ chip (the group is the one way)', async () => {
   const D = await drawer({ onPin: () => {} });
-  assert.match(rowHtml(D.rows(), 'a'), /<div class="pac-lttl"><span class="pac-lstar" aria-label="Bookmarked · 已收藏">★<\/span> Roof<\/div>/);
+  assert.match(rowHtml(D.rows(), 'a'), /<div class="pac-lttl"><span class="pac-lstar" aria-label="已收藏 · Bookmarked">★<\/span> Roof<\/div>/);
   assert.doesNotMatch(rowHtml(D.rows(), 'b'), /pac-lstar/);
   assert.match(rowHtml(D.rows(), 'c'), /★<\/span> Rent/, 'a row without doc can be pinned too (the flag is the host\'s, not the index\'s)');
   assert.equal(D.strip().innerHTML, '', 'no tags asked, no chips — and no ★ chip while rows are pinned');
@@ -57,7 +57,7 @@ test('listDrawer: the ⋯ on a row → the sheet → Bookmark calls the host\'s 
   finally { delete globalThis.innerWidth; delete globalThis.innerHeight; }
   const sheet = D.d.el.children.filter((k) => /^pac-modal/.test(k.className)).pop();
   assert.ok(sheet, 'the sheet opened in the drawer host');
-  const btn = sheet.children[0].children.find((k) => k.textContent === 'Bookmark · 收藏');
+  const btn = sheet.children[0].children.find((k) => k.textContent === '收藏 · Bookmark');
   assert.ok(btn, 'offered on an unpinned row with an onPin');
   sheet.remove = () => {};   // the harness element has no remove(); the sheet closes itself on a pick
   btn.onclick(); await tick(5);
@@ -80,11 +80,11 @@ function menuModule() {
 test('the ⋯ sheet: Bookmark on an unpinned row calls onPin(true); Unbookmark on a pinned row calls onPin(false); after Rename, never destructive', async () => {
   const run = menuModule();
   const got = [];
-  const offered = await run({ onRename: async () => {}, onDelete: async () => got.push('DELETED'), onPin: async (f) => got.push(f) }, (labels) => labels.indexOf('Bookmark · 收藏'));
-  assert.deepEqual(offered, ['Rename 重命名', 'Bookmark · 收藏', 'Delete 删除']);
+  const offered = await run({ onRename: async () => {}, onDelete: async () => got.push('DELETED'), onPin: async (f) => got.push(f) }, (labels) => labels.indexOf('收藏 · Bookmark'));
+  assert.deepEqual(offered, ['Rename 重命名', '收藏 · Bookmark', 'Delete 删除']);
   assert.deepEqual(got, [true]);
-  const again = await run({ pin: true, onPin: async (f) => got.push(f) }, (labels) => labels.indexOf('Unbookmark · 取消收藏'));
-  assert.deepEqual(again, ['Unbookmark · 取消收藏'], 'the label reads the row\'s own flag');
+  const again = await run({ pin: true, onPin: async (f) => got.push(f) }, (labels) => labels.indexOf('取消收藏 · Unbookmark'));
+  assert.deepEqual(again, ['取消收藏 · Unbookmark'], 'the label reads the row\'s own flag');
   assert.deepEqual(got, [true, false]);
 });
 
@@ -112,7 +112,7 @@ test('a saved summary row with the raw W title shows its human title (display on
   const d = PAChat.listDrawer({ title: 'Notes', items: async () => items, onOpen: () => {} });
   await d.refresh(); await tick(5);
   const html = d.el.querySelector('.pac-lrows').innerHTML;
-  assert.match(rowHtml(html, 's'), /<div class="pac-lttl">This week · 本周 Nov 9–15, 2026<\/div>/);
+  assert.match(rowHtml(html, 's'), /<div class="pac-lttl">本周 · This week Nov 9–15, 2026<\/div>/);
   assert.match(rowHtml(html, 'r'), /<div class="pac-lttl">Roof<\/div>/);
   assert.equal(items[0].title, 'Summary · 总结 2026-W46', 'the stored title is not rewritten');
 });
