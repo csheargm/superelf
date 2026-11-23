@@ -19,10 +19,13 @@ import { missingReason, resolveSkip } from './helpers-e2e-gate.mjs';
 import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, waitFor, OWNER_TOKEN } from './helpers-web.mjs';
 
 const REPO = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+// PA_E2E_ENGINE=webkit (or firefox) runs the same suites in that engine — webkit is iPad Safari's.
+// The export keeps the name `chromium` so the suites need no edit; the default engine is Chromium.
+const ENGINE = process.env.PA_E2E_ENGINE || 'chromium';
 async function loadChromium() {
   const spec = process.env.PA_PLAYWRIGHT;
-  if (spec) return (await import(pathToFileURL(spec).href)).chromium;   // asked for, so a failure is loud
-  try { return (await import('playwright')).chromium; } catch { return null; /* reported by missingReason() below */ }
+  if (spec) return (await import(pathToFileURL(spec).href))[ENGINE];   // asked for, so a failure is loud
+  try { return (await import('playwright'))[ENGINE]; } catch { return null; /* reported by missingReason() below */ }
 }
 export const chromium = await loadChromium();
 export const skip = resolveSkip(await missingReason(chromium));
