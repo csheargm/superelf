@@ -653,14 +653,14 @@ async function runSearch(){
   // A search that FAILED is not a search with no hits — "No results." for a 401/500/dropped
   // connection is the same lie one level up (V6 re-audit). Say which one it was.
   if(!(r&&r.ok)){ box.innerHTML='<div style="padding:14px;color:var(--muted)">Search failed · 搜索失败 — '+esc((r&&r.error)||'try again 请重试')+'</div>'; return; }
-  const hits=r.results||[];
+  const hits=(r.results&&r.results.hits)||[], more=!!(r.results&&r.results.more);   // lib/bible.mjs searchBible
   if(!hits.length){ box.innerHTML='<div style="padding:14px;color:var(--muted)">No results · 无结果</div>'; return; }
   const re=q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   box.innerHTML=hits.map(v=>{
     const label=`${BOOKS[v.book-1]?BOOKS[v.book-1][0]+' · '+BOOKS[v.book-1][1]:''} ${v.chapter}:${v.verse}`;
     const txt=esc(v.text).replace(new RegExp('('+re+')','gi'),'<mark>$1</mark>');
     return `<div class="sr" data-b="${v.book}" data-c="${v.chapter}" data-v="${v.verse}"><div class="sr-ref">${esc(label)}</div><div class="sr-txt">${txt}</div></div>`;
-  }).join('');
+  }).join('')+(more?'<div style="padding:14px;color:var(--muted)">仅显示前 '+hits.length+' 条，再加一个词可缩小范围 · Showing the first '+hits.length+' — add a word to narrow it</div>':'');
 }
 document.getElementById('search-go').onclick=runSearch;
 document.getElementById('search-inp').addEventListener('keydown',e=>{ if(e.key==='Enter') runSearch(); });

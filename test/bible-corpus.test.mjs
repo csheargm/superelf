@@ -60,10 +60,14 @@ test('a reference that is not a plain whole number is a bad reference, not an in
 
 test('search: an English query reads the BSB, a Chinese one 和合本; capped; short queries empty', () => {
   const en = searchBible(DATA, 'so loved the world');
-  assert.ok(en.some((r) => r.book === 43 && r.chapter === 3 && r.verse === 16), 'John 3:16 found in English');
+  assert.ok(en.hits.some((r) => r.book === 43 && r.chapter === 3 && r.verse === 16), 'John 3:16 found in English');
+  assert.equal(en.more, false, 'every hit is listed');
   const zh = searchBible(DATA, '神爱世人');
-  assert.ok(zh.some((r) => r.book === 43 && r.chapter === 3 && r.verse === 16), 'John 3:16 found in Chinese');
-  assert.equal(searchBible(DATA, 'the').length, 60, 'capped at 60');
-  assert.deepEqual(searchBible(DATA, 'a'), []);
-  assert.deepEqual(searchBible(DATA, ''), []);
+  assert.ok(zh.hits.some((r) => r.book === 43 && r.chapter === 3 && r.verse === 16), 'John 3:16 found in Chinese');
+  // F2-01: a cap that says nothing reads as "these are all the verses" ("love" stopped at 1 Samuel).
+  const the = searchBible(DATA, 'the');
+  assert.equal(the.hits.length, 60, 'capped at 60');
+  assert.equal(the.more, true, 'the cap is said, so the reader knows to narrow the search');
+  assert.deepEqual(searchBible(DATA, 'a'), { hits: [], more: false });
+  assert.deepEqual(searchBible(DATA, ''), { hits: [], more: false });
 });

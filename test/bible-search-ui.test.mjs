@@ -1,4 +1,5 @@
 // Bible search box, driven on BOTH copies of the real app source (overnight 2026-11-22):
+//   F2-01 a capped list says it is capped ("love" stopped at 1 Samuel with no word of more).
 //   F2-04 a single Chinese character (爱) is a real search; one Latin letter is refused 中文 first.
 // R11 — searched: "Type at least 2", "runSearch", "bible-search" — one search box per copy.
 import { test } from 'node:test';
@@ -27,9 +28,8 @@ async function boot(app) {
 }
 
 test('searchBible: one Chinese character searches 和合本; one Latin letter does not', () => {
-  const zh = searchBible(DATA, '爱');
-  assert.ok(zh.length > 0, '爱 finds verses');
-  assert.deepEqual(searchBible(DATA, 'a'), []);
+  assert.ok(searchBible(DATA, '爱').hits.length > 0, '爱 finds verses');
+  assert.deepEqual(searchBible(DATA, 'a').hits, []);
 });
 
 for (const app of ['bible (template)', 'bible (live)']) {
@@ -45,6 +45,20 @@ for (const app of ['bible (template)', 'bible (live)']) {
       await A.runSearch();
       assert.deepEqual(asked, ['爱'], 'one Latin letter is not sent');
       assert.match(el('search-results').innerHTML, /请至少输入 2 个字母 · Type at least 2 letters/);
+    } finally { await h.stop(); }
+  });
+
+  test(`${app}: a capped list says so and how to narrow it; a full list does not`, async () => {
+    const { h, A } = await boot(app);
+    try {
+      A.el('search-inp').value = 'love';
+      await A.runSearch();
+      const html = A.el('search-results').innerHTML;
+      assert.equal((html.match(/class="sr"/g) || []).length, 60);
+      assert.match(html, /仅显示前 60 条，再加一个词可缩小范围 · Showing the first 60 — add a word to narrow it/);
+      A.el('search-inp').value = 'so loved the world';
+      await A.runSearch();
+      assert.doesNotMatch(A.el('search-results').innerHTML, /仅显示前/);
     } finally { await h.stop(); }
   });
 }
