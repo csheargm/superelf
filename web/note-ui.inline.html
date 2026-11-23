@@ -3976,6 +3976,11 @@
       open.forEach(p=>p.classList.remove('on')); syncPopBtns();
       e.preventDefault(); e.stopPropagation(); };
     document.addEventListener('pointerdown',onPopOutside,true);
+    // Escape closes an open popover (Page settings, ink, style…) like a backdrop tap (F3-07); with none open it is the page's.
+    // TODO(R4 seam): popover open/close (togglePop, closePops, onPopOutside, onPopEsc) → its own part.
+    const onPopEsc=(e)=>{ if(e.key!=='Escape') return; const open=[...host.querySelectorAll(POPS_OPEN)]; if(!open.length) return;
+      open.forEach(p=>p.classList.remove('on')); syncPopBtns(); e.preventDefault(); e.stopPropagation(); };
+    document.addEventListener('keydown',onPopEsc,true);
     function flash(msg){ let el=q('.pan-flash'); if(!el){ el=document.createElement('div'); el.className='pan-flash'; host.appendChild(el); }
       el.textContent=msg; el.classList.add('on'); clearTimeout(flash._t); flash._t=setTimeout(()=>el.classList.remove('on'),2200); }
     // AWAITS the write on every tool change — exitTextMode() commits the typed page first, so
@@ -4360,7 +4365,7 @@
       setTitle:(t)=>{ if(htitle) htitle.textContent=t||''; },
       // Returns the flush promise so a caller can await durability BEFORE the pad is gone.
       destroy:()=>{ commitPageHtml(); const done=flushDurable(); clearTimeout(lockShowT); clearTimeout(textTimer);
-        document.removeEventListener('pointerdown',onPopOutside,true); document.removeEventListener('paste',onDocPaste,true);
+        document.removeEventListener('pointerdown',onPopOutside,true); document.removeEventListener('keydown',onPopEsc,true); document.removeEventListener('paste',onDocPaste,true);
         try{ roStage&&roStage.disconnect(); }catch(_){ /* already gone */ }
         window.removeEventListener('message',onPrefs); window.removeEventListener('resize',onResize);
         document.removeEventListener('visibilitychange',onHide); window.removeEventListener('pagehide',onPageHide);

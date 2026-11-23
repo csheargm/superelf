@@ -80,3 +80,18 @@ test('F3-08: Page settings shows no developer readout and stays inside the viewp
     await ctx.close();
   }
 });
+
+test('F3-07: Escape closes the Page settings popover and a drawer row ⋯ sheet, as a backdrop tap does', { skip, timeout: 90000 }, async () => {
+  await seed();
+  const ctx = await newContext(); const page = await ctx.newPage();
+  const frame = await openDocked(page);
+  await frame.locator('.pac-lrow .pac-lmenu').first().click();
+  await frame.waitForSelector('.pac-modal .pac-mopt');
+  await page.keyboard.press('Escape');
+  await frame.waitForFunction(() => !document.querySelector('.pac-modal'), null, { timeout: 3000 });
+  await frame.locator('.pan-hmore, .pan-paperbtn').first().dispatchEvent('click');
+  await frame.waitForSelector('.pan-paperpop.on');
+  await page.keyboard.press('Escape');
+  await frame.waitForFunction(() => !document.querySelector('.pan-paperpop.on'), null, { timeout: 3000 });
+  await ctx.close();
+});
