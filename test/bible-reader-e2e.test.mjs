@@ -5,11 +5,13 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { ROOT } from './helpers-app.mjs';
 import { skip, chromium } from './helpers-note-link.mjs';
 import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, OWNER_TOKEN } from './helpers-web.mjs';
 
 let port, web, browser, root;
+const OLD_PAGE = (() => { try { return execFileSync('git', ['show', '857c8f2:workspace/apps/bible/index.html'], { cwd: ROOT }); } catch { return null; } })();   // no git history (a tarball): the control is skipped, said so
 const NOTES = () => path.join(root, 'workspace', 'data', 'bible', 'notes');
 before(async () => {
   if (skip) return;
@@ -136,26 +138,36 @@ test('F2-03: chapter-end buttons step chapters (across books), ← → keys step
     assert.equal(await frame.locator('#end-prev').isDisabled(), true, 'Genesis 1 has no previous');
   } finally { await ctx.close(); }
 });
-test('F2-03: a finger swipe left turns to the next chapter, right goes back; a vertical drag does not', { skip, timeout: 90000 }, async () => {
-  const { ctx, page, frame } = await open({ viewport: { width: 820, height: 1180 }, touch: true });
-  try {
-    await frame.evaluate(() => { bookIdx = 42; chapter = 3; document.getElementById('book-sel').value = 42; return load(); });   // a known chapter, whatever the history restored
-    const start = await where(frame);
-    const cdp = await ctx.newCDPSession(page);
-    const swipe = async (x0, y0, x1, y1) => {
-      const pt = (x, y) => [{ x, y, id: 1 }];
-      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pt(x0, y0) });
-      for (let k = 1; k <= 6; k++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: pt(x0 + ((x1 - x0) * k) / 6, y0 + ((y1 - y0) * k) / 6) });
-      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-    };
-    await swipe(600, 600, 200, 620);
-    await frame.waitForFunction((c) => +document.getElementById('ch-label').value === c + 1 && document.querySelectorAll('.verse').length > 5, start[1]);
-    await swipe(200, 600, 600, 610);
-    await frame.waitForFunction((c) => +document.getElementById('ch-label').value === c, start[1]);
-    await swipe(400, 800, 420, 400); await frame.waitForTimeout(600);
-    assert.deepEqual(await where(frame), start, 'a vertical drag scrolls, it never turns the page');
-  } finally { await ctx.close(); }
-});
+// Touch input inside the app frame. CDP is Chromium-only and macOS WebKit has no Touch constructor, so a
+// plain Event carries the TouchEvent fields (touches/changedTouches/touchType) — the same in both engines.
+const swipeIn = (frame, x0, y0, x1, y1, touchType = 'direct') => frame.evaluate(([x0, y0, x1, y1, touchType]) => {
+  const el = document.elementFromPoint(x0, y0) || document.getElementById('verses');
+  const mk = (x, y) => ({ identifier: 1, target: el, clientX: x, clientY: y, touchType });
+  const fire = (type, x, y, live) => { const ev = new Event(type, { bubbles: true, cancelable: true });
+    Object.defineProperties(ev, { touches: { value: live ? [mk(x, y)] : [] }, changedTouches: { value: [mk(x, y)] } }); el.dispatchEvent(ev); };
+  fire('touchstart', x0, y0, true);
+  for (let k = 1; k <= 6; k++) fire('touchmove', x0 + ((x1 - x0) * k) / 6, y0 + ((y1 - y0) * k) / 6, true);
+  fire('touchend', x1, y1, false);
+}, [x0, y0, x1, y1, touchType]);
+const toActs3 = (frame) => frame.evaluate(() => { bookIdx = 42; chapter = 3; document.getElementById('book-sel').value = 42; return load(); });   // a known chapter, whatever the history restored
+for (const viewport of [{ width: 820, height: 1180 }, { width: 1180, height: 820 }]) {
+  test(`F2-03 (${viewport.width}x${viewport.height}): a finger swipe left turns to the next chapter, right goes back; a vertical drag and a Pencil stroke do not`, { skip, timeout: 90000 }, async () => {
+    const { ctx, frame } = await open({ viewport, touch: true });
+    try {
+      await toActs3(frame);
+      const start = await where(frame);
+      assert.equal(await frame.locator('#end-next').count(), 1, 'the chapter-end buttons render on touch');
+      await swipeIn(frame, 600, 600, 200, 620);
+      await frame.waitForFunction((c) => +document.getElementById('ch-label').value === c + 1 && document.querySelectorAll('.verse').length > 5, start[1]);
+      await swipeIn(frame, 200, 600, 600, 610);
+      await frame.waitForFunction((c) => +document.getElementById('ch-label').value === c, start[1]);
+      await swipeIn(frame, 400, 700, 420, 300); await frame.waitForTimeout(600);
+      assert.deepEqual(await where(frame), start, 'a vertical drag scrolls, it never turns the page');
+      await swipeIn(frame, 600, 600, 200, 620, 'stylus'); await frame.waitForTimeout(600);
+      assert.deepEqual(await where(frame), start, 'a Pencil stroke writes, it never turns the page');
+    } finally { await ctx.close(); }
+  });
+}
 
 // Triage 2026-11-23 item 7: each Bible open logged four 404s ("Failed to load resource") for data that
 // does not exist yet — general.json, notes/<book>-<ch>.json and both .bak. Now none. CONTROL (R14): the
@@ -171,8 +183,29 @@ test('opening the Bible on a fresh account logs no 404 for absent data files', {
   await page.evaluate(() => openApp(UID, 'bible', 'bible'));
   let frame = null;
   for (let i = 0; i < 200 && !frame; i++) { frame = page.frames().find((f) => f.url().includes('/app/owner/bible/')) || null; if (!frame) await page.waitForTimeout(50); }
-  await frame.waitForFunction(ready); await page.waitForTimeout(800);
+  await frame.waitForFunction(ready);
+  // All four absent-file reads — general.json, its .bak, the chapter's notes file, its .bak — each answered 204.
+  const READS = [/\/general\.json\?/, /\/general\.json\.bak\?/, /\/notes\/[^/?]+\.json\?/, /\/notes\/[^/?]+\.json\.bak\?/];
+  const seen = () => READS.every((re) => absent.some((u) => re.test(u)));
+  for (let i = 0; i < 100 && !seen(); i++) await page.waitForTimeout(100);
+  await page.waitForTimeout(300);
   assert.deepEqual(bad, [], 'no 4xx/5xx data reads');
-  assert.ok(absent.some((u) => /general\.json\.bak\?/.test(u)), `CONTROL: the .bak probe ran and was answered 204: ${absent.join(' ')}`);
+  for (const re of READS) assert.ok(absent.some((u) => re.test(u)), `CONTROL: ${re} was read and answered 204: ${absent.join(' ')}`);
   await ctx.close();
+});
+
+// CONTROL (R14): the same checks against the Bible the live private node was stuck on (857c8f2) FAIL —
+// so the passes above prove F2-03 is in the shipped page, not that the harness passes anything.
+test('CONTROL: the old 857c8f2 Bible has no chapter-end buttons and a swipe does not turn it', { skip: skip || !OLD_PAGE, timeout: 90000 }, async () => {
+  const f = path.join(root, 'workspace', 'apps', 'bible', 'index.html'), cur = fs.readFileSync(f);
+  fs.writeFileSync(f, OLD_PAGE);
+  try {
+    const { ctx, frame } = await open({ viewport: { width: 820, height: 1180 }, touch: true });
+    try {
+      await toActs3(frame); const start = await where(frame);
+      assert.equal(await frame.locator('#end-next').count(), 0, 'old page: no buttons');
+      await swipeIn(frame, 600, 600, 200, 620); await frame.waitForTimeout(800);
+      assert.deepEqual(await where(frame), start, 'old page: a swipe does nothing');
+    } finally { await ctx.close(); }
+  } finally { fs.writeFileSync(f, cur); }
 });
