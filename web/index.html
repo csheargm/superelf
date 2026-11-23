@@ -133,7 +133,11 @@ button.plain{ background:none; border:1px solid var(--line); border-radius:8px; 
    across all 19 apps, 11 anchor chrome to the top or bottom edge, always full-width rows whose
    CONTROLS sit at the left and right ends — the centre of that row is title text. A grabber there
    shadows letters, never a button. Anything wider, or in a corner, lands on one. */
-#frame.peek{ padding-top:env(safe-area-inset-top,0px); }
+/* The handle's own STRIP (triage 2026-11-23): the app starts below the handle, so no app control can
+   ever sit under it — whatever the app draws at its top (church's row at 375px, the longevity /
+   productivity-hub tab rows, Journal's header with a long title). 28px, not the old 43px bar row. */
+#frame.peek{ padding-top:calc(env(safe-area-inset-top,0px) + var(--pa-handle-h)); }
+#frame.peek.ownbar{ padding-top:env(safe-area-inset-top,0px); }   /* an own-bar app shows no shell handle */
 /* The notch inset moves to the FRAME here, so the iframe still clears the camera once the bar is
    no longer the thing holding that space. The bar drops its own copy or it would count twice. */
 #frame.peek .bar{ position:absolute; top:0; left:0; right:0; z-index:6; background:var(--bg);
@@ -141,7 +145,7 @@ button.plain{ background:none; border:1px solid var(--line); border-radius:8px; 
 #frame.peek.barin .bar{ transform:translateY(0); }
 /* -101%, not -100%: the bar's own bottom border is outside its box and a 1px line parked at the
    top of every app reads as a rendering fault. */
-#barpeek{ display:none; position:absolute; top:0; left:50%; transform:translateX(-50%); z-index:7;
+#barpeek{ display:none; position:absolute; top:env(safe-area-inset-top,0px); left:50%; transform:translateX(-50%); z-index:7;
   width:var(--pa-handle-w); height:var(--pa-handle-h); align-items:center; justify-content:center; cursor:pointer;
   background:none; border:0; padding:0; -webkit-tap-highlight-color:transparent;
   transition:opacity .18s ease; }

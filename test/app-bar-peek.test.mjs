@@ -69,7 +69,9 @@ test('the grabber is centred and bounded, or it lands on a real button in 11 app
 test('the notch is still cleared, and counted once', () => {
   // The bar used to hold the safe-area inset. Now that it is absolutely positioned it holds
   // nothing, so the FRAME has to take that over or the app renders under the camera.
-  assert.match(rule('#frame.peek'), /padding-top:env\(safe-area-inset-top/, 'the frame clears the notch');
+  assert.match(rule('#frame.peek'), /padding-top:calc\(env\(safe-area-inset-top,0px\) \+ var\(--pa-handle-h\)\)/, 'the frame clears the notch, plus the handle strip (no app control under the handle)');
+  assert.match(rule('#frame.peek.ownbar'), /padding-top:env\(safe-area-inset-top,0px\)/, 'an own-bar app (no shell handle) gets no strip');
+  assert.match(rule('#barpeek'), /top:env\(safe-area-inset-top,0px\)/, 'the handle sits in its strip, below the notch');
   const bar = rule('#frame.peek .bar');
   assert.doesNotMatch(bar, /env\(safe-area-inset-top/,
     'the peek bar must NOT add the inset again — it is positioned inside the frame padding box');
