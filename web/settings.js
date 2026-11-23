@@ -521,18 +521,21 @@ async function loadShelf(){
 }
 async function loadFamily(){
   const box=$('#family'); box.style.display='block';
+  // min-width:0 + minmax(0,1fr): a phone's 390px fits two inputs; their intrinsic width used to push
+  // the row (and the whole Settings page) sideways (F5-5).
+  const FIELD='min-width:0;width:100%;box-sizing:border-box;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text)';
   let list=[]; try{ list=await (await api('/api/admin/users')).json(); }catch{}
   box.innerHTML='<b>Family accounts</b>'+list.map(u=>
-    `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)">
-      <span style="flex:1">${esc(u.name)} <small style="color:var(--muted)">${u.status==='pending'?'等待批准 · Waiting for approval':u.role}${u.age!=null?' · age '+u.age:''}</small></span>
+    `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)">
+      <span style="flex:1;min-width:0;overflow-wrap:anywhere">${esc(u.name)} <small style="color:var(--muted)">${u.status==='pending'?'等待批准 · Waiting for approval':u.role}${u.age!=null?' · age '+u.age:''}</small></span>
       ${u.status==='pending'?`<button class="primary" data-approve="${esc(u.id)}">批准 · Approve</button>`:''}
       ${u.id!=='owner'?`<button class="plain" data-pw="${esc(u.id)}">重设密码 · Reset password</button><button class="plain" data-del="${esc(u.id)}">×</button>`:''}
     </div>`).join('')+
-    `<div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px">
-      <input id="nId" placeholder="id (e.g. mia)" style="padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text)">
-      <input id="nName" placeholder="Name" style="padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text)">
-      <input id="nYear" placeholder="Birth year" inputmode="numeric" style="padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text)">
-      <input id="nPass" type="password" autocomplete="new-password" placeholder="起始密码（可不填）· Starting password (optional)" style="padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text)">
+    `<div style="margin-top:10px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px">
+      <input id="nId" placeholder="id (e.g. mia)" style="${FIELD}">
+      <input id="nName" placeholder="Name" style="${FIELD}">
+      <input id="nYear" placeholder="Birth year" inputmode="numeric" style="${FIELD}">
+      <input id="nPass" type="password" autocomplete="new-password" placeholder="起始密码（可不填）· Starting password (optional)" style="${FIELD}">
       <button class="primary" id="addU" style="padding:6px">Add member</button>
     </div>`;
   box.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{ if(confirm('Remove '+b.dataset.del+"? (their data stays on disk)")){ await api('/api/admin/users/'+b.dataset.del,{method:'DELETE'}); loadFamily(); } });

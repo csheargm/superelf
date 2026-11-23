@@ -78,3 +78,15 @@ test('F5-3: a self-signed-up account shows as waiting, and Approve lets it sign 
     assert.equal((await login()).status, 200, 'approved: she signs in');
   } finally { await ctx.close(); }
 });
+
+test('F5-5: on a phone the Add member row fits — Settings never scrolls sideways', { skip, timeout: 60000 }, async () => {
+  const { ctx, page } = await openSettings({ viewport: { width: 390, height: 844 } });
+  try {
+    const m = await page.evaluate(() => {
+      const cfg = document.querySelector('#cfg'), r = (s) => document.querySelector(s).getBoundingClientRect();
+      return { sw: cfg.scrollWidth, cw: cfg.clientWidth, vw: innerWidth, right: Math.max(...['#nId', '#nName', '#nYear', '#nPass', '#addU'].map((s) => r(s).right)) };
+    });
+    assert.ok(m.sw <= m.cw, `Settings is not wider than the screen (${m.sw} > ${m.cw})`);
+    assert.ok(m.right <= m.vw, `the Add member row ends on screen (${m.right} > ${m.vw})`);
+  } finally { await ctx.close(); }
+});
