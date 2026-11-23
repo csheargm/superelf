@@ -82,3 +82,43 @@ test('real start-up on a Docker-shaped root: the old 857c8f2 Bible (owner + shel
       assert.ok(res, 'node is serving');
     } finally { await stopWeb(web); fs.rmSync(root, { recursive: true, force: true }); }
   });
+
+// Members too (2026-11-23): a member's workspace-<id>/apps was seeded from workspace.example and kept its
+// old Bible for ever. Same rule as the owner: a known repo version is replaced from the image's member
+// template; an edited page, an app the template does not ship and data/ are never touched.
+test('real start-up: an owner and two members — the unedited member Bible is updated, the edited one and all data are kept',
+  { skip: !hasGitHistory && 'needs git history', timeout: 60000 }, async () => {
+    const port = await freePort();
+    const users = [{ id: 'owner', name: 'Owner', role: 'owner', token: 'test-owner-token-abcdefgh', workspace: 'workspace' },
+      { id: 'amy', name: 'Amy', role: 'member', token: 'test-amy-token-abcdefghij', workspace: 'workspace-amy' },
+      { id: 'ben', name: 'Ben', role: 'member', token: 'test-ben-token-abcdefghij', workspace: 'workspace-ben' }];
+    const root = mkWebRoot({ port, extraConfig: { users } });
+    const tpl = fs.readFileSync(path.join(REPO, 'workspace.example/apps/bible/index.html'));
+    const cur = fs.readFileSync(path.join(REPO, 'workspace/apps/bible/index.html'));
+    put(path.join(root, 'builtin-apps/workspace-apps/bible/index.html'), cur);
+    put(path.join(root, 'workspace.example/apps/bible/index.html'), tpl);              // the image's member template
+    const old = atRev(OLD, 'workspace.example/apps/bible/index.html');
+    put(path.join(root, 'workspace/apps/bible/index.html'), atRev(OLD, 'workspace/apps/bible/index.html'));
+    const amy = path.join(root, 'workspace-amy'), ben = path.join(root, 'workspace-ben');
+    for (const w of [amy, ben]) put(path.join(w, 'memory', '.keep'), '');
+    put(path.join(amy, 'apps/bible/index.html'), old);
+    put(path.join(amy, 'apps/mine/index.html'), '<p>amy built this</p>');           // not a built-in: never touched
+    const amyNote = path.join(amy, 'data/bible/notes/43-3.json'); put(amyNote, '{"notes":{"v16":"amy"}}');
+    const benPage = Buffer.concat([old, Buffer.from('\n<!-- ben edited -->')]);
+    put(path.join(ben, 'apps/bible/index.html'), benPage);
+    const benNote = path.join(ben, 'data/bible/notes/1-1.json'); put(benNote, '{"notes":{"v1":"ben"}}');
+    assert.ok(known().bible.includes(sha256(old)), 'CONTROL (R14): amy\'s copy is a known repo version');
+    assert.notEqual(sha256(old), sha256(tpl), 'CONTROL (R14): amy\'s copy really is old');
+    const web = startWeb(root);
+    try {
+      await waitReady(port);
+      await waitFor(() => sha256(fs.readFileSync(path.join(amy, 'apps/bible/index.html'))) === sha256(tpl), 'member amy\'s Bible updated');
+      assert.equal(sha256(fs.readFileSync(path.join(root, 'workspace/apps/bible/index.html'))), sha256(cur), 'owner still updated');
+      assert.deepEqual(fs.readFileSync(path.join(ben, 'apps/bible/index.html')), benPage, 'member ben\'s edited Bible is kept');
+      assert.equal(fs.readFileSync(path.join(amy, 'apps/mine/index.html'), 'utf8'), '<p>amy built this</p>');
+      assert.equal(fs.readFileSync(amyNote, 'utf8'), '{"notes":{"v16":"amy"}}', 'amy\'s data untouched');
+      assert.equal(fs.readFileSync(benNote, 'utf8'), '{"notes":{"v1":"ben"}}', 'ben\'s data untouched');
+      const log = fs.readFileSync(path.join(root, 'audit.log'), 'utf8');
+      assert.match(log, /builtin-apps-update[^\n]*workspace-ben[^\n]*"edited":\["bible"\]/, 'the kept edit is reported');
+    } finally { await stopWeb(web); fs.rmSync(root, { recursive: true, force: true }); }
+  });
