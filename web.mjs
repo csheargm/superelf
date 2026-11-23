@@ -1864,6 +1864,8 @@ const server = http.createServer(async (req, res) => {
       if (!slugOk(slug)) return send(res, 400, 'application/json', '{"error":"bad name"}');
       const dir = ownAppDir(user, slug);
       if (!dir) return send(res, 400, 'application/json', LINKED_APP);
+      // Not theirs (or mistyped): say so instead of a 200 for nothing deleted (F4-5).
+      if (!fs.existsSync(dir)) return send(res, 404, 'application/json', '{"error":"没有这个应用 · No such app"}');
       fs.rmSync(dir, { recursive: true, force: true });
       return send(res, 200, 'application/json', '{"ok":true}');
     }
@@ -2603,7 +2605,9 @@ const server = http.createServer(async (req, res) => {
         provisionWorkspace(rec);
         await upsertUser(rec);
         audit('create', { who: id, name: rec.name, by: user.id });
-        return send(res, 200, 'application/json', JSON.stringify({ ok: true, id, hasPin: !!rec.passHash }));
+        // No password set → the token is how they first sign in (POST /api/login {token}), shown ONCE by
+        // Settings; with a password it could not sign in at all, so it is not handed out (F5-1).
+        return send(res, 200, 'application/json', JSON.stringify({ ok: true, id, hasPin: !!rec.passHash, ...(rec.passHash ? {} : { token: rec.token }) }));
       }
       if (p.startsWith('/api/admin/users/')) {
         const id = p.slice('/api/admin/users/'.length);
@@ -2611,6 +2615,10 @@ const server = http.createServer(async (req, res) => {
         if (!target) return send(res, 404, 'application/json', '{"error":"not found"}');
         if (req.method === 'PUT') {
           const b = await readBody(req, BODY_LIMITS.control);
+          // Owner resets a member's password (Settings "重设密码 · Reset password", F5-2): checked before
+          // anything is written; every session of theirs is signed out so the old password's reach ends.
+          if (b.password !== undefined && passwordError(b.password)) return send(res, 400, 'application/json', JSON.stringify({ error: passwordError(b.password) }));
+          if (b.password !== undefined) { target.passHash = hashPassword(String(b.password)); cfg.sessions.destroyUser(id); audit('password-reset', { who: id, by: user.id }); }
           const prof = loadProfileForUpdate(target.workspace, { name: target.name }); // read-before-write: never rebuild a member's profile from a failed read
           if (typeof b.name === 'string' && b.name.trim()) { prof.name = b.name.trim().slice(0, 60); target.name = prof.name; }
           if (b.birthYear !== undefined) { prof.birthYear = Number(b.birthYear) || null; target.birthYear = prof.birthYear; }

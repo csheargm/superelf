@@ -519,30 +519,60 @@ async function loadShelf(){
   box.querySelectorAll('[data-un]').forEach(b=>b.onclick=async()=>{ if(confirm('Remove "'+b.dataset.un+'" from the shelf? (archived, not deleted)')){ await api('/api/admin/shared/'+b.dataset.un+'/unshare',{method:'POST'}); loadShelf(); loadApps(); } });
   $('#promoteBtn').onclick=async(e)=>{ e.preventDefault(); const v=$('#promoteSel').value; if(!v) return; const [from,slug]=v.split('|'); const r=await api('/api/admin/share',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({from,slug})}); const j=await r.json(); if(!j.ok){alert(j.error||'failed');return;} loadShelf(); loadApps(); };
 }
+// TODO(R4): web/settings.js is over budget — Family accounts (loadFamily and its add/approve/reset/
+// remove handlers) is the seam to split into its own web/settings-family.js.
 async function loadFamily(){
   const box=$('#family'); box.style.display='block';
+  // min-width:0 + minmax(0,1fr): a phone's 390px fits two inputs; their intrinsic width used to push
+  // the row (and the whole Settings page) sideways (F5-5).
+  const FIELD='min-width:0;width:100%;box-sizing:border-box;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text)';
   let list=[]; try{ list=await (await api('/api/admin/users')).json(); }catch{}
   box.innerHTML='<b>Family accounts</b>'+list.map(u=>
-    `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)">
-      <span style="flex:1">${esc(u.name)} <small style="color:var(--muted)">${u.role}${u.age!=null?' · age '+u.age:''}</small></span>
-      ${u.id!=='owner'?`<button class="plain" data-tok="${esc(u.id)}">token</button><button class="plain" data-del="${esc(u.id)}">×</button>`:''}
+    `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)">
+      <span style="flex:1;min-width:0;overflow-wrap:anywhere">${esc(u.name)} <small style="color:var(--muted)">${u.status==='pending'?'等待批准 · Waiting for approval':u.role}${u.age!=null?' · age '+u.age:''}</small></span>
+      ${u.status==='pending'?`<button class="primary" data-approve="${esc(u.id)}">批准 · Approve</button>`:''}
+      ${u.id!=='owner'?`<button class="plain" data-pw="${esc(u.id)}">重设密码 · Reset password</button><button class="plain" data-del="${esc(u.id)}">×</button>`:''}
     </div>`).join('')+
-    `<div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px">
-      <input id="nId" placeholder="id (e.g. mia)" style="padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text)">
-      <input id="nName" placeholder="Name" style="padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text)">
-      <input id="nYear" placeholder="Birth year" inputmode="numeric" style="padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text)">
+    `<div style="margin-top:10px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px">
+      <input id="nId" placeholder="id (e.g. mia)" style="${FIELD}">
+      <input id="nName" placeholder="Name" style="${FIELD}">
+      <input id="nYear" placeholder="Birth year" inputmode="numeric" style="${FIELD}">
+      <input id="nPass" type="password" autocomplete="new-password" placeholder="起始密码（可不填）· Starting password (optional)" style="${FIELD}">
       <button class="primary" id="addU" style="padding:6px">Add member</button>
     </div>`;
-  box.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{ if(confirm('Remove '+b.dataset.del+"? (their data stays on disk)")){ await api('/api/admin/users/'+b.dataset.del,{method:'DELETE'}); loadFamily(); } });
-  box.querySelectorAll('[data-tok]').forEach(b=>b.onclick=async()=>{ alert('To (re)issue a token, delete and re-add the member — tokens are shown once at creation for safety.'); });
+  // preventDefault: these buttons sit inside Settings' <form method="dialog">, so a bare click also
+  // submitted it and closed the whole Settings page (F5-8).
+  box.querySelectorAll('[data-del]').forEach(b=>b.onclick=async(e)=>{
+    e.preventDefault();
+    if(!confirm(`移除 ${b.dataset.del}？对方会被登出，资料仍留在电脑上 · Remove ${b.dataset.del}? They are signed out; their data stays on disk.`)) return;
+    const g=await relayJson(api('/api/admin/users/'+b.dataset.del,{method:'DELETE'}),'data');
+    if(!g.ok) alert(g.text);
+    loadFamily();
+  });
+  // Self sign-ups wait for the owner (cfg.require_approval); this is the owner's only way to let them in (F5-3).
+  box.querySelectorAll('[data-approve]').forEach(b=>b.onclick=async(e)=>{
+    e.preventDefault();
+    const g=await relayJson(api('/api/admin/users/'+b.dataset.approve+'/approve',{method:'POST'}),'data');
+    if(!g.ok){ alert(g.text); return; }
+    loadFamily();
+  });
+  box.querySelectorAll('[data-pw]').forEach(b=>b.onclick=async(e)=>{
+    e.preventDefault();
+    const pw=prompt(`给 ${b.dataset.pw} 设新密码（至少 8 位），对方会被登出 · New password for ${b.dataset.pw} (8+ characters); they will be signed out:`,'');
+    if(!pw) return;
+    const g=await relayJson(api('/api/admin/users/'+b.dataset.pw,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({password:pw})}),'data');
+    alert(g.ok?`已重设。对方用新密码登录 · Done. They sign in with the new password.`:g.text);
+  });
   $('#addU').onclick=async(e)=>{
     e.preventDefault();
-    const id=$('#nId').value.trim().toLowerCase(), name=$('#nName').value.trim(), birthYear=parseInt($('#nYear').value,10)||null;
-    if(!id){ alert('id required'); return; }
-    const r=await api('/api/admin/users',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id,name,birthYear})});
+    const id=$('#nId').value.trim().toLowerCase(), name=$('#nName').value.trim(), birthYear=parseInt($('#nYear').value,10)||null, password=$('#nPass').value;
+    if(!id){ alert('请填用户名 · Username required'); return; }
+    const r=await api('/api/admin/users',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id,name,birthYear,...(password?{password}:{})})});
     const j=await r.json();
-    if(!j.ok){ alert(j.error||'failed'); return; }
-    prompt(`Created ${name||id}. Give them this token (shown once):`, j.token);
+    if(!j.ok){ alert(j.error||'添加失败 · Could not add'); return; }
+    // With a password they sign in by name; without one the server hands out a one-time sign-in code (F5-1).
+    if(j.token) prompt(`已添加 ${name||id}。把这个登录码交给对方（只显示一次），登录后在设置里设密码 · Added ${name||id}. Give them this sign-in code (shown once); they set a password in Settings:`, j.token);
+    else alert(`已添加 ${name||id}。对方用用户名「${id}」和你设的密码登录 · Added ${name||id}. They sign in with username "${id}" and the password you set.`);
     loadFamily();
   };
 }

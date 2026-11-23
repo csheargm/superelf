@@ -156,3 +156,11 @@ test('a member deletes an ordinary app of their own', async () => {
   assert.equal(r.status, 200, await r.text());
   assert.ok(!fs.existsSync(app), 'the folder is gone');
 });
+
+// F4-5 (overnight test 2026-11-22): deleting an app the member does not have answered 200 ok:true,
+// so a client could never tell "deleted" from "was never yours / mistyped".
+test('deleting an app the member does not have says so (404), not ok', async () => {
+  const r = await api(L.port, '/api/apps/never-was', { method: 'DELETE', headers: { authorization: `Bearer ${MEMBER_TOKEN}` } });
+  assert.equal(r.status, 404);
+  assert.match(await r.text(), /没有这个应用/, 'a reason a newcomer reads, 中文 first');
+});
