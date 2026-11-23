@@ -306,7 +306,7 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
 <aside id="drawer">
   <div class="dhead"><button class="plain" id="goHome" title="主页 · Home">Home</button><button class="plain" id="drawerSearch" title="Search chats" style="margin-right:2px">🔍</button><button class="plain" id="newChat">+ New</button></div>
   <div class="dsec open" id="secApps"><div class="dsec-head">My Apps</div><div class="dsec-body"><div class="d-apps-list" id="dApps"></div></div></div>
-  <div class="dsec open" id="secFamily"><div class="dsec-head">Family Apps</div><div class="dsec-body"><div id="dFamily" class="d-apps-list" style="padding:0 12px 8px"><span style="color:var(--muted);font-size:13px">None shared yet.</span></div></div></div>
+  <div class="dsec open" id="secFamily"><div class="dsec-head">Family Apps</div><div class="dsec-body"><div id="dFamily" class="d-apps-list" style="padding:0 12px 8px"></div></div></div>
   <!-- 简报 · Briefings — a JOB's output. System-level, like the jobs that produce it, so it
        belongs beside My Apps rather than inside any one app. It was previously readable only
        inside the longevity app: an accident of history, since briefings began as a health
@@ -664,7 +664,7 @@ const ACCOUNT_REMOVED_CODE='account_removed', ACCOUNT_REMOVED_TEXT='你的账号
 let accountRemoved=false;
 async function ping(signal){ if(!T) return false; const t0=T; let r; try{ r=await api('/api/ping',signal?{signal}:{}); }catch{ if(T===t0&&!signal) PAOffline.noteNet(false); return 'offline'; } if(T!==t0) return false;   // the session changed while this ping ran: its answer is not ours to apply
   if(signal){ let j0; try{ j0=await r.clone().json(); }catch{ return false; } if(T!==t0||!j0||!((r.ok&&typeof j0.ok==='boolean')||r.status===401)) return false; }   // a re-check needs the NODE: its ping reply or its 401 bad-token; a gateway error or HTML page does not count
-  PAOffline.noteNet(true); try{ const j=await r.json(); if(T!==t0) return false; accountRemoved=r.status===401&&j.code===ACCOUNT_REMOVED_CODE; if(accountRemoved){ T=null; try{ localStorage.removeItem('pa_session'); localStorage.removeItem(SW_UID_KEY); }catch{ /* blocked storage: nothing was kept to reopen offline */ } } if(j.ok){ UID=j.uid; PASW.remember(SW_UID_KEY,j.uid); setHeaderName(j.name); } return j.ok; }catch{ return false; } }
+  PAOffline.noteNet(true); try{ const j=await r.json(); if(T!==t0) return false; accountRemoved=r.status===401&&j.code===ACCOUNT_REMOVED_CODE; if(accountRemoved){ T=null; try{ localStorage.removeItem('pa_session'); localStorage.removeItem(SW_UID_KEY); localStorage.removeItem(SW_FAMILY_KEY); }catch{ /* blocked storage: nothing was kept to reopen offline */ } } if(j.ok){ UID=j.uid; PASW.remember(SW_UID_KEY,j.uid); setHeaderName(j.name); rememberFamily({name:j.name}); } return j.ok; }catch{ return false; } }
 // Offline is set by one failed request, and only a later success clears it. On a screen that makes no
 // requests (the home grid) that never came, so the line stayed on with the network back (owner 2026-11-21).
 // While offline and visible, ask the node again on a short beat, on return to the app and on 'online'.
@@ -707,7 +707,7 @@ async function doSetup(){
 }
 async function ensureToken(){
   // Offline-first: with no node at all, the last sign-in on this device stands (web/sw-client.js); a refused token still signs in again.
-  if(T){ const p=await ping(); if(p===true||(p==='offline'&&(UID=PASW.recall(SW_UID_KEY)))){ $('#dot').classList.add('ok'); return; } }
+  if(T){ const p=await ping(); if(p===true||(p==='offline'&&(UID=PASW.recall(SW_UID_KEY)))){ if(p==='offline') setHeaderName(recallFamily().name); $('#dot').classList.add('ok'); return; } }
   // No live session here: whatever the last account left (cached app pages, the app cookie) goes first (ADR 0037).
   // Offline it may not reach the node; the next signed-out boot tries again, so a failure is only noted on the line.
   await swSignedOut(window.caches,(u)=>fetch(u,{method:'POST',credentials:'same-origin'})).catch(()=>PAOffline.noteNet(false));
@@ -1223,15 +1223,26 @@ async function checkAndAutoUpdate(apps){
 }
 
 // TODO(R4): index.html is far over budget; the drawer's app sections (loadApps/loadFamilyApps) are the seam to split out.
+const FAMILY_NONE='还没有共享的应用 · None shared yet.';
+const FAMILY_OFFLINE='离线 · Offline — 上次保存的列表 · the last saved list';
+const FAMILY_UNREADABLE='离线 · Offline — 家庭应用暂时无法加载 · Family Apps cannot load right now';
+// The header name and Family Apps from the last online load, kept per account so another sign-in on this device never sees them.
+const recallFamily=()=>{ const v=PASW.recall(SW_FAMILY_KEY); return v&&v.uid===UID?v:{}; };
+const rememberFamily=(part)=>{ if(UID) PASW.remember(SW_FAMILY_KEY,{...recallFamily(),...part,uid:UID}); };
 const DEMO_FAMILY_NOTE='家庭应用仅在私有部署的 superelf 上可用 · Family Apps are available on a privately hosted superelf';
 async function loadFamilyApps(){
   // The demo node (lib/demo-boot.mjs sets PADemoAuth) has no family: a muted note, no /api/family-apps request.
   if(window.PADemoAuth){ const d=$('#dFamily'); d.textContent=''; const n=document.createElement('span'); n.id='dFamilyDemo'; n.style.cssText='color:var(--muted);font-size:13px'; n.textContent=DEMO_FAMILY_NOTE; d.appendChild(n); return; }
-  let apps=[]; try{ apps=await (await api('/api/family-apps')).json(); }catch{}
-  let myNames=new Set(); try{ (await (await api('/api/apps')).json()).forEach(a=>myNames.add(a.name)); }catch{}
+  // Offline (F5-7): the list from the last online load, marked as such — never "None shared yet." for a list we could not read.
+  let apps=[], offline=false;
+  try{ const r=await api('/api/family-apps'); if(!r.ok) throw new Error('HTTP '+r.status); apps=await r.json(); if(!Array.isArray(apps)) throw new Error('bad list'); rememberFamily({apps}); }
+  catch{ offline=true; apps=recallFamily().apps||null; }   // R5: the failure is shown below (the offline mark, or the could-not-load line)
+  let myNames=new Set(); try{ (await (await api('/api/apps')).json()).forEach(a=>myNames.add(a.name)); }catch{ (PASW.recall(SW_APPS_KEY)||[]).forEach(a=>myNames.add(a.name)); }
   const el=$('#dFamily');
-  if(!apps.length){ el.innerHTML='<span style="color:var(--muted);font-size:13px">None shared yet.</span>'; return; }
-  el.innerHTML=apps.map(a=>{
+  if(!apps){ el.innerHTML=`<span style="color:var(--muted);font-size:13px">${FAMILY_UNREADABLE}</span>`; return; }
+  const mark=offline?`<div class="fc-offline" style="color:var(--muted);font-size:12px;margin-bottom:6px">${FAMILY_OFFLINE}</div>`:'';
+  if(!apps.length){ el.innerHTML=mark+`<span style="color:var(--muted);font-size:13px">${FAMILY_NONE}</span>`; return; }
+  el.innerHTML=mark+apps.map(a=>{
     const isOwn=a.uid===UID, have=myNames.has(a.slug);
     return`<div class="family-card" style="margin-bottom:6px">
       <div class="fc-info"><b>${esc(a.title)}</b><small>${esc(a.desc)}</small><div class="fc-author">by ${esc(a.author)}${isOwn?' (you)':''}</div></div>

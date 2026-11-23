@@ -20,6 +20,7 @@ const SW_OFFLINE_CONFIG_URL='/api/offline-config';   // lib/offline.mjs OFFLINE_
 const SW_ROUTE_SRC='src', SW_ROUTE_SRCDOC='srcdoc';
 const SW_UID_KEY='pa_uid';                   // localStorage: who signed in last, for a boot with no node (ensureToken)
 const SW_APPS_KEY='pa_apps';                 // localStorage: the app list from the last online load (loadApps)
+const SW_FAMILY_KEY='pa_family';             // localStorage: {uid, name, apps} — the header name and Family Apps from the last online load (F5-7)
 const SW_OPEN_FAILED_TXT='无法打开 · Could not open';
 const swAppUrl=(uid,slug)=>`/app/${encodeURIComponent(uid)}/${encodeURIComponent(slug)}/`;
 // The build id inside the footer line '<app name> · v<semver>+N · <build>' (web/update.js reads the same line).
