@@ -1748,7 +1748,9 @@ const server = http.createServer(async (req, res) => {
     // TODO(R4): web.mjs is over budget; split the small GET routes (ping, bible, family-apps) into lib/.
     if (req.method === 'GET' && p === '/api/ping') return send(res, 200, 'application/json', JSON.stringify({ ok: true, uid: user.id, name: user.demo ? ownName(user) : user.name, role: user.role }),
       demoOn(cfg) ? undefined : { 'set-cookie': appPageCookie(req, bearerOf(req)) });   // carries the session to the app iframe's navigation (lib/app-page-access.mjs)
-    if (req.method === 'GET' && p === '/api/family-apps') return send(res, 200, 'application/json', JSON.stringify(listFamilyApps()));
+    // Each app is listed once (F4-6): your own apps are in "My apps", and an app on the family shelf is under the shelf.
+    if (req.method === 'GET' && p === '/api/family-apps') { const shelf = new Set(demoOn(cfg) ? [] : listShared(SHARED).map((a) => a.name));
+      return send(res, 200, 'application/json', JSON.stringify(listFamilyApps().filter((a) => a.uid !== user.id && !shelf.has(a.slug)))); }
     if (req.method === 'PATCH' && p.endsWith('/share') && p.startsWith('/api/apps/')) {
       const slug = p.slice('/api/apps/'.length, -'/share'.length);
       if (!slugOk(slug)) return send(res, 400, 'application/json', '{"error":"bad name"}');

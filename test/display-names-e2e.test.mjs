@@ -44,7 +44,9 @@ test('server lists say "mom" and "Chore Chart", never "owner" or a slug', async 
   const cand = await get('/api/admin/share/candidates');
   assert.equal(cand[0].name, 'mom');
   assert.equal(cand[0].titles['chore-chart'], 'Chore Chart');
-  assert.equal((await get('/api/family-apps'))[0].author, 'mom');
+  await get('/api/admin/users', { method: 'POST', body: JSON.stringify({ id: 'kid', name: 'Kid', password: 'kid-first-pass-1' }) });
+  const kid = (await (await fetch(`http://127.0.0.1:${port}/api/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'kid', password: 'kid-first-pass-1' }) })).json()).token;
+  assert.equal((await (await fetch(`http://127.0.0.1:${port}/api/family-apps`, { headers: { authorization: `Bearer ${kid}` } })).json())[0].author, 'mom', 'a member sees mom\'s shared app by her name');
   assert.equal((await get('/api/admin/users'))[0].name, 'mom');
   const r = await get('/api/admin/share', { method: 'POST', body: JSON.stringify({ from: 'owner', slug: 'chore-chart' }) });
   assert.equal(r.ok, true, JSON.stringify(r));

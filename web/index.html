@@ -1244,13 +1244,13 @@ async function loadFamilyApps(){
   const mark=offline?`<div class="fc-offline" style="color:var(--muted);font-size:12px;margin-bottom:6px">${FAMILY_OFFLINE}</div>`:'';
   if(!apps.length){ el.innerHTML=mark+`<span style="color:var(--muted);font-size:13px">${FAMILY_NONE}</span>`; return; }
   el.innerHTML=mark+apps.map(a=>{
-    const isOwn=a.uid===UID, have=myNames.has(a.slug);
+    const have=myNames.has(a.slug);   // never your own app: the node lists each app once (F4-6)
     return`<div class="family-card" style="margin-bottom:6px">
-      <div class="fc-info"><b>${esc(a.title)}</b><small>${esc(a.desc)}</small><div class="fc-author">by ${esc(a.author)}${isOwn?' (you)':''}</div></div>
+      <div class="fc-info"><b>${esc(a.title)}</b><small>${esc(a.desc)}</small><div class="fc-author">by ${esc(a.author)}</div></div>
       <div class="fc-btns">
         <button class="plain" style="font-size:12px;padding:3px 8px" data-fopen="${esc(a.uid)}" data-fslug="${esc(a.slug)}" data-ftitle="${esc(a.title)}">Open</button>
-        ${!isOwn&&!have?`<button class="plain" style="font-size:12px;padding:3px 8px" data-ffork="${esc(a.uid)}" data-fslug="${esc(a.slug)}">Fork</button>`:''}
-        ${have&&!isOwn?`<small style="color:var(--accent);font-size:11px">✓</small>`:''}
+        ${!have?`<button class="plain" style="font-size:12px;padding:3px 8px" data-ffork="${esc(a.uid)}" data-fslug="${esc(a.slug)}">Fork</button>`:''}
+        ${have?`<small style="color:var(--accent);font-size:11px">✓</small>`:''}
       </div>
     </div>`;
   }).join('');
