@@ -36,3 +36,16 @@ test('F5-1: a member added WITH a password signs in by name + password; no token
   const login = await call('/api/login', { token: null, body: { username: 'ben', password: 'ben-start-pass-1' } });
   assert.equal(login.status, 200);
 });
+
+test('F5-2: the owner resets a member password; the old one and old sessions stop working', async () => {
+  await call('/api/admin/users', { body: { id: 'ann', name: 'Ann', password: 'ann-first-pass-1' } });
+  const s = await (await call('/api/login', { token: null, body: { username: 'ann', password: 'ann-first-pass-1' } })).json();
+  assert.equal((await call('/api/ping', { token: s.token })).status, 200, 'CONTROL: her session works before the reset');
+  const short = await call('/api/admin/users/ann', { method: 'PUT', body: { password: 'x' } });
+  assert.equal(short.status, 400, 'a too-short password is refused');
+  const ok = await call('/api/admin/users/ann', { method: 'PUT', body: { password: 'ann-new-pass-22' } });
+  assert.equal(ok.status, 200);
+  assert.equal((await call('/api/ping', { token: s.token })).status, 401, 'her old session is signed out');
+  assert.equal((await call('/api/login', { token: null, body: { username: 'ann', password: 'ann-first-pass-1' } })).status, 401, 'old password refused');
+  assert.equal((await call('/api/login', { token: null, body: { username: 'ann', password: 'ann-new-pass-22' } })).status, 200, 'new password works');
+});

@@ -2613,6 +2613,10 @@ const server = http.createServer(async (req, res) => {
         if (!target) return send(res, 404, 'application/json', '{"error":"not found"}');
         if (req.method === 'PUT') {
           const b = await readBody(req, BODY_LIMITS.control);
+          // Owner resets a member's password (Settings "重设密码 · Reset password", F5-2): checked before
+          // anything is written; every session of theirs is signed out so the old password's reach ends.
+          if (b.password !== undefined && passwordError(b.password)) return send(res, 400, 'application/json', JSON.stringify({ error: passwordError(b.password) }));
+          if (b.password !== undefined) { target.passHash = hashPassword(String(b.password)); cfg.sessions.destroyUser(id); audit('password-reset', { who: id, by: user.id }); }
           const prof = loadProfileForUpdate(target.workspace, { name: target.name }); // read-before-write: never rebuild a member's profile from a failed read
           if (typeof b.name === 'string' && b.name.trim()) { prof.name = b.name.trim().slice(0, 60); target.name = prof.name; }
           if (b.birthYear !== undefined) { prof.birthYear = Number(b.birthYear) || null; target.birthYear = prof.birthYear; }

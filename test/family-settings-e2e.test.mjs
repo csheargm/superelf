@@ -44,3 +44,18 @@ test('F5-1: Add member with no password shows a real one-time sign-in code', { s
     assert.equal(login.status, 200, 'the shown code signs Mia in');
   } finally { await ctx.close(); }
 });
+
+test('F5-2: the per-member button resets the password, and the new one signs in', { skip, timeout: 60000 }, async () => {
+  await fetch(`http://127.0.0.1:${port}/api/admin/users`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${OWNER_TOKEN}` }, body: JSON.stringify({ id: 'leo', name: 'Leo', password: 'leo-first-pass-1' }) });
+  const { ctx, page, dialogs } = await openSettings({ answer: (d) => (d.type() === 'prompt' ? 'leo-reset-pass-9' : true) });
+  try {
+    const btn = page.locator('[data-pw="leo"]');
+    assert.match(await btn.innerText(), /重设密码/, 'the button says what it does, 中文 first');
+    await btn.click();
+    await waitDialogs(page, dialogs, 2);
+    assert.equal(dialogs[0].type, 'prompt');
+    assert.match(dialogs[1].message, /^已/, 'a 中文-first confirmation');
+    const login = await fetch(`http://127.0.0.1:${port}/api/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'leo', password: 'leo-reset-pass-9' }) });
+    assert.equal(login.status, 200, 'the new password signs Leo in');
+  } finally { await ctx.close(); }
+});

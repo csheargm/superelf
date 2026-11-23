@@ -525,7 +525,7 @@ async function loadFamily(){
   box.innerHTML='<b>Family accounts</b>'+list.map(u=>
     `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)">
       <span style="flex:1">${esc(u.name)} <small style="color:var(--muted)">${u.role}${u.age!=null?' · age '+u.age:''}</small></span>
-      ${u.id!=='owner'?`<button class="plain" data-tok="${esc(u.id)}">token</button><button class="plain" data-del="${esc(u.id)}">×</button>`:''}
+      ${u.id!=='owner'?`<button class="plain" data-pw="${esc(u.id)}">重设密码 · Reset password</button><button class="plain" data-del="${esc(u.id)}">×</button>`:''}
     </div>`).join('')+
     `<div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px">
       <input id="nId" placeholder="id (e.g. mia)" style="padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text)">
@@ -535,7 +535,13 @@ async function loadFamily(){
       <button class="primary" id="addU" style="padding:6px">Add member</button>
     </div>`;
   box.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{ if(confirm('Remove '+b.dataset.del+"? (their data stays on disk)")){ await api('/api/admin/users/'+b.dataset.del,{method:'DELETE'}); loadFamily(); } });
-  box.querySelectorAll('[data-tok]').forEach(b=>b.onclick=async()=>{ alert('To (re)issue a token, delete and re-add the member — tokens are shown once at creation for safety.'); });
+  box.querySelectorAll('[data-pw]').forEach(b=>b.onclick=async(e)=>{
+    e.preventDefault();
+    const pw=prompt(`给 ${b.dataset.pw} 设新密码（至少 8 位），对方会被登出 · New password for ${b.dataset.pw} (8+ characters); they will be signed out:`,'');
+    if(!pw) return;
+    const g=await relayJson(api('/api/admin/users/'+b.dataset.pw,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({password:pw})}),'data');
+    alert(g.ok?`已重设。对方用新密码登录 · Done. They sign in with the new password.`:g.text);
+  });
   $('#addU').onclick=async(e)=>{
     e.preventDefault();
     const id=$('#nId').value.trim().toLowerCase(), name=$('#nName').value.trim(), birthYear=parseInt($('#nYear').value,10)||null, password=$('#nPass').value;
