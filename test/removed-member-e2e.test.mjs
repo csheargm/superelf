@@ -43,11 +43,10 @@ test('R3: the shell\'s copy of the code matches lib/auth.mjs', () => {
 
 let port, root, web, browser;
 before(async () => {
-  if (skip) return;
-  port = await freePort();
+  port = await freePort();   // the HTTP-only checks run in CI too; only the browser is Playwright-gated
   root = mkWebRoot({ port, extraConfig: { users: [{ id: 'owner', name: 'Owner', role: 'owner', token: OWNER_TOKEN, workspace: 'workspace', passHash: hashPassword('owner-pass-123') }] } });   // set up: the shell shows Sign in, not first-run setup
   web = startWeb(root); await waitReady(port);
-  browser = await chromium.launch();
+  if (!skip) browser = await chromium.launch();
 });
 after(async () => { if (browser) await browser.close(); if (web) await stopWeb(web); if (root) rmTemp(root); });
 
@@ -57,7 +56,7 @@ async function owner(p, opt = {}) {
   return fetch(`http://127.0.0.1:${port}${p}`, { ...opt, headers: { 'content-type': 'application/json', authorization: `Bearer ${ownerSession}` } });
 }
 
-test('the server tells only the removed member\'s own session that it was removed', { skip }, async () => {
+test('the server tells only the removed member\'s own session that it was removed', async () => {
   await owner('/api/admin/users', { method: 'POST', body: JSON.stringify({ id: 'nia', name: 'Nia', password: 'nia-first-pass-1' }) });
   const login = await (await fetch(`http://127.0.0.1:${port}/api/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'nia', password: 'nia-first-pass-1' }) })).json();
   assert.equal((await owner('/api/admin/users/nia', { method: 'DELETE' })).status, 200);
@@ -83,6 +82,10 @@ test('a removed member reloads and sees "你的账号已被移除 · Your accoun
   await page.reload();
   await page.waitForSelector('#login[open]');
   await page.waitForFunction((t) => document.querySelector('#loginErr').textContent === t, REMOVED_TEXT);
+  assert.deepEqual(await page.evaluate(() => [localStorage.getItem('pa_session'), localStorage.getItem('pa_uid')]), [null, null], 'nothing left to reopen offline as the removed member');
+  await ctx.setOffline(true); await page.reload().catch(() => { /* no worker page cached: the reload itself fails offline, which is also no way in */ });
+  assert.equal(await page.evaluate(() => !!document.querySelector('#dot.ok')).catch(() => false), false, 'offline boot does not start the app as the removed member');
+  await ctx.setOffline(false);
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'removed-member.png') });
   await ctx.close();
   const fresh = await browser.newContext(); const p2 = await fresh.newPage();

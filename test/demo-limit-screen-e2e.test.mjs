@@ -11,6 +11,7 @@ import { rmTemp } from './helpers-tmp.mjs';
 import { skip, chromium } from './helpers-note-link.mjs';
 import { QUOTA_MESSAGES } from '../lib/demo-quota.mjs';
 import { LIMIT_LABELS } from '../lib/demo-boot.mjs';
+import { WAITLIST_LABELS } from '../lib/demo-waitlist-ui.mjs';
 
 const REPO = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const HOME = 'https://example.org/front';
@@ -45,7 +46,6 @@ test('refused first visit: 中文-first card with sign-in, waiting list and tomo
   const card = page.locator('#demoStop');
   await card.waitFor({ state: 'visible' });
   assert.match(await card.innerText(), /^今天来自你网络的新访客太多 · Too many new visitors today/);
-  assert.equal(await page.locator('#demoStopJoin').getAttribute('href'), `${HOME}?join=1`);
   assert.equal(await page.locator('#demoStopJoin').innerText(), LIMIT_LABELS.join);
   assert.equal(await page.locator('#demoStopSignin').innerText(), LIMIT_LABELS.signin);
   assert.ok((await card.innerText()).includes(LIMIT_LABELS.tomorrow));
@@ -56,5 +56,26 @@ test('refused first visit: 中文-first card with sign-in, waiting list and tomo
   await page.locator('#demoStopSignin').click();   // the next step really opens the shell's sign-in
   await page.locator('#demoAuth input[type=email]').waitFor({ state: 'visible' });
   assert.equal(await card.count(), 0);
+  await ctx.close();
+});
+
+test('refused first visit: the waiting-list button opens the form, which sends with no session', { skip }, async () => {
+  const ctx = await browser.newContext(); const page = await ctx.newPage();
+  await page.goto(`http://127.0.0.1:${full.port}/`);
+  await page.locator('#demoStopJoin').click();
+  assert.equal(await page.locator('#demoStop').count(), 0);
+  await page.locator('#demoWait input[type=email]').fill('limit-visitor@example.org');
+  await page.locator('#demoWait button[type=submit]').click();
+  await page.waitForFunction((t) => document.querySelector('#demoWait')?.textContent.includes(t), WAITLIST_LABELS.thanks);
+  assert.equal(await page.evaluate(() => localStorage.getItem('pa_session')), null, 'sent with no node session');
+  await ctx.close();
+});
+
+test('refused first visit: Escape does not close the limit card', { skip }, async () => {
+  const ctx = await browser.newContext(); const page = await ctx.newPage();
+  await page.goto(`http://127.0.0.1:${full.port}/`);
+  const card = page.locator('#demoStop'); await card.waitFor({ state: 'visible' });
+  await page.keyboard.press('Escape'); await page.waitForTimeout(300);
+  assert.ok(await card.evaluate((d) => d.open), 'the card stays open');
   await ctx.close();
 });
