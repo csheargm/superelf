@@ -24,7 +24,7 @@ import { readJsonState, readJsonForUpdate, FILE_OK, FILE_ABSENT, FILE_UNREADABLE
 // 2026-09-02: app data (handwriting notebooks!) inherited the 64KB default,
 // five real notes hit it, one lost a page of Apple Pencil strokes.
 import { saveAppData, restoreAppData, appDataFile, noLinkOnTheWay, APP_DATA_DIR, UPLOADS_DIR } from './lib/appdata.mjs';
-import { loadProfile, loadProfileForUpdate, saveProfile, ageFromYear, sanitizeHealthThresholds, effectiveHealthThresholds, emailOk } from './lib/users.mjs';
+import { loadProfile, loadProfileForUpdate, saveProfile, displayName, ageFromYear, sanitizeHealthThresholds, effectiveHealthThresholds, emailOk } from './lib/users.mjs';
 import { promote, rollback, unshare, listShared, fork, copyNoLinks, LINKED_SOURCE, FORK_REFUSED } from './lib/sharedapps.mjs';
 import { getChapter, bibleSearchWire, BIBLE_DATA_DIR } from './lib/bible.mjs';
 import { listBriefings, getBriefing, saveBriefing, pruneBriefings, pendingActions, runJob } from './lib/autonomy.mjs';
@@ -499,7 +499,7 @@ function provisionWorkspace(rec) {
   if (!existingProfile) saveProfile(rec.workspace, { name: rec.name, role: rec.role, birthYear: rec.birthYear || null, about: '', prefs: '' });
 }
 
-function publicUser(u) { const p = loadProfile(u.workspace) || {}; return { id: u.id, name: p.name || u.name, role: u.role, status: u.status || 'active', hasPin: !!u.passHash, birthYear: p.birthYear ?? u.birthYear ?? null, age: ageFromYear(p.birthYear ?? u.birthYear, thisYear()) }; }
+function publicUser(u) { const p = loadProfile(u.workspace) || {}; return { id: u.id, name: displayName(u), role: u.role, status: u.status || 'active', hasPin: !!u.passHash, birthYear: p.birthYear ?? u.birthYear ?? null, age: ageFromYear(p.birthYear ?? u.birthYear, thisYear()) }; }
 
 if (!cfg.web_token) {
   cfg.web_token = crypto.randomBytes(24).toString('base64url');
@@ -949,6 +949,9 @@ async function reloadConfig({ keepAccounts = false } = {}) {
   cfg.sessions = sessions;
 }
 
+// The shelf as people see it: sharedBy is the sharer's name, not their account id (F5-9).
+const shelfWithNames = () => listShared(SHARED).map((a) => ({ ...a, sharedBy: a.sharedBy ? displayName(cfg.userById.get(a.sharedBy)) : '' }));
+function appTitleOf(dir) { try { const m = JSON.parse(fs.readFileSync(path.join(dir, 'meta.json'), 'utf8')); return String((m && m.title) || path.basename(dir)); } catch { return path.basename(dir); } }   // no meta: the folder name is all there is (R5: deliberate)
 function listFamilyApps() {
   const result = [];
   for (const u of cfg.users) {
@@ -961,8 +964,7 @@ function listFamilyApps() {
         let meta = {};
         try { const m = JSON.parse(fs.readFileSync(path.join(dir, d.name, 'meta.json'), 'utf8')); if (m && typeof m === 'object') meta = m; } catch {}
         if (!meta.shared) return;
-        const prof = loadProfile(u.workspace) || {};
-        result.push({ uid: u.id, slug: d.name, title: String(meta.title || d.name), desc: String(meta.desc || ''), author: prof.name || u.name });
+        result.push({ uid: u.id, slug: d.name, title: String(meta.title || d.name), desc: String(meta.desc || ''), author: displayName(u) });
       });
   }
   return result;
@@ -1763,7 +1765,7 @@ const server = http.createServer(async (req, res) => {
       const links = openUrlApps();   // own apps only: a shelf or family app never opens links
       const own = listApps(user).map((a) => ({ ...a, uid: user.id, links: links.has(a.name) }));
       const ownNames = new Set(own.map((a) => a.name));
-      const promoted = demoOn(cfg) ? [] : listShared(SHARED).map((a) => ({ ...a, uid: 'shared' }));   // demo: workspace.example apps only
+      const promoted = demoOn(cfg) ? [] : shelfWithNames().map((a) => ({ ...a, uid: 'shared' }));   // demo: workspace.example apps only
       const promotedNames = new Set(promoted.map((a) => a.name));
       const family = listFamilyApps()
         .filter((a) => a.uid !== user.id && !ownNames.has(a.slug) && !promotedNames.has(a.slug))
@@ -2527,10 +2529,11 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, 'application/json', JSON.stringify(cfg.users.map((u) => {
           const dir = appsDir(u);
           const apps = fs.existsSync(dir) ? fs.readdirSync(dir).filter((n) => slugOk(n) && fs.existsSync(path.join(dir, n, 'index.html'))) : [];
-          return { user: u.id, name: u.name, apps };
+          const titles = Object.fromEntries(apps.map((n) => [n, appTitleOf(path.join(dir, n))]));   // the list shows titles, never slugs (F5-9)
+          return { user: u.id, name: displayName(u), apps, titles };
         }).filter((x) => x.apps.length)));
       }
-      if (req.method === 'GET' && p === '/api/admin/shared') return send(res, 200, 'application/json', JSON.stringify(listShared(SHARED)));
+      if (req.method === 'GET' && p === '/api/admin/shared') return send(res, 200, 'application/json', JSON.stringify(shelfWithNames()));
       if (req.method === 'POST' && p === '/api/admin/share') {
         const { from, slug } = await readBody(req, BODY_LIMITS.control);
         const src = cfg.userById.get(String(from || ''));

@@ -507,7 +507,7 @@ async function loadShelf(){
   let shelf=[],cand=[];
   try{ shelf=await (await api('/api/admin/shared')).json(); }catch{}
   try{ cand=await (await api('/api/admin/share/candidates')).json(); }catch{}
-  const opts=cand.flatMap(u=>u.apps.map(a=>`<option value="${esc(u.user)}|${esc(a)}">${esc(u.name)} · ${esc(a)}</option>`)).join('');
+  const opts=cand.flatMap(u=>u.apps.map(a=>`<option value="${esc(u.user)}|${esc(a)}">${esc(u.name)} · ${esc((u.titles&&u.titles[a])||a)}</option>`)).join('');   // titles, not slugs (F5-9)
   box.innerHTML='<b>Shared apps (family shelf)</b>'+
     (shelf.map(a=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)">
       <span style="flex:1">${esc(a.title)} <small style="color:var(--muted)">by ${esc(a.sharedBy||'?')}${a.versions?' · '+a.versions+' old ver':''}</small></span>
