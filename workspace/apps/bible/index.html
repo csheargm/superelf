@@ -1619,15 +1619,50 @@ function longPressVerse(n,el){
 }
 
 ;let _penPress=false;   // the last press on the verse list came from the Pencil
+// Palm rejection (owner 2026-11-22): writing with the Pencil, the side of the hand rests on the glass.
+// iPad sends it as a FINGER, so it long-pressed a verse (Ask AI) and started an iOS word selection
+// (Highlight). A finger that lands while the Pencil is down or within PALM_WINDOW_MS of its last
+// event is a palm: no long-press, no tint, no selection. Later deliberate finger presses still work.
+// TODO(R4 seam): this press / long-press / palm block -> bible/verse-press.js when this file is split.
+const PALM_WINDOW_MS=600;
+let _lastPen=-Infinity, _penDown=0, _palmHeld=0, _fingers=0, _palmClick=false;
+const palmGuard=()=>_penDown>0||_palmHeld>0||Date.now()-_lastPen<PALM_WINDOW_MS;
+function clearSel(){
+  try{ const sel=window.getSelection&&window.getSelection(); if(sel&&sel.rangeCount&&sel.removeAllRanges) sel.removeAllRanges(); }
+  catch(e){ /* no Selection API here: nothing was selected, so nothing to clear */ }
+}
 (function(){
   const wrap=document.getElementById('verses');
   if(!wrap) return;
+  const palmIds=new Set(), liveFingers=new Set();
+  // Only a Pencil ON the glass counts: hover (buttons 0, no pressure) must not swallow finger taps.
+  const penSeen=(e)=>{ if(e.pointerType==='pen'&&(e.buttons!==0||e.pressure>0)) _lastPen=Date.now(); };
+  document.addEventListener('pointermove',penSeen,{capture:true,passive:true});
+  for(const t of ['pointerup','pointercancel']) window.addEventListener(t,function(e){
+    if(e.pointerType==='pen'){ _penDown=Math.max(0,_penDown-1); _lastPen=Date.now(); return; }
+    if(e.pointerType==='touch'){ _fingers=Math.max(0,_fingers-1); liveFingers.delete(e.pointerId); }
+    if(palmIds.delete(e.pointerId)){ _palmHeld=palmIds.size; _palmClick=true; _lastPen=Math.max(_lastPen,Date.now()); clearSel(); }   // the window runs on past a lifted palm
+  },{capture:true,passive:true});
+  // A palm resting on the glass while the Pencil is down: stop iOS's own long-press selection at the
+  // source. Only then — a lone finger (link tap, scroll, swipe) is never cancelled here.
+  wrap.addEventListener('touchstart',function(e){
+    const ts=[...(e.touches||[])];
+    if(ts.some(t=>t.touchType==='stylus')&&[...(e.changedTouches||[])].some(t=>t.touchType!=='stylus')) e.preventDefault();
+  },{passive:false});
+  document.addEventListener('selectstart',function(e){ if(palmGuard()&&wrap.contains(e.target)) e.preventDefault(); });
+  document.addEventListener('selectionchange',function(){ if(palmGuard()) clearSel(); });
   // Set in the DOCUMENT capture phase: the ink layer's own capture listener on #verses stops a
   // Pencil pointerdown before wrap's listeners run. A finger press tints its verse here (.press).
   let pressed=null; const unpress=()=>{ if(pressed){ pressed.classList.remove('press'); pressed=null; } };
   document.addEventListener('pointerdown',function(e){
     if(!wrap.contains(e.target)) return;
-    if(e.pointerType==='pen'){ _penPress=true; lpCancel(); return; }
+    if(e.pointerType==='pen'){ _penPress=true; _penDown++; _lastPen=Date.now(); lpCancel();
+      // Palm first, Pencil second: every finger already resting is a palm from now on.
+      if(liveFingers.size){ for(const id of liveFingers) palmIds.add(id); _palmHeld=palmIds.size; unpress(); clearSel(); }
+      return; }
+    _palmClick=false;
+    if(e.pointerType==='touch'){ _fingers++; liveFingers.add(e.pointerId); }
+    if(e.pointerType==='touch'&&palmGuard()){ palmIds.add(e.pointerId); _palmHeld=palmIds.size; lpCancel(); return; }
     unpress(); pressed=e.target.closest?e.target.closest('.verse'):null; if(pressed) pressed.classList.add('press');
   },{capture:true,passive:true});
   for(const t of ['pointerup','pointercancel']) window.addEventListener(t,function(e){ if(e.pointerType!=='pen') unpress(); },{capture:true,passive:true});
@@ -1637,9 +1672,11 @@ function longPressVerse(n,el){
     _penPress=e.pointerType==='pen';         // Pencil writes; it never selects or long-presses (owner 2026-11-13)
     lpCancel(); _lpFired=false;              // cleared here too: a press that never produced a
     if(!v||_penPress) return;                // click would otherwise swallow the NEXT one
+    if(palmIds.has(e.pointerId)||_fingers>1) return;   // a palm, or a second finger (pinch/scroll): never a long-press
     _lpX=e.clientX; _lpY=e.clientY;
-    const n=+v.dataset.n;
-    _lpTimer=setTimeout(function(){ longPressVerse(n,v); },LONG_PRESS_MS);
+    const n=+v.dataset.n, at=Date.now();
+    // Re-checked when it fires: the Pencil may arrive AFTER the palm, or a second finger join it.
+    _lpTimer=setTimeout(function(){ _lpTimer=null; if(_lastPen>=at||_fingers>1||_palmHeld) return; longPressVerse(n,v); },LONG_PRESS_MS);
   },{passive:true});
   wrap.addEventListener('pointermove',function(e){
     if(!_lpTimer) return;
@@ -1652,6 +1689,7 @@ function longPressVerse(n,el){
   // the verse's own handler.
   wrap.addEventListener('click',function(e){
     if(_penPress){ _penPress=false; e.stopPropagation(); e.preventDefault(); return; }   // a Pencil tap: no verse selection
+    if(_palmClick){ _palmClick=false; e.stopPropagation(); e.preventDefault(); return; }   // a palm lifting: no verse selection, no link
     if(!_lpFired) return;
     _lpFired=false; e.stopPropagation(); e.preventDefault();
   },true);
