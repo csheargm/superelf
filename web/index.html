@@ -363,10 +363,11 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
 <dialog id="setup"><form method="dialog">
   <h3 style="margin-bottom:6px">Welcome to superelf</h3>
   <p style="color:var(--muted);font-size:14px;margin-bottom:12px">Create your master account. You'll manage the family from here.</p>
-  <input id="sUser" placeholder="username" autocapitalize="none" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
-  <input id="sName" placeholder="Your name" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
-  <input id="sPin" type="password" placeholder="password (8+ characters) · 密码（至少 8 位）" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
-  <input id="sCode" placeholder="setup code (server log / setup-code file) · 初始化码" autocapitalize="characters" autocomplete="off" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
+  <input id="sUser" placeholder="用户名 · username" autocapitalize="none" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
+  <input id="sName" placeholder="你的名字 · your name" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
+  <input id="sPin" type="password" placeholder="密码（至少 8 位）· password" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
+  <input id="sCode" placeholder="初始化码 · setup code" autocapitalize="characters" autocomplete="off" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
+  <div style="color:var(--muted);font-size:12px;margin:-4px 0 8px">初始化码在服务器日志或 setup-code 文件里 · The setup code is in the server log or the setup-code file</div>
   <div id="setupErr" style="color:var(--danger);font-size:13px;min-height:18px"></div>
   <button class="primary" id="setupBtn" style="width:100%;padding:10px;margin-top:6px">Create master account</button>
 </form></dialog>
@@ -375,11 +376,11 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
   <input id="luser" placeholder="username" autocapitalize="none" autocomplete="username" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
   <input id="lpin" type="password" placeholder="Password or PIN · 密码或 PIN" autocomplete="current-password" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
   <input id="lname" placeholder="Your name" style="display:none;width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
+  <input id="ltok" placeholder="访问令牌 · access token" autocomplete="off" style="display:none;width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
   <div id="loginErr" style="color:var(--danger);font-size:13px;min-height:18px"></div>
   <button class="primary" id="loginBtn" style="width:100%;padding:10px;margin-top:6px">Sign in</button>
   <div style="text-align:center;margin-top:10px;font-size:14px"><a href="#" id="toReg" style="color:var(--accent)">Create an account</a></div>
   <div style="text-align:center;margin-top:6px;font-size:12px"><a href="#" id="toTok" style="color:var(--muted)">No password yet: sign in with access token · 尚无密码：用访问令牌登录</a></div>
-  <input id="ltok" placeholder="access token (config.json web_token)" style="display:none;width:100%;padding:9px;margin-top:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
 </form></dialog>
 <script>
 const $=(s)=>document.querySelector(s);
@@ -671,7 +672,7 @@ async function doAuth(){
 async function doSetup(){
   const username=$('#sUser').value.trim().toLowerCase(), name=$('#sName').value.trim(), password=$('#sPin').value, setupCode=$('#sCode').value.trim();
   if(!username||!password||!setupCode){ $('#setupErr').textContent='Fill in username, password and setup code · 请填写用户名、密码和初始化码'; return false; }   // length rule: the server's (lib/owner.mjs MIN_PASSWORD)
-  const g=await relayJson(fetch('/api/setup',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username,name,password,setupCode})}),'request');
+  const g=await relayJson(fetch('/api/setup',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username,name,password,setupCode})}),'credentials');   // 403 = wrong setup code: show the server's reason, never "Signed out"
   if(!g.ok){ $('#setupErr').textContent=g.text; return false; }
   const j=g.data;
   if(!j.ok){ $('#setupErr').textContent=j.error||'Setup refused · 初始化被拒绝。'; return false; }
@@ -1481,15 +1482,16 @@ function relayText(f,sentBytes,what){
   // NOT the `sent` clause: nothing was sent, so naming a "sent" size here would contradict
   // the sentence it sits in. The size is stated as what is still waiting on the device.
   if(e.code==='network') return 'Connection failed · 连接失败 — it never left this device · 未发出'+(sentBytes?' ('+relaySize(sentBytes)+' waiting · 待发送)':'')+'. Retry when you are back online · 恢复网络后重试。';
-  if(e.code==='server-error') return 'Server error · 服务器错误'+(e.status?' ('+e.status+')':'')+' — '+w.en+' '+w.did+'. Nothing on this device was changed · 本机内容未受影响。';
+  // No HTTP status in any line below: a code is jargon to a newcomer (overnight QA F1-4); 中文 first.
+  if(e.code==='server-error') return '服务器错误 · Server error — '+w.en+' '+w.did+'. Nothing on this device was changed · 本机内容未受影响。';
   if(e.code==='not-found') return 'Not found · 未找到 — '+w.en+' '+w.did+'。';
   if(e.code==='relay-error') return 'App shell error · 外壳出错 — '+w.en+' '+w.did+'. Reload and retry · 请重新加载后重试'+(e.error?' ('+e.error+')':'')+'。';
   // bad-request (incl. the 408 an unfinished body earns) and anything without a code: the
   // server's own reason is the most specific thing available, so it is shown verbatim
   // rather than replaced by a house sentence that would say less (R5). 'cancelled' lands here
   // too: its error, RELAY_CANCELLED, already is the whole sentence.
-  return (e.code==='bad-request'?'Rejected · 请求被拒绝'+(e.status?' ('+e.status+')':'')+' — ':'')
-    +String(e.error||'Request rejected · 请求被拒绝')+'。';
+  return (e.code==='bad-request'?'请求被拒绝 · Rejected — ':'')
+    +String(e.error||'请求被拒绝 · Request rejected')+'。';
 }
 // Attach that sentence to a failure reply. EVERY broker kind answers through this, so an
 // app that only knows how to print a string still shows the specific reason — the fix for

@@ -62,7 +62,7 @@ Status: accepted · 2026-10-17
    filed under the app `#fr` holds by then.
 5. **No slug, no service, for every kind.** The broker refuses any request from a page with no slug
    before any branch runs: `{ok:false, code:'bad-request', error: NO_APP_TEXT}`, which the shell
-   renders as `Rejected · 请求被拒绝 — no app in view · 未打开应用。`. The `!appSlug` checks in the
+   renders as `请求被拒绝 · Rejected — no app in view · 未打开应用。`. The `!appSlug` checks in the
    `data` and `save-data` branches are gone, since the gate covers them. `NO_APP_TEXT` is the one
    copy of the sentence that `setAppModel` and `saveAppSettings` already used.
 6. The server's routes are unchanged (web.mjs only places PALeave on each page). It already requires `data/<slug>/` for app data (`lib/appdata.mjs`
