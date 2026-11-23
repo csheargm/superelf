@@ -341,11 +341,8 @@ $('#jobsList').onclick=async(e)=>{
    typing a value REPLACES on save, Clear deletes the key. Boot-time fields
    are marked; Apply & restart exits the process (supervisor respawns) and the
    UI polls / until the node answers again. */
-async function loadNodeCfg(){
-  const box=$('#nodeCfgList');
-  let rows=null; try{ rows=await (await api('/api/admin/config')).json(); }catch{ /* !Array below renders the bilingual failure line (R5) */ }
-  if(!Array.isArray(rows)){ box.textContent='无法加载配置 · Could not load config'; return; }
-  box.innerHTML=rows.map((r)=>{
+// TODO(R4 seam): Node settings (nodeCfgRow, loadNodeCfg, putNodeCfg, restart) → web/settings-nodecfg.js.
+function nodeCfgRow(r){
     const val=r.kind==='value'?(Array.isArray(r.value)?r.value.join(', '):(r.value==null?'':String(r.value))):'';
     const badge=r.kind==='secret'?`<small style="flex-shrink:0;color:${r.status==='SET'?'var(--accent)':'var(--muted)'}">${r.status==='SET'?'已设置 · SET':'未设置 · empty'}</small>`:'';
     return `<div style="padding:6px 0;border-bottom:1px solid var(--line)">
@@ -354,11 +351,20 @@ async function loadNodeCfg(){
         <input data-ck="${esc(r.key)}" ${r.kind==='secret'?'type="password" placeholder="粘贴以替换 · paste to replace" autocomplete="new-password"':''} value="${esc(val)}" style="flex:1;min-width:0;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px">
         <button type="button" class="plain" style="font-size:12px;padding:3px 8px" data-cs="${esc(r.key)}">保存 · Save</button>
         ${r.kind==='secret'&&r.status==='SET'?`<button type="button" class="plain" style="font-size:12px;padding:3px 8px" data-cc="${esc(r.key)}">清除 · Clear</button>`:''}
-      </div><div data-cmsg="${esc(r.key)}" style="font-size:12px;color:var(--muted)"></div></div>`;
-  }).join('')
+      </div>${r.purpose?`<div data-cpurpose="${esc(r.key)}" style="font-size:12px;color:var(--muted)">${esc(r.purpose)}</div>`:''}<div data-cmsg="${esc(r.key)}" style="font-size:12px;color:var(--muted)"></div></div>`;
+}
+async function loadNodeCfg(){
+  const box=$('#nodeCfgList');
+  let rows=null; try{ rows=await (await api('/api/admin/config')).json(); }catch{ /* !Array below renders the bilingual failure line (R5) */ }
+  if(!Array.isArray(rows)){ box.textContent='无法加载配置 · Could not load config'; return; }
+  const adv=rows.filter((r)=>r.advanced);   // API keys: folded under 高级 · Advanced, one purpose line each (F5-12)
+  const advOpen=!!(box.querySelector('#cfgAdv')||{}).open;   // a save re-renders: keep the fold as it was
+  box.innerHTML=rows.filter((r)=>!r.advanced).map(nodeCfgRow).join('')
+  +(adv.length?`<details id="cfgAdv"${advOpen?' open':''} style="margin-top:8px"><summary style="cursor:pointer;padding:6px 0;font-size:13px">高级 · Advanced <small style="color:var(--muted)">接口密钥 · API keys</small></summary>${adv.map(nodeCfgRow).join('')}</details>`:'')
   +'<div style="margin-top:10px;display:flex;gap:8px;align-items:center"><button type="button" class="plain" id="cfgReload">重载配置 · Reload config</button><button type="button" class="plain" id="cfgRestart" style="color:var(--danger)">应用并重启 · Apply &amp; restart</button><span id="cfgRestartMsg" style="font-size:12px;color:var(--muted)"></span></div>';
   $('#cfgReload').onclick=doReloadConfig;
   $('#cfgRestart').onclick=doNodeRestart;
+  markNewSel('#cfgAdv>summary','node-advanced');
 }
 async function putNodeCfg(key,value){
   const msg=$('#nodeCfgList').querySelector(`[data-cmsg="${CSS.escape(key)}"]`);
