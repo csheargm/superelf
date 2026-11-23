@@ -72,3 +72,29 @@ test('F2-11: signed-out direct app link → shell sign-in with #open; after sign
     assert.equal(new URL(page.url()).hash, '', 'the hash is consumed: Home or a reload does not reopen it');
   } finally { await ctx.close(); }
 });
+
+// F2-06: the top bar hides by itself only on touch while reading; never for a desktop mouse, never while a verse is selected.
+const barHidden = (frame) => frame.evaluate(() => document.querySelector('#nav').getAttribute('data-paab-hidden') === '1');
+test('F2-06: desktop mouse — the bar stays past the idle clock and after a wheel down', { skip, timeout: 90000 }, async () => {
+  const { ctx, page, frame } = await open();
+  try {
+    const ms = await frame.evaluate(() => PAAppBar.IDLE_MS);
+    await page.mouse.move(500, 500); await page.mouse.wheel(0, 300);
+    await frame.waitForTimeout(ms + 800);
+    assert.equal(await barHidden(frame), false);
+  } finally { await ctx.close(); }
+});
+test('F2-06: touch — a selected verse holds the bar; cleared, it idles away (control)', { skip, timeout: 90000 }, async () => {
+  const { ctx, frame } = await open({ viewport: { width: 820, height: 1180 }, touch: true });
+  try {
+    const ms = await frame.evaluate(() => PAAppBar.IDLE_MS);
+    await frame.locator('.verse').nth(2).tap();
+    await frame.waitForFunction(() => !document.getElementById('top-mark').disabled);
+    await frame.waitForTimeout(ms + 800);
+    assert.equal(await barHidden(frame), false, 'held while a verse is selected');
+    await frame.locator('.verse').nth(2).tap();   // a second tap clears it
+    await frame.waitForFunction(() => document.getElementById('top-mark').disabled);
+    await frame.evaluate(() => { document.activeElement && document.activeElement.blur && document.activeElement.blur(); PAAppBar.show(); });
+    await frame.waitForFunction(() => document.querySelector('#nav').getAttribute('data-paab-hidden') === '1', null, { timeout: ms + 3000 });
+  } finally { await ctx.close(); }
+});

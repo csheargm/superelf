@@ -1591,7 +1591,7 @@ loadGen(); load().then(ok=>{ _booted=true; if(ok!==false&&_openDrawOnLoad){ open
 const BAR_KEEPS_OPEN='#search-overlay.on,.pac-drawerhost.on,.pvm-sheet,dialog[open]';
 const barPaneUp=()=>(rail?(paneOpen('note')||paneOpen('chat')):!!(drawPad&&drawPad.isOpen()))||!!(aiChat.isOpen&&aiChat.isOpen());
 if(window.PAAppBar) PAAppBar.attach({bar:document.getElementById('nav'),scroller:document.getElementById('verses'),
-  keepOpen:()=>INK_PEN.isOpen()||barPaneUp()||!!document.querySelector(BAR_KEEPS_OPEN)});
+  keepOpen:()=>INK_PEN.isOpen()||barPaneUp()||markVerses().length>0||!!document.querySelector(BAR_KEEPS_OPEN)});   // + a selected verse or words: Highlight / Note / Ask AI are in the bar (F2-06)
 </script>
 </body>
 </html>
