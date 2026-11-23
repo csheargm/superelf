@@ -2438,7 +2438,8 @@ function paintSendBtn(){
   b.classList.toggle('stop',stop); b.textContent=stop?'■':'↑'; b.title=stop?STOP_LABEL:SEND_LABEL; b.setAttribute('aria-label',b.title);
 }
 async function stopTurn(){
-  if(!convoId) return;   // the turn has not named its conversation yet; the button stays, a second tap reaches it
+  while(!convoId&&convoIdWait) await convoIdWait;   // a tap before the turn named its conversation waits for it, never a silent no-op
+  if(!convoId) return;   // the turn ended without naming one: nothing is running to stop
   try{ const r=await api('/api/chat/stop',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({convoId})});
     if(!r.ok) throw new Error('HTTP '+r.status); }
   catch(e){ add('err','⚠ 无法停止 · Could not stop — '+((e&&e.message)||'')); }   // R5: said, never silent
