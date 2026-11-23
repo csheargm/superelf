@@ -49,6 +49,15 @@ test('a bad or missing reference throws — never an empty chapter', () => {
   assert.throws(() => getChapter(DATA, 43, 151), /bad reference/);
 });
 
+// F2-10 (overnight 2026-11-22): book=1.5 passed the range check and leaked Node's internal
+// 'The "path" argument must be of type string'; book=1e1 was read as 10. Whole numbers only.
+test('a reference that is not a plain whole number is a bad reference, not an internal error', () => {
+  for (const [b, c] of [['1.5', 1], ['1e1', 1], [43, '3.5'], [' 43', 3], ['0x2B', 3], [43, '']]) {
+    assert.throws(() => getChapter(DATA, b, c), /^Error: bad reference$/, `book=${b} chapter=${c}`);
+  }
+  assert.equal(getChapter(DATA, '43', '3').book, 43, 'a digit string still works (query params are strings)');
+});
+
 test('search: an English query reads the BSB, a Chinese one 和合本; capped; short queries empty', () => {
   const en = searchBible(DATA, 'so loved the world');
   assert.ok(en.some((r) => r.book === 43 && r.chapter === 3 && r.verse === 16), 'John 3:16 found in English');
