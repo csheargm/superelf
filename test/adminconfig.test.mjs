@@ -157,3 +157,11 @@ test('writes are fresh + atomic: other keys survive, file stays valid JSON, no t
   assert.equal(raw.telegram_bot_token, SECRET_SENTINELS.telegram_bot_token, 'unrelated secrets untouched');
   assert.ok(!fs.readdirSync(root).some((f) => f.includes('.tmp')), 'atomic writer leaves no tmp files');
 });
+
+test('F5-12: every API-key secret sits under Advanced with a one-line bilingual purpose (中文 first)', () => {
+  const rows = adminConfigView({}, CFG);
+  const adv = rows.filter((r) => r.advanced);
+  assert.deepEqual(adv.map((r) => r.key).sort(), CONFIG_FIELDS.filter((f) => f.kind === 'secret').map((f) => f.key).sort());
+  for (const r of adv) assert.match(r.purpose, /^[^·]*[一-鿿][^·]* · [A-Za-z]/, `${r.key}: 中文 · English purpose`);
+  for (const r of rows.filter((x) => !x.advanced)) assert.equal(r.purpose, undefined);
+});

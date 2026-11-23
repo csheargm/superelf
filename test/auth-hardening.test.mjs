@@ -111,6 +111,9 @@ test('brute force: the account locks after the threshold, with a bilingual retry
   assert.equal(locked.status, 429, 'even the right password waits out the lock');
   assert.ok(Number(locked.headers.get('retry-after')) > 0);
   assert.match((await locked.json()).error, /Try again in \d+ s · .*秒/);
+  // Same IP (a home node's whole family): another name and the token path are not locked (F5-4).
+  assert.equal((await B.call('/api/login', { body: { username: 'someone-else', password: 'nope-nope-1' } })).status, 401);
+  assert.equal((await B.call('/api/login', { body: { token: 'not-a-token' } })).status, 401);
 });
 
 test('the server listens on 127.0.0.1 by default, not on the LAN', async () => {

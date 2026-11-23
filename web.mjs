@@ -62,7 +62,7 @@ import { readJobPrefs, setJobEnabled, applyJobPrefs, heldOff, builtinsFor } from
 import { RESERVED_IDS, idOkSlug, needsSetup as ownerNeedsSetup, validateOwner, applyOwnerSetup, nodeOwnerId, passwordError } from './lib/owner.mjs';
 // Login hardening (lib/login-guard.mjs, lib/setup-code.mjs, lib/bind.mjs). TODO(R4 seam): the public auth
 // routes (/api/setup, /api/login, /api/register, /api/logout) belong in one lib/auth-routes.mjs.
-import { createLoginGuard, clientKey, lockedMessage } from './lib/login-guard.mjs';
+import { createLoginGuard, clientKey, loginKeys, lockedMessage } from './lib/login-guard.mjs';
 import { ensureSetupCode, setupCodeOk, consumeSetupCode } from './lib/setup-code.mjs';
 import { bindHostFor } from './lib/bind.mjs';
 import { webSearch } from './tools/websearch.mjs';
@@ -1611,7 +1611,7 @@ const server = http.createServer(async (req, res) => {
     // --- Public auth (no session required) ---
     if (req.method === 'POST' && p === '/api/login') {
       const b = await readBody(req, BODY_LIMITS.auth);
-      const gkeys = [`ip:${clientKey(req)}`, `acct:${String(b.username || (b.token ? '#token' : '')).toLowerCase().slice(0, 40)}`];
+      const gkeys = loginKeys(req, b);   // [IP backstop, IP + account] (lib/login-guard.mjs)
       const wait = loginGuard.retryAfter(gkeys);   // check → verify → record has no await between (lib/login-guard.mjs)
       if (wait) return send(res, 429, 'application/json', JSON.stringify({ error: lockedMessage(wait) }), { 'retry-after': String(wait) });
       let u = findLogin(b.username);

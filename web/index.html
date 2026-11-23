@@ -377,7 +377,7 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
 <dialog id="login"><form method="dialog">
   <h3 id="loginTitle" style="margin-bottom:12px">Sign in</h3>
   <input id="luser" placeholder="username" autocapitalize="none" autocomplete="username" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
-  <input id="lpin" type="password" placeholder="密码或 PIN · Password or PIN" autocomplete="current-password" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
+  <input id="lpin" type="password" placeholder="密码 · Password" autocomplete="current-password" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
   <input id="lname" placeholder="Your name" style="display:none;width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
   <input id="ltok" placeholder="访问令牌 · access token" autocomplete="off" style="display:none;width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
   <div id="loginErr" style="color:var(--danger);font-size:13px;min-height:18px"></div>
@@ -711,14 +711,17 @@ async function ensureToken(){
   // No live session here: whatever the last account left (cached app pages, the app cookie) goes first (ADR 0037).
   // Offline it may not reach the node; the next signed-out boot tries again, so a failure is only noted on the line.
   await swSignedOut(window.caches,(u)=>fetch(u,{method:'POST',credentials:'same-origin'})).catch(()=>PAOffline.noteNet(false));
+  // Escape must not leave the app live with no account (F5-13): refuse cancel, and since Chrome lets a
+  // repeated Escape skip cancel, reopen any close that was not the flow's own close('done').
+  for(const d of ['#setup','#login']){ const el=$(d); el.addEventListener('cancel',(ev)=>ev.preventDefault()); el.addEventListener('close',()=>{ if(el.returnValue!=='done'&&!document.querySelector('dialog[open]')) el.showModal(); el.returnValue=''; }); }   // another open modal (the demo card, lib/demo-boot.mjs) owns the screen: leave it
   let first=false; try{ first=(await (await fetch('/api/setup-status')).json()).needsSetup; }catch{}
   if(first){
-    for(;;){ const done=await new Promise((d)=>{ $('#setup').showModal(); $('#setupBtn').onclick=async(ev)=>{ ev.preventDefault(); if(await doSetup()){ $('#setup').close(); d(true); } }; }); if(done && await ping()) break; }
+    for(;;){ const done=await new Promise((d)=>{ $('#setup').showModal(); $('#setupBtn').onclick=async(ev)=>{ ev.preventDefault(); if(await doSetup()){ $('#setup').close('done'); d(true); } }; }); if(done && await ping()) break; }
     $('#dot').classList.add('ok'); return;
   }
   setLoginMode(false); if(accountRemoved) $('#loginErr').textContent=ACCOUNT_REMOVED_TEXT;   // only this browser's own (removed) session gets the code
   for(;;){
-    const done=await new Promise((d)=>{ $('#login').showModal(); $('#loginBtn').onclick=async(ev)=>{ ev.preventDefault(); if(await doAuth()){ $('#login').close(); d(true); } }; });
+    const done=await new Promise((d)=>{ $('#login').showModal(); $('#loginBtn').onclick=async(ev)=>{ ev.preventDefault(); if(await doAuth()){ $('#login').close('done'); d(true); } }; });
     if(done && await ping()) break;
   }
   $('#dot').classList.add('ok');
@@ -747,6 +750,7 @@ window._PA_NEW_KEYS={
   'jobs-section':'v2.9.0',           // Jobs · 任务 status + Run now · 立即运行 in the profile
   'node-settings':'v2.9.0',          // Node settings · 节点设置 owner config surface in the profile
   'member-agent-tools':'v5.0.0',     // AI 工具 · Agent tools opt-in per member in Family accounts (F4-2)
+  'node-advanced':'v5.1.0',          // 高级 · Advanced fold for API keys in Node settings
 };
 
 /* ── Global font scale for apps ── */
@@ -1335,7 +1339,7 @@ async function relayReminderRemove(m,deps){
      {ok:false, code:'bad-request',  error, status}                  other 4xx, or a path this shell refuses
      {ok:false, code:'relay-error',  error}                          a fault inside this shell — still NOT 'not-found'
      {ok:false, code:'cancelled',    error}                          the app withdrew it (chat-cancel) — NOT 'network' */
-const DEMO_SIGNIN_CODE='demo_signin', DEMO_SIGNIN_EVENT='pa-demo-signin';   // R3: = SIGNIN_CODE (lib/demo-auth.mjs) and SIGNIN_EVENT (lib/demo-boot.mjs), pinned by test/demo-signin-prompt.test.mjs
+const DEMO_SIGNIN_CODE='demo_signin', DEMO_SIGNIN_EVENT='pa-demo-signin', DEMO_SIGNIN_ANSWER='登录后获得回答 · Sign in to get an answer';   // R3: = SIGNIN_CODE (lib/demo-auth.mjs) and SIGNIN_EVENT (lib/demo-boot.mjs), pinned by test/demo-signin-prompt.test.mjs
 const RELAY_NOT_FOUND='not found';                              // the legacy error string, pinned once (R3)
 const RELAY_CANCELLED='已取消 · Cancelled';                      // == PAC_CANCELLED in web/chat-ui.inline.html (test/chat-cancel.test.mjs)
 /* ── The noun table（名词表）— WHAT was refused ─────────────────────────────────────────
@@ -2486,7 +2490,11 @@ async function sendTurn(q){
     // removed, a .msg.err line), and the message goes back into the composer.
     if(!res.ok){
       const f=await relayHttpFail(res);
-      stopEl(); status.remove(); userEl.remove();
+      stopEl(); status.remove();
+      // Demo guest (F1-8): the question stays in the chat, with an inline button that opens the sign-in.
+      if(f.signin){ const b=document.createElement('button'); b.type='button'; b.className='demo-answer'; b.textContent=DEMO_SIGNIN_ANSWER;
+        b.onclick=()=>dispatchEvent(new Event(DEMO_SIGNIN_EVENT)); add('err','⚠ '+relayText(f,sentBytes)).appendChild(b); return; }
+      userEl.remove();
       add('err','⚠ '+relayText(f,sentBytes));
       restoreComposer(q,attsBefore);
       return;
