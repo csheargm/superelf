@@ -519,6 +519,8 @@ async function loadShelf(){
   box.querySelectorAll('[data-un]').forEach(b=>b.onclick=async()=>{ if(confirm('Remove "'+b.dataset.un+'" from the shelf? (archived, not deleted)')){ await api('/api/admin/shared/'+b.dataset.un+'/unshare',{method:'POST'}); loadShelf(); loadApps(); } });
   $('#promoteBtn').onclick=async(e)=>{ e.preventDefault(); const v=$('#promoteSel').value; if(!v) return; const [from,slug]=v.split('|'); const r=await api('/api/admin/share',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({from,slug})}); const j=await r.json(); if(!j.ok){alert(j.error||'failed');return;} loadShelf(); loadApps(); };
 }
+// TODO(R4): web/settings.js is over budget — Family accounts (loadFamily and its add/approve/reset/
+// remove handlers) is the seam to split into its own web/settings-family.js.
 async function loadFamily(){
   const box=$('#family'); box.style.display='block';
   // min-width:0 + minmax(0,1fr): a phone's 390px fits two inputs; their intrinsic width used to push
