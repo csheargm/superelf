@@ -195,7 +195,7 @@
       const ext=extentOf(g), prev=last&&groups.includes(last.g)?last:null; last={g:null,t:Date.now(),ext,box};   // an erased or undone stroke seeds nothing
       const burst=Frame.joinsBurst(prev,t0,g,ext,box), lr=local(L.el.getBoundingClientRect()), cw=colW(lr);
       // TODO(R4 split): the cluster tag (bid/rel/ww, PAInkFrame.clusterOf) → its own helper with toWriting.
-      const bid=Frame.clusterOf(prev,t0,g,ext,box), aRec=bid==null?null:prev.g.bid==null?prev.g:groups.find(x=>x.bid===bid&&!x.rel);
+      const cb=Frame.clusterOf(prev,t0,g,ext,box), aRec=cb==null?null:prev.g.bid==null?prev.g:groups.find(x=>x.bid===cb&&!x.rel), bid=aRec?cb:null;   // anchor erased: no tag
       const aAt=aRec&&(placements().find(p=>p.g===aRec)||{}).at, tag=(r,cs)=>Object.assign(r,{ww:round2(cw)},bid==null?{}:{bid},aAt?{rel:Frame.relOf(box,cs,aAt)}:{});
       if(bid!=null&&prev.g.bid==null) swap=[prev.g,Object.assign({},prev.g,{bid})];   // the anchor: a new record, never edited in place
       // A BIG stroke over the whole line (an underline of the verse, a bracket) is a mark on it, never writing.

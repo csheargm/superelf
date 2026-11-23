@@ -141,3 +141,46 @@ test('gate: within 1px of the written column the placement list comes back untou
   assert.equal(o.Frame.shiftClusters(placed, env(W0 - 2 * PADL + 1)), placed);
   assert.notEqual(o.Frame.shiftClusters(placed, env(W0 - 2 * PADL + 2)), placed);
 });
+
+// ── GPT round 1 regressions (df0b443) ──
+const stubEnv = (cw, left = 0) => ({ lineEl: () => ({ getBoundingClientRect: () => ({ left, top: 0 }) }), local: (r) => r, colW: () => cw });
+const st1 = { p: [[0, 0, 0.5], [10, 10, 0.5]], c: '#000', w: 2, t: 'pen' };
+const rec = (lang, o) => ({ verse: 6, lang, frame: 'line', fx: 0, fy: 0, fw: 1000, strokes: [st1], ww: 1000, bid: 7, ...o });
+
+test('right edge: a cluster pushed past the narrow column moves left as one unit, offsets kept', () => {
+  const o = open(W0);
+  const a = { g: rec('en', {}), at: { ox: 590, oy: 0, s: 1 } }, m = { g: rec('zh', { rel: [20, 30, 1] }), at: { ox: 0, oy: 99, s: 1 } };
+  const out = o.Frame.shiftClusters([a, m], stubEnv(600));
+  const right = Math.max(...out.map((p) => p.at.ox + 10 * p.at.s));
+  assert.ok(right <= 600, `inside the column (right edge ${right})`);
+  assert.equal(out[1].at.ox - out[0].at.ox, 20); assert.equal(out[1].at.oy - out[0].at.oy, 30);
+  // CONTROL: without the pull-back the member would be at 610 + 10 = 620 > 600
+  assert.ok(590 + 20 + 10 > 600);
+});
+
+test('resize mid-word: the gate is the anchor\'s ww; a stroke written on another column is not a member', () => {
+  const o = open(W0);
+  const a = { g: rec('en', {}), at: { ox: 100, oy: 0, s: 1 } };
+  const m = { g: rec('zh', { rel: [5, 30, 1], ww: 816 }), at: { ox: 852.38, oy: 40, s: 1 } };
+  const placed = [a, m];
+  assert.equal(o.Frame.shiftClusters(placed, stubEnv(1000)), placed, 'at the anchor\'s width nothing moves');
+  const out = o.Frame.shiftClusters(placed, stubEnv(600));
+  assert.deepStrictEqual(out[1].at, m.at, 'the other-column stroke keeps the 7fe85a8 placement');
+  // end to end: write across a resize, back at W0 the drawing equals 7fe85a8
+  const e = open(W0); letter(e.dom, PADL + 790, e.v.en.top + 6, 1); letter(e.dom, PADL + 802, e.v.en.top + 6, 2);
+  setWidth(e.dom, 840); letter(e.dom, PADL + 600, e.v.zh.top + 1, 3); setWidth(e.dom, W0);
+  const recs = e.I.groups();
+  assert.ok(new Set(recs.map((g) => g.ww)).size > 1, 'the strokes really carry two columns');
+  const [now, ref] = both(recs, W0); assert.deepStrictEqual(now, ref);
+});
+
+test('erased anchor: the member with the smallest rel stands in, the word stays together', () => {
+  const o = open(W0);
+  const m1 = { g: rec('zh', { rel: [10, 30, 1] }), at: { ox: 300, oy: 80, s: 1 } };
+  const m2 = { g: rec('en', { rel: [25, 30, 1] }), at: { ox: 0, oy: 120, s: 1 } };
+  const out = o.Frame.shiftClusters([m1, m2], stubEnv(600));
+  assert.deepStrictEqual(out[0].at, m1.at, 'the stand-in keeps its place');
+  assert.deepStrictEqual(out[1].at, { ox: 315, oy: 80, s: 1 }, 'the other keeps its offset from it');
+  // CONTROL: with only one rel-member left nothing is re-placed (no false anchor)
+  const one = [m1]; assert.equal(o.Frame.shiftClusters(one, stubEnv(600)), one);
+});

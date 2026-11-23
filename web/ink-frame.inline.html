@@ -144,14 +144,26 @@
     return Math.abs(env.colW(env.local(el.getBoundingClientRect()))-g.ww)>EPS_W;
   }
   // placed: [{g,at,orphan}]. Returns the SAME array unless some cluster spans lines on a changed width.
+  // The anchor is the record with no rel; if it was erased, the member with the smallest rel stands in
+  // (the anchor's place is derived from it). Only members written on the anchor's column (ww) belong;
+  // the gate is the anchor's ww alone. A word pushed past the column's right edge moves left as one unit.
+  const relLen=p=>p.g.rel?Math.hypot(p.g.rel[0],p.g.rel[1]):-1;
+  const rightOf=(g,at)=>{ let m=0; for(const st of g.strokes||[]) for(const q of st.p) m=Math.max(m,q[0]); return at.ox+m*at.s; };
+  function clusterShift(ps,env){
+    const a=ps.reduce((b,p)=>relLen(p)<relLen(b)?p:b), ww=a.g.ww, el=ww>0&&env.lineEl(a.g.verse,a.g.lang);
+    const mem=ps.filter(p=>Math.abs((p.g.ww||0)-ww)<=EPS_W);
+    if(!el||mem.length<2||mem.every(p=>sameLine(p.g,a.g))||!widthChanged(a.g,env)) return null;
+    const [ax,ay,ak]=a.g.rel||[0,0,1], As=a.at.s/ak, A={ox:a.at.ox-ax*As,oy:a.at.oy-ay*As}, out=new Map();
+    for(const p of mem){ if(!p.g.rel&&p!==a) continue; const [rx,ry,rk]=p.g.rel||[0,0,1]; out.set(p,{ox:A.ox+rx*As,oy:A.oy+ry*As,s:As*rk}); }
+    const lr=env.local(el.getBoundingClientRect()), over=Math.max(...[...out].map(([p,at])=>rightOf(p.g,at)))-(lr.left+env.colW(lr));
+    const dx=over>0?Math.min(over,Math.min(...[...out.values()].map(at=>at.ox))-lr.left):0;
+    if(dx>0) for(const at of out.values()) at.ox-=dx;
+    return out;
+  }
   function shiftClusters(placed,env){
     const byBid=new Map(), moved=new Map();
     for(const p of placed){ if(p.g.bid==null||!p.at) continue; if(!byBid.has(p.g.bid)) byBid.set(p.g.bid,[]); byBid.get(p.g.bid).push(p); }
-    for(const ps of byBid.values()){
-      const a=ps.find(p=>!p.g.rel); if(!a||ps.length<2||ps.every(p=>sameLine(p.g,a.g))||!ps.some(p=>widthChanged(p.g,env))) continue;
-      for(const p of ps){ if(p===a||!Array.isArray(p.g.rel)) continue; const [rx,ry,rk]=p.g.rel;
-        moved.set(p,{ox:a.at.ox+rx*a.at.s,oy:a.at.oy+ry*a.at.s,s:a.at.s*rk}); }
-    }
+    for(const ps of byBid.values()){ const m=ps.length>1&&clusterShift(ps,env); if(m) for(const [p,at] of m) moved.set(p,at); }
     return moved.size?placed.map(p=>moved.has(p)?{g:p.g,at:moved.get(p),orphan:p.orphan}:p):placed;
   }
   // The DOM side of places(), built once per attached list. colW: the text column now (the list less the
