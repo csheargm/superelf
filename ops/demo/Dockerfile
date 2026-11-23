@@ -15,6 +15,13 @@ RUN if [ -n "$AGENT_CLIS" ]; then \
     fi
 WORKDIR /opt/superelf
 COPY . /opt/superelf
+# The repo's built-in app pages go to builtin-apps/, NOT workspace/ or shared-apps/: the entrypoint copies the
+# image over the node folder, and an installed (possibly edited) app must never be overwritten blind.
+# web.mjs updates only unedited copies from here at start (lib/builtin-app-update.mjs).
+RUN mkdir -p builtin-apps \
+ && if [ -d workspace/apps ]; then mv workspace/apps builtin-apps/workspace-apps; fi \
+ && if [ -d shared-apps ]; then mv shared-apps builtin-apps/shared-apps; fi \
+ && rm -rf workspace
 RUN chmod +x /opt/superelf/ops/demo/entrypoint.sh /opt/superelf/backup.sh /opt/superelf/restore.sh \
  && useradd --uid 10001 --create-home --shell /usr/sbin/nologin superelf
 ENV NODE_ENV=production

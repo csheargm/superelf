@@ -26,6 +26,7 @@ import { readJsonState, readJsonForUpdate, FILE_OK, FILE_ABSENT, FILE_UNREADABLE
 // five real notes hit it, one lost a page of Apple Pencil strokes.
 import { saveAppData, restoreAppData, appDataFile, noLinkOnTheWay, APP_DATA_DIR, UPLOADS_DIR, DATA_ABSENT_QUERY } from './lib/appdata.mjs';
 import { loadProfile, loadProfileForUpdate, saveProfile, displayName, ageFromYear, sanitizeHealthThresholds, effectiveHealthThresholds, emailOk } from './lib/users.mjs';
+import { updateBuiltinApps } from './lib/builtin-app-update.mjs';
 import { promote, rollback, unshare, listShared, fork, copyNoLinks, LINKED_SOURCE, FORK_REFUSED } from './lib/sharedapps.mjs';
 import { getChapter, bibleSearchWire, BIBLE_DATA_DIR } from './lib/bible.mjs';
 import { listBriefings, getBriefing, saveBriefing, pruneBriefings, pendingActions, runJob } from './lib/autonomy.mjs';
@@ -544,6 +545,10 @@ function userForToken(given, req) {
   return null;
 }
 const audit = limitAudit(makeAudit(cfg.auditFile), () => demoOn(cfg)); // the ONE shared audit-entry shape (lib/auth.mjs, R3); capped per kind on a demo node
+// A Docker node has no git pull: bring unedited built-in apps up to the image's copies (lib/builtin-app-update.mjs).
+// TODO(R4 seam): start-up steps like this belong in a lib/boot.mjs, not web.mjs.
+try { if (!demoOn(cfg)) updateBuiltinApps({ root: ROOT, ownerWorkspaces: cfg.users.filter((u) => u.role === 'owner').map((u) => u.workspace), sharedDir: SHARED, audit }); }
+catch (e) { audit('builtin-apps-update-failed', { error: String(e && e.message || e) }); console.error('[web] built-in app update failed (apps left as they were):', e); }   // R5: audited + logged; never blocks start
 // Which Ollama models answered gone — 410, or Ollama's model-not-found 404 (lib/model-health.mjs). Node-wide runtime state, beside
 // audit.log — a model is retired for everyone on the node, not per person.
 const modelHealth = modelHealthFor(path.join(ROOT, MODEL_HEALTH_FILENAME), audit, (ev, fields) => auditSize(ev, 'model-health', fields));
