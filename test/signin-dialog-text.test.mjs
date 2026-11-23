@@ -41,3 +41,11 @@ test('F5-13: setup placeholders fit a phone and are 中文 first; the code hint 
   const setup = SHELL.slice(SHELL.indexOf('<dialog id="setup"'), SHELL.indexOf('<dialog id="login"'));
   assert.match(setup, /setup-code/, 'where to find the setup code is still said, outside the placeholder');
 });
+
+test('F1-5: the access-token field opens above Sign in and names no config key', () => {
+  const login = SHELL.slice(SHELL.indexOf('<dialog id="login"'), SHELL.indexOf('</dialog>', SHELL.indexOf('<dialog id="login"')));
+  assert.ok(login.indexOf('id="ltok"') < login.indexOf('id="loginBtn"'), 'token field sits above the Sign in button');
+  const ph = placeholderOf('ltok');
+  assert.doesNotMatch(ph, /config|web_token/, `no file/key jargon in "${ph}"`);
+  assert.match(ph, /^[㐀-鿿]/, `"${ph}" is 中文 first`);
+});

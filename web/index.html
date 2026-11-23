@@ -376,11 +376,11 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
   <input id="luser" placeholder="username" autocapitalize="none" autocomplete="username" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
   <input id="lpin" type="password" placeholder="Password or PIN · 密码或 PIN" autocomplete="current-password" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
   <input id="lname" placeholder="Your name" style="display:none;width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
+  <input id="ltok" placeholder="访问令牌 · access token" autocomplete="off" style="display:none;width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
   <div id="loginErr" style="color:var(--danger);font-size:13px;min-height:18px"></div>
   <button class="primary" id="loginBtn" style="width:100%;padding:10px;margin-top:6px">Sign in</button>
   <div style="text-align:center;margin-top:10px;font-size:14px"><a href="#" id="toReg" style="color:var(--accent)">Create an account</a></div>
   <div style="text-align:center;margin-top:6px;font-size:12px"><a href="#" id="toTok" style="color:var(--muted)">No password yet: sign in with access token · 尚无密码：用访问令牌登录</a></div>
-  <input id="ltok" placeholder="access token (config.json web_token)" style="display:none;width:100%;padding:9px;margin-top:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
 </form></dialog>
 <script>
 const $=(s)=>document.querySelector(s);
