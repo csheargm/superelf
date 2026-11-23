@@ -297,7 +297,7 @@ test('F3-15: on a metered link the prefetch stops after the first set — "parti
 test('F3-15: the shell\'s daily chapter is the Bible app\'s dailyRead rule; the broker remembers the book read', () => {
   for (const f of ['workspace/apps/bible/index.html', 'workspace.example/apps/bible/index.html']) {
     const src = fs.readFileSync(path.join(ROOT, f), 'utf8');
-    assert.match(src, /let idx=Math\.floor\(Date\.now\(\)\/86400000\)%totalChapters;/, `${f}: the rule the shell mirrors`);
+    assert.match(src, /let idx=Math\.floor\(Date\.now\(\)\/86400000\)%totalChapters[;,]/, `${f}: the rule the shell mirrors`);
   }
   const shell = fs.readFileSync(path.join(ROOT, 'web', 'index.html'), 'utf8');
   assert.match(shell, /m\.kind==='bible'\)\{\n\s+if\(typeof PASW!=='undefined'&&PASW\.noteBook\) PASW\.noteBook\(m\.book\);/);

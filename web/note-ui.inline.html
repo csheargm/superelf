@@ -2366,6 +2366,7 @@
     // Store the region's live HTML (sanitized) as the page's text. A no-op unless the T tool is
     // active and the content changed, so flip/undo/save always read fresh text without churn.
     function commitPageHtml(){
+      clearTimeout(textTimer);                     // an early commit (a flush) retires the pending debounced one
       if(!txtEdit) return;
       const html=sanitizeHtml(textLayer.innerHTML);
       const was=page().pageHtml||'';
@@ -3892,7 +3893,10 @@
     const scheduleSave=()=>guard.schedule();
     // Commit any in-progress stroke first, then force + RETURN the write so callers can await
     // real durability. Unlike the old version this is never a no-op while work is unconfirmed.
-    const flushSave=async()=>{ if(drawing) endStroke(); return guard.flush(); };
+    // A flush commits the text layer's pending draft FIRST: typing reaches the notebook only after the
+    // 200 ms onTextInput debounce, so a host flush (a chapter change, a pane close) inside that window
+    // found nothing dirty and the typed words were dropped.
+    const flushSave=async()=>{ if(drawing) endStroke(); commitPageHtml(); return guard.flush(); };
     const flushDurable=()=>{ if(drawing) endStroke(); return guard.flushDurable(); };
     // Tap = retry now while THIS notebook is unsaved; once it is clean the pill is either this
     // note's outstanding report (a write that never landed before the user left it) or the

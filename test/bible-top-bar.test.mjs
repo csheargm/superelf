@@ -131,7 +131,7 @@ test('GPT 2026-11-15: a stale annotation read never lands in ANN or the ink laye
     assert.match(S, /const r=await DATA\.read\(p\);\n  if\(s!==_annSeq\) return false;/, p);
     assert.match(S, /ANN_LOADING=false; return true;/, p);
     assert.match(S, /if\(_rhBoot\) await restoreReading\(g\);[^\n]*\n  if\(g!==_loadSeq\) return false;/, p);
-    assert.match(S, /const annOk=await loadAnn\(\); if\(g!==_loadSeq\) return false;[^\n]*\n  if\(annOk\) INK\.load\(ANN\.ink\);/, p);
+    assert.match(S, /const annOk=await loadAnn\(\); if\(g!==_loadSeq\) return false;[^\n]*\n  if\(annOk\)\{ followSelection\(\); INK\.load\(ANN\.ink\); \}/, p);
   }
 });
 test('GPT 2026-11-15: a ☰ delete re-read that was superseded leaves the ink to the newer read', () => {
@@ -146,8 +146,21 @@ test('GPT round 10: load() resolves false when superseded, and every load().then
     const S = fs.readFileSync(new URL(p, import.meta.url), 'utf8');
     const body = S.slice(S.indexOf('async function load(){'), S.indexOf('\n}\n', S.indexOf('async function load(){')));
     assert.doesNotMatch(body, /_loadSeq\) return;/, p);
-    const thens = S.split('\n').filter((l) => /load\(\)\.then\(/.test(l) && !/_booted=true/.test(l));
-    assert.equal(thens.length, 5, p);   // + stepChapter (F2-03)
+    const thens = S.split('\n').filter((l) => /(load\(\)|goChapter\(.*?\))\.then\(/.test(l) && !/_booted=true/.test(l));
+    assert.equal(thens.length, 5, p);   // + stepChapter (F2-03); the chapter jumps go through goChapter, which resolves load()'s outcome
     for (const l of thens) assert.match(l, /ok===false|ok!==false/, `${p}: ${l.trim().slice(0, 60)}`);
+  }
+});
+
+// The note-chapter fix (data integrity): the location moves in ONE place, after the open note is flushed,
+// and every annotation write targets the chapter ANN was read for — never the live bookIdx/chapter.
+test('a chapter change flushes the note first (goChapter) and every annotation write targets ANN_PATH', () => {
+  for (const p of ['../workspace/apps/bible/index.html', '../workspace.example/apps/bible/index.html']) {
+    const S = fs.readFileSync(new URL(p, import.meta.url), 'utf8');
+    const sets = S.split('\n').filter((l) => /(^\s*|[;{]\s*)bookIdx=(?!=)/.test(l));
+    assert.equal(sets.length, 3, `${p}: goChapter, the boot restore and the boot hash are the only writers\n${sets.join('\n')}`);
+    assert.match(S, /await drawPad\.flush\(\);[^\n]*\n  if\(g!==_navSeq\) return false;[^\n]*\n  bookIdx=b; chapter=/, p);
+    assert.match(S, /async function saveAnn\(\)\{ return saveAnnAt\(ANN_PATH,/, p);
+    assert.match(S, /if\(ANN_LOADING\|\|_drawPath!==ANN_PATH\) return \{ok:false,error:NOTE_MOVED\};/, p);
   }
 });
