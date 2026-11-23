@@ -19,10 +19,13 @@ import { missingReason, resolveSkip } from './helpers-e2e-gate.mjs';
 import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, waitFor, OWNER_TOKEN } from './helpers-web.mjs';
 
 const REPO = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+// PA_E2E_ENGINE=webkit (or firefox) runs the same suites in that engine — webkit is iPad Safari's.
+// The export keeps the name `chromium` so the suites need no edit; the default engine is Chromium.
+const ENGINE = process.env.PA_E2E_ENGINE || 'chromium';
 async function loadChromium() {
   const spec = process.env.PA_PLAYWRIGHT;
-  if (spec) return (await import(pathToFileURL(spec).href)).chromium;   // asked for, so a failure is loud
-  try { return (await import('playwright')).chromium; } catch { return null; /* reported by missingReason() below */ }
+  if (spec) return (await import(pathToFileURL(spec).href))[ENGINE];   // asked for, so a failure is loud
+  try { return (await import('playwright'))[ENGINE]; } catch { return null; /* reported by missingReason() below */ }
 }
 export const chromium = await loadChromium();
 export const skip = resolveSkip(await missingReason(chromium));
@@ -115,5 +118,15 @@ export const layerHtml = (frame) => frame.evaluate(() => document.querySelector(
 export const flashText = (frame) => frame.evaluate(() => { const f = document.querySelector('.pan-flash.on'); return f ? f.textContent : ''; });
 export const linking = (frame) => frame.evaluate(() => document.querySelector('.pan-linkpop').classList.contains('on'));
 export const lit = (frame, sel) => frame.evaluate((s) => document.querySelector(s).classList.contains('on'), sel);
-export async function textMode(frame) { await frame.locator('.pan-mtext').click(); await frame.waitForSelector('.pan-textlayer.pan-txted'); }
+// The Text mode button is a toggle, and a mostly-text note now OPENS in Text (openToolFor, d6af038):
+// press it only when the page is not already editing, or the press would leave Text mode.
+export async function textMode(frame) {
+  if (!(await frame.evaluate(() => !!document.querySelector('.pan-textlayer.pan-txted')))) await frame.locator('.pan-mtext').click();
+  await frame.waitForSelector('.pan-textlayer.pan-txted');
+}
+// Draw mode, the way a user gets there from a note that opened in Text: one press of Draw.
+export async function drawMode(frame) {
+  if (await frame.evaluate(() => !!document.querySelector('.pan-textlayer.pan-txted'))) await frame.locator('.pan-mdraw').click();
+  await frame.waitForFunction(() => !document.querySelector('.pan-textlayer.pan-txted'));
+}
 export async function selectWord(page, frame, word) { const p = await wordAt(page, frame, word); await page.mouse.dblclick(p.x, p.y); }

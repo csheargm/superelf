@@ -15,7 +15,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { skip, TARGET, SAVED, port, setup, teardown, onDisk, indexed, newContext, openJournal, wordAt,
-  layerHtml, flashText, linking, lit, textMode, selectWord } from './helpers-note-link.mjs';
+  layerHtml, flashText, linking, lit, textMode, drawMode, selectWord } from './helpers-note-link.mjs';
 
 before(() => setup());
 after(teardown);
@@ -44,8 +44,11 @@ test('select a word, Link, type an address, Apply: the note on disk holds the li
   frame = await openJournal(page);
   assert.ok((await layerHtml(frame)).includes(SAVED), 'the link survives a reload, with target/rel');
 
-  // Read state (Select, the desktop opening tool): a click on the link opens it in a NEW TAB,
-  // through the shell — the app frame itself cannot (no allow-popups).
+  // Read state: a mostly-text note reopens in Text (editing), so leave it the way a user does —
+  // Draw, then Select. A click on the link opens it in a NEW TAB, through the shell — the app
+  // frame itself cannot (no allow-popups).
+  await drawMode(frame);
+  await frame.locator('.pan-tool[data-tool="select"]').click();
   const p = await wordAt(page, frame, 'example');
   const [tab] = await Promise.all([ctx.waitForEvent('page'), page.mouse.click(p.x, p.y)]);
   await tab.waitForLoadState();
@@ -62,7 +65,8 @@ test('iPad flow: a FINGER tap on a link in the pen tool opens it; the pad stays 
   const page = await ctx.newPage();
   const errors = []; page.on('pageerror', (e) => errors.push(String(e)));
   const frame = await openJournal(page, { touch: true });
-  assert.equal(await frame.evaluate(() => matchMedia('(pointer: coarse)').matches), true, 'CONTROL: a touch device, so the Journal opened on the pen');
+  await drawMode(frame);                                                     // a mostly-text note opens in Text; Draw puts the pen up
+  assert.equal(await frame.evaluate(() => matchMedia('(pointer: coarse)').matches), true, 'CONTROL: a touch device, so Draw is on the pen');
   assert.deepEqual(await frame.evaluate(() => [...document.querySelectorAll('.pan-tool.on')].map((b) => b.dataset.tool)), ['pen']);
   const p = await wordAt(page, frame, 'example');
   const [tab] = await Promise.all([ctx.waitForEvent('page'), page.touchscreen.tap(p.x, p.y)]);

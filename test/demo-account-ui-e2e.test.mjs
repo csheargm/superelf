@@ -169,9 +169,12 @@ test('the drawer has no Briefings section on the demo, and asks /api/briefings n
 test('the demo drawer keeps Family Apps with the private-hosting note, muted, and asks /api/family-apps nothing', { skip }, async () => {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } }); const page = await ctx.newPage();
   const asked = []; page.on('request', (r) => { if (r.url().includes('/api/family-apps')) asked.push(r.url()); });
+  // Read at DOMContentLoaded INSIDE each document: the boot reloads the page once, and a count from
+  // the test process could land in the gap where the reloaded document has not parsed yet (the flake).
+  await page.addInitScript(() => document.addEventListener('DOMContentLoaded', () => { window.__noteAtParse = !!document.getElementById('dFamilyDemo'); }));
   await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-  assert.equal(await page.locator('#dFamilyDemo').count(), 1, 'the note is there at parse time, before any boot fetch (GPT r2)');
   await settled(page);
+  assert.equal(await page.evaluate(() => window.__noteAtParse), true, 'the note is there at parse time, before any boot fetch (GPT r2)');
   await page.evaluate(() => openDrawer());
   await page.locator('#drawer.open').waitFor();
   const note = page.locator('#secFamily #dFamilyDemo');
