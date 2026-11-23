@@ -59,6 +59,17 @@ test('expired sessions, removed-member marks included, are pruned on load and on
   assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(f, 'utf8'))), ['b'], 'the sweep is written back');
 });
 
+test('a failed load-time cleanup write does not stop startup', { skip: process.platform === 'win32' && 'POSIX dir modes' }, () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pa-s4-')); const f = path.join(dir, 's.json');
+  fs.writeFileSync(f, JSON.stringify({ old: { userId: 'x', expires: 1 }, live: { userId: 'y', expires: 1e15 } }));
+  fs.chmodSync(dir, 0o500); // the atomic write's temp file cannot be created
+  try {
+    const s = new Sessions(f, 1000);
+    assert.equal(s.resolve('live', 1000), 'y', 'live sessions survive');
+    assert.equal(s.map.has('old'), false);
+  } finally { fs.chmodSync(dir, 0o700); }
+});
+
 test('audit append + read newest-first', () => {
   const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pa-a-')), 'audit.log');
   appendAudit(f, { at: 1, ev: 'register', who: 'a' });
