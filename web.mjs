@@ -1611,7 +1611,7 @@ const server = http.createServer(async (req, res) => {
     // --- Public auth (no session required) ---
     if (req.method === 'POST' && p === '/api/login') {
       const b = await readBody(req, BODY_LIMITS.auth);
-      const gkeys = loginKeys(req, b);   // [IP backstop, IP + account] (lib/login-guard.mjs)
+      const gkeys = loginKeys(req, b);   // [IP backstop, IP + account, account backstop] (lib/login-guard.mjs)
       const wait = loginGuard.retryAfter(gkeys);   // check → verify → record has no await between (lib/login-guard.mjs)
       if (wait) return send(res, 429, 'application/json', JSON.stringify({ error: lockedMessage(wait) }), { 'retry-after': String(wait) });
       let u = findLogin(b.username);
@@ -1627,7 +1627,7 @@ const server = http.createServer(async (req, res) => {
       }
       audit('login', { who: String(b.username || '').slice(0, 40), ok: !!ok });
       if (!ok) { loginGuard.fail(gkeys); await sleep(400); return send(res, 401, 'application/json', '{"error":"Wrong username or password · 用户名或密码错误"}'); }
-      if (byPin) loginGuard.success(gkeys.slice(1));   // the account only: one member's own good login must not reset the client's count
+      if (byPin) loginGuard.success(gkeys.slice(1));   // the account keys only: one member's own good login must not reset the client's count
       const token = cfg.sessions.create(u.id, Date.now());
       return send(res, 200, 'application/json', JSON.stringify({ ok: true, token, uid: u.id, name: u.name, role: u.role }));
     }
