@@ -21,7 +21,7 @@ PRIVATE=; [[ "${SUPERELF_PRIVATE:-}" == 1 ]] && PRIVATE=1
 mkdir -p "$NODE_DIR"
 # Code folders are replaced whole, so a file the image no longer has (a removed seed app) is gone
 # too; visitor data lives elsewhere in the folder and is never touched.
-for d in lib web tools workspace.example bible-data ops; do rm -rf "${NODE_DIR:?}/$d"; done
+for d in lib web tools workspace.example bible-data ops builtin-apps; do rm -rf "${NODE_DIR:?}/$d"; done
 tar -C /opt/superelf -cf - . | tar -C "$NODE_DIR" -xf -
 chmod 700 "$NODE_DIR"   # tar's "." entry resets it to the image's 755; visitor data is private
 SEED=/opt/superelf/ops/demo/config.demo.json; [[ -n "$PRIVATE" ]] && SEED=/opt/superelf/ops/private/config.private.json

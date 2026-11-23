@@ -10,6 +10,9 @@
 !tools
 !workspace.example
 !bible-data
+# built-in app PAGES only (moved to builtin-apps/ by the Dockerfile); never their data or meta
+!workspace/apps/*/index.html
+!shared-apps/*/index.html
 !backup.sh
 !restore.sh
 !ops/demo/entrypoint.sh
