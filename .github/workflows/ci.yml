@@ -76,11 +76,13 @@ jobs:
         # skip on CI by PA_E2E_SKIP; no real test turned into a skip.
         # 2026-11-23: EVERY OS +9 (ubuntu 88, windows 170; measured 87 and 169 in run 45124049583, +1
         # slack): ink-enclosure-e2e.test.mjs, 9 Playwright checks that skip on CI by PA_E2E_SKIP.
+        # 2026-11-23: EVERY OS +5 (ubuntu 97, windows 179): fix/morning's new Playwright checks (demo
+        # limit screen 1, demo app sign-out 1, removed member 2, family labels 1), skipped on CI by PA_E2E_SKIP.
         include:
           - os: ubuntu-latest
-            max_skipped: 92
+            max_skipped: 97
           - os: windows-latest
-            max_skipped: 174
+            max_skipped: 179
     env:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED
