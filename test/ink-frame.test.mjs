@@ -54,8 +54,12 @@ test('handwriting goes on the line frame and moves as one block: same shape at e
 });
 
 test('REGRESSION: the same sentence on the shipped-before engine scattered across the verse when it re-wrapped', () => {
-  const before = execFileSync('git', ['show', 'origin/main:web/ink-anchor.inline.html'], { cwd: ROOT, encoding: 'utf8' });
+  // The engine shipped before the frame (1a654f7^), pinned by SHA: origin/main moves and has the frame now.
+  const before = execFileSync('git', ['show', '1a654f7^:web/ink-anchor.inline.html'], { cwd: ROOT, encoding: 'utf8' });
+  assert.ok(!before.includes('PAInkFrame'), 'really the pre-frame engine');
   const { dom, I } = writeSentence(before);
+  assert.equal(I.placements().length, 26, 'the old engine loaded and kept every stroke');
+  assert.ok(I.placements().every((p) => p.at), 'and placed every one (the bug is the scatter, not a crash)');
   const shape = rel(I);
   setWidth(dom, 200);
   assert.notDeepEqual(rel(I), shape, 'the old engine loses the shape (this is the bug the frame fixes)');
