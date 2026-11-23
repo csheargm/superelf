@@ -200,6 +200,10 @@
     while(grew){ grew=false; for(const c of cand) if(!out.includes(c)&&boxes.some(b=>gap(b,c.box)<=NEAR)){ out.push(c); boxes.push(c.box); grew=true; } }
     return out;
   }
+  function nowEncloses(g,el,env,w,key){
+    const k=key+'@'+Math.round(w), m=env.nowMemo.get(g); if(m&&m.k===k) return m.v;
+    const v=!!env.enclosedAt(el,w,g); env.nowMemo.set(g,{k,v}); return v;
+  }
   // placed: [{g,at,orphan}] after shiftClusters. Returns the SAME array unless an enclosure moved.
   function followEnclosures(placed,groups,env){
     const moved=new Map();
@@ -209,6 +213,9 @@
       const lr=env.local(el.getBoundingClientRect()), key=widthsOf(a.g,groups).join(','), memo=env.encMemo.get(a.g);   // keyed by the widths: new ink re-measures
       const enc=memo&&memo.key===key?memo.enc:encWritten(a.g,groups,el,env); if(!memo||memo.key!==key) env.encMemo.set(a.g,{key,enc});
       if(!enc||Math.abs(env.colW(lr)-enc.W)<=EPS_W) continue;   // the written width: drawn exactly as stored
+      // No ww: W is a guess from other ink. If the record already encloses its words here, this may be the
+      // written width (a one-row run measures the same at any width), so it is drawn as stored.
+      if(a.g.ww==null&&nowEncloses(a.g,el,env,env.colW(lr),key)) continue;
       const rr=env.runNow(el,enc.s,enc.e); if(!rr) continue;
       const k=enc.w>0&&rr.width>0?rr.width/enc.w:1, at={ox:rr.left+enc.dx*k,oy:rr.top+enc.dy*k,s:k};
       moved.set(a,at);
@@ -244,8 +251,9 @@
         return {s:r.start,e:r.end,dx:l-nr.left,dy:t-nr.top,w:nr.width,box:{l:l-cr.left,t:t-cr.top,r:box.r-cr.left,b:box.b-cr.top}};
       }finally{ c.parentNode.removeChild(c); }
     }
-    const runNow=(el,s,e)=>{ const r=o.measurer(el).runRect(s,e); return r&&r.width>0?o.local(r):null; };
-    return {lineEl:o.lineEl,local:o.local,colW,measureAt,wholeOf,extentOf,enclosedAt,runNow,memo:new WeakMap(),encMemo:new WeakMap()};
+    // The words on ONE row now, else null: one oval cannot ring two rows (it keeps today's placement).
+    const runNow=(el,s,e)=>{ const m=o.measurer(el), r=m.runRect(s,e), u=m.rangeRect(s,e); return r&&r.width>0&&u&&u.height<=r.height*1.5?o.local(r):null; };
+    return {lineEl:o.lineEl,local:o.local,colW,measureAt,wholeOf,extentOf,enclosedAt,runNow,memo:new WeakMap(),encMemo:new WeakMap(),nowMemo:new WeakMap()};
   }
   window.PAInkFrame={env,NEAR,isSmall,bboxOf,isScrub,hitGroups,extentOf,SCRUB,ERASE_HIT,BURST_MS,SMALL,NEIGHBOR,isLine,sameLine,handwriting,writtenWidth,placeLine,joinsBurst,frameOf,places,toLine,EPS_W,clusterOf,relOf,widthChanged,shiftClusters,ENC_GAP,isEnclosure,followEnclosures};
 })();

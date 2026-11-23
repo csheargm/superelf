@@ -113,3 +113,30 @@ test('an older note (written before ww tags) gets its oval back on the other wid
   assert.deepStrictEqual(atWrite.at, refWrite.at, 'identity at the written width');
   sameShape((await run('now', LANDSCAPE)).s, atWrite.s, 'old note');
 });
+
+// GPT review, 9ef2a19: at a width where the circled words split over two rows, one oval cannot ring
+// them both (the run's summed width stretched it along row 1), so it keeps today's placement.
+test('circled words split over two rows at the new width: drawn as origin/main draws them', { skip }, async () => {
+  const SPLIT = 834;   // "叫" ends row 1 here, the rest wraps
+  const p = await open('now', LANDSCAPE); const recs = await write(p, 12); await p.close();
+  const at = {};
+  for (const eng of ['now', 'ref']) { const q = await open(eng, SPLIT); assert.ok(new Set((await target(q)).map((r) => r.t)).size > 1, 'the words split here');
+    await q.evaluate((r) => A.load(r), recs); at[eng] = await places(q); await q.close(); }
+  assert.deepStrictEqual(at.now, at.ref);
+});
+
+// GPT review, 9ef2a19: an old oval (no ww) must not take another note's width as its own. Landscape ink on
+// verse 5 carries ww/fw 1194; the oval was written in portrait on an engine without ww. At portrait the
+// note draws exactly as on origin/main.
+test('old oval in a chapter with ink from the other width: identity at its own width', { skip }, async () => {
+  const q = await open('now', LANDSCAPE);
+  const rows = await q.evaluate(() => { const r = document.querySelector('[data-n="5"] .vzh').getBoundingClientRect(), c = document.getElementById('v').getBoundingClientRect(); return { l: r.left - c.left, b: r.bottom - c.top }; });
+  for (let k = 0; k < 3; k++) { const x = rows.l + 40 + k * 22, y = rows.b - 20; await stroke(q, [[x, y], [x + 15, y + 5], [x + 5, y + 18]]); await q.waitForTimeout(150); }
+  const other = await q.evaluate(() => A.groups()); await q.close();
+  assert.ok(other.some((g) => Math.abs((g.ww || g.fw || 0) - LANDSCAPE_W) < 40), 'the other ink carries the landscape width');
+  const p = await open('old', PORTRAIT); const mine = await write(p, 12); await p.close();
+  const recs = [...other, ...mine], at = {};
+  for (const eng of ['now', 'ref']) { const r = await open(eng, PORTRAIT); await r.evaluate((x) => A.load(x), recs); at[eng] = await places(r); await r.close(); }
+  assert.deepStrictEqual(at.now, at.ref);
+});
+const LANDSCAPE_W = LANDSCAPE - 32;
