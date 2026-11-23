@@ -81,7 +81,7 @@ import { pageImageFile, IMG_BAD_PATH, IMG_NOT_FOUND } from './lib/note-page-imag
 import { buildFollowup, followupDeps } from './lib/summary-followup.mjs';
 import { writerClaudeBase, writerLaneMs } from './lib/research-writer.mjs';
 import { snapshotApps, appBuildWarnings } from './lib/app-postcheck.mjs';
-import { isBlankAnswer, laneFailureText, shouldFallBackToAgent, fallbackStatusText, chatTurnLogLine } from './lib/chat-outcome.mjs';
+import { isBlankAnswer, laneFailureText, shouldFallBackToAgent, fallbackStatusText, chatTurnLogLine, turnErrorText } from './lib/chat-outcome.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 
@@ -1489,7 +1489,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
     line({ type: 'done', ok: r.ok, text: blank ? '' : (r.text || ''), by });
   } catch (e) {
     console.log(chatTurnLogLine({ app: tag, lane: chosen, ok: false, textLen: 0, ms: Date.now() - startedAt, code: e.code || e.status || e.name, fellBack }));
-    line({ type: 'error', text: e.message });
+    line({ type: 'error', text: turnErrorText(chosen, e) });
   } finally {
     clearInterval(beat);
     if (alive()) res.end();
@@ -2720,7 +2720,7 @@ const server = http.createServer(async (req, res) => {
         const r = await enqueue(() => runAgent(message, agentArgs(user, fastBaseArgs(user, origin), origin), wsDir(user), 5 * 60000, agentCapabilities(laneRole(user, origin), APP_CONTRACT)));
         clearInterval(beat);
         res.end(JSON.stringify({ ok: r.ok, text: r.text }));
-      } catch (e) { clearInterval(beat); if (!res.writableEnded) res.end(JSON.stringify({ ok: false, text: e.message })); }
+      } catch (e) { clearInterval(beat); if (!res.writableEnded) res.end(JSON.stringify({ ok: false, text: turnErrorText(null, e) })); }
       return;
     }
     send(res, 404, 'text/plain', 'not found');
