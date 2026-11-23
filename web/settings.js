@@ -531,18 +531,21 @@ async function loadFamily(){
       <input id="nId" placeholder="id (e.g. mia)" style="padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text)">
       <input id="nName" placeholder="Name" style="padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text)">
       <input id="nYear" placeholder="Birth year" inputmode="numeric" style="padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text)">
+      <input id="nPass" type="password" autocomplete="new-password" placeholder="起始密码（可不填）· Starting password (optional)" style="padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text)">
       <button class="primary" id="addU" style="padding:6px">Add member</button>
     </div>`;
   box.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{ if(confirm('Remove '+b.dataset.del+"? (their data stays on disk)")){ await api('/api/admin/users/'+b.dataset.del,{method:'DELETE'}); loadFamily(); } });
   box.querySelectorAll('[data-tok]').forEach(b=>b.onclick=async()=>{ alert('To (re)issue a token, delete and re-add the member — tokens are shown once at creation for safety.'); });
   $('#addU').onclick=async(e)=>{
     e.preventDefault();
-    const id=$('#nId').value.trim().toLowerCase(), name=$('#nName').value.trim(), birthYear=parseInt($('#nYear').value,10)||null;
-    if(!id){ alert('id required'); return; }
-    const r=await api('/api/admin/users',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id,name,birthYear})});
+    const id=$('#nId').value.trim().toLowerCase(), name=$('#nName').value.trim(), birthYear=parseInt($('#nYear').value,10)||null, password=$('#nPass').value;
+    if(!id){ alert('请填用户名 · Username required'); return; }
+    const r=await api('/api/admin/users',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id,name,birthYear,...(password?{password}:{})})});
     const j=await r.json();
-    if(!j.ok){ alert(j.error||'failed'); return; }
-    prompt(`Created ${name||id}. Give them this token (shown once):`, j.token);
+    if(!j.ok){ alert(j.error||'添加失败 · Could not add'); return; }
+    // With a password they sign in by name; without one the server hands out a one-time sign-in code (F5-1).
+    if(j.token) prompt(`已添加 ${name||id}。把这个登录码交给对方（只显示一次），登录后在设置里设密码 · Added ${name||id}. Give them this sign-in code (shown once); they set a password in Settings:`, j.token);
+    else alert(`已添加 ${name||id}。对方用用户名「${id}」和你设的密码登录 · Added ${name||id}. They sign in with username "${id}" and the password you set.`);
     loadFamily();
   };
 }

@@ -2603,7 +2603,9 @@ const server = http.createServer(async (req, res) => {
         provisionWorkspace(rec);
         await upsertUser(rec);
         audit('create', { who: id, name: rec.name, by: user.id });
-        return send(res, 200, 'application/json', JSON.stringify({ ok: true, id, hasPin: !!rec.passHash }));
+        // No password set → the token is how they first sign in (POST /api/login {token}), shown ONCE by
+        // Settings; with a password it could not sign in at all, so it is not handed out (F5-1).
+        return send(res, 200, 'application/json', JSON.stringify({ ok: true, id, hasPin: !!rec.passHash, ...(rec.passHash ? {} : { token: rec.token }) }));
       }
       if (p.startsWith('/api/admin/users/')) {
         const id = p.slice('/api/admin/users/'.length);
