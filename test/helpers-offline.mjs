@@ -2,6 +2,7 @@
 // (R3: one fake store, one stand-in node).
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import { DATA_ABSENT_QUERY } from '../lib/appdata.mjs';
 
 // ── An in-memory IndexedDB: open → upgrade → db; transaction(store).objectStore(store) → requests
 // that settle on a microtask, as the browser's do. `quota` makes every write fail like a full disk.
@@ -64,7 +65,13 @@ export function standInNode(files, { build = 'b1' } = {}) {
       const json = (code, o) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(o)); };
       if (req.url === '/api/build') return json(200, { build, version: 'v1 · ' + build });
       if (req.url === '/api/save-data') { const b = JSON.parse(body); posts.push(b.path); if (b.path.endsWith('fail.json')) return json(500, { ok: false, error: '保存失败 · save failed', code: 'write_failed' }); files.set(b.path, b.data); return json(200, { ok: true, bytes: b.data.length }); }
-      if (req.url.startsWith('/api/data/')) { const t = files.get(decodeURIComponent(req.url.slice('/api/data/'.length))); if (t == null) return json(404, { error: 'not found' }); res.writeHead(200, { 'content-type': 'text/plain' }); return res.end(t); }
+      if (req.url.startsWith('/api/data/')) {
+        // Mirrors web.mjs: the query is not part of the path; ?absent=empty turns a missing file into an empty 204.
+        const [p, q] = req.url.slice('/api/data/'.length).split('?');
+        const t = files.get(decodeURIComponent(p));
+        if (t == null) { if (q === DATA_ABSENT_QUERY) { res.writeHead(204); return res.end(); } return json(404, { error: 'not found' }); }
+        res.writeHead(200, { 'content-type': 'text/plain' }); return res.end(t);
+      }
       json(404, { error: 'nf' });
     });
   });

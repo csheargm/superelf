@@ -208,7 +208,7 @@ test('wiring in the shell as served: merge then sync after PAOffline, the boot d
   assert.match(SHELL, /PAOffline\.boot\(\);[^\n]*\n\s*PASync\.drain\(\);/, 'the boot drain follows PAOffline.boot');
   assert.match(SHELL, /shellBusy:\(\)=>!!\(\$\('#box'\)\.value\.trim\(\)\|\|\$\('#log'\)\.querySelector\('\.msg\.status'\)\|\|\(typeof PASync!=='undefined'&&PASync\.inFlight\(\)\)\)/, 'PAUpdate never reloads under a drain');
   assert.match(SHELL, /reachable:\(\)=>PAOrigin\.reachable\(\),/, 'the reachability question goes to PAOrigin (web/offline-origin.js): the public name, then the home name');
-  assert.match(SHELL, /read:\(slug,path\)=>relayCall\('\/api\/data\/'\+offDataPath\(slug,path\)/);
+  assert.match(SHELL, /read:\(slug,path\)=>relayCall\(dataReadUrl\(offDataPath\(slug,path\)\)/, 'the sync read asks ?absent=empty (test/data-absent)');
   assert.match(SHELL, /post:\(slug,path,text\)=>relayCall\('\/api\/save-data',\{method:'POST'/);
   assert.match(SHELL, /merge:mergeOffline, state:PAOffline\.syncState,/);
   assert.match(SHELL, /setInterval\(\(\)=>\{ if\(document\.visibilityState==='visible'\) fn\(\); \},UPDATE_POLL_MS\);/, 'one cadence (R3)');
