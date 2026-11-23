@@ -115,5 +115,15 @@ export const layerHtml = (frame) => frame.evaluate(() => document.querySelector(
 export const flashText = (frame) => frame.evaluate(() => { const f = document.querySelector('.pan-flash.on'); return f ? f.textContent : ''; });
 export const linking = (frame) => frame.evaluate(() => document.querySelector('.pan-linkpop').classList.contains('on'));
 export const lit = (frame, sel) => frame.evaluate((s) => document.querySelector(s).classList.contains('on'), sel);
-export async function textMode(frame) { await frame.locator('.pan-mtext').click(); await frame.waitForSelector('.pan-textlayer.pan-txted'); }
+// The Text mode button is a toggle, and a mostly-text note now OPENS in Text (openToolFor, d6af038):
+// press it only when the page is not already editing, or the press would leave Text mode.
+export async function textMode(frame) {
+  if (!(await frame.evaluate(() => !!document.querySelector('.pan-textlayer.pan-txted')))) await frame.locator('.pan-mtext').click();
+  await frame.waitForSelector('.pan-textlayer.pan-txted');
+}
+// Draw mode, the way a user gets there from a note that opened in Text: one press of Draw.
+export async function drawMode(frame) {
+  if (await frame.evaluate(() => !!document.querySelector('.pan-textlayer.pan-txted'))) await frame.locator('.pan-mdraw').click();
+  await frame.waitForFunction(() => !document.querySelector('.pan-textlayer.pan-txted'));
+}
 export async function selectWord(page, frame, word) { const p = await wordAt(page, frame, word); await page.mouse.dblclick(p.x, p.y); }
