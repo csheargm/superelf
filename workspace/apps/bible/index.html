@@ -26,6 +26,9 @@ body{display:flex;flex-direction:column}
 .sl-hint{padding:24px 18px;color:var(--muted);font-size:14px;text-align:center}
 #book-sel{flex:1;min-width:0;font:inherit;font-size:14px;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
 .ch-btn{background:var(--card);border:1px solid var(--line);border-radius:8px;width:36px;height:36px;font-size:20px;cursor:pointer;color:var(--text);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+#ch-end{display:flex;gap:10px;justify-content:center;padding:18px 12px 28px}
+.ch-step{font:inherit;font-size:14px;font-weight:600;background:var(--bg);color:var(--accent);border:1px solid var(--line);border-radius:10px;padding:10px 16px;min-height:44px;cursor:pointer}
+.ch-step:disabled{opacity:.4;cursor:default}
 #ch-label{font:inherit;font-size:14px;font-weight:600;min-width:52px;flex-shrink:0;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 4px;text-align:center}   /* chapter drop-down */
 /* Verses */
 #verses{flex:1;overflow-y:auto;padding:8px 10px calc(76px + var(--sab))}
@@ -699,6 +702,34 @@ function fillChapters(){ if(_chFor!==bookIdx){ _chFor=bookIdx;
   chLabel.innerHTML=''; for(let i=1;i<=BOOKS[bookIdx][2];i++){ const o=document.createElement('option'); o.value=i; o.textContent=i; chLabel.appendChild(o); } }
   chLabel.value=chapter; }
 chLabel.onchange=()=>{ chapter=+chLabel.value; load(); };
+// F2-03 (owner 2026-11-23): next / previous chapter three ways — the buttons at the chapter end, a
+// finger swipe across the text on touch, the ← → keys on desktop. One step function, across books.
+// TODO(R4 seam): chapter stepping + its gestures → bible/chapter-nav.js when this file is split.
+const SWIPE_PX=80;   // a horizontal finger travel this long, at least twice the vertical, is a page turn
+function stepChapter(d){
+  let b=bookIdx, c=chapter+d;
+  if(c<1){ if(b===0) return false; b--; c=BOOKS[b][2]; }
+  else if(c>BOOKS[b][2]){ if(b===BOOKS.length-1) return false; b++; c=1; }
+  bookIdx=b; chapter=c; bookSel.value=b; load().then(ok=>{ if(ok!==false) document.getElementById('verses').scrollTop=0; }); return true;
+}
+function chapterEnd(){
+  const nav=document.createElement('div'); nav.id='ch-end';
+  const btn=(id,txt,d,off)=>{ const b=document.createElement('button'); b.className='ch-step'; b.id=id; b.textContent=txt; b.disabled=off; b.onclick=()=>stepChapter(d); nav.appendChild(b); };
+  btn('end-prev','‹ 上一章 · Previous',-1,bookIdx===0&&chapter===1);
+  btn('end-next','下一章 · Next ›',1,bookIdx===BOOKS.length-1&&chapter===BOOKS[bookIdx][2]);
+  return nav;
+}
+const editing=(t)=>!!(t&&t.closest&&t.closest('input,textarea,select,[contenteditable="true"],[contenteditable=""]'));
+const overlayUp=()=>!!document.querySelector('#search-overlay.on,.pac-drawerhost.on,.pvm-sheet,dialog[open],.pac-fs.on,.pan-fs.on');
+document.addEventListener('keydown',e=>{
+  if((e.key!=='ArrowLeft'&&e.key!=='ArrowRight')||e.altKey||e.ctrlKey||e.metaKey||e.shiftKey||editing(e.target)||overlayUp()) return;
+  if(stepChapter(e.key==='ArrowRight'?1:-1)) e.preventDefault();
+});
+{ const wrap=document.getElementById('verses'); let t0=null;
+  wrap.addEventListener('touchstart',e=>{ const t=e.touches[0]; t0=(e.touches.length===1&&t&&t.touchType!=='stylus')?{x:t.clientX,y:t.clientY}:null; },{passive:true});
+  wrap.addEventListener('touchend',e=>{ const t=e.changedTouches&&e.changedTouches[0]; if(!t0||!t) return; const dx=t.clientX-t0.x, dy=t.clientY-t0.y; t0=null;
+    if(Math.abs(dx)>=SWIPE_PX&&Math.abs(dx)>=2*Math.abs(dy)&&!(window.getSelection&&String(window.getSelection())) ) stepChapter(dx<0?1:-1); },{passive:true});
+  wrap.addEventListener('touchcancel',()=>{ t0=null; },{passive:true}); }
 
 // ── Load chapter ──
 // Resolves false when a newer load() superseded this one: a .then() that acts on THIS chapter must stop.
@@ -746,6 +777,7 @@ function renderVerses(verses){
     d.onclick=()=>{ const r=VM.selection(); if(!(r&&r.n===v.n&&selV.has(v.n))) selectVerse(v.n,d); };
     wrap.appendChild(d);
   });
+  wrap.appendChild(chapterEnd());   // F2-03: ‹ Previous / Next › after the last verse
   VM.render(); INK.render();   // the list was rebuilt: repaint the marks, re-append + re-anchor the ink
 }
 // ── Verse marks（经文高亮）: PAVerseMarks (web/verse-marks.inline.html) owns the anchoring, the
@@ -848,6 +880,7 @@ TOP.chat.onclick=()=>topToggle('chat',()=>{ hideBackPill(); return askAI(); }); 
 if(typeof PATips!=='undefined'){   // first-use tips (ADR 0030); a bare global so a host harness can supply it
   PATips.register({id:'bible-top-panes',anchor:()=>TOP.note,text:'笔记和问一问在这里打开；可在面板标题栏浮动或最大化 · Note and Ask AI open here; float or maximise from the pane header'});
   PATips.register({id:'bible-highlight',anchor:()=>document.getElementById('top-mark'),text:'选中经文或词语，点此高亮或划线 · Select verses or words, then tap to highlight or underline'});
+  PATips.register({id:'bible-chapter-nav',anchor:()=>document.getElementById('end-next'),text:'下一章：点这里、左右滑动或按 ← → 键 · Next chapter: tap here, swipe sideways, or press ← →'});
   PATips.register({id:'bible-history',anchor:()=>document.getElementById('search-btn'),text:'阅读历史在搜索里 · Your reading history is in Search'});
 }
 

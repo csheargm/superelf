@@ -115,3 +115,44 @@ test('F2-06: touch — a selected verse holds the bar; cleared, it idles away (c
     await frame.waitForFunction(() => document.querySelector('#nav').getAttribute('data-paab-hidden') === '1', null, { timeout: ms + 3000 });
   } finally { await ctx.close(); }
 });
+
+// F2-03: next / previous chapter — buttons at the chapter end, ← → on desktop, a finger swipe on touch.
+const where = (frame) => frame.evaluate(() => [+document.getElementById('book-sel').value, +document.getElementById('ch-label').value]);
+test('F2-03: chapter-end buttons step chapters (across books), ← → keys step on desktop, but not while typing', { skip, timeout: 90000 }, async () => {
+  const { ctx, frame } = await open();
+  try {
+    await frame.evaluate(() => { bookIdx = 0; chapter = 50; document.getElementById('book-sel').value = 0; return load(); });
+    assert.equal(await frame.locator('#end-prev').isDisabled(), false);
+    await frame.locator('#end-next').scrollIntoViewIfNeeded(); await frame.locator('#end-next').click();
+    await frame.waitForFunction(() => +document.getElementById('book-sel').value === 1 && document.querySelectorAll('.verse').length > 5);
+    assert.deepEqual(await where(frame), [1, 1], 'Genesis 50 → Exodus 1');
+    await frame.locator('body').press('ArrowLeft');
+    await frame.waitForFunction(() => +document.getElementById('book-sel').value === 0);
+    assert.deepEqual(await where(frame), [0, 50], '← goes back across the book');
+    await frame.locator('#search-btn').click(); await frame.locator('#search-inp').press('ArrowRight');
+    assert.deepEqual(await where(frame), [0, 50], 'an arrow in the search box moves the caret, not the chapter');
+    await frame.locator('#search-close').click();
+    await frame.evaluate(() => { bookIdx = 0; chapter = 1; document.getElementById('book-sel').value = 0; return load(); });
+    assert.equal(await frame.locator('#end-prev').isDisabled(), true, 'Genesis 1 has no previous');
+  } finally { await ctx.close(); }
+});
+test('F2-03: a finger swipe left turns to the next chapter, right goes back; a vertical drag does not', { skip, timeout: 90000 }, async () => {
+  const { ctx, page, frame } = await open({ viewport: { width: 820, height: 1180 }, touch: true });
+  try {
+    await frame.evaluate(() => { bookIdx = 42; chapter = 3; document.getElementById('book-sel').value = 42; return load(); });   // a known chapter, whatever the history restored
+    const start = await where(frame);
+    const cdp = await ctx.newCDPSession(page);
+    const swipe = async (x0, y0, x1, y1) => {
+      const pt = (x, y) => [{ x, y, id: 1 }];
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pt(x0, y0) });
+      for (let k = 1; k <= 6; k++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: pt(x0 + ((x1 - x0) * k) / 6, y0 + ((y1 - y0) * k) / 6) });
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    };
+    await swipe(600, 600, 200, 620);
+    await frame.waitForFunction((c) => +document.getElementById('ch-label').value === c + 1 && document.querySelectorAll('.verse').length > 5, start[1]);
+    await swipe(200, 600, 600, 610);
+    await frame.waitForFunction((c) => +document.getElementById('ch-label').value === c, start[1]);
+    await swipe(400, 800, 420, 400); await frame.waitForTimeout(600);
+    assert.deepEqual(await where(frame), start, 'a vertical drag scrolls, it never turns the page');
+  } finally { await ctx.close(); }
+});
