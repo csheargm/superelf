@@ -249,6 +249,7 @@
 .pan-pop{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + var(--pan-toolsbottom,8px) + 54px);top:auto;z-index:7;
   display:none;flex-direction:column;gap:10px;border:1px solid var(--line,#e6e6e6);
   border-radius:14px;padding:12px;box-shadow:0 3px 14px rgba(0,0,0,.18);max-height:calc(100vh - 130px);overflow-y:auto;
+  max-width:calc(100% - 16px);box-sizing:border-box;   /* never wider than the page: positionPop's 8px clamp then holds both edges (F3-08) */
   /* Scroll-shadow affordance: iOS hides scrollbars, so when the popover content overflows
      (e.g. the finger-drawing row below the swatches on a phone), a soft shadow at the clipped
      edge signals "more below/above". Pure CSS: the local layers cover the shadows at the ends. */
@@ -284,7 +285,6 @@
 /* Divides the page ACTIONS from the page SETTINGS in the ⋯ panel — they are different kinds of
    thing and the list reads as one long menu without it. */
 .pan-pgsep{height:1px;background:var(--line,#e6e6e6);margin:6px 2px}
-.pan-devro{font-size:11px;color:var(--muted,#6b7370);padding:0 8px 4px;white-space:nowrap}
 /* Each row is SET IN THE STYLE IT APPLIES, so the menu is its own preview — the reason Apple's
    version needs neither icons nor explanation. */
 /* --text, NOT --fg. SCAR: --fg is defined nowhere in this app — the apps declare --text,
@@ -604,10 +604,8 @@
   // unit. A note then looks identical on an 11" iPad, a 12.9" and a laptop, which is also exactly
   // what makes it printable.
   const PAGE_W=816, PAGE_H=1056;
-  // Device readout · 设备读数 (annotation-anchoring.md §4 ii): one line in the page settings sheet,
-  // so the owner screenshots both iPads instead of describing them. The page side is fixed (PAGE_W);
-  // only the device side (viewport, k, the text layer's on-screen width) can differ.
-  const DEV_READOUT=m=>'Device 设备: '+m.w+'×'+m.h+' px · scale k='+(Math.round(m.k*1000)/1000)+' · text '+Math.round(m.textW)+'px · page '+PAGE_W;
+  // The device readout (annotation-anchoring.md §4 ii) lives in the ⚙ settings only (ink-anchor's
+  // 设备读数 · Device readout): the page settings sheet is for the page, not a developer line (F3-08).
   // SEAMLESS: the page keeps a screenful of empty paper below the lowest ink, so writing can
   // carry on downwards without anyone flipping. Capped, because the page is ONE canvas and a
   // 816-wide surface at 5 sheets is already ~20M device pixels at dpr 2 — past that the browser
@@ -1556,7 +1554,6 @@
            PANoteText (web/note-text.inline.html); a property of the PAGE, so it lives with the paper. */
         '<button class="pan-photoopt pan-pgtext" data-pg="text">'+ico('list')+'<span class="pan-optlbl">'+SEARCH_TXT.transcript+'</span></button>'+
         '<div class="pan-pgsep"></div>'+
-        '<div class="pan-devro"></div>'+   // the device readout (DEV_READOUT), filled when the sheet opens
         /* VIEW sits above Template because it is the coarser choice: it decides how much paper
            there is, and the template only decides what is printed on it. */
         /* The View picker is WITHDRAWN, not deleted. Seamless as built makes one page taller
@@ -1832,7 +1829,6 @@
         el.style.width=W+'px'; el.style.height=H+'px';
         el.style.zoom=k; el.style.left=left+'px'; el.style.right='auto'; el.style.bottom='auto'; }
       syncStageClear();                                        // `top` depends on the k just set
-      if(typeof syncDevReadout==='function'&&paperPop&&paperPop.classList.contains('on')) syncDevReadout();   // the readout follows rotation while the sheet is open
       // The backing store follows the ON-SCREEN size, so a magnified page is rendered at device
       // resolution instead of being an upscaled 816px bitmap. Clamped by AREA, not by k: a tall
       // seamless page at a large k would otherwise ask for a canvas the browser answers with
@@ -4138,9 +4134,7 @@
     const togglePop=(pop,btn)=>{ const willOpen=!pop.classList.contains('on'); closePops(); pop.classList.toggle('on',willOpen);
       if(willOpen) positionPop(pop,btn); syncPopBtns(); };
     inkBtn.addEventListener('click',()=>togglePop(inkPop,inkBtn));
-    // TODO(R4 seam): the device readout belongs with the page-settings sheet when that sheet is split out of note-ui.
-    function syncDevReadout(){ const el=q('.pan-devro'); if(el) el.textContent=DEV_READOUT({w:window.innerWidth,h:window.innerHeight,k:parseFloat(pageInner.style.zoom)||1,textW:textLayer.getBoundingClientRect().width}); }
-    paperBtn.addEventListener('click',()=>{ togglePop(paperPop,paperBtn); syncDevReadout(); });
+    paperBtn.addEventListener('click',()=>togglePop(paperPop,paperBtn));
     undoBtn.addEventListener('click',undo);
     redoBtn.addEventListener('click',redo);
     prevBtn.addEventListener('click',async()=>{ await flipTo(cur-1); });

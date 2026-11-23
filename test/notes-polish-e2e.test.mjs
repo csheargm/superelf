@@ -65,3 +65,18 @@ test('F3-13: on a phone the kind chip stays on one line and the row time stays o
   assert.ok(m.timeW > 0 && m.timeR <= m.vw, `the time is on screen (right ${m.timeR} <= ${m.vw})`);
   await ctx.close();
 });
+
+test('F3-08: Page settings shows no developer readout and stays inside the viewport (desktop and iPad portrait)', { skip, timeout: 90000 }, async () => {
+  for (const vp of [{ width: 1280, height: 850 }, { width: 820, height: 1180 }]) {
+    const ctx = await newContext({ viewport: vp }); const page = await ctx.newPage();
+    const frame = await openJournal(page);
+    // dispatched, not clicked at a point: with a long title the ⋯ can sit under the shell's bar-peek handle (reported separately)
+    await frame.locator('.pan-hmore, .pan-paperbtn').first().dispatchEvent('click');
+    await frame.waitForSelector('.pan-paperpop.on');
+    const m = await frame.evaluate(() => { const p = document.querySelector('.pan-paperpop.on'); const r = p.getBoundingClientRect();
+      return { text: p.textContent, left: r.left, right: r.right, vw: document.documentElement.clientWidth }; });
+    assert.doesNotMatch(m.text, /scale k=|Device 设备/, `${vp.width}: no developer readout`);
+    assert.ok(m.left >= 0 && m.right <= m.vw, `${vp.width}: the popover is inside the viewport (${m.left}..${m.right} of ${m.vw})`);
+    await ctx.close();
+  }
+});
