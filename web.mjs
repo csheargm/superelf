@@ -54,7 +54,7 @@ import { hashPassword, verifyPassword, makeAudit, readAudit, ACCOUNT_REMOVED_BOD
 import { notifyBriefingEmail } from './lib/notify.mjs';
 import { readShell } from './lib/shellhtml.mjs';
 import { makeBuildId, BUILD_MARKER, readRevision } from './lib/buildid.mjs';
-import { SW_PATH, OFFLINE_CONFIG_PATH, bibleIndex, withCspMeta, APP_CSP } from './lib/offline.mjs';
+import { SW_PATH, SW_PROBE_PATH, OFFLINE_CONFIG_PATH, offlineAppsFor, bibleIndex, withCspMeta, APP_CSP } from './lib/offline.mjs';
 import { corsHeaders } from './lib/local-origin.mjs';
 import { loadJobs as loadJobFiles, saveJob, deleteJob, validateJob } from './lib/jobs/store.mjs';
 import { readJobPrefs, setJobEnabled, applyJobPrefs, heldOff, builtinsFor } from './lib/jobs/prefs.mjs';
@@ -1692,6 +1692,7 @@ const server = http.createServer(async (req, res) => {
       return sendFile(res, f, { type, extra });
     }
 
+    if (p === SW_PROBE_PATH) { res.writeHead(204); return res.end(); }   // only the worker answers it; the node's empty 204 is the silence the probe waits out — no 401/404 noise per load (F4-4)
     const user = userFor(req);
     if (!user) return send(res, 401, 'application/json', cfg.sessions.wasRemoved(bearerOf(req), Date.now()) ? ACCOUNT_REMOVED_BODY : '{"error":"bad token"}');
 
@@ -1734,7 +1735,7 @@ const server = http.createServer(async (req, res) => {
       try { return send(res, 200, 'application/json', JSON.stringify(getChapter(BIBLE_DATA, url.searchParams.get('book'), url.searchParams.get('chapter')))); }
       catch (e) { return send(res, 400, 'application/json', JSON.stringify({ error: e.message })); }
     }
-    if (req.method === 'GET' && p === OFFLINE_CONFIG_PATH) return send(res, 200, 'application/json', JSON.stringify({ ...cfg.offline, local_origin: cfg.local_origin, bible: bibleIndex(BIBLE_DATA) }));   // read at use time: a config reload changes the cap with no restart
+    if (req.method === 'GET' && p === OFFLINE_CONFIG_PATH) return send(res, 200, 'application/json', JSON.stringify({ ...cfg.offline, ...offlineAppsFor(cfg.offline.apps, appsDir(user), demoOn(cfg) ? null : SHARED), local_origin: cfg.local_origin, bible: bibleIndex(BIBLE_DATA) }));   // read at use time: a config reload changes the cap with no restart
     // A demo visitor's record name is a placeholder ("Member · 会员"): the header shows only a name they set themselves.
     // TODO(R4): web.mjs is over budget; split the small GET routes (ping, bible, family-apps) into lib/.
     if (req.method === 'GET' && p === '/api/ping') return send(res, 200, 'application/json', JSON.stringify({ ok: true, uid: user.id, name: user.demo ? ownName(user) : user.name, role: user.role }),

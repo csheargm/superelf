@@ -160,13 +160,14 @@ before(async () => {
 after(async () => { if (web) await stopWeb(web); fs.rmSync(root, { recursive: true, force: true }); });
 const auth = { headers: { authorization: `Bearer ${OWNER_TOKEN}` } };
 
-test('node: /sw.js is served unauthenticated as JavaScript that revalidates (no-cache), scope /; the probe path is a 404 on the network', async () => {
+test('node: /sw.js is served unauthenticated as JavaScript that revalidates (no-cache), scope /; the probe path is an empty 204 on the network', async () => {
   const r = await api(port, SW_PATH);
   assert.equal(r.status, 200);
   assert.match(r.headers.get('content-type'), /^application\/javascript/);
   assert.equal(r.headers.get('cache-control'), 'no-cache');
   assert.ok((await r.text()).includes('PA_SW_BEGIN'));
-  assert.equal((await api(port, SW_PROBE_PATH)).status, 404, 'only the worker answers it: silence means the srcdoc route');
+  assert.equal((await api(port, SW_PROBE_PATH)).status, 204, 'only the worker answers it: an empty answer (silence) means the srcdoc route');
+  assert.equal((await api(port, SW_PROBE_PATH, { headers: { authorization: '' } })).status, 204, 'signed out too: never a 401 per load (F4-4)');
 });
 
 test('node: /api/offline-config needs the token and reads config at use time — the cap from config.json, the apps default, the corpus index', async () => {
@@ -174,7 +175,8 @@ test('node: /api/offline-config needs the token and reads config at use time —
   const r = await api(port, OFFLINE_CONFIG_PATH, auth);
   assert.equal(r.headers.get('cache-control'), 'no-store');
   const c = await r.json();
-  assert.deepEqual(c.apps, [...OFFLINE_DEFAULTS.apps]);
+  assert.deepEqual([...c.apps, ...c.shelf_apps], [], 'the defaults name notes and bible, but this root has neither: nothing that would 404 is listed (F4-4)');
+  assert.ok(OFFLINE_DEFAULTS.apps.length > 0, 'CONTROL: the configured list is not empty');
   assert.equal(c.bible_cap_bytes, 5, 'the value in this root\'s config.json, not the default');
   assert.equal(c.bible_prefetch, true);
   assert.equal(c.bible.length, 66); assert.ok(c.bible.every((n) => n === 0), 'this root has no corpus: nothing to prefetch (R14: not a vacuous "done")');

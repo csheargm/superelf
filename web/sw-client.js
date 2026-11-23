@@ -62,7 +62,9 @@ async function swPrefetch(d,ctx,uid){
   const {status}=ctx;
   if(status.worker!=='ready'||!uid) return status.bible='skipped';
   let cfg; try{ cfg=await d.fetchJson(SW_OFFLINE_CONFIG_URL); }catch(err){ status.bible='no-config'; status.error=String(err&&err.message||err); return status.bible; }
-  for(const slug of cfg.apps||[]){ try{ await d.fetchText(swAppUrl(uid,slug)); }catch(err){ status.error=String(err&&err.message||err); } }   // a missing app page is not a reason to skip the corpus; the error is kept
+  // apps: this user's own copies; shelf_apps: the family shelf's (the node lists only what exists, F4-4).
+  const pages=[...(cfg.apps||[]).map((slug)=>swAppUrl(uid,slug)),...(cfg.shelf_apps||[]).map((slug)=>swAppUrl('shared',slug))];
+  for(const url of pages){ try{ await d.fetchText(url); }catch(err){ status.error=String(err&&err.message||err); } }   // a missing app page is not a reason to skip the corpus; the error is kept
   if(cfg.bible_prefetch===false) return status.bible='off';
   const st=await ctx.ask({kind:SW_BIBLE_STATUS_KIND},SW_BIBLE_STATUS_KIND);
   if(st&&st.done) return status.bible='done';
