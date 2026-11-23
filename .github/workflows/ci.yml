@@ -71,11 +71,14 @@ jobs:
         # 2026-11-22: EVERY OS +12 (ubuntu 73, windows 155; measured 72 and 154 in run 45054412816, +1
         # slack): demo-account-ui-e2e.test.mjs + demo-home-link.test.mjs, 12 Playwright e2e checks
         # that skip on CI (PA_E2E_SKIP), from the sync of the private repo's demo work.
+        # 2026-11-23: EVERY OS +6 (ubuntu 79, windows 161; measured 78 and 160 in run 45122519933, +1
+        # slack): new Playwright e2e checks (ink pen contrast, app-page access, 375px top bars) that
+        # skip on CI by PA_E2E_SKIP; no real test turned into a skip.
         include:
           - os: ubuntu-latest
-            max_skipped: 73
+            max_skipped: 79
           - os: windows-latest
-            max_skipped: 155
+            max_skipped: 161
     env:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED

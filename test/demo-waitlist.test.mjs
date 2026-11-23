@@ -89,7 +89,8 @@ test('server: the demo answers and stores outside every workspace; a private nod
   const r = await post(demo, { email: 'srv@example.test' });
   assert.equal(r.status, 200); assert.deepEqual(await r.json(), { ok: true }, 'nothing else echoed back');
   assert.ok(entries(demo.root).some((e) => e.email === 'srv@example.test'));
-  assert.equal((fs.statSync(path.join(demo.root, WAITLIST_FILE)).mode & 0o077), 0, 'owner-only file');
+  // Windows has no POSIX mode bits (stat reports 0o666); file privacy there is the folder ACL.
+  if (process.platform !== 'win32') assert.equal((fs.statSync(path.join(demo.root, WAITLIST_FILE)).mode & 0o077), 0, 'owner-only file');
   assert.equal((await post(demo, { email: 'nope' })).status, 400);
   const o = await post(owner, { email: 'srv@example.test' });
   assert.notEqual(o.status, 200, `private node refuses (${o.status})`);

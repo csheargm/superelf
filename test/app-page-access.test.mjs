@@ -3,6 +3,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { canViewAppPage, appIsShared, appPageToken, appPageCookie, APP_PAGE_COOKIE } from '../lib/app-page-access.mjs';
 import { freePort, mkWebRoot, startWeb, stopWeb, waitReady, OWNER_TOKEN } from './helpers-web.mjs';
 
@@ -18,7 +19,7 @@ test('decision: unshared → author and owner only; shared → anyone', () => {
 });
 
 test('meta: missing or broken meta.json is unshared', () => {
-  const d = fs.mkdtempSync(path.join(fs.realpathSync('/tmp'), 'pa-meta-'));
+  const d = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir())  /* '/tmp' does not exist on Windows */, 'pa-meta-'));
   assert.equal(appIsShared(d), false);
   fs.writeFileSync(path.join(d, 'meta.json'), '{bad');
   assert.equal(appIsShared(d), false);
