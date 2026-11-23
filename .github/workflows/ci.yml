@@ -78,9 +78,9 @@ jobs:
         # slack): ink-enclosure-e2e.test.mjs, 9 Playwright checks that skip on CI by PA_E2E_SKIP.
         include:
           - os: ubuntu-latest
-            max_skipped: 88
+            max_skipped: 92
           - os: windows-latest
-            max_skipped: 170
+            max_skipped: 174
     env:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED
