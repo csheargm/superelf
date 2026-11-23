@@ -95,3 +95,17 @@ test('F3-07: Escape closes the Page settings popover and a drawer row ⋯ sheet,
   await frame.waitForFunction(() => !document.querySelector('.pan-paperpop.on'), null, { timeout: 3000 });
   await ctx.close();
 });
+
+test('F3-04: a plain click on a summary [n] link in Text mode opens its source note (no ⌘ needed); a web link still needs ⌘', { skip, timeout: 90000 }, async () => {
+  const ctx = await newContext(); const page = await ctx.newPage();
+  const frame = await openJournal(page);
+  await textMode(frame);
+  const opened = await frame.evaluate(() => { window.__opened = []; const real = PASummaryRefs.open; PASummaryRefs.open = (h, f) => { window.__opened.push(h); return true; };
+    const tl = document.querySelector('.pan-textlayer'); tl.insertAdjacentHTML('beforeend', '<div>See <a href="?note=abc&amp;page=0">[1]</a> and <a href="https://example.com/">web</a></div>'); return !!real; });
+  assert.ok(opened, 'CONTROL: PASummaryRefs is on the page');
+  await frame.locator('.pan-textlayer a[href^="?note="]').click();
+  assert.deepEqual(await frame.evaluate(() => window.__opened), ['?note=abc&page=0'], 'the plain click opened the note link');
+  await frame.locator('.pan-textlayer a[href^="https:"]').click();
+  assert.deepEqual(await frame.evaluate(() => window.__opened), ['?note=abc&page=0'], 'a plain click on a web link while editing places the caret, opens nothing');
+  await ctx.close();
+});

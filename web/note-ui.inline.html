@@ -2873,7 +2873,10 @@
     ink.addEventListener('pointerup',e=>{ const d=linkTap; linkTap=null;
       if(!d||d.id!==e.pointerId||penNear()||Date.now()-d.t>LINK_TAP_MS||Math.hypot(e.clientX-d.x,e.clientY-d.y)>LINK_TAP_PX) return;
       const a=linkAt(e.clientX,e.clientY); if(a) openLink(a.getAttribute('href')); });
-    textLayer.addEventListener('click',e=>{ const a=txtEdit&&(e.metaKey||e.ctrlKey)&&linkIn(e.target);
+    // A note link (a summary's [n] → its source note) opens on a plain click or tap, even while editing: it is a
+    // reference inside this app, not a web address to edit (F3-04). A web link still wants ⌘/Ctrl while editing.
+    const isNoteLink=a=>!!(a&&window.PASummaryRefs&&window.PASummaryRefs.parseLink(a.getAttribute('href')));
+    textLayer.addEventListener('click',e=>{ const l=txtEdit&&linkIn(e.target); const a=l&&((e.metaKey||e.ctrlKey)||isNoteLink(l))?l:null;
       if(a){ e.preventDefault(); openLink(a.getAttribute('href')); } });
     // Capture phase, so the selection is recorded BEFORE focus leaves the region.
     fmtBar.addEventListener('pointerdown',()=>{ selFrozen=false; saveSel(); selFrozen=true; },true);
