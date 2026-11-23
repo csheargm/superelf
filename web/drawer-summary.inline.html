@@ -264,7 +264,7 @@
     let extra='', noteId=null; const title=T().runTitleOf(period,T().now());   // the follow-up block once added (note-features.md I); this run's note and title
     const save=async(fresh)=>{ b.disabled=true;   // the first line names the period by titleOf (R3), the human title the tab shows
       const md0=window.PANote&&typeof window.PANote.mdToHtml==='function'?window.PANote.mdToHtml(String(answer||'')):'<div>'+esc(answer)+'</div>';
-      const md=R().linkifyHtml(md0,refs);   // [n] → note links the saved note keeps (sanitizeHtml keeps the scheme)
+      const md=R().untagHtml(R().linkifyHtml(md0,refs));   // quoted #tags are not this note's tags (F3-14)   // [n] → note links the saved note keeps (sanitizeHtml keeps the scheme)
       const html='<div>'+esc(fill(TXT.firstLine,{p:titleOf(period)}))+'</div>'+md; const convoId=(typeof x.convo==='function'?x.convo():null)||null; let r;
       try{ r=await x.hooks.saveNote({...(noteId==null?{}:{id:noteId}),title,html:html+extra,period,scope:x.key,convoId}); }catch(e){ r={ok:false,error:String((e&&e.message)||e)}; }
       if(r&&r.ok&&r.id!=null) noteId=r.id;

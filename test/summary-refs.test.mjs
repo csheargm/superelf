@@ -29,6 +29,15 @@ test('the note-link scheme: ?note=<id>&page=<p>, round-tripped through encodeURI
     assert.equal(S.parseLink(bad), null, String(bad));
 });
 
+test('untagHtml: a #tag quoted in a summary\'s text is not a tag (＃), markup and hrefs untouched; the index reads none of them (F3-14)', async () => {
+  const S = R();
+  const out = S.untagHtml('<p>One ink entry (#墨水 1) and #grace_2</p><a href="?note=a&amp;page=0#x">#1 ref</a> C# and # alone');
+  assert.equal(out, '<p>One ink entry (＃墨水 1) and ＃grace_2</p><a href="?note=a&amp;page=0#x">＃1 ref</a> C# and # alone');
+  const { tagsOf } = await import('../lib/note-index.mjs');
+  assert.deepEqual(tagsOf(out.replace(/<[^>]*>/g, ' ')), [], 'no tag survives');
+  assert.deepEqual(tagsOf('AI 总结 · AI summary — Nov #summary #ai ' + out), ['summary', 'ai'], 'CONTROL: the note\'s own first-line tags still count');
+});
+
 test('importantOf: one note\'s page records → its important lines in page order and the first page that has one', () => {
   const S = R();
   assert.deepEqual(S.importantOf([{ page: 0, important: [] }, { page: 1, important: [' call ', ''] }, { page: 2, important: ['pay'] }]), { lines: ['call', 'pay'], page: 1 });

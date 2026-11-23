@@ -29,7 +29,8 @@
   const LINK_RE=/\[([^\]\n]{1,120})\]\((https?:\/\/[^)\s]{1,500})\)/g, TOKEN=i=>'PSFLINK'+i+'X';
   function block(r){
     const links=[]; const t=String(r.text||'').replace(LINK_RE,(m,a,u)=>TOKEN(links.push('<a href="'+esc(u)+'">'+esc(a)+'</a>')-1));
-    return '<h3>'+esc(r.heading)+'</h3>'+md(t).replace(/PSFLINK(\d+)X/g,(m,i)=>links[Number(i)]||m);
+    const out='<h3>'+esc(r.heading)+'</h3>'+md(t).replace(/PSFLINK(\d+)X/g,(m,i)=>links[Number(i)]||m);
+    return window.PASummaryRefs&&typeof window.PASummaryRefs.untagHtml==='function'?window.PASummaryRefs.untagHtml(out):out;   // quoted #tags are not the note's (F3-14)
   }
   async function run(o){
     const x=o||{}; if(!x.bar||!x.hooks||typeof x.hooks.saveNote!=='function') return {ok:false,status:''};
