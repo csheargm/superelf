@@ -40,7 +40,7 @@ test('run: ONE status line (researching → added), one broker ask with the answ
   assert.deepEqual(U.calls.asks, [{ kind: 'summary-followup', text: 'SUMMARY TEXT' }]);
   assert.equal(U.calls.saved.length, 1);
   assert.deepEqual(U.calls.saved[0], { id: 'n7', title: 'This month', html: '<div>first</div><p>body</p><h3>跟进 · Follow-up</h3><p>### Find out X|- An answer|- 来源 · Sources: a.com</p>', period: '2026-11', scope: 'summary:2026-11', convoId: 'c1', quiet: true }, 'quiet: the host writes, never opens');
-  assert.equal(r.ok, true); assert.equal(r.status, '已添加跟进 · Follow-up added — 1 项待办 · 1 to-dos'); assert.equal(status(U.bar).textContent, r.status);
+  assert.equal(r.ok, true); assert.equal(r.status, '已添加跟进 · Follow-up added — 1 项待办 · 1 to-do'); assert.equal(status(U.bar).textContent, r.status);
   assert.equal(U.bar.children.filter((k) => k.className === 'pds-fu').length, 1);
 });
 
@@ -95,7 +95,7 @@ test('the turn\'s own auto-save runs the follow-up ONCE: second saveNote carries
   assert.equal(D.calls.saved[1].title, D.calls.saved[0].title); assert.match(D.calls.saved[0].title, / · \d{2}\/\d{2} \d{2}:\d{2}$/, 'titled with the run time');
   assert.equal(D.calls.saved[1].html, D.calls.saved[0].html + '<h3>跟进 · Follow-up</h3><p>' + BLOCK.text + '</p>');
   assert.equal(D.calls.saved[0].quiet, undefined, 'the turn\'s own save opens the note'); assert.equal(D.calls.saved[1].quiet, true, 'the follow-up\'s save is QUIET: no open, no pad or rail move');
-  assert.equal(status(bar).textContent, '已添加跟进 · Follow-up added — 1 项待办 · 1 to-dos');
+  assert.equal(status(bar).textContent, '已添加跟进 · Follow-up added — 1 项待办 · 1 to-do');
   assert.equal(b.textContent, '已存 · Saved');
   await b.onclick();   // a tap after the follow-up: the block stays in the note
   assert.equal(D.calls.saved.length, 3); assert.equal(D.calls.saved[2].html, D.calls.saved[1].html); assert.equal(D.calls.saved[2].id, 'n1', 'a re-save updates its own note');
@@ -129,5 +129,5 @@ test('block: source links render as <a href> through the real mdToHtml; a javasc
   assert.ok(html.includes('<li>来源 · Sources: <a href="https://www.desiringgod.org/fasting">Fasting &amp; prayer</a> · '), html);
   assert.ok(html.includes('<a href="https://www.hopkinsmedicine.org/if">IF basics</a>'));
   assert.equal(/href="javascript/.test(html), false, 'only http(s) is lifted'); assert.equal(/PSFLINK/.test(html), false, 'no token left behind');
-  assert.equal(r.status, '已添加跟进 · Follow-up added — 1 项待办 · 1 to-dos — 经 Codex · via Codex');
+  assert.equal(r.status, '已添加跟进 · Follow-up added — 1 项待办 · 1 to-do — 经 Codex · via Codex');
 });

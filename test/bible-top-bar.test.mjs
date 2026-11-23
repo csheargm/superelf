@@ -85,8 +85,9 @@ for (const app of ['bible (template)', 'bible (live)']) {
       assert.match(chat.sent[0], /3:16/, 'about the selected verse');
       await A.TOP.chat.onclick();
       assert.equal(rail.isCollapsed('chat'), false, 'with a selection a tap acts, it never closes');
-      assert.deepEqual(PATips.regs.map((r) => r.id), ['bible-top-panes', 'bible-highlight', 'bible-history']);
-      assert.match(PATips.regs[2].text, /阅读历史在搜索里 · Your reading history is in Search/, 'the history tip (anchored to Search)');
+      assert.deepEqual(PATips.regs.map((r) => r.id), ['bible-top-panes', 'bible-highlight', 'bible-chapter-nav', 'bible-history']);
+      assert.match(PATips.regs[2].text, /^下一章.* · Next chapter/, 'the chapter-nav tip (F2-03), 中文 first');
+      assert.match(PATips.regs[3].text, /阅读历史在搜索里 · Your reading history is in Search/, 'the history tip (anchored to Search)');
       assert.equal(PATips.regs[0].anchor(), A.TOP.note);
       assert.match(PATips.regs[0].text, /面板.* · /); assert.match(PATips.regs[1].text, /高亮.* · .*highlight/);
       A.stopPads();
@@ -146,7 +147,7 @@ test('GPT round 10: load() resolves false when superseded, and every load().then
     const body = S.slice(S.indexOf('async function load(){'), S.indexOf('\n}\n', S.indexOf('async function load(){')));
     assert.doesNotMatch(body, /_loadSeq\) return;/, p);
     const thens = S.split('\n').filter((l) => /load\(\)\.then\(/.test(l) && !/_booted=true/.test(l));
-    assert.equal(thens.length, 4, p);
+    assert.equal(thens.length, 5, p);   // + stepChapter (F2-03)
     for (const l of thens) assert.match(l, /ok===false|ok!==false/, `${p}: ${l.trim().slice(0, 60)}`);
   }
 });

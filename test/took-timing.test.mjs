@@ -125,7 +125,7 @@ test('the took line names the model that actually answered', () => {
   assert.equal(shellApi.addTook(el, 4700, 'Claude').textContent, 'Claude · took 4.7s');
   assert.equal(shellApi.addTook(el, 4700).textContent, 'took 4.7s', 'an old stored turn without by is unchanged');
   const WEB = fs.readFileSync(new URL('../web.mjs', import.meta.url), 'utf8');
-  assert.match(WEB, /const by = chosen \? chosen\.label : 'Claude';/, 'by is the lane that answered, after any reroute or fallback');
+  assert.match(WEB, /const by = ml\.blocked \? '' : chosen \? chosen\.label : 'Claude';/, 'by is the lane that answered, after any reroute or fallback (none when no plain lane existed for a member, F4-2)');
   assert.match(WEB, /role: 'md', text: r\.text \|\| '', ms: turnMs, by,/, 'by is stored with the answer');
   assert.match(WEB, /type: 'done', ok: r\.ok, [^\n]*, by \}/, 'by is sent with done');
   assert.match(CHAT, /if\(ev\.type==='done'&&typeof ev\.by==='string'\) _doneBy=ev\.by;/, 'PAChat reads it from done');

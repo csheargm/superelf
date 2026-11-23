@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createLoginGuard, clientKey, FAIL_THRESHOLD, BASE_LOCK_MS, MAX_LOCK_MS } from '../lib/login-guard.mjs';
+import { createLoginGuard, clientKey, loginKeys, FAIL_THRESHOLD, IP_FAIL_THRESHOLD, ACCOUNT_FAIL_THRESHOLD, BASE_LOCK_MS, MAX_LOCK_MS } from '../lib/login-guard.mjs';
 import { ensureSetupCode, setupCodeOk, consumeSetupCode, SETUP_CODE_FILE } from '../lib/setup-code.mjs';
 import { bindHostFor, DEFAULT_BIND_HOST } from '../lib/bind.mjs';
 import { MIN_PASSWORD, passwordError } from '../lib/owner.mjs';
@@ -64,4 +64,30 @@ test('one password minimum', () => {
   assert.equal(MIN_PASSWORD, 8);
   assert.ok(passwordError('1234567'));
   assert.equal(passwordError('12345678'), null);
+});
+
+test('loginKeys: one name locks only (IP + that name); the IP alone needs the much higher backstop', () => {
+  const g = createLoginGuard();
+  const req = { socket: { remoteAddress: '100.1.2.3' }, headers: {} };
+  const ben = loginKeys(req, { username: 'Ben' });
+  for (let i = 0; i < FAIL_THRESHOLD; i += 1) g.fail(ben, 0);
+  assert.ok(g.retryAfter(ben, 0) > 0, 'ben is locked');
+  assert.equal(g.retryAfter(loginKeys(req, { username: 'mom' }), 0), 0, 'mom on the same IP is not');
+  assert.equal(g.retryAfter(loginKeys(req, { token: 'x' }), 0), 0, 'the token path has its own counter');
+  assert.equal(g.retryAfter(loginKeys({ socket: { remoteAddress: '203.0.113.9' }, headers: {} }, { username: 'ben' }), 0), 0, 'another client is not');
+  assert.ok(IP_FAIL_THRESHOLD > FAIL_THRESHOLD * 5);
+  for (let i = FAIL_THRESHOLD; i < IP_FAIL_THRESHOLD; i += 1) g.fail(loginKeys(req, { username: `n${i}` }), 0);
+  assert.ok(g.retryAfter(loginKeys(req, { username: 'mom' }), 0) > 0, 'backstop: many names from one IP lock the IP');
+});
+
+// GPT review: guesses at ONE account spread over many IPs still add up to a lock (account backstop).
+test('account backstop: many IPs against one account lock it; another account and a single IP\'s typos do not', () => {
+  const g = createLoginGuard();
+  const from = (n) => ({ socket: { remoteAddress: `203.0.113.${n}` }, headers: {} });
+  for (let i = 0; i < ACCOUNT_FAIL_THRESHOLD - 1; i += 1) g.fail(loginKeys(from(i + 1), { username: 'ben' }), 0);   // one failure per IP
+  assert.equal(g.retryAfter(loginKeys(from(200), { username: 'ben' }), 0), 0, 'one under the account threshold: a fresh IP may still try');
+  g.fail(loginKeys(from(201), { username: 'ben' }), 0);
+  assert.ok(g.retryAfter(loginKeys(from(202), { username: 'ben' }), 0) > 0, 'at the threshold the account locks from any IP');
+  assert.equal(g.retryAfter(loginKeys(from(202), { username: 'mom' }), 0), 0, 'CONTROL: another account is not locked');
+  assert.ok(ACCOUNT_FAIL_THRESHOLD > FAIL_THRESHOLD);
 });

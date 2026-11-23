@@ -324,7 +324,8 @@ test('R6 wiring: the shell chat checks res.ok BEFORE reading the stream, and put
   const okCheck = send.indexOf('if(!res.ok)');
   const reader = send.indexOf('res.body.getReader()');
   assert.ok(okCheck > 0 && reader > okCheck, 'a non-2xx must be handled BEFORE the NDJSON loop swallows it');
-  assert.match(send, /status\.remove\(\);\s*userEl\.remove\(\);/, 'the "…" pill and the echoed bubble are removed');
+  assert.match(send, /status\.remove\(\);[\s\S]{0,600}?userEl\.remove\(\);/, 'the "…" pill and the echoed bubble are removed');
+  assert.match(send, /if\(f\.signin\)\{[^\n]*\n[^\n]*return; \}/, 'only the demo guest\'s refusal keeps the bubble (F1-8, test/demo-guest-ask-e2e.test.mjs)');
   assert.match(send, /add\('err','⚠ '\+relayText\(f,sentBytes\)\)/, 'the message lands in the chat UI\'s error position (.msg.err), like a stream error event');
   assert.match(send, /restoreComposer\(q,attsBefore\)/, 'the typed text and its attachments come back');
   // …and the app-facing chat relay does the same (V4 secondary).

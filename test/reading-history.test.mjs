@@ -132,7 +132,7 @@ test('pins: both Bible copies carry the marker and the thin wiring; web.mjs regi
     const s = read(f);
     assert.equal(s.split('<!--PA_INK_PEN_UI-->\n<!--PA_READING_HISTORY_UI-->').length, 2, `${f}: the marker`);
     assert.equal(s.split('const RH=PAReadingHistory.attach(').length, 2, `${f}: one attach`);
-    assert.match(s, /renderVerses\(vs\); if\(vs\.length&&g===_loadSeq&&b0===bookIdx&&c0===chapter\) RH\.record\(b0,c0\);/, `${f}: recorded only when the text loaded`);
+    assert.match(s, /renderVerses\(vs\); if\(vs\.length&&g===_loadSeq&&b0===bookIdx&&c0===chapter\) recordWhenRead\(g,b0,c0\);/, `${f}: recorded only when the text loaded, and then only once read (F2-09)`);
     assert.match(s, /async function load\(\)\{\n  const g=\+\+_loadSeq;\n  if\(_rhBoot\) await restoreReading\(g\);/, `${f}: restored before the first load`);
     assert.match(s, /_hashBoot=true;/, `${f}: a #b..c.. hash wins`);
     assert.match(s, /id:'bible-history',anchor:\(\)=>document\.getElementById\('search-btn'\)/, `${f}: the first-use tip`);
@@ -143,22 +143,24 @@ test('pins: both Bible copies carry the marker and the thin wiring; web.mjs regi
 });
 
 // Behaviour of the Bible's boot/load wiring, run from the real source with fakes for everything around it.
-function bootHarness(f, { restore, hash = false }) {
+function bootHarness(f, { restore, hash = false, dwell = 0 }) {
   const src = read(f);
   const a = src.indexOf('const RH_BOOT_WAIT_MS='), b = src.indexOf('function searchIdle(');
   const c = src.indexOf('async function load(){'), d = src.indexOf('\n}\n', c) + 3;
   const pend = new Map(); const recorded = [];
+  const scroller = { scrollTop: 0, fns: new Set(), addEventListener(t, f) { this.fns.add(f); }, removeEventListener(t, f) { this.fns.delete(f); },
+    scroll(y) { this.scrollTop = y; [...this.fns].forEach((f) => f()); } };
   const ctx = {
     RH: { restore, record: (b, c) => recorded.push([b, c]) }, BOOKS: Array.from({ length: 66 }, () => ['x', 'x', 50]),
     bookIdx: 42, chapter: 3, bookSel: { value: 42 }, selV: { clear() {} }, updateFab() {}, followSelection() {}, fillChapters() {},
-    chLabel: {}, document: { getElementById: () => ({}) }, loadAnn: async () => true, INK: { load() {} }, ANN: {},
+    chLabel: {}, document: { getElementById: () => scroller }, clearTimeout, loadAnn: async () => true, INK: { load() {} }, ANN: {},
     setTimeout, Promise, renderVerses() {},
     paBible: (b, c) => new Promise((res) => { const k = `${b - 1}:${c}`, prev = pend.get(k); const go = () => res({ ok: true, data: { verses: [1] } }); pend.set(k, prev ? () => { prev(); go(); } : go); }),
   };
   vm.createContext(ctx);
-  vm.runInContext(src.slice(a, b).replace('let _hashBoot=false', `let _hashBoot=${hash}`) + src.slice(c, d) +
+  vm.runInContext(src.slice(a, b).replace('let _hashBoot=false', `let _hashBoot=${hash}`).replace('RH_DWELL_MS=4000', `RH_DWELL_MS=${dwell}`) + src.slice(c, d) +
     ';globalThis.load=load;globalThis.getBC=()=>[bookIdx,chapter];globalThis.setBC=(x,y)=>{bookIdx=x;chapter=y;};', ctx);
-  return { ctx, pend, recorded, tick: () => new Promise((r) => setTimeout(r, 0)) };
+  return { ctx, pend, recorded, scroller, tick: () => new Promise((r) => setTimeout(r, 0)) };
 }
 for (const f of ['workspace/apps/bible/index.html', 'workspace.example/apps/bible/index.html']) {
   test(`${f}: a slow reading.json read does not hold the first chapter past the boot cap`, async () => {
@@ -178,15 +180,28 @@ for (const f of ['workspace/apps/bible/index.html', 'workspace.example/apps/bibl
     h.ctx.setBC(44, 1); const pick = h.ctx.load(); await h.tick(); await h.tick();
     done({ b: 0, c: 2 }); await h.tick(); await h.tick();
     assert.deepEqual([...h.ctx.getBC()], [44, 1], 'the reader\'s pick stays');
-    for (const fn of h.pend.values()) fn(); await Promise.all([boot, pick]);
+    for (const fn of h.pend.values()) fn(); await Promise.all([boot, pick]); await h.tick();   // the (zeroed) dwell
     assert.deepEqual(h.recorded, [[44, 1]], 'only the current chapter is recorded');
   });
   test(`${f}: an out-of-order chapter load is not recorded`, async () => {
     const h = bootHarness(f, { restore: async () => null }); h.ctx.load(); await h.tick(); await h.tick(); h.pend.get('42:3')(); await h.tick();
     h.recorded.length = 0;
     h.ctx.setBC(42, 4); const a = h.ctx.load(); await h.tick(); h.ctx.setBC(42, 5); const b = h.ctx.load(); await h.tick();
-    h.pend.get('42:5')(); await b; h.pend.get('42:4')(); await a;
+    h.pend.get('42:5')(); await b; h.pend.get('42:4')(); await a; await h.tick();
     assert.deepEqual(h.recorded, [[42, 5]]);
+  });
+  test(`${f}: F2-09 — a chapter passed through (book change auto-loads ch 1, then a pick) is not recorded; dwell or scroll records`, async () => {
+    const h = bootHarness(f, { restore: async () => null, dwell: 300 });
+    h.ctx.load(); await h.tick(); await h.tick(); h.pend.get('42:3')(); await h.tick();
+    h.ctx.setBC(44, 1); const a = h.ctx.load(); await h.tick(); h.pend.get('44:1')(); await a;   // the book drop-down opens chapter 1
+    h.ctx.setBC(44, 7); const b = h.ctx.load(); await h.tick(); h.pend.get('44:7')(); await b;   // the reader picks chapter 7 at once
+    await new Promise((r) => setTimeout(r, 400));
+    assert.deepEqual(h.recorded, [[44, 7]], 'only the chapter that stayed open; boot John 3 and the passing Acts 1 were superseded before their dwell');
+    h.recorded.length = 0;
+    h.ctx.setBC(44, 8); const c = h.ctx.load(); await h.tick(); h.pend.get('44:8')(); await c;
+    h.scroller.scroll(10); assert.deepEqual(h.recorded, [], 'a nudge is not reading');
+    h.scroller.scroll(200); assert.deepEqual(h.recorded, [[44, 8]], 'a real scroll records at once, before the dwell');
+    await new Promise((r) => setTimeout(r, 400)); assert.deepEqual(h.recorded, [[44, 8]], 'once');
   });
   test(`${f}: GPT round 6 — a late older chapter never paints over the newer one`, async () => {
     const h = bootHarness(f, { restore: async () => null }); h.ctx.load(); await h.tick(); await h.tick(); h.pend.get('42:3')(); await h.tick();

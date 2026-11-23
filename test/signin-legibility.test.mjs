@@ -75,9 +75,15 @@ test('other 401 renderings did not drift: still exactly one house sign-out sente
   assert.equal(n, 1, 'one sentence, one place (R3)');
 });
 
-test('the sign-in form asks for a password, not only a PIN (any password is accepted)', () => {
+test('one word for the secret: "password" on sign-in, Settings and the length rule (F1-6/F5-12)', async () => {
   const html = fs.readFileSync(new URL('../web/index.html', import.meta.url), 'utf8');
-  assert.match(html, /id="lpin" type="password" placeholder="密码或 PIN · Password or PIN"/);
+  assert.match(html, /id="lpin" type="password" placeholder="密码 · Password"/);
+  const dlg = fs.readFileSync(new URL('../web/settings-dialog.html', import.meta.url), 'utf8');
+  assert.match(dlg, /修改密码 · Change password/);
+  assert.match(dlg, /id="pPin" type="password" placeholder="新密码 · new password"/);
+  assert.equal(/Change PIN|new PIN/.test(dlg), false);
+  const { passwordError } = await import('../lib/owner.mjs');
+  assert.match(passwordError('x'), /^密码至少 8 位 · Password must be at least 8 characters$/);
   assert.match(html, /No password yet: sign in with access token/);
   assert.equal(/No PIN yet/.test(html), false, 'the PIN-only hint is gone');
 });

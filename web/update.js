@@ -64,6 +64,15 @@ function reopenAfterUpdate(){
   let a=null; try{ a=JSON.parse(sessionStorage.getItem(REOPEN_KEY)||'null'); sessionStorage.removeItem(REOPEN_KEY); }catch(_){ a=null; /* nothing remembered */ }
   if(a&&a.u&&a.s) openApp(a.u,a.s,a.t);
 }
+// After boot (signed in): the app a direct link asked for. web.mjs sends a signed-out /app/<uid>/<slug>/
+// page load here as #open=<uid>/<slug> (lib/app-page-access.mjs signInRedirect, F2-11). The hash is
+// read once and cleared, so a reload or Home does not reopen it.
+const OPEN_LINK_RE=/^#open=([\w.-]{1,80})\/([a-z0-9][a-z0-9-]{0,39})$/;   // a user id, then an app slug (lib/webutil.mjs slugOk)
+function openFromLink(){
+  const m=OPEN_LINK_RE.exec(location.hash||''); if(!m) return false;
+  try{ history.replaceState(null,'',location.pathname+location.search); }catch(_){ /* no history API: the hash stays, and reopens the same app once more */ }
+  openApp(m[1],m[2],m[2]); return true;
+}
 const PAUpdate=makeUpdate({
   // The footer is '<app name> · <appVersion()>' (web/settings-dialog.html); the version is its tail.
   loaded:()=>{ const vl=$('#ver-lbl'); return vl?vl.textContent.trim():''; },

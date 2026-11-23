@@ -341,11 +341,8 @@ $('#jobsList').onclick=async(e)=>{
    typing a value REPLACES on save, Clear deletes the key. Boot-time fields
    are marked; Apply & restart exits the process (supervisor respawns) and the
    UI polls / until the node answers again. */
-async function loadNodeCfg(){
-  const box=$('#nodeCfgList');
-  let rows=null; try{ rows=await (await api('/api/admin/config')).json(); }catch{ /* !Array below renders the bilingual failure line (R5) */ }
-  if(!Array.isArray(rows)){ box.textContent='无法加载配置 · Could not load config'; return; }
-  box.innerHTML=rows.map((r)=>{
+// TODO(R4 seam): Node settings (nodeCfgRow, loadNodeCfg, putNodeCfg, restart) → web/settings-nodecfg.js.
+function nodeCfgRow(r){
     const val=r.kind==='value'?(Array.isArray(r.value)?r.value.join(', '):(r.value==null?'':String(r.value))):'';
     const badge=r.kind==='secret'?`<small style="flex-shrink:0;color:${r.status==='SET'?'var(--accent)':'var(--muted)'}">${r.status==='SET'?'已设置 · SET':'未设置 · empty'}</small>`:'';
     return `<div style="padding:6px 0;border-bottom:1px solid var(--line)">
@@ -354,11 +351,20 @@ async function loadNodeCfg(){
         <input data-ck="${esc(r.key)}" ${r.kind==='secret'?'type="password" placeholder="粘贴以替换 · paste to replace" autocomplete="new-password"':''} value="${esc(val)}" style="flex:1;min-width:0;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px">
         <button type="button" class="plain" style="font-size:12px;padding:3px 8px" data-cs="${esc(r.key)}">保存 · Save</button>
         ${r.kind==='secret'&&r.status==='SET'?`<button type="button" class="plain" style="font-size:12px;padding:3px 8px" data-cc="${esc(r.key)}">清除 · Clear</button>`:''}
-      </div><div data-cmsg="${esc(r.key)}" style="font-size:12px;color:var(--muted)"></div></div>`;
-  }).join('')
+      </div>${r.purpose?`<div data-cpurpose="${esc(r.key)}" style="font-size:12px;color:var(--muted)">${esc(r.purpose)}</div>`:''}<div data-cmsg="${esc(r.key)}" style="font-size:12px;color:var(--muted)"></div></div>`;
+}
+async function loadNodeCfg(){
+  const box=$('#nodeCfgList');
+  let rows=null; try{ rows=await (await api('/api/admin/config')).json(); }catch{ /* !Array below renders the bilingual failure line (R5) */ }
+  if(!Array.isArray(rows)){ box.textContent='无法加载配置 · Could not load config'; return; }
+  const adv=rows.filter((r)=>r.advanced);   // API keys: folded under 高级 · Advanced, one purpose line each (F5-12)
+  const advOpen=!!(box.querySelector('#cfgAdv')||{}).open;   // a save re-renders: keep the fold as it was
+  box.innerHTML=rows.filter((r)=>!r.advanced).map(nodeCfgRow).join('')
+  +(adv.length?`<details id="cfgAdv"${advOpen?' open':''} style="margin-top:8px"><summary style="cursor:pointer;padding:6px 0;font-size:13px">高级 · Advanced <small style="color:var(--muted)">接口密钥 · API keys</small></summary>${adv.map(nodeCfgRow).join('')}</details>`:'')
   +'<div style="margin-top:10px;display:flex;gap:8px;align-items:center"><button type="button" class="plain" id="cfgReload">重载配置 · Reload config</button><button type="button" class="plain" id="cfgRestart" style="color:var(--danger)">应用并重启 · Apply &amp; restart</button><span id="cfgRestartMsg" style="font-size:12px;color:var(--muted)"></span></div>';
   $('#cfgReload').onclick=doReloadConfig;
   $('#cfgRestart').onclick=doNodeRestart;
+  markNewSel('#cfgAdv>summary','node-advanced');
 }
 async function putNodeCfg(key,value){
   const msg=$('#nodeCfgList').querySelector(`[data-cmsg="${CSS.escape(key)}"]`);
@@ -483,7 +489,7 @@ function markNewSel(sel,key){ markNew($(sel),key); }
   }
 })();
 $('#settings').onclick=async()=>{ await loadProfile(); if(ME.role==='owner'){ await loadFamily(); await loadShelf(); $('#auditBtn').style.display='inline-block'; } $('#cfg').showModal(); };
-$('#auditBtn').onclick=async(e)=>{ e.preventDefault(); let rows=[]; try{ rows=await (await api('/api/admin/audit')).json(); }catch{} alert(rows.slice(0,20).map(r=>`${(r.at||'').slice(5,16)}  ${r.ev}  ${r.who||''}${r.ok===false?' (failed)':''}`).join('\n')||'No activity yet.'); };
+$('#auditBtn').onclick=(e)=>{ e.preventDefault(); showActivityLog(); };   // web/activity-log.js (F5-10)
 $('#pSave').onclick=async(e)=>{
   e.preventDefault();
   const body={name:$('#pName').value,about:$('#pAbout').value,prefs:$('#pPrefs').value,briefingEmail:$('#pBriefEmail').value,briefingRetainDays:parseInt($('#pRetainDays').value,10)||30, postcode:$('#pPostcode').value.trim(),
@@ -507,7 +513,7 @@ async function loadShelf(){
   let shelf=[],cand=[];
   try{ shelf=await (await api('/api/admin/shared')).json(); }catch{}
   try{ cand=await (await api('/api/admin/share/candidates')).json(); }catch{}
-  const opts=cand.flatMap(u=>u.apps.map(a=>`<option value="${esc(u.user)}|${esc(a)}">${esc(u.name)} · ${esc(a)}</option>`)).join('');
+  const opts=cand.flatMap(u=>u.apps.map(a=>`<option value="${esc(u.user)}|${esc(a)}">${esc(u.name)} · ${esc((u.titles&&u.titles[a])||a)}</option>`)).join('');   // titles, not slugs (F5-9)
   box.innerHTML='<b>Shared apps (family shelf)</b>'+
     (shelf.map(a=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)">
       <span style="flex:1">${esc(a.title)} <small style="color:var(--muted)">by ${esc(a.sharedBy||'?')}${a.versions?' · '+a.versions+' old ver':''}</small></span>
@@ -521,6 +527,8 @@ async function loadShelf(){
 }
 // TODO(R4): web/settings.js is over budget — Family accounts (loadFamily and its add/approve/reset/
 // remove handlers) is the seam to split into its own web/settings-family.js.
+const AGENT_TOOLS_LABEL='AI 工具 · Agent tools';
+const AGENT_TOOLS_HINT='开启后可使用 Claude/GPT 等能操作电脑的模型；默认只用普通聊天模型 · On: may use Claude/GPT, which act on this computer. Off (default): plain chat models only';
 async function loadFamily(){
   const box=$('#family'); box.style.display='block';
   // min-width:0 + minmax(0,1fr): a phone's 390px fits two inputs; their intrinsic width used to push
@@ -530,6 +538,7 @@ async function loadFamily(){
   box.innerHTML='<b>Family accounts</b>'+list.map(u=>
     `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)">
       <span style="flex:1;min-width:0;overflow-wrap:anywhere">${esc(u.name)} <small style="color:var(--muted)">${u.status==='pending'?'等待批准 · Waiting for approval':u.role}${u.age!=null?' · age '+u.age:''}</small></span>
+      ${u.role!=='owner'&&u.status!=='pending'?`<label style="font-size:12px;display:flex;align-items:center;gap:4px" title="${esc(AGENT_TOOLS_HINT)}"><input type="checkbox" data-agent="${esc(u.id)}"${u.agent?' checked':''}>${AGENT_TOOLS_LABEL}</label>`:''}
       ${u.status==='pending'?`<button class="primary" data-approve="${esc(u.id)}">批准 · Approve</button>`:''}
       ${u.id!=='owner'?`${u.status==='pending'?'':`<button class="plain" data-pw="${esc(u.id)}">重设密码 · Reset password</button>`}<button class="plain" data-del="${esc(u.id)}">×</button>`:''}
     </div>`).join('')+
@@ -556,6 +565,12 @@ async function loadFamily(){
     const g=await relayJson(api('/api/admin/users/'+b.dataset.approve+'/approve',{method:'POST'}),'data');
     if(!g.ok){ alert(g.text); return; }
     loadFamily();
+  });
+  // F4-2: members answer on a plain chat model; the owner opts one into the agent lanes (lib/member-lanes.mjs).
+  { const a=box.querySelector('[data-agent]'); if(a) markNew(a.closest('label'),'member-agent-tools'); }   // the shell's new-control dot (_PA_NEW_KEYS); the label's title is the hint
+  box.querySelectorAll('[data-agent]').forEach(b=>b.onchange=async()=>{
+    const g=await relayJson(api('/api/admin/users/'+b.dataset.agent,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({agent:b.checked})}),'data');
+    if(!g.ok){ b.checked=!b.checked; alert(g.text); }   // R5: the box goes back and the reason is shown
   });
   box.querySelectorAll('[data-pw]').forEach(b=>b.onclick=async(e)=>{
     e.preventDefault();

@@ -30,6 +30,8 @@ header h1{ font-size:18px; white-space:nowrap; min-width:0; overflow:hidden; tex
 .dot{ width:8px; height:8px; border-radius:50%; background:var(--danger); flex-shrink:0; }
 .dot.ok{ background:var(--accent); }
 header .spacer{ flex:1; }
+/* Phone: tighter header so the name is not cut to "M…" (F4-8); setHeaderName drops the product word next. */
+@media (max-width:440px){ header{ gap:4px; padding:12px 10px; } header .ibtn{ padding-left:4px; padding-right:4px; } }
 main{ max-width:720px; width:100%; margin:0 auto; padding:0 16px; flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; }
 #log{ flex:1; min-height:0; overflow-y:auto; padding:8px 0 var(--pill-clear, calc(104px + env(safe-area-inset-bottom,0px))); scroll-padding-bottom:var(--pill-clear, calc(104px + env(safe-area-inset-bottom,0px))); }
 #log{ display:flex; flex-direction:column; gap:10px; }
@@ -109,6 +111,7 @@ form#f > *{ pointer-events:auto; }
 #updBar.on + #offLine.on{ transform:translate(-50%,calc(100% + .4em)); }   /* both lit: the state line sits under the update line */
 button.primary{ background:var(--accent); color:#fff; border:none; border-radius:10px; padding:0 16px; font:inherit; cursor:pointer; }
 #send{ border-radius:999px; width:36px; height:36px; padding:0; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+#send.stop{ font-size:14px; }
 button.plain{ background:none; border:1px solid var(--line); border-radius:8px; padding:4px 10px; color:var(--muted); font:inherit; cursor:pointer; }
 #frame{ position:fixed; inset:0; background:var(--bg); display:none; flex-direction:column; z-index:9; }
 #frame iframe{ flex:1; border:0; width:100%; }
@@ -303,7 +306,7 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
 <aside id="drawer">
   <div class="dhead"><button class="plain" id="goHome" title="主页 · Home">Home</button><button class="plain" id="drawerSearch" title="Search chats" style="margin-right:2px">🔍</button><button class="plain" id="newChat">+ New</button></div>
   <div class="dsec open" id="secApps"><div class="dsec-head">My Apps</div><div class="dsec-body"><div class="d-apps-list" id="dApps"></div></div></div>
-  <div class="dsec open" id="secFamily"><div class="dsec-head">Family Apps</div><div class="dsec-body"><div id="dFamily" class="d-apps-list" style="padding:0 12px 8px"><span style="color:var(--muted);font-size:13px">None shared yet.</span></div></div></div>
+  <div class="dsec open" id="secFamily"><div class="dsec-head">Family Apps</div><div class="dsec-body"><div id="dFamily" class="d-apps-list" style="padding:0 12px 8px"></div></div></div>
   <!-- 简报 · Briefings — a JOB's output. System-level, like the jobs that produce it, so it
        belongs beside My Apps rather than inside any one app. It was previously readable only
        inside the longevity app: an accident of history, since briefings began as a health
@@ -338,7 +341,7 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
   <div id="frow">
     <button class="ibtn" id="plus" type="button" title="Attach">+</button>
     <input id="box" placeholder="Ask, or: create an app that…" autocomplete="off">
-    <button class="primary" id="send">↑</button>
+    <button class="primary" id="send" type="button" title="发送 · Send" aria-label="发送 · Send">↑</button>
   </div>
 </form>
 <input type="file" id="filein-photo" multiple hidden accept="image/*">
@@ -374,7 +377,7 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
 <dialog id="login"><form method="dialog">
   <h3 id="loginTitle" style="margin-bottom:12px">Sign in</h3>
   <input id="luser" placeholder="username" autocapitalize="none" autocomplete="username" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
-  <input id="lpin" type="password" placeholder="密码或 PIN · Password or PIN" autocomplete="current-password" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
+  <input id="lpin" type="password" placeholder="密码 · Password" autocomplete="current-password" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
   <input id="lname" placeholder="Your name" style="display:none;width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
   <input id="ltok" placeholder="访问令牌 · access token" autocomplete="off" style="display:none;width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
   <div id="loginErr" style="color:var(--danger);font-size:13px;min-height:18px"></div>
@@ -571,8 +574,29 @@ function closeDrawer(){ $('#drawer').classList.remove('open'); $('#backdrop').cl
 $('#menu').onclick=openDrawer; $('#backdrop').onclick=closeDrawer;
 $('#newChat').onclick=newConvo; $('#goHome').onclick=goHome;
 
+/* ── Header name (F4-8) ── "Mara’s 管家" when it fits; on a narrow phone just "Mara" — the product word
+   goes first, never the name cut to "M…". Re-fitted whenever the header's width changes. */
+function setHeaderName(name){
+  const h1=document.querySelector('header h1'); if(!h1) return;
+  const product=h1.dataset.product||'管家';
+  h1.dataset.full=name?name+'’s '+product:product; h1.dataset.short=name||product;
+  fitHeaderName();
+}
+function fitHeaderName(){
+  const h1=document.querySelector('header h1'); if(!h1||!h1.dataset.full) return;
+  h1.textContent=h1.dataset.full;
+  if(h1.scrollWidth>h1.clientWidth) h1.textContent=h1.dataset.short;
+}
+if(typeof ResizeObserver==='function') new ResizeObserver(fitHeaderName).observe(document.querySelector('header'));
+
+/* ── Replies never show an account's folder name ── (F4-8) The agent works in workspace-<id>
+   and sometimes says so; people see "your workspace" instead. Display only — the stored text is untouched. */
+const WORKSPACE_DIR_RE=/(?:\/?[\w.~-]+\/)*workspace-[a-z0-9_-]+\b/gi;
+const plainWorkspace=(t)=>String(t).replace(WORKSPACE_DIR_RE,'your workspace');
+
 /* ── Markdown renderer ── */
 function renderMd(raw){
+  raw=plainWorkspace(raw);
   const he=(s)=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const blocks=[]; let s=raw.replace(/```(\w*)\n?([\s\S]*?)```/g,(_,lang,code)=>{
     blocks.push(`<pre><code>${he(code.replace(/\n$/,''))}</code></pre>`);
@@ -640,7 +664,7 @@ const ACCOUNT_REMOVED_CODE='account_removed', ACCOUNT_REMOVED_TEXT='你的账号
 let accountRemoved=false;
 async function ping(signal){ if(!T) return false; const t0=T; let r; try{ r=await api('/api/ping',signal?{signal}:{}); }catch{ if(T===t0&&!signal) PAOffline.noteNet(false); return 'offline'; } if(T!==t0) return false;   // the session changed while this ping ran: its answer is not ours to apply
   if(signal){ let j0; try{ j0=await r.clone().json(); }catch{ return false; } if(T!==t0||!j0||!((r.ok&&typeof j0.ok==='boolean')||r.status===401)) return false; }   // a re-check needs the NODE: its ping reply or its 401 bad-token; a gateway error or HTML page does not count
-  PAOffline.noteNet(true); try{ const j=await r.json(); if(T!==t0) return false; accountRemoved=r.status===401&&j.code===ACCOUNT_REMOVED_CODE; if(accountRemoved){ T=null; try{ localStorage.removeItem('pa_session'); localStorage.removeItem(SW_UID_KEY); }catch{ /* blocked storage: nothing was kept to reopen offline */ } } if(j.ok){ UID=j.uid; PASW.remember(SW_UID_KEY,j.uid); const h1=document.querySelector('h1'); if(j.name) h1.textContent=j.name+'’s '+(h1.dataset.product||'管家'); else if(h1.dataset.product) h1.textContent=h1.dataset.product; } return j.ok; }catch{ return false; } }
+  PAOffline.noteNet(true); try{ const j=await r.json(); if(T!==t0) return false; accountRemoved=r.status===401&&j.code===ACCOUNT_REMOVED_CODE; if(accountRemoved){ T=null; try{ localStorage.removeItem('pa_session'); localStorage.removeItem(SW_UID_KEY); localStorage.removeItem(SW_FAMILY_KEY); }catch{ /* blocked storage: nothing was kept to reopen offline */ } } if(j.ok){ UID=j.uid; PASW.remember(SW_UID_KEY,j.uid); setHeaderName(j.name); rememberFamily({name:j.name}); } return j.ok; }catch{ return false; } }
 // Offline is set by one failed request, and only a later success clears it. On a screen that makes no
 // requests (the home grid) that never came, so the line stayed on with the network back (owner 2026-11-21).
 // While offline and visible, ask the node again on a short beat, on return to the app and on 'online'.
@@ -683,23 +707,26 @@ async function doSetup(){
 }
 async function ensureToken(){
   // Offline-first: with no node at all, the last sign-in on this device stands (web/sw-client.js); a refused token still signs in again.
-  if(T){ const p=await ping(); if(p===true||(p==='offline'&&(UID=PASW.recall(SW_UID_KEY)))){ $('#dot').classList.add('ok'); return; } }
+  if(T){ const p=await ping(); if(p===true||(p==='offline'&&(UID=PASW.recall(SW_UID_KEY)))){ if(p==='offline') setHeaderName(recallFamily().name); $('#dot').classList.add('ok'); return; } }
   // No live session here: whatever the last account left (cached app pages, the app cookie) goes first (ADR 0037).
   // Offline it may not reach the node; the next signed-out boot tries again, so a failure is only noted on the line.
   await swSignedOut(window.caches,(u)=>fetch(u,{method:'POST',credentials:'same-origin'})).catch(()=>PAOffline.noteNet(false));
+  // Escape must not leave the app live with no account (F5-13): refuse cancel, and since Chrome lets a
+  // repeated Escape skip cancel, reopen any close that was not the flow's own close('done').
+  for(const d of ['#setup','#login']){ const el=$(d); el.addEventListener('cancel',(ev)=>ev.preventDefault()); el.addEventListener('close',()=>{ if(el.returnValue!=='done'&&!document.querySelector('dialog[open]')) el.showModal(); el.returnValue=''; }); }   // another open modal (the demo card, lib/demo-boot.mjs) owns the screen: leave it
   let first=false; try{ first=(await (await fetch('/api/setup-status')).json()).needsSetup; }catch{}
   if(first){
-    for(;;){ const done=await new Promise((d)=>{ $('#setup').showModal(); $('#setupBtn').onclick=async(ev)=>{ ev.preventDefault(); if(await doSetup()){ $('#setup').close(); d(true); } }; }); if(done && await ping()) break; }
+    for(;;){ const done=await new Promise((d)=>{ $('#setup').showModal(); $('#setupBtn').onclick=async(ev)=>{ ev.preventDefault(); if(await doSetup()){ $('#setup').close('done'); d(true); } }; }); if(done && await ping()) break; }
     $('#dot').classList.add('ok'); return;
   }
   setLoginMode(false); if(accountRemoved) $('#loginErr').textContent=ACCOUNT_REMOVED_TEXT;   // only this browser's own (removed) session gets the code
   for(;;){
-    const done=await new Promise((d)=>{ $('#login').showModal(); $('#loginBtn').onclick=async(ev)=>{ ev.preventDefault(); if(await doAuth()){ $('#login').close(); d(true); } }; });
+    const done=await new Promise((d)=>{ $('#login').showModal(); $('#loginBtn').onclick=async(ev)=>{ ev.preventDefault(); if(await doAuth()){ $('#login').close('done'); d(true); } }; });
     if(done && await ping()) break;
   }
   $('#dot').classList.add('ok');
 }
-async function logout(){ try{ await api('/api/logout',{method:'POST'}); }catch{} try{ await swSignedOut(window.caches,(u)=>fetch(u,{method:'POST',credentials:'same-origin'})); }catch(err){ alert('未能清除已保存的应用页面 · Could not clear saved app pages — '+(err&&err.message||err)); } localStorage.removeItem('pa_session'); location.reload(); }
+async function logout(){ try{ await api('/api/logout',{method:'POST'}); }catch{} try{ await swSignedOut(window.caches,(u)=>fetch(u,{method:'POST',credentials:'same-origin'})); }catch(err){ alert('未能清除已保存的应用页面 · Could not clear saved app pages — '+(err&&err.message||err)); } localStorage.removeItem('pa_session'); try{ localStorage.removeItem(SW_FAMILY_KEY); }catch{ /* blocked storage: nothing was kept */ } location.reload(); }
 
 /* ── New-feature key registry: maps feature-key → version added ── */
 // Update this when shipping new UI features; markNew() + PANewDot.mark() use these keys.
@@ -722,6 +749,8 @@ window._PA_NEW_KEYS={
   'agent-address':'v2.7.0',          // Agent email · 管家邮箱 read-only address in the owner profile
   'jobs-section':'v2.9.0',           // Jobs · 任务 status + Run now · 立即运行 in the profile
   'node-settings':'v2.9.0',          // Node settings · 节点设置 owner config surface in the profile
+  'member-agent-tools':'v5.0.0',     // AI 工具 · Agent tools opt-in per member in Family accounts (F4-2)
+  'node-advanced':'v5.1.0',          // 高级 · Advanced fold for API keys in Node settings
 };
 
 /* ── Global font scale for apps ── */
@@ -1199,22 +1228,34 @@ async function checkAndAutoUpdate(apps){
 }
 
 // TODO(R4): index.html is far over budget; the drawer's app sections (loadApps/loadFamilyApps) are the seam to split out.
+const FAMILY_NONE='还没有共享的应用 · None shared yet.';
+const FAMILY_OFFLINE='离线 · Offline — 上次保存的列表 · the last saved list';
+const FAMILY_UNREADABLE='离线 · Offline — 家庭应用暂时无法加载 · Family Apps cannot load right now';
+// The header name and Family Apps from the last online load, kept per account so another sign-in on this device never sees them.
+const recallFamily=()=>{ const v=PASW.recall(SW_FAMILY_KEY); return v&&v.uid===UID?v:{}; };
+const rememberFamily=(part)=>{ if(UID) PASW.remember(SW_FAMILY_KEY,{...recallFamily(),...part,uid:UID}); };
 const DEMO_FAMILY_NOTE='家庭应用仅在私有部署的 superelf 上可用 · Family Apps are available on a privately hosted superelf';
 async function loadFamilyApps(){
   // The demo node (lib/demo-boot.mjs sets PADemoAuth) has no family: a muted note, no /api/family-apps request.
   if(window.PADemoAuth){ const d=$('#dFamily'); d.textContent=''; const n=document.createElement('span'); n.id='dFamilyDemo'; n.style.cssText='color:var(--muted);font-size:13px'; n.textContent=DEMO_FAMILY_NOTE; d.appendChild(n); return; }
-  let apps=[]; try{ apps=await (await api('/api/family-apps')).json(); }catch{}
-  let myNames=new Set(); try{ (await (await api('/api/apps')).json()).forEach(a=>myNames.add(a.name)); }catch{}
+  // Offline (F5-7): the list from the last online load, marked as such — never "None shared yet." for a list we could not read.
+  let apps=[], offline=false;
+  let denied=false;   // 401/403 is the server saying no, not offline: the saved list is dropped, never shown (GPT review)
+  try{ const r=await api('/api/family-apps'); if(r.status===401||r.status===403){ denied=true; try{ localStorage.removeItem(SW_FAMILY_KEY); }catch{ /* blocked storage: nothing was kept */ } } if(!r.ok) throw new Error('HTTP '+r.status); apps=await r.json(); if(!Array.isArray(apps)) throw new Error('bad list'); rememberFamily({apps}); }
+  catch{ offline=!denied; apps=denied?null:(recallFamily().apps||null); }   // R5: the failure is shown below (the offline mark, or the could-not-load line)
+  let myNames=new Set(); try{ (await (await api('/api/apps')).json()).forEach(a=>myNames.add(a.name)); }catch{ (PASW.recall(SW_APPS_KEY)||[]).forEach(a=>myNames.add(a.name)); }
   const el=$('#dFamily');
-  if(!apps.length){ el.innerHTML='<span style="color:var(--muted);font-size:13px">None shared yet.</span>'; return; }
-  el.innerHTML=apps.map(a=>{
-    const isOwn=a.uid===UID, have=myNames.has(a.slug);
+  if(!apps){ el.innerHTML=`<span style="color:var(--muted);font-size:13px">${FAMILY_UNREADABLE}</span>`; return; }
+  const mark=offline?`<div class="fc-offline" style="color:var(--muted);font-size:12px;margin-bottom:6px">${FAMILY_OFFLINE}</div>`:'';
+  if(!apps.length){ el.innerHTML=mark+`<span style="color:var(--muted);font-size:13px">${FAMILY_NONE}</span>`; return; }
+  el.innerHTML=mark+apps.map(a=>{
+    const have=myNames.has(a.slug);   // never your own app: the node lists each app once (F4-6)
     return`<div class="family-card" style="margin-bottom:6px">
-      <div class="fc-info"><b>${esc(a.title)}</b><small>${esc(a.desc)}</small><div class="fc-author">by ${esc(a.author)}${isOwn?' (you)':''}</div></div>
+      <div class="fc-info"><b>${esc(a.title)}</b><small>${esc(a.desc)}</small><div class="fc-author">by ${esc(a.author)}</div></div>
       <div class="fc-btns">
         <button class="plain" style="font-size:12px;padding:3px 8px" data-fopen="${esc(a.uid)}" data-fslug="${esc(a.slug)}" data-ftitle="${esc(a.title)}">Open</button>
-        ${!isOwn&&!have?`<button class="plain" style="font-size:12px;padding:3px 8px" data-ffork="${esc(a.uid)}" data-fslug="${esc(a.slug)}">Fork</button>`:''}
-        ${have&&!isOwn?`<small style="color:var(--accent);font-size:11px">✓</small>`:''}
+        ${!have?`<button class="plain" style="font-size:12px;padding:3px 8px" data-ffork="${esc(a.uid)}" data-fslug="${esc(a.slug)}">Fork</button>`:''}
+        ${have?`<small style="color:var(--accent);font-size:11px">✓</small>`:''}
       </div>
     </div>`;
   }).join('');
@@ -1299,7 +1340,7 @@ async function relayReminderRemove(m,deps){
      {ok:false, code:'bad-request',  error, status}                  other 4xx, or a path this shell refuses
      {ok:false, code:'relay-error',  error}                          a fault inside this shell — still NOT 'not-found'
      {ok:false, code:'cancelled',    error}                          the app withdrew it (chat-cancel) — NOT 'network' */
-const DEMO_SIGNIN_CODE='demo_signin', DEMO_SIGNIN_EVENT='pa-demo-signin';   // R3: = SIGNIN_CODE (lib/demo-auth.mjs) and SIGNIN_EVENT (lib/demo-boot.mjs), pinned by test/demo-signin-prompt.test.mjs
+const DEMO_SIGNIN_CODE='demo_signin', DEMO_SIGNIN_EVENT='pa-demo-signin', DEMO_SIGNIN_ANSWER='登录后获得回答 · Sign in to get an answer';   // R3: = SIGNIN_CODE (lib/demo-auth.mjs) and SIGNIN_EVENT (lib/demo-boot.mjs), pinned by test/demo-signin-prompt.test.mjs
 const RELAY_NOT_FOUND='not found';                              // the legacy error string, pinned once (R3)
 const RELAY_CANCELLED='已取消 · Cancelled';                      // == PAC_CANCELLED in web/chat-ui.inline.html (test/chat-cancel.test.mjs)
 /* ── The noun table（名词表）— WHAT was refused ─────────────────────────────────────────
@@ -1881,6 +1922,7 @@ window.addEventListener('message',async(e)=>{
     } else if(m.kind==='bible-search'){
       reply(await relayCall('/api/bible-search?q='+encodeURIComponent(m.q||''),undefined,'json','results'));
     } else if(m.kind==='bible'){
+      if(typeof PASW!=='undefined'&&PASW.noteBook) PASW.noteBook(m.book);   // the book being read goes first in the offline prefetch (F3-15, web/sw-client.js)
       reply(await relayCall('/api/bible?book='+encodeURIComponent(m.book)+'&chapter='+encodeURIComponent(m.chapter),undefined,'json','data'));
     } else if(m.kind==='chat'){
       // Relay the real chat pipeline (persistence, sessions, streaming) to the app.
@@ -2385,6 +2427,23 @@ function pollForResult(id, afterMs, statusEl, outEl, onSettled){
   },4000);
 }
 
+// Stop · 停止 (F4-3). While a turn runs and the composer is empty, the send button is Stop and asks
+// the server to end that conversation's turn (POST /api/chat/stop; lib/turn-stop.mjs); the stream
+// then ends with "已取消 · Cancelled". Typing turns it back into Send, and Enter always sends — the
+// server queues a follow-up behind the running turn. TODO(R4 seam): leaves with submitSend for a composer module.
+const SEND_LABEL='发送 · Send', STOP_LABEL='停止 · Stop';
+let turnsRunning=0;
+function paintSendBtn(){
+  const b=$('#send'), stop=turnsRunning>0&&!$('#box').value.trim()&&!attachments.length;
+  b.classList.toggle('stop',stop); b.textContent=stop?'■':'↑'; b.title=stop?STOP_LABEL:SEND_LABEL; b.setAttribute('aria-label',b.title);
+}
+async function stopTurn(){
+  while(!convoId&&convoIdWait) await convoIdWait;   // a tap before the turn named its conversation waits for it, never a silent no-op
+  if(!convoId) return;   // the turn ended without naming one: nothing is running to stop
+  try{ const r=await api('/api/chat/stop',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({convoId})});
+    if(!r.ok) throw new Error('HTTP '+r.status); }
+  catch(e){ add('err','⚠ 无法停止 · Could not stop — '+((e&&e.message)||'')); }   // R5: said, never silent
+}
 /* ── Send ── */
 // A send made before the running one has learned its conversation id would go out with
 // convoId=null and start a NEW conversation, losing all context. It waits for the {type:'convo'}
@@ -2394,11 +2453,15 @@ let convoIdWait=null;
 async function submitSend(){
   const q=$('#box').value.trim();
   if(!q&&!attachments.length) return;
+  turnsRunning++; paintSendBtn();
+  try{ await sendTurn(q); }finally{ turnsRunning--; paintSendBtn(); }
+}
+async function sendTurn(q){
   lastPromptText=q;
   const fileAtts=attachments.filter(a=>a.path).map(a=>({name:a.name,path:a.path}));
   const attsBefore=attachments.slice();          // buildMessage() clears the composer; a rejected send puts it back
   const msg=buildMessage(q||'(see attached files)');
-  $('#box').value='';
+  $('#box').value=''; paintSendBtn();   // emptied by code, no input event: Stop shows now
   const shown=q||(attachments.length?`[${attachments.length} file(s)]`:'');
   const userEl=add('me',shown); if(q) addActions(userEl,'prompt',q); renderAtts(userEl,fileAtts);
   const status=add('status',''); let out=null, acc='', rlast=0;
@@ -2429,7 +2492,11 @@ async function submitSend(){
     // removed, a .msg.err line), and the message goes back into the composer.
     if(!res.ok){
       const f=await relayHttpFail(res);
-      stopEl(); status.remove(); userEl.remove();
+      stopEl(); status.remove();
+      // Demo guest (F1-8): the question stays in the chat, with an inline button that opens the sign-in.
+      if(f.signin){ const b=document.createElement('button'); b.type='button'; b.className='demo-answer'; b.textContent=DEMO_SIGNIN_ANSWER;
+        b.onclick=()=>dispatchEvent(new Event(DEMO_SIGNIN_EVENT)); add('err','⚠ '+relayText(f,sentBytes)).appendChild(b); return; }
+      userEl.remove();
       add('err','⚠ '+relayText(f,sentBytes));
       restoreComposer(q,attsBefore);
       return;
@@ -2476,6 +2543,8 @@ async function submitSend(){
 }
 
 $('#f').onsubmit=(e)=>{ e.preventDefault(); submitSend(); };
+$('#send').onclick=()=>{ if($('#send').classList.contains('stop')) stopTurn(); else submitSend(); };
+$('#box').addEventListener('input',paintSendBtn);
 
 /* ── Shell composer: model pill + Verify toggle ── */
 let SHELL_CURMODEL=null, shellVerifyOn=false;
@@ -2503,6 +2572,7 @@ function renderShellVfy(){ const btn=$('#shellVfy'); btn.textContent=(shellVerif
 $('#shellVfy').onclick=()=>{ shellVerifyOn=!shellVerifyOn; renderShellVfy(); };
 
 /* PA_SETTINGS_JS */
+/* PA_ACTIVITY_JS */
 
 /* ── Scroll-to-bottom button ── */
 const scrollBtn=document.createElement('button'); scrollBtn.id='scrollBtn'; scrollBtn.title='Scroll to bottom'; scrollBtn.textContent='↓'; document.body.appendChild(scrollBtn);
@@ -2543,6 +2613,7 @@ $('#reload').onclick=()=>{ try{ sessionStorage.setItem('pa_refreshing','1'); }ca
   if(!convoId) showEmptyState();
   if(refreshing){ try{ sessionStorage.removeItem('pa_refreshing'); }catch{} $('#reload').classList.remove('spin'); }
   reopenAfterUpdate();   // the app that was open when PAUpdate reloaded the page (web/update.js)
+  openFromLink();        // a direct app link opened while signed out (F2-11, web/update.js)
   PASW.prefetch(UID);    // background: the app pages and the Bible corpus into the bundle (web/sw-client.js)
   // Apply new-feature dots on shell elements after login
   markNewSel('#settings','ver-changelog');

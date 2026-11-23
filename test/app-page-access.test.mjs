@@ -121,3 +121,15 @@ test('POST /app/-/signout ends the app cookie\'s session even when /api/logout n
   assert.equal((await get('/app/alice/diary/', { cookie })).status, 404, 'the cookie is dead');
   assert.equal((await get('/api/ping', bearer(token))).status, 401, 'and so is its session');
 });
+
+// F2-11: a direct link opened in a browser tab goes to the shell (sign-in if needed), then the app.
+test('top-level page load of an app link → 302 to the shell with #open=<uid>/<slug>, alike for hidden, missing, shared and signed-in; iframe and code: as before', async () => {
+  const doc = { 'sec-fetch-dest': 'document' };
+  for (const [p, h] of [['/app/alice/diary/', {}], ['/app/alice/diary/index.html', {}], ['/app/alice/diary', {}], ['/app/alice/nosuch/', {}], ['/app/alice/pub/', {}], ['/app/alice/diary/', bearer(TOK_B)], ['/app/alice/diary/', bearer(TOK_A)]]) {
+    const r = await get(p, { ...doc, ...h });
+    assert.equal(r.status, 302, p); assert.match(r.headers.get('location'), /^\/#open=alice\/(diary|nosuch|pub)$/, p);
+  }
+  assert.equal((await get('/app/alice/diary/', { 'sec-fetch-dest': 'iframe' })).status, 404, 'the shell iframe, signed out: 404 as before');
+  assert.equal((await get('/app/alice/diary/', { 'sec-fetch-dest': 'iframe', ...bearer(TOK_A) })).status, 200, 'control: the author\'s iframe load');
+  assert.equal((await get('/app/alice/diary/app.js', doc)).status, 404, 'code is never redirected');
+});

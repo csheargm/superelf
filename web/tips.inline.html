@@ -14,6 +14,8 @@
          priority:true  goes ahead of every non-priority tip (owner 2026-11-13: "Home moved" must not wait
                         behind older unseen tips), and replaces one already on screen, unseen, so it shows THIS
                         open. Default false: registration order, as before.
+         dismissOnUse:true  the first press or key anywhere on the page also dismisses it for good (F2-07:
+                        the app-bar tip explains a bar that then moves; it must not outstay the first tap).
        PATips.check()   re-look now (a feature that just opened a sheet or dialog calls it)
        PATips.reset()   forget tipsSeen on the account (Settings: Show tips again · 重新显示提示)
        PATips.seen() / PATips.current() / PATips.whenIdle() — for tests and hosts.
@@ -36,6 +38,8 @@
   const CLOSE='关闭 · Dismiss';
   const regs=[];                              // [{id, anchor, text, when}] in registration order
   const MAX_W_PX=320;                         // tip width cap, also bounded by the viewport
+  // The control's whole BAR: a tip clears it, so it never covers the bar's other controls or a wrapped second row (F3-06).
+  const BAR_SEL='.pan-top,.pac-dhead,.pac-lsearch,.paab-bar,[data-tip-bar]';
   let seen=null, failed=false, loading=null, cur=null, shown=false, waiting=false, chain=Promise.resolve();
   const prefs=()=>window.PAAppPrefs;
   const later=f=>(typeof window.requestAnimationFrame==='function'?window.requestAnimationFrame(f):queueMicrotask(f));
@@ -109,9 +113,10 @@
     const W=window.innerWidth||0, H=window.innerHeight||0, w=Math.max(0,Math.min(MAX_W_PX,W-2*EDGE_PX));
     tip.style.width=w+'px'; tip.style.maxWidth=w+'px'; tip.style.left=EDGE_PX+'px'; tip.style.top=EDGE_PX+'px';
     const a=el.getBoundingClientRect(), b=tip.getBoundingClientRect(), h=b.height||0;
+    const bar=typeof el.closest==='function'?el.closest(BAR_SEL):null, v=bar?bar.getBoundingClientRect():a;   // vertical: the bar's edges; horizontal: the control's
     const dx=(b.left||0)-EDGE_PX, dy=(b.top||0)-EDGE_PX;          // containing-block offset (0 when none)
-    let top=a.bottom+GAP_PX;
-    if(top+h>H-EDGE_PX){ const up=a.top-GAP_PX-h; top=up>=EDGE_PX?up:(H-a.bottom>a.top?H-EDGE_PX-h:EDGE_PX); }
+    let top=v.bottom+GAP_PX;
+    if(top+h>H-EDGE_PX){ const up=v.top-GAP_PX-h; top=up>=EDGE_PX?up:(H-v.bottom>v.top?H-EDGE_PX-h:EDGE_PX); }
     const left=Math.max(EDGE_PX,Math.min(a.left,W-EDGE_PX-w));   // clamp into [EDGE, W-EDGE-width]
     tip.style.top=Math.round(Math.max(EDGE_PX,top)-dy)+'px'; tip.style.left=Math.round(left-dx)+'px';
   }
@@ -137,7 +142,7 @@
   function register(o){
     if(!o||typeof o.id!=='string'||!o.id||typeof o.text!=='string'||!o.text||!o.anchor) throw new Error('PATips.register: id, text and anchor required');
     if(!regs.some(r=>r.id===o.id)){
-      const t={id:o.id,anchor:o.anchor,text:o.text,when:typeof o.when==='function'?o.when:null,priority:o.priority===true};
+      const t={id:o.id,anchor:o.anchor,text:o.text,when:typeof o.when==='function'?o.when:null,priority:o.priority===true,dismissOnUse:o.dismissOnUse===true};
       const at=t.priority?regs.findIndex(r=>!r.priority):-1;   // after earlier priority tips, before the rest
       if(at<0) regs.push(t); else regs.splice(at,0,t);
     }
@@ -180,7 +185,13 @@
   if(typeof document.addEventListener==='function'){
     document.addEventListener('transitionend',onScroll,true);   // an ancestor's slide finished: re-place
     document.addEventListener('click',()=>{ follow(); later(check); },true);
+    // The first press anywhere else is the user getting on with the page: the tip is dismissed (seen), so one
+    // that sits over a note's first lines or a group header never stands in the way twice (F3-06). Not swallowed.
+    document.addEventListener('pointerdown',e=>{ if(cur&&shown&&!(cur.tip.contains&&cur.tip.contains(e.target))) dismiss(); },true);
     document.addEventListener('scroll',onScroll,true);
+    // dismissOnUse: a key press also dismisses it (a press already dismisses every tip, above).
+    const used=e=>{ if(cur&&cur.t.dismissOnUse&&!(e&&e.target&&cur.tip.contains&&cur.tip.contains(e.target))) dismiss(); };
+    document.addEventListener('keydown',used,true);
   }
   window.addEventListener('resize',()=>{ if(cur) follow(); else later(check); });
   window.PATips={register,check,reset,dismiss,PREF,CLOSE,
