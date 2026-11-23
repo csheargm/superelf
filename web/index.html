@@ -1428,9 +1428,14 @@ function relayBadPath(){ return {ok:false,code:'bad-request',error:'路径无效
 //   'none' → {ok:true} · 'text' → {ok:true,[key||'text']} · 'json' → {ok:true,[key||'data']}
 //   'blob' → {ok:true,blob} (never postMessage'd — the caller converts it first)
 //   'raw'  → the server's own JSON verbatim (save-data telemetry, /api/ask)
+// An app-data read that may find no file yet asks with ?absent=empty and gets 204, not a 404 console
+// error; it means exactly what the 404 meant. R3: equals DATA_ABSENT_QUERY in lib/appdata.mjs (test/data-absent).
+const DATA_ABSENT_QUERY='absent=empty';
+const dataReadUrl=(rel)=>'/api/data/'+rel.split('/').map(encodeURIComponent).join('/')+'?'+DATA_ABSENT_QUERY;
 async function relayCall(url,opt,as,key){
   let r;
   try{ r=await api(url,opt); }catch(err){ return relayNetFail(err,'request'); }
+  if(r.status===204&&url.endsWith('?'+DATA_ABSENT_QUERY)) return {ok:false,code:'not-found',status:404,error:RELAY_NOT_FOUND};
   if(!r.ok) return await relayHttpFail(r);
   try{
     if(as==='none') return {ok:true};
@@ -1898,7 +1903,7 @@ window.addEventListener('message',async(e)=>{
       // it answers a code, never a bare "not found" (see RELAY-CORE above).
       if(typeof m.path!=='string'||m.path.includes('..')) return reply(relayBadPath());
       // Offline-first: the node first, the on-device mirror when the network fails (web/offline-client.js). TODO(R4 seam): the broker to its own file.
-      reply(await PAOffline.read(appSlug,m.path,()=>relayCall('/api/data/'+appData(m.path).split('/').map(encodeURIComponent).join('/'),undefined,'text','text')));
+      reply(await PAOffline.read(appSlug,m.path,()=>relayCall(dataReadUrl(appData(m.path)),undefined,'text','text')));
     } else if(m.kind==='attach-url'){
       // Return an uploaded attachment as a data URL so a sandboxed app can re-display it on
       // reload (apps can't fetch; blob URLs don't cross origins). Same source as renderAtts.

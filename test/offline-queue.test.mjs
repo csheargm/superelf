@@ -201,7 +201,7 @@ test('broker without IndexedDB (every other suite): a save-data with no node is 
 });
 
 test('wiring in the shell as served: the part last, both broker hooks, the refusal first, the line, boot and ping', () => {
-  assert.match(SHELL, /reply\(await PAOffline\.read\(appSlug,m\.path,\(\)=>relayCall\('\/api\/data\/'\+appData\(m\.path\)/, 'kind data reads through PAOffline');
+  assert.match(SHELL, /reply\(await PAOffline\.read\(appSlug,m\.path,\(\)=>relayCall\(dataReadUrl\(appData\(m\.path\)\)/, 'kind data reads through PAOffline');
   assert.match(SHELL, /reply\(await PAOffline\.write\(appSlug,m\.path,m\.data,\(\)=>relayCall\('\/api\/save-data',\{method:'POST'/, 'kind save-data writes through PAOffline');
   const broker = between(SHELL, '/* ── Broker (for sandboxed apps) ── */', '/* ── Chat log helpers ── */');
   assert.ok(broker.indexOf('const needsNode=PAOffline.refuse(m.kind); if(needsNode) return reply(needsNode);') < broker.indexOf("if(m.kind==='pref')"), 'the refusal runs before any kind, inside the try (the frame\'s busy count is released)');

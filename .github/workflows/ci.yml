@@ -85,11 +85,12 @@ jobs:
         # family offline, member tips, ...), skipped on CI by PA_E2E_SKIP; fail 0 on both.
         # 2026-11-23: EVERY OS +1 (ubuntu 129, windows 212): shell-placeholder-e2e.test.mjs (1 Playwright check).
         # 2026-11-23: EVERY OS +1 (ubuntu 130, windows 213): family-offline-e2e service-worker-on offline check.
+        # 2026-11-23: EVERY OS +1 (ubuntu 131, windows 214): bible-reader-e2e no-404 check.
         include:
           - os: ubuntu-latest
-            max_skipped: 130
+            max_skipped: 131
           - os: windows-latest
-            max_skipped: 213
+            max_skipped: 214
     env:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED
