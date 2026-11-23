@@ -98,7 +98,7 @@ form#f{ position:fixed; left:0; right:0; bottom:0; display:flex; flex-direction:
 .chip button{ background:none; border:none; cursor:pointer; color:var(--muted); font-size:15px; padding:0 2px; line-height:1; flex-shrink:0; }
 form#f > *{ pointer-events:auto; }
 #frow{ display:flex; gap:4px; align-items:center; background:var(--card); border:1px solid var(--line); border-radius:999px; padding:4px 4px 4px 6px; box-shadow:0 2px 12px rgba(0,0,0,.25); }
-#box{ flex:1; font:inherit; padding:8px 8px; border:none; border-radius:999px; background:transparent; color:var(--text); outline:none; }
+#box{ flex:1; min-width:0; text-overflow:ellipsis; font:inherit; padding:8px 8px; border:none; border-radius:999px; background:transparent; color:var(--text); outline:none; }
 .ibtn{ background:none; border:none; border-radius:999px; padding:7px 10px; font-size:18px; cursor:pointer; color:var(--muted); line-height:1; flex-shrink:0; }
 @keyframes pa-spin{ to{ transform:rotate(-360deg); } }
 #reload.spin{ animation:pa-spin .8s linear infinite; color:var(--accent); pointer-events:none; }
@@ -340,7 +340,7 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
   <div class="pac-pills"><button class="pac-model" id="shellModel" type="button" style="display:none"></button><button class="pac-vfy" id="shellVfy" type="button" style="display:none">校验 · ☐ Verify</button></div>
   <div id="frow">
     <button class="ibtn" id="plus" type="button" title="Attach">+</button>
-    <input id="box" placeholder="Ask, or: create an app that…" autocomplete="off">
+    <input id="box" placeholder="提问，或：创建一个应用… · Ask, or: create an app that…" autocomplete="off">
     <button class="primary" id="send" type="button" title="发送 · Send" aria-label="发送 · Send">↑</button>
   </div>
 </form>
