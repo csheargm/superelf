@@ -671,7 +671,7 @@ async function doAuth(){
 async function doSetup(){
   const username=$('#sUser').value.trim().toLowerCase(), name=$('#sName').value.trim(), password=$('#sPin').value, setupCode=$('#sCode').value.trim();
   if(!username||!password||!setupCode){ $('#setupErr').textContent='Fill in username, password and setup code · 请填写用户名、密码和初始化码'; return false; }   // length rule: the server's (lib/owner.mjs MIN_PASSWORD)
-  const g=await relayJson(fetch('/api/setup',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username,name,password,setupCode})}),'request');
+  const g=await relayJson(fetch('/api/setup',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username,name,password,setupCode})}),'credentials');   // 403 = wrong setup code: show the server's reason, never "Signed out"
   if(!g.ok){ $('#setupErr').textContent=g.text; return false; }
   const j=g.data;
   if(!j.ok){ $('#setupErr').textContent=j.error||'Setup refused · 初始化被拒绝。'; return false; }
