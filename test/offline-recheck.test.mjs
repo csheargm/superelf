@@ -49,7 +49,7 @@ test('GPT: a session change during the re-check skips the drain', async () => {
 });
 test('GPT: ping drops answers from a replaced session and an aborted ping never marks offline', () => {
   assert.match(SRC, /async function ping\(signal\)\{ if\(!T\) return false; const t0=T; let r; try\{ r=await api\('\/api\/ping',signal\?\{signal\}:\{\}\); \}catch\{ if\(T===t0&&!signal\) PAOffline\.noteNet\(false\);/);
-  assert.match(SRC, /const j=await r\.json\(\); if\(T!==t0\) return false; if\(j\.ok\)\{ UID=j\.uid;/);
+  assert.match(SRC, /const j=await r\.json\(\); if\(T!==t0\) return false; accountRemoved=[^\n]*? if\(j\.ok\)\{ UID=j\.uid;/);
 });
 test('GPT rounds 5-6: a re-check counts only the node JSON (a proxy error or HTML page stays offline; a 401 bad-token is the node)', () => {
   assert.match(SRC, /if\(T!==t0\) return false;[^\n]*\n  if\(signal\)\{ let j0; try\{ j0=await r\.clone\(\)\.json\(\); \}catch\{ return false; \}[^\n]*\n  PAOffline\.noteNet\(true\);/);
