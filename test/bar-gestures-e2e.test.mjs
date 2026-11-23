@@ -2,8 +2,8 @@
 // hasTouch + isMobile, with real touch swipes through CDP Input.dispatchTouchEvent on the shipped Bible and
 // Journal in the real shell. Owner 2026-11-13 (iPhone):
 //   a finger swipe up hides at once (ADR 0036); pull down shows (also an overscroll pull at the very top); shown, the bar hides
-//   itself after IDLE_MS; keepOpen (Note pane, Highlight sheet) holds it; hidden, the page starts at the
-//   safe-area top (no stripe); the Bible's phone labels are one short line; a Pencil never pulls it.
+//   itself after IDLE_MS; keepOpen (Note pane, Highlight sheet) holds it; hidden, the bar is off the top row
+//   and the text does not move (owner 2026-11-23, supersedes "page to the top"); the Bible's phone labels are one short line; a Pencil never pulls it.
 // Without Playwright and its browser the file FAILS, unless PA_E2E_SKIP=1 (see test/helpers-note-link.mjs).
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -95,23 +95,22 @@ for (const slug of ['bible', 'notes']) {
     } finally { await ctx.close(); }
   });
 
-  test(`${slug} phone: hidden, the page starts at the safe-area top — no stripe`, { skip, timeout: 90000 }, async () => {
+  test(`${slug} phone: hidden, the bar slides off the top row and the text stays put`, { skip, timeout: 90000 }, async () => {
     const { ctx, frame } = await open(slug);
     try {
       const top = () => frame.evaluate((s) => {
-        const el = s === '#nav' ? document.getElementById('verses') : document.querySelector('.pan-pageInner');
+        const el = s === '#nav' ? document.querySelector('.verse') : document.querySelector('.pan-pageInner');
         return Math.round(el.getBoundingClientRect().top);
       }, BAR[slug]);
       await frame.evaluate(() => PAAppBar.show()); await frame.waitForTimeout(300);
       const shown = await top();
       assert.ok(shown > 30, `control: shown, the page sits below the bar (${shown}px)`);
       await frame.evaluate(() => PAAppBar.hide()); await frame.waitForTimeout(400);
-      // Playwright's safe-area inset is 0, so the first content row must be row 0 of the frame.
-      assert.ok(Math.abs(await top()) <= 1, `hidden: the page starts at the top (${await top()}px)`);
+      assert.equal(await top(), shown, 'hidden: the text did not move (owner 2026-11-23)');
       const hit = await frame.evaluate((s) => { const e = document.elementFromPoint(innerWidth / 4, 2); return !!(e && e.closest(s)); }, BAR[slug]);
       assert.equal(hit, false, 'the top pixel row is not the bar');
       await frame.evaluate(() => PAAppBar.show()); await frame.waitForTimeout(400);
-      assert.equal(await top(), shown, 'shown again, it is back below the bar');
+      assert.equal(await top(), shown, 'shown again, the text is where it was');
     } finally { await ctx.close(); }
   });
 

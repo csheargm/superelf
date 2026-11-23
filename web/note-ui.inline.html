@@ -1909,14 +1909,14 @@
     // lines sit on the lines; non-ruled templates keep the CSS defaults (line-height 1.6 / 18px).
     // How much of the page's top is hidden behind the pad's own chrome, in SCREEN px — which is
     // the right unit here because the stage is not zoomed.
-    // A bar the host slid away (PAAppBar sets data-paab-hidden, ADR 0035) gives its height back: the page
-    // then starts at the safe-area top, never under a stripe the bar used to fill (owner 2026-11-13, iPhone).
     // TODO(R4 seam): bar clearance + safe-area probe → note-ui/stage-clear part when this file is split.
+    // The PAGE's clearance ignores a hidden bar (owner 2026-11-23: the page jumped up on every hide and back
+    // on every show): the bar slides over the page, the page stays. Only the floating tools follow it.
     function barClearance(){
-      if(topBar&&topBar.getAttribute('data-paab-hidden')==='1') return safeTop();
       return topBar ? topBar.offsetHeight
         : (parseFloat(getComputedStyle(host).getPropertyValue('--pan-dockrow'))||0);
     }
+    function toolsClearance(){ return topBar&&topBar.getAttribute('data-paab-hidden')==='1' ? safeTop() : barClearance(); }
     let satProbe=null;
     function safeTop(){
       if(!satProbe){ satProbe=document.createElement('div'); satProbe.setAttribute('aria-hidden','true');
@@ -4262,7 +4262,7 @@
 
     // Position the floating tools bar below the top bar when one is present (measured, so it
     // tracks the real bar height incl. safe-area). No top bar → CSS default (safe-area + 8px).
-    function syncToolsTop(){ if(!topBar) return; const h=barClearance(); if(h||topBar.getAttribute('data-paab-hidden')==='1') host.style.setProperty('--pan-toolstop',(h+8)+'px'); }
+    function syncToolsTop(){ if(!topBar) return; const h=toolsClearance(); if(h||topBar.getAttribute('data-paab-hidden')==='1') host.style.setProperty('--pan-toolstop',(h+8)+'px'); }
     // The host hiding / showing the bar (data-paab-hidden) moves the page and the floating tools with it.
     if(topBar&&window.MutationObserver) new MutationObserver(()=>{ applyTextMetrics(); syncToolsTop(); })
       .observe(topBar,{attributes:true,attributeFilter:['data-paab-hidden']});
