@@ -19,7 +19,7 @@
 <script id="pif-script">
 (function(){
   if(window.PAInkFrame) return;
-  const BURST_MS=1500;   // a stroke started this soon after the last one is the same writing (on the LAST stroke's line)
+  const BURST_MS=1500;   // a stroke started this soon after the last one, on the same line, is the same writing
   const NEAR=16;         // px: and it starts this close to the last stroke's box (two quick underlines on two words are not writing)
   const SMALL=60;        // px: a stroke this small either way is a piece of a letter, not a mark around a word
   const NEIGHBOR=2;      // an old letter-piece joins the writing when a whole-line piece is this near in the list
@@ -83,71 +83,9 @@
   }
   // A new stroke joins the writing in progress: same line, started soon after, both pieces small, and
   // drawn right beside the last one (boxes {l,t,r,b} in the list's px).
-  // `prev.box` is the writing in progress (the caller widens it with union): a dot near the word, not only
-  // near the last stroke, is still the word.
-  const union=(a,b)=>({l:Math.min(a.l,b.l),t:Math.min(a.t,b.t),r:Math.max(a.r,b.r),b:Math.max(a.b,b.b)});
   const gap=(a,b)=>Math.max(0,a.l-b.r,b.l-a.r,a.t-b.b,b.t-a.b);
-  // NOT same-line only: a dot of a character just over the line boundary is the same word, and the
-  // caller puts it on the last stroke's line (owner, Romans 7:5-6, landscape→portrait, 2026-11-22).
-  // Across lines only from WRITING already on a line frame: a quick underline on the English words and
-  // then a mark on the Chinese words below are two marks, each on its own line (GPT review).
   function joinsBurst(prev,now,g,ext,box){
-    return !!(prev&&prev.g&&prev.g.verse!=null&&(sameLine(prev.g,g)||isLine(prev.g))&&now-prev.t<=BURST_MS&&isSmall(prev.ext)&&isSmall(ext)&&gap(prev.box,box)<=NEAR);
-  }
-  // The burst a new stroke joins and, across lines, the line it moves to ({burst, el}). Across lines only
-  // through the boundary: the new stroke or the writing in progress reaches past its own line's text
-  // (rects in the list's px); two marks each inside its own line are two notes (GPT review).
-  const outside=(b,r)=>!!r&&(b.t<r.top||b.b>r.top+r.height);
-  function burstOf(prev,now,g,ext,box,own,lineEl,local){
-    if(!joinsBurst(prev,now,g,ext,box)) return {burst:false,el:null};
-    if(sameLine(prev.g,g)) return {burst:true,el:null};
-    const el=lineEl(prev.g.verse,prev.g.lang), pr=el&&local(el.getBoundingClientRect());
-    return el&&(outside(box,own)||outside(prev.box,pr))?{burst:true,el}:{burst:false,el:null};
-  }
-  // ── One word, one frame, on READ (old and new records, never rewritten): small handwriting pieces
-  //    within NEAR of each other at the width they were written at, on two ADJACENT lines, are one word;
-  //    the upper of its lines hosts it, and the others are moved onto that line's frame by
-  //    the offset between the two lines' top-lefts at that width (the upper line's height measured on a
-  //    hidden copy at that width + today's gap between them). Pieces two lines away keep their own frame.
-  const wkey=w=>w==null?'':String(Math.round(w));
-  // Offset of line b's top-left from line a's (a directly above b) at width w. Measured on every call to
-  // places() (no memo across calls: the A-/A+ text size changes a line's height at the same width).
-  function lineOffset(env,a,b,w){
-    const ra=env.local(a.getBoundingClientRect()), rb=env.local(b.getBoundingClientRect());
-    return {dx:rb.left-ra.left,dy:env.heightAt(a,w)+(rb.top-(ra.top+ra.height))};
-  }
-  // Two pieces can be one word: line-frame records written at the same width; old (pre-frame) records
-  // carry only each line's own written width (its text's width), so any two whose widths are known.
-  // An old piece's w is its LINE's written width: the upper line's height is measured at the upper's w.
-  const pairable=(A,B)=>A.old===B.old&&(A.old?A.w!=null&&B.w!=null:wkey(A.w)===wkey(B.w));
-  function rehost(items,env){
-    const order=env.lineEls?env.lineEls().map(L=>L.el):[], idx=new Map(order.map((e,i)=>[e,i])), n=items.length, par=items.map((_,i)=>i);
-    const find=i=>par[i]===i?i:(par[i]=find(par[i])), D=new Map();
-    const H=new Map(), hgt=(el,w)=>{ const k=idx.get(el)+'|'+wkey(w); if(!H.has(k)) H.set(k,env.heightAt(el,w)); return H.get(k); };
-    const off=(a,b,w)=>{ const k=idx.get(a)+'|'+wkey(w); if(!D.has(k)) D.set(k,lineOffset(env,a,b,w)); return D.get(k); };
-    // b's frame point in a's frame (a directly above b): p + offset
-    const box=(it,o)=>({l:it.fx+o.dx,t:it.fy+o.dy,r:it.fx+o.dx+it.ext.w,b:it.fy+o.dy+it.ext.h});
-    const Z={dx:0,dy:0};
-    for(let i=0;i<n;i++) for(let j=i+1;j<n;j++){
-      const A=items[i],B=items[j]; if(!A.small||!B.small||!pairable(A,B)) continue;
-      const ia=idx.get(A.el), ib=idx.get(B.el); if(ia==null||ib==null||Math.abs(ia-ib)>1) continue;
-      let ga,gb; if(ia===ib){ ga=box(A,Z); gb=box(B,Z); } else { const [U,L]=ia<ib?[A,B]:[B,A], o=off(U.el,L.el,U.w); ga=box(U,Z); gb=box(L,o);
-        // Across lines only through the boundary: one of the two reaches past its own line's text toward
-        // the other. Two marks each on its own line's text are two notes, however close (GPT review).
-        if(!(ga.b>hgt(U.el,U.w)||L.fy<0)) continue; }
-      if(gap(ga,gb)<=NEAR) par[find(i)]=find(j);
-    }
-    const groups=new Map(); items.forEach((it,i)=>{ const r=find(i); if(!groups.has(r)) groups.set(r,[]); groups.get(r).push(it); });
-    for(const mem of groups.values()){
-      const els=new Set(mem.map(m=>m.el)); if(els.size<2) continue;
-      // The UPPER line hosts, not the one with most pieces: erasing one stroke must never flip the host
-      // and move the rest of the word by a row (GPT review). It changes only when that line's pieces are all gone.
-      let host=null; for(const e of els) if(!host||idx.get(e)<idx.get(host)) host=e;
-      const hi=idx.get(host), hm=mem.find(x=>x.el===host), hk=hm.k;
-      for(const m of mem){ const mi=idx.get(m.el); if(m.el===host||Math.abs(mi-hi)!==1) continue;
-        const o=mi<hi?off(m.el,host,m.w):off(host,m.el,hm.w), sg=mi<hi?-1:1;
-        m.fx+=sg*o.dx; m.fy+=sg*o.dy; m.el=host; m.k=hk; }
-    }
+    return !!(prev&&prev.g&&now-prev.t<=BURST_MS&&sameLine(prev.g,g)&&isSmall(prev.ext)&&isSmall(ext)&&gap(prev.box,box)<=NEAR);
   }
   // A group's place on its line's frame: a line-frame record's own; an old whole-line record's offset
   // (it was measured from the line's top-left); an old letter-piece's characters measured on a copy of
@@ -168,16 +106,15 @@
   // width it was measured at (records are never mutated; a changed width re-measures).
   function places(groups,env){
     const hand=handwriting(groups,g=>{ const el=env.lineEl(g.verse,g.lang); return !!el&&env.wholeOf(g,el); },env.extentOf);
-    const lines=new Map(), out=new Map(), items=[];
+    const lines=new Map(), out=new Map();
     groups.forEach((g,i)=>{
       if(!isLine(g)&&!hand[i]) return;
       const el=env.lineEl(g.verse,g.lang); if(!el) return;
       const w=measuredAt(g,groups,el,env), m=env.memo.get(g);
       const f=m&&m.w===w?m.f:frameOf(g,groups,el,env); if(!m||m.w!==w) env.memo.set(g,{w,f}); if(!f) return;
-      const ext=env.extentOf(g); items.push({g,el,k:g.verse+'|'+g.lang,fx:f.fx,fy:f.fy,ext,small:isSmall(ext),old:!isLine(g),w:isLine(g)?g.fw:writtenWidth(groups,g,x=>env.wholeOf(x,el))});
+      const k=g.verse+'|'+g.lang; if(!lines.has(k)) lines.set(k,{el,items:[]});
+      lines.get(k).items.push({g,fx:f.fx,fy:f.fy,ext:env.extentOf(g)});
     });
-    if(env.heightAt) rehost(items,env);
-    for(const it of items){ if(!lines.has(it.k)) lines.set(it.k,{el:it.el,items:[]}); lines.get(it.k).items.push(it); }
     for(const {el,items} of lines.values()){ const r=env.local(el.getBoundingClientRect()); placeLine(r,env.colW(r),items).forEach((at,i)=>out.set(items[i].g,at)); }
     return out;
   }
@@ -200,14 +137,8 @@
       try{ const r=o.measurer(c).anchorRect(s,e,gw), cr=c.getBoundingClientRect(); return r&&r.width>0?{left:r.left-cr.left,top:r.top-cr.top}:null; }
       finally{ if(w) c.parentNode.removeChild(c); }
     }
-    // A line's height at width w (null: today's), on a hidden copy as measureAt measures.
-    function heightAt(el,w){
-      if(!w) return el.getBoundingClientRect().height;
-      const c=el.cloneNode(true); c.style.cssText='position:absolute;visibility:hidden;left:0;top:0;width:'+w+'px'; el.parentNode.appendChild(c);
-      try{ return c.getBoundingClientRect().height; } finally{ c.parentNode.removeChild(c); }
-    }
-    return {lineEl:o.lineEl,lineEls:o.lineEls,local:o.local,colW,measureAt,heightAt,wholeOf,extentOf,memo:new WeakMap()};
+    return {lineEl:o.lineEl,local:o.local,colW,measureAt,wholeOf,extentOf,memo:new WeakMap()};
   }
-  window.PAInkFrame={env,NEAR,isSmall,bboxOf,isScrub,hitGroups,extentOf,SCRUB,ERASE_HIT,BURST_MS,SMALL,NEIGHBOR,isLine,sameLine,handwriting,writtenWidth,placeLine,joinsBurst,frameOf,places,toLine,rehost,union,burstOf};
+  window.PAInkFrame={env,NEAR,isSmall,bboxOf,isScrub,hitGroups,extentOf,SCRUB,ERASE_HIT,BURST_MS,SMALL,NEIGHBOR,isLine,sameLine,handwriting,writtenWidth,placeLine,joinsBurst,frameOf,places,toLine};
 })();
 </script>
