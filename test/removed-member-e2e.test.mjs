@@ -21,7 +21,7 @@ const REMOVED_TEXT = '你的账号已被移除 · Your account was removed';
 test('Sessions.removeUser: the sessions stop working but say "removed" until they expire; logout forgets', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pa-sess-'));
   try {
-    const s = new Sessions(path.join(dir, 's.json')), now = 1_000;
+    const now = 1_000, s = new Sessions(path.join(dir, 's.json'), now);
     const a = s.create('mia', now), b = s.create('leo', now);
     s.removeUser('mia');
     assert.equal(s.resolve(a, now), null, 'a removed member is signed out');
@@ -29,7 +29,7 @@ test('Sessions.removeUser: the sessions stop working but say "removed" until the
     assert.equal(s.wasRemoved(b, now), false, 'another member is untouched');
     assert.equal(s.resolve(b, now), 'leo');
     assert.equal(s.wasRemoved('never-issued', now), false, 'an unknown token says nothing');
-    assert.equal(new Sessions(path.join(dir, 's.json')).wasRemoved(a, now), true, 'kept across a restart');
+    assert.equal(new Sessions(path.join(dir, 's.json'), now).wasRemoved(a, now), true, 'kept across a restart');
     assert.equal(s.wasRemoved(a, now + 31 * 24 * 3600 * 1000), false, 'gone once the session would have expired');
     const c = s.create('kit', now); s.removeUser('kit'); s.destroy(c);
     assert.equal(s.wasRemoved(c, now), false, 'sign-out forgets the mark');
