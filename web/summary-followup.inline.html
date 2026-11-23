@@ -17,8 +17,8 @@
 <script id="psf-script">
 (function(){
   if(window.PASummaryFollowup) return;
-  const TXT=Object.freeze({ researching:'正在研究待办 · Researching to-dos', added:'已添加跟进 · Follow-up added — {n} 项待办 · {n} to-dos',
-    partial:'已添加跟进（部分失败） · Follow-up added (partial) — {n} 项待办 · {n} to-dos', none:'没有待办 · No open to-dos',
+  const TXT=Object.freeze({ researching:'正在研究待办 · Researching to-dos', added:'已添加跟进 · Follow-up added — {n} 项待办 · {todos}',
+    partial:'已添加跟进（部分失败） · Follow-up added (partial) — {n} 项待办 · {todos}', none:'没有待办 · No open to-dos',
     failed:'跟进失败 · Follow-up failed — {e}', notSaved:'跟进未保存 · Follow-up not saved — {e}', noBroker:'无通道 · no broker', gone:'该总结笔记已删除 · its summary note was deleted', via:' — 经 {lane} · via {lane}' });
   const fill=(s,o)=>String(s).replace(/\{(\w+)\}/g,(_,k)=>String(o[k]==null?'':o[k]));
   const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -29,7 +29,8 @@
   const LINK_RE=/\[([^\]\n]{1,120})\]\((https?:\/\/[^)\s]{1,500})\)/g, TOKEN=i=>'PSFLINK'+i+'X';
   function block(r){
     const links=[]; const t=String(r.text||'').replace(LINK_RE,(m,a,u)=>TOKEN(links.push('<a href="'+esc(u)+'">'+esc(a)+'</a>')-1));
-    return '<h3>'+esc(r.heading)+'</h3>'+md(t).replace(/PSFLINK(\d+)X/g,(m,i)=>links[Number(i)]||m);
+    const out='<h3>'+esc(r.heading)+'</h3>'+md(t).replace(/PSFLINK(\d+)X/g,(m,i)=>links[Number(i)]||m);
+    return window.PASummaryRefs&&typeof window.PASummaryRefs.untagHtml==='function'?window.PASummaryRefs.untagHtml(out):out;   // quoted #tags are not the note's (F3-14)
   }
   async function run(o){
     const x=o||{}; if(!x.bar||!x.hooks||typeof x.hooks.saveNote!=='function') return {ok:false,status:''};
@@ -45,7 +46,7 @@
     try{ s=await x.hooks.saveNote({id:x.id,title:x.title,html,period:x.period,scope:x.scope,convoId:x.convoId||null,quiet:true}); }catch(e){ s={ok:false,error:String((e&&e.message)||e)}; }
     if(!s||!s.ok) return {ok:false,status:say(fill(TXT.notSaved,{e:(s&&s.gone)?TXT.gone:(s&&s.error)||''})),html};
     const via=typeof r.writerFallback==='string'&&r.writerFallback?fill(TXT.via,{lane:r.writerFallback}):'';   // said only when the first writer lane failed
-    return {ok:true,status:say(fill(r.partial===true?TXT.partial:TXT.added,{n})+via),html,partial:r.partial===true};
+    return {ok:true,status:say(fill(r.partial===true?TXT.partial:TXT.added,{n,todos:n+(n===1?' to-do':' to-dos')})+via),html,partial:r.partial===true};
   }
   window.PASummaryFollowup={run,block,TXT};
 })();

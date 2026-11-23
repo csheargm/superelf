@@ -36,13 +36,13 @@ export let port;                                         // live binding: set by
 let root, web, browser;
 
 // The Journal, as shipped, under each slug in `slugs` (a slug off the link list is a control).
-export async function setup({ slugs = ['notes'] } = {}) {
+export async function setup({ slugs = ['notes'], from = path.join('shared-apps', 'notes') } = {}) {   // from: the Journal copy to install (the template carries ownBar)
   if (skip) return;
   port = await freePort(); root = mkWebRoot({ port });
   for (const slug of slugs) {
     const app = path.join(root, 'workspace', 'apps', slug);
     fs.mkdirSync(app, { recursive: true });
-    for (const f of ['index.html', 'meta.json']) fs.copyFileSync(path.join(REPO, 'shared-apps', 'notes', f), path.join(app, f));
+    for (const f of ['index.html', 'meta.json']) fs.copyFileSync(path.join(REPO, from, f), path.join(app, f));
   }
   web = startWeb(root); await waitReady(port);
   browser = await chromium.launch();

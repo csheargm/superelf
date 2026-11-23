@@ -154,10 +154,10 @@
 .pac-lbody{flex:1;min-width:0}
 .pac-lttl{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text,#111)}
 .pac-lprev{font-size:12px;color:var(--muted,#888);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
-.pac-lmeta{display:flex;gap:7px;margin-top:4px;align-items:center}
+.pac-lmeta{display:flex;flex-wrap:wrap;gap:3px 7px;margin-top:4px;align-items:center}/* wraps to a second line rather than squeezing a chip or pushing the time off the row (F3-13) */
 .pac-lsmsg{font-size:12px;color:var(--muted,#888);padding:6px 2px 0}.pac-lsmsg:empty{display:none}
-.pac-lchip{font-size:11px;color:var(--accent,#0a7a5a);background:color-mix(in srgb,var(--accent,#0a7a5a) 12%,transparent);border-radius:5px;padding:1px 6px;font-weight:600}
-.pac-ltime{font-size:11px;color:var(--muted,#888)}
+.pac-lchip{white-space:nowrap;flex-shrink:0;font-size:11px;color:var(--accent,#0a7a5a);background:color-mix(in srgb,var(--accent,#0a7a5a) 12%,transparent);border-radius:5px;padding:1px 6px;font-weight:600}
+.pac-ltime{font-size:11px;color:var(--muted,#888);white-space:nowrap;flex-shrink:0}
 .pac-lmenu{background:none;border:none;color:var(--muted,#888);font-size:17px;padding:0 6px;cursor:pointer;align-self:center;flex-shrink:0}
 .pac-lempty{padding:26px 18px;color:var(--muted,#888);font-size:14px;text-align:center;line-height:1.6}
 .pac-ltabs{display:flex;gap:6px;padding:8px 11px;border-bottom:1px solid var(--line,#e6e6e6);flex-shrink:0}
@@ -397,6 +397,11 @@
   // Native prompt()/confirm() are blocked in sandbox=allow-scripts; use these instead.
   // `host` is the element the .pac-modal overlay is appended to (a Chat host, or a
   // listDrawer host) — module scope so Chat and listDrawer share one implementation (R3).
+  // Escape answers a modal or sheet the way its backdrop tap does (F3-07); the listener leaves with the overlay.
+  // TODO(R4 seam): the in-panel modals (pacPrompt/pacConfirm/pacSheet/escCloses) → their own part.
+  function escCloses(ov,close){ if(typeof document.addEventListener!=='function'||typeof MutationObserver!=='function') return;   // a DOM-free test host has neither
+    const k=e=>{ if(e.key!=='Escape'||!ov.isConnected) return; e.preventDefault(); e.stopPropagation(); close(); };
+    document.addEventListener('keydown',k,true); new MutationObserver((_,mo)=>{ if(!ov.isConnected){ document.removeEventListener('keydown',k,true); mo.disconnect(); } }).observe(ov.parentNode||document.body,{childList:true}); }
   function pacPrompt(host,title,initial){ return new Promise(res=>{
     const ov=document.createElement('div'); ov.className='pac-modal';
     ov.innerHTML='<div class="pac-mbox"><div class="pac-mttl"></div><input class="pac-minp"><div class="pac-mbtns"><button class="pac-mcancel">Cancel</button><button class="pac-mok">Save</button></div></div>';
@@ -414,7 +419,7 @@
     const done=v=>{ ov.remove(); res(v); };
     ov.querySelector('.pac-mcancel').onclick=()=>done(false);
     ov.querySelector('.pac-mok').onclick=()=>done(true);
-    ov.addEventListener('click',e=>{ if(e.target===ov)done(false); }); }); }
+    ov.addEventListener('click',e=>{ if(e.target===ov)done(false); }); escCloses(ov,()=>done(false)); }); }
   // With an anchor element, the menu opens as a POPOVER next to it (clamped to the viewport,
   // outside-tap closes — no Cancel row needed); without one it stays the classic bottom sheet.
   function pacSheet(host,optsArr,anchor){ return new Promise(res=>{
@@ -423,7 +428,7 @@
     const box=document.createElement('div'); box.className='pac-mbox';
     optsArr.forEach((o,i)=>{ const b=document.createElement('button'); b.className='pac-mopt'+(o.del?' del':''); b.textContent=o.label; b.onclick=()=>{ov.remove();res(i);}; box.appendChild(b); });
     if(!anchor){ const c=document.createElement('button'); c.className='pac-mopt'; c.textContent='Cancel'; c.onclick=()=>{ov.remove();res(-1);}; box.appendChild(c); }
-    ov.appendChild(box); ov.addEventListener('click',e=>{ if(e.target===ov){ov.remove();res(-1);} }); host.appendChild(ov);
+    ov.appendChild(box); ov.addEventListener('click',e=>{ if(e.target===ov){ov.remove();res(-1);} }); host.appendChild(ov); escCloses(ov,()=>{ov.remove();res(-1);});
     if(anchor){ const r=anchor.getBoundingClientRect(), bw=box.offsetWidth||190, bh=box.offsetHeight||100;
       box.style.position='absolute'; box.style.width='auto'; box.style.minWidth='170px'; box.style.padding='6px';
       box.style.left=Math.max(8, Math.min(r.left, innerWidth-bw-8))+'px';
@@ -718,9 +723,11 @@
     // TODO(R4 seam): grows this over-budget file by two lines; the seam is buildDrawer → web/drawer-ui.inline.html.
     if(window.PADrawerSummary) window.PADrawerSummary.attach({host,bar:bulkBar,head:q('.pac-dhead'),picked:()=>[..._picked].map(itemOf),items:()=>_items,done:()=>setMulti(false),hooks:c.summary||null});   // head: the header's Summarize (owner 2026-11-11)
 
+    // A tap outside closes the docked list on CLICK, not pointerdown: closing reflows the page beside it, and a
+    // reflow between press and release moved the header out from under the pointer, so that first click was lost (F3-01).
     let _docClose=null;
-    function close(){ if(_multi) setMulti(false); host.classList.remove('on'); list.classList.remove('on'); backdrop.classList.remove('on'); dockOff(host); if(_docClose){ document.removeEventListener('pointerdown',_docClose,true); _docClose=null; } }
-    async function open(){ sel=c.activeId?c.activeId():sel; await refresh(); host.classList.add('on'); list.classList.add('on'); backdrop.classList.add('on'); dockOn(host); if(!_docClose){ _docClose=e=>{ if(!host.contains(e.target)) close(); }; document.addEventListener('pointerdown',_docClose,true); } }
+    function close(){ if(_multi) setMulti(false); host.classList.remove('on'); list.classList.remove('on'); backdrop.classList.remove('on'); dockOff(host); if(_docClose){ document.removeEventListener('click',_docClose,true); _docClose=null; } }
+    async function open(){ sel=c.activeId?c.activeId():sel; await refresh(); host.classList.add('on'); list.classList.add('on'); backdrop.classList.add('on'); dockOn(host); if(!_docClose){ _docClose=e=>{ if(!host.contains(e.target)) close(); }; document.addEventListener('click',_docClose,true); } }
     // setActive(id): re-mark the ONE active row; redraws now if open, else the next open()
     // re-reads activeId() anyway.
     function setActive(id){ sel=(id==null?null:id); if(list.classList.contains('on')) draw(); }

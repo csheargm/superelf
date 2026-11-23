@@ -10,7 +10,7 @@
 //      and every stored page passes through the sanitizer again on load, so old notes are covered.
 // Plus the owner's device readout (§4 ii): one line in the page-settings sheet, format pinned here
 // from fake metrics.
-// R11 — searched: "SAFE_FSIZE", "FSIZE_REM", "DEV_READOUT", "pan-devro" — all owned by
+// R11 — searched: "SAFE_FSIZE", "FSIZE_REM", "DEV_READOUT", "pan-devro" (removed, F3-08) — all owned by
 //   web/note-ui.inline.html; this file only consumes them.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,7 +28,7 @@ function coreFrom(engineSrc) {
   assert.ok(from > 0 && to > from, 'the engine core must stay a DOM-free block above function Note()');
   // eslint-disable-next-line no-new-func
   return new Function(`${engineSrc.slice(from, to)}
-    return {STYLE_OK,cleanStyle,bindFontSize,DEV_READOUT,PAGE_W};`)();
+    return {STYLE_OK,cleanStyle,bindFontSize,PAGE_W};`)();
 }
 const G = coreFrom(ENGINE);
 
@@ -82,22 +82,11 @@ test('the conversion is on the one path every kept element takes, and old pages 
     'a stored pageHtml is re-sanitised on load, so notes saved with rem are converted too');
 });
 
-// ── 3. The device readout ─────────────────────────────────────────────────────────────────────
-test('the readout line from fake metrics', () => {
+// ── 3. No developer readout in the page settings sheet (F3-08) ───────────────────────────────
+test('the page settings sheet carries no device readout: it lives in the ⚙ settings only (ink-anchor)', () => {
   assert.equal(G.PAGE_W, 816);
-  assert.equal(G.DEV_READOUT({ w: 1180, h: 820, k: 0.8, textW: 652.8 }),
-    'Device 设备: 1180×820 px · scale k=0.8 · text 653px · page 816');
-  assert.equal(G.DEV_READOUT({ w: 834, h: 1194, k: 1.02205882, textW: 834 }),
-    'Device 设备: 834×1194 px · scale k=1.022 · text 834px · page 816', 'k to 3 decimals, width to whole px');
-});
-
-test('the readout lives in the existing page-settings sheet and refreshes when it opens', () => {
   const sheet = /<div class="pan-pop pan-paperpop">'\+([\s\S]*?)'<div class="pan-customlbl">模板 · Template/.exec(ENGINE);
   assert.ok(sheet, 'the page settings sheet must be findable');
-  assert.match(sheet[1], /pan-pgtext/, 'the Transcript row is in the same sheet');
-  assert.match(sheet[1], /<div class="pan-devro"><\/div>/, 'the readout slot sits in that sheet — no new button');
-  assert.match(ENGINE, /paperBtn\.addEventListener\('click',\(\)=>\{ togglePop\(paperPop,paperBtn\); syncDevReadout\(\); \}\);/,
-    'opening the sheet refreshes the line');
-  assert.match(ENGINE, /el\.textContent=DEV_READOUT\(\{w:window\.innerWidth,h:window\.innerHeight,k:parseFloat\(pageInner\.style\.zoom\)\|\|1,textW:textLayer\.getBoundingClientRect\(\)\.width\}\)/,
-    'measured from the live page: the zoom the page was fitted with, the text layer as drawn');
+  assert.match(sheet[1], /pan-pgtext/, 'CONTROL: the Transcript row is in the sheet');
+  assert.doesNotMatch(ENGINE, /pan-devro|DEV_READOUT|scale k=/, 'no readout slot, builder or text left in the engine');
 });

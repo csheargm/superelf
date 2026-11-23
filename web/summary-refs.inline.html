@@ -71,6 +71,10 @@
   // ── [n] → <a> in rendered HTML ── text outside tags only, never inside an existing <a>, only the
   // numbers that have a ref. Pure string work (no DOM), so a node test runs the real thing.
   const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  // A #tag the AI QUOTES in a summary ("#墨水 1") is not the summary's tag (owner decision F3-14): its '#' becomes
+  // the full-width '＃' (U+FF03), which the index's TAG_RE (lib/note-index.mjs) does not read. Text only: markup
+  // and attributes (hrefs) are left as written. The note's own first line (#summary #ai) is added after this.
+  const untagHtml=html=>String(html==null?'':html).split(/(<[^>]*>)/).map((p,i)=>i%2?p:p.replace(/#(?=[\p{L}\p{N}_])/gu,'＃')).join('');
   function linkifyHtml(html,refs){
     const list=Array.isArray(refs)?refs:[]; if(!list.length||typeof onLink!=='function') return String(html==null?'':html);   // no host hook: a link would go nowhere, so [n] stays text
     const by=new Map(list.map(r=>[String(r.n),r])); let inA=0;
@@ -107,6 +111,6 @@
   function install(hooks){ if(!hooks||typeof hooks.onLink!=='function') return false; onLink=hooks.onLink;
     if(!listening&&typeof document!=='undefined'&&document.addEventListener){ document.addEventListener('click',onClick,true); listening=true; }
     return true; }
-  window.PASummaryRefs={TXT,TITLE_MAX,NOTE_LINK_RE,linkHref,parseLink,importantOf,section,number,label,titleHasDate,remember,refsOf,refsFor,linkifyHtml,enhance,noteSaved,showBack,hideBack,goBack,backTarget:()=>backTo,open,install,onClick};
+  window.PASummaryRefs={TXT,untagHtml,TITLE_MAX,NOTE_LINK_RE,linkHref,parseLink,importantOf,section,number,label,titleHasDate,remember,refsOf,refsFor,linkifyHtml,enhance,noteSaved,showBack,hideBack,goBack,backTarget:()=>backTo,open,install,onClick};
 })();
 </script>

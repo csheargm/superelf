@@ -129,7 +129,10 @@
   color:var(--muted,#888);font-size:13px;font-weight:600;-webkit-tap-highlight-color:transparent}
 .pan-hmode.on{background:color-mix(in srgb,var(--accent,#0f6355) 14%,transparent);color:var(--accent,#0f6355)}
 .pan-hmode .pan-mlbl{font-size:12px}
-@media (max-width:520px){ .pan-hmode .pan-mlbl{display:none} }   /* on a phone the glyph carries it */
+@media (max-width:520px){ .pan-hmode .pan-mlbl{display:none} }
+/* Below 900px (iPad portrait beside the docked list, the app bar's Home · A- · A+ in the row) the header wraps
+   onto a 2nd line instead of pushing Print off the right edge (F3-02); barClearance reads its height. */
+@media (max-width:900px){ .pan-top{flex-wrap:wrap;row-gap:4px} }   /* TODO(R4 seam): the header CSS → its own part */   /* on a phone the glyph carries it */
 /* A control row that its tab has not asked for. !important because the dock/drag machinery
    writes inline styles onto these bars and would otherwise win. */
 .pan-bar.pan-off{display:none!important}
@@ -249,6 +252,7 @@
 .pan-pop{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + var(--pan-toolsbottom,8px) + 54px);top:auto;z-index:7;
   display:none;flex-direction:column;gap:10px;border:1px solid var(--line,#e6e6e6);
   border-radius:14px;padding:12px;box-shadow:0 3px 14px rgba(0,0,0,.18);max-height:calc(100vh - 130px);overflow-y:auto;
+  max-width:calc(100% - 16px);box-sizing:border-box;   /* never wider than the page: positionPop's 8px clamp then holds both edges (F3-08) */
   /* Scroll-shadow affordance: iOS hides scrollbars, so when the popover content overflows
      (e.g. the finger-drawing row below the swatches on a phone), a soft shadow at the clipped
      edge signals "more below/above". Pure CSS: the local layers cover the shadows at the ends. */
@@ -284,7 +288,6 @@
 /* Divides the page ACTIONS from the page SETTINGS in the ⋯ panel — they are different kinds of
    thing and the list reads as one long menu without it. */
 .pan-pgsep{height:1px;background:var(--line,#e6e6e6);margin:6px 2px}
-.pan-devro{font-size:11px;color:var(--muted,#6b7370);padding:0 8px 4px;white-space:nowrap}
 /* Each row is SET IN THE STYLE IT APPLIES, so the menu is its own preview — the reason Apple's
    version needs neither icons nor explanation. */
 /* --text, NOT --fg. SCAR: --fg is defined nowhere in this app — the apps declare --text,
@@ -604,10 +607,8 @@
   // unit. A note then looks identical on an 11" iPad, a 12.9" and a laptop, which is also exactly
   // what makes it printable.
   const PAGE_W=816, PAGE_H=1056;
-  // Device readout · 设备读数 (annotation-anchoring.md §4 ii): one line in the page settings sheet,
-  // so the owner screenshots both iPads instead of describing them. The page side is fixed (PAGE_W);
-  // only the device side (viewport, k, the text layer's on-screen width) can differ.
-  const DEV_READOUT=m=>'Device 设备: '+m.w+'×'+m.h+' px · scale k='+(Math.round(m.k*1000)/1000)+' · text '+Math.round(m.textW)+'px · page '+PAGE_W;
+  // The device readout (annotation-anchoring.md §4 ii) lives in the ⚙ settings only (ink-anchor's
+  // 设备读数 · Device readout): the page settings sheet is for the page, not a developer line (F3-08).
   // SEAMLESS: the page keeps a screenful of empty paper below the lowest ink, so writing can
   // carry on downwards without anyone flipping. Capped, because the page is ONE canvas and a
   // 816-wide surface at 5 sheets is already ~20M device pixels at dpr 2 — past that the browser
@@ -1556,7 +1557,6 @@
            PANoteText (web/note-text.inline.html); a property of the PAGE, so it lives with the paper. */
         '<button class="pan-photoopt pan-pgtext" data-pg="text">'+ico('list')+'<span class="pan-optlbl">'+SEARCH_TXT.transcript+'</span></button>'+
         '<div class="pan-pgsep"></div>'+
-        '<div class="pan-devro"></div>'+   // the device readout (DEV_READOUT), filled when the sheet opens
         /* VIEW sits above Template because it is the coarser choice: it decides how much paper
            there is, and the template only decides what is printed on it. */
         /* The View picker is WITHDRAWN, not deleted. Seamless as built makes one page taller
@@ -1832,7 +1832,6 @@
         el.style.width=W+'px'; el.style.height=H+'px';
         el.style.zoom=k; el.style.left=left+'px'; el.style.right='auto'; el.style.bottom='auto'; }
       syncStageClear();                                        // `top` depends on the k just set
-      if(typeof syncDevReadout==='function'&&paperPop&&paperPop.classList.contains('on')) syncDevReadout();   // the readout follows rotation while the sheet is open
       // The backing store follows the ON-SCREEN size, so a magnified page is rendered at device
       // resolution instead of being an upscaled 816px bitmap. Clamped by AREA, not by k: a tall
       // seamless page at a large k would otherwise ask for a canvas the browser answers with
@@ -2877,7 +2876,10 @@
     ink.addEventListener('pointerup',e=>{ const d=linkTap; linkTap=null;
       if(!d||d.id!==e.pointerId||penNear()||Date.now()-d.t>LINK_TAP_MS||Math.hypot(e.clientX-d.x,e.clientY-d.y)>LINK_TAP_PX) return;
       const a=linkAt(e.clientX,e.clientY); if(a) openLink(a.getAttribute('href')); });
-    textLayer.addEventListener('click',e=>{ const a=txtEdit&&(e.metaKey||e.ctrlKey)&&linkIn(e.target);
+    // A note link (a summary's [n] → its source note) opens on a plain click or tap, even while editing: it is a
+    // reference inside this app, not a web address to edit (F3-04). A web link still wants ⌘/Ctrl while editing.
+    const isNoteLink=a=>!!(a&&window.PASummaryRefs&&window.PASummaryRefs.parseLink(a.getAttribute('href')));
+    textLayer.addEventListener('click',e=>{ const l=txtEdit&&linkIn(e.target); const a=l&&((e.metaKey||e.ctrlKey)||isNoteLink(l))?l:null;
       if(a){ e.preventDefault(); openLink(a.getAttribute('href')); } });
     // Capture phase, so the selection is recorded BEFORE focus leaves the region.
     fmtBar.addEventListener('pointerdown',()=>{ selFrozen=false; saveSel(); selFrozen=true; },true);
@@ -3980,6 +3982,11 @@
       open.forEach(p=>p.classList.remove('on')); syncPopBtns();
       e.preventDefault(); e.stopPropagation(); };
     document.addEventListener('pointerdown',onPopOutside,true);
+    // Escape closes an open popover (Page settings, ink, style…) like a backdrop tap (F3-07); with none open it is the page's.
+    // TODO(R4 seam): popover open/close (togglePop, closePops, onPopOutside, onPopEsc) → its own part.
+    const onPopEsc=(e)=>{ if(e.key!=='Escape') return; const open=[...host.querySelectorAll(POPS_OPEN)]; if(!open.length) return;
+      open.forEach(p=>p.classList.remove('on')); syncPopBtns(); e.preventDefault(); e.stopPropagation(); };
+    document.addEventListener('keydown',onPopEsc,true);
     function flash(msg){ let el=q('.pan-flash'); if(!el){ el=document.createElement('div'); el.className='pan-flash'; host.appendChild(el); }
       el.textContent=msg; el.classList.add('on'); clearTimeout(flash._t); flash._t=setTimeout(()=>el.classList.remove('on'),2200); }
     // AWAITS the write on every tool change — exitTextMode() commits the typed page first, so
@@ -4138,9 +4145,7 @@
     const togglePop=(pop,btn)=>{ const willOpen=!pop.classList.contains('on'); closePops(); pop.classList.toggle('on',willOpen);
       if(willOpen) positionPop(pop,btn); syncPopBtns(); };
     inkBtn.addEventListener('click',()=>togglePop(inkPop,inkBtn));
-    // TODO(R4 seam): the device readout belongs with the page-settings sheet when that sheet is split out of note-ui.
-    function syncDevReadout(){ const el=q('.pan-devro'); if(el) el.textContent=DEV_READOUT({w:window.innerWidth,h:window.innerHeight,k:parseFloat(pageInner.style.zoom)||1,textW:textLayer.getBoundingClientRect().width}); }
-    paperBtn.addEventListener('click',()=>{ togglePop(paperPop,paperBtn); syncDevReadout(); });
+    paperBtn.addEventListener('click',()=>togglePop(paperPop,paperBtn));
     undoBtn.addEventListener('click',undo);
     redoBtn.addEventListener('click',redo);
     prevBtn.addEventListener('click',async()=>{ await flipTo(cur-1); });
@@ -4366,7 +4371,7 @@
       setTitle:(t)=>{ if(htitle) htitle.textContent=t||''; },
       // Returns the flush promise so a caller can await durability BEFORE the pad is gone.
       destroy:()=>{ commitPageHtml(); const done=flushDurable(); clearTimeout(lockShowT); clearTimeout(textTimer);
-        document.removeEventListener('pointerdown',onPopOutside,true); document.removeEventListener('paste',onDocPaste,true);
+        document.removeEventListener('pointerdown',onPopOutside,true); document.removeEventListener('keydown',onPopEsc,true); document.removeEventListener('paste',onDocPaste,true);
         try{ roStage&&roStage.disconnect(); }catch(_){ /* already gone */ }
         window.removeEventListener('message',onPrefs); window.removeEventListener('resize',onResize);
         document.removeEventListener('visibilitychange',onHide); window.removeEventListener('pagehide',onPageHide);

@@ -45,7 +45,7 @@
 .pds-send{background:var(--accent,#0a7a5a);color:#fff;border:none;border-radius:8px;padding:8px 14px;font:inherit;cursor:pointer}
 .pds-send:disabled{opacity:.45;cursor:default}
 .pds-x{background:none;border:none;color:var(--muted,#888);font:inherit;cursor:pointer;padding:8px}
-.pds-savenote{font-size:12px;padding:2px 8px}
+.pds-savenote{font-size:12px;padding:2px 8px;white-space:nowrap}
 .pac-dsum{padding:4px 10px;font-size:12px;border-radius:999px;margin-right:2px}
 .pds-p:disabled{opacity:.45;cursor:default}
 </style>
@@ -77,12 +77,13 @@
     photo:'含图片文字 · Include photo text', counting:'统计中 · Counting', nothing:'此时期没有笔记 · No notes in this period',
     send:'发送 · Send', cancel:'取消 · Cancel', noLane:'无通道 · no lane', turns:'{n} 轮 · {n} turns',
     trimmed:'[已截断至 {n} 字 · Trimmed to {n} characters]', trimmedShort:'已截断 · trimmed',
-    line:'发送 {p} 页 · {c} 字到 {lane} · Send {p} pages · {c} characters to {lane} (离开本机 · off this Mac)',
+    line:'发送 {p} 页 · {c} 字到 {lane} · Send {pe} · {ce} to {lane} (离开本机 · off this Mac)',
     failed:'无法读取笔记 · Could not read the notes', busy:'正在回答中 · Still answering', monthFailed:'月总结失败 · Month summary failed',
     progress:'正在总结 {m} ({i}/{n}) · Summarizing {m}', saveNote:'存为笔记 · Save as note', saved:'已存 · Saved', notSaved:'未保存 · Not saved',
     firstLine:'AI 总结 · AI summary — {p} #summary #ai', noText:'没有可发送的文字 · No text to send',
     pending:'{n} 页待转写 · {n} pending', incomplete:'不完整 · incomplete', sendFailed:'无法发送 · Could not send — {e}' });
   const fill=(s,o)=>String(s).replace(/\{(\w+)\}/g,(_,k)=>String(o[k]==null?'':o[k]));
+  const en=(n,one,many)=>n+' '+(Number(n)===1?one:many);   // English count: "1 page", "3 pages" (F3-10)
   const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const dayOf=ts=>T().dayOf(ts), monthOf=ts=>T().monthOf(ts);
   const tsOf=it=>Number(it&&(it.created||it.updated))||0;
@@ -206,7 +207,7 @@
     const say=s=>{ els.line.textContent=s; };
     const mark=key=>{ for(const k in presets) presets[k].setAttribute('aria-pressed',k===key?'true':'false'); };
     R().install(c.hooks);   // the host's onLink({id,page}): a tap on a [n] link opens that note
-    function open(){ ({ov,presets,els}=buildSheet({choose,togglePhoto,cancel,send})); const n=docRows(c.picked()).length; presets.selected.textContent=T().TXT.selected+' ('+n+')'; presets.selected.disabled=!n;   // Selected greyed until rows are ticked (Select · 多选 in the ⋯ sheet)
+    function open(){ ({ov,presets,els}=buildSheet({choose,togglePhoto,cancel,send})); const n=docRows(c.picked()).length; presets.selected.textContent=T().TXT.selected+(n?' ('+n+')':''); presets.selected.disabled=!n;   // Selected greyed (and no "(0)" beside a line that sends a page, F3-10) until rows are ticked (Select · 多选 in the ⋯ sheet)
       st={key:null,photo:false,rows:[],id:'',pages:null,pending:0,truncated:false,plan:null,busy:false}; say(''); c.host.appendChild(ov); return choose(n?'selected':'month'); }
     function cancel(){ st=null; if(ov.remove) ov.remove(); else if(ov.parentNode&&ov.parentNode.removeChild) ov.parentNode.removeChild(ov); }
     // One note-text ask per preset choice; the photo tick re-plans from the same reply. A failure is said on the line and Send stays off (R5).
@@ -223,7 +224,7 @@
       const p=(st.key==='year'||st.key==='lastYear')?await yearPlan(st,c.hooks,()=>st):shortPlan(st);
       if(!p) return false; st.plan=p; st.images=I()?I().plan({pages:st.pages,rows:st.rows,key:st.key}):null;   // + the pages with important ink as pictures, and the lane that will see them (note-features.md I); a year scope gets none
       if(!p.pages&&!p.chars){ say(TXT.noText); els.send.disabled=true; return false; }
-      let line=fill(TXT.line,{p:p.pages,c:p.chars,lane:(st.images&&st.images.lane)?st.images.lane.label:lane()})+(st.images?st.images.line:''); if(p.turns.length>1) line+=' · '+fill(TXT.turns,{n:p.turns.length}); if(p.trimmed) line+=' · '+TXT.trimmedShort;
+      let line=fill(TXT.line,{p:p.pages,c:p.chars,pe:en(p.pages,'page','pages'),ce:en(p.chars,'character','characters'),lane:(st.images&&st.images.lane)?st.images.lane.label:lane()})+(st.images?st.images.line:''); if(p.turns.length>1) line+=' · '+fill(TXT.turns,{n:p.turns.length}); if(p.trimmed) line+=' · '+TXT.trimmedShort;
       if(st.pending) line+=' · '+fill(TXT.pending,{n:st.pending}); if(st.truncated) line+=' · '+TXT.incomplete;   // the reply's own honesty: pages still transcribing, a cut listing
       say(line); els.send.disabled=!!st.busy; return true;
     }
@@ -263,7 +264,7 @@
     let extra='', noteId=null; const title=T().runTitleOf(period,T().now());   // the follow-up block once added (note-features.md I); this run's note and title
     const save=async(fresh)=>{ b.disabled=true;   // the first line names the period by titleOf (R3), the human title the tab shows
       const md0=window.PANote&&typeof window.PANote.mdToHtml==='function'?window.PANote.mdToHtml(String(answer||'')):'<div>'+esc(answer)+'</div>';
-      const md=R().linkifyHtml(md0,refs);   // [n] → note links the saved note keeps (sanitizeHtml keeps the scheme)
+      const md=R().untagHtml(R().linkifyHtml(md0,refs));   // quoted #tags are not this note's tags (F3-14)   // [n] → note links the saved note keeps (sanitizeHtml keeps the scheme)
       const html='<div>'+esc(fill(TXT.firstLine,{p:titleOf(period)}))+'</div>'+md; const convoId=(typeof x.convo==='function'?x.convo():null)||null; let r;
       try{ r=await x.hooks.saveNote({...(noteId==null?{}:{id:noteId}),title,html:html+extra,period,scope:x.key,convoId}); }catch(e){ r={ok:false,error:String((e&&e.message)||e)}; }
       if(r&&r.ok&&r.id!=null) noteId=r.id;

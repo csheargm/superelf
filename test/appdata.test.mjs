@@ -94,6 +94,21 @@ test('backup: one rolling generation, refreshed at most once a minute', () => {
   rmTemp(d);
 });
 
+test('a tombstone ({deleted:true}) removes the backup, so a deleted note leaves no text on disk; any other payload keeps it (F3-12)', () => {
+  const d = mkdir(); const f = path.join(d, 'entry-1.json'); const bak = backupPathFor(f);
+  const t0 = Date.now();
+  saveAppData(f, notebook(1), { now: t0 }); saveAppData(f, notebook(2), { now: t0 + 100 });
+  assert.equal(fs.existsSync(bak), true, 'CONTROL: the previous version is backed up');
+  const r = saveAppData(f, JSON.stringify({ v: 1, deleted: true }), { now: t0 + BACKUP_MIN_AGE_MS + 1000 });
+  assert.equal(r.ok, true); assert.equal(r.backedUp, false);
+  assert.equal(fs.existsSync(bak), false, 'the deleted text is gone from the .bak');
+  assert.deepEqual(JSON.parse(read(f)), { v: 1, deleted: true });
+  const g = path.join(d, 'other.json');
+  saveAppData(g, notebook(1), { now: t0 }); saveAppData(g, JSON.stringify({ deleted: true, pages: [] }), { now: t0 + 100 });
+  assert.equal(fs.existsSync(backupPathFor(g)), true, 'deleted:true beside real data is data, not a tombstone: backed up');
+  rmTemp(d);
+});
+
 test('backup: a collapsed file can never roll the good backup out, even after the cooldown', () => {
   const d = mkdir(); const f = path.join(d, 'note.json'); const bak = backupPathFor(f);
   const t0 = Date.now();

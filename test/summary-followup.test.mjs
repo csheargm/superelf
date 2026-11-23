@@ -31,6 +31,15 @@ test('extractTodos: the list under the to-do heading, EN (`## 待办 · Open to-
   const l = extractTodos(long); assert.equal(l.items.length, ITEMS_MAX); assert.equal(l.dropped, 3, 'past the cap: counted, not silently gone');
 });
 
+test('extractTodos: a "None" placeholder under the heading is no to-do — the block is built from real items only, so a summary never says None and then lists one (F3-03)', async () => {
+  for (const none of ['- None', '- **None.** No open to-dos were found in these notes.', '- 无', '- 没有待办', '- N/A', '- (none)', '- 暂无。', '- Nothing open.'])
+    assert.deepEqual(extractTodos(`## ${TODO_HEADING}\n${none}`).items, [], none);
+  assert.deepEqual(extractTodos(`## ${TODO_HEADING}\n- None\n- Pay the rent`).items, ['Pay the rent'], 'the real item stays');
+  assert.deepEqual(extractTodos(`## ${TODO_HEADING}\n- Nonetheless call Sam`).items, ['Nonetheless call Sam'], 'a word that starts with None is an item');
+  const r = await buildFollowup(`## ${TODO_HEADING}\n- **None.** No open to-dos were found in these notes.`, { suggest: async () => 'x' });
+  assert.deepEqual(r.items, []); assert.equal(r.text, '', 'no block: the client says "No open to-dos"');
+});
+
 test('classifyTodo: a personal verb at the start stays home, a question about the world goes out, a tie stays home', () => {
   for (const s of ['Call the landlord about whether the gutter is covered', 'Pay the November rent', 'Email Taylor the photos', '给房东打电话说明雨槽问题', '交十一月房租', '预约牙医', 'Buy milk', 'Water the plants']) assert.equal(classifyTodo(s), KIND_PERSONAL, s);
   for (const s of ['Find out whether solar tiles work on a flat roof', 'Compare e-bike prices under $1500', 'How much does a roof inspection cost?', 'Best way to store onions?', '了解平屋顶能否装太阳能瓦', '比较几款电动自行车的价格', 'Which laptop for a 10 year old', 'Is the 2026 Civic hybrid worth it?']) assert.equal(classifyTodo(s), KIND_RESEARCH, s);

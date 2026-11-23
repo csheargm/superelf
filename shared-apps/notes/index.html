@@ -343,7 +343,9 @@ function migrateEntry(data){
 }
 // Plain-text preview of a notebook's typed content (first page), for the drawer row + search.
 function previewOf(nb){ try{ const h=(nb&&nb.pages&&nb.pages[0]&&nb.pages[0].pageHtml)||'';
-  const d=document.createElement('div'); d.innerHTML=String(h); return (d.textContent||'').replace(/\s+/g,' ').trim().slice(0,PREVIEW_MAX);
+  const d=document.createElement('div'); d.innerHTML=String(h);
+  d.querySelectorAll('div,p,li,br,h1,h2,h3,h4,h5,h6,blockquote,pre,tr,td').forEach(el=>{ el.before(' '); el.after(' '); });   // a line break reads as a space, never "#familyRemember" (F3-11)
+  return (d.textContent||'').replace(/\s+/g,' ').trim().slice(0,PREVIEW_MAX);
 }catch(_){ return ''; /* unparsable pageHtml: the drawer row shows the fallback preview — cosmetic only, and the notebook itself is untouched (R5 (c)) */ } }
 // Derived display title — the first non-empty line of the first page's text (≤TITLE_MAX chars),
 // recomputed on every save (so it follows the first line). Block tags/<br> become line breaks
