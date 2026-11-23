@@ -88,11 +88,12 @@ jobs:
         # 2026-11-23: EVERY OS +1 (ubuntu 131, windows 214): bible-reader-e2e no-404 check.
         # 2026-11-23: EVERY OS +1 (ubuntu 132, windows 215): note-link-e2e range-end check.
         # 2026-11-23: EVERY OS +2 (ubuntu 135, windows 218): bible-reader-e2e swipe split per orientation + old-857c8f2-copy control.
+        # 2026-11-23: EVERY OS +10 (ubuntu 145, windows 228): bar-no-jump-e2e 8 hide/show viewports + 2 daily-banner checks.
         include:
           - os: ubuntu-latest
-            max_skipped: 135
+            max_skipped: 145
           - os: windows-latest
-            max_skipped: 218
+            max_skipped: 228
     env:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED

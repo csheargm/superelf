@@ -20,14 +20,17 @@ bilingual top-bar labels wrapped to two lines on a phone.
    moves the page (below); a pointerup lost outside the frame stops counting after 3 waits.
 4. Listeners are passive and never preventDefault. A Pencil (`pointerType 'pen'`, iOS `touchType 'stylus'`)
    never starts a pull. Removed: `touchHides`, the scroll-down hide, the handle-only "stays" state.
-5. No stripe: PANote's `barClearance()` returns the safe-area top (probe `env(safe-area-inset-top)`) while
-   its `.pan-top` carries `data-paab-hidden="1"`, re-read through a MutationObserver, so the page and the
-   floating tools move up. The Bible's in-flow `#nav` already gave its height back (pinned by test).
+5. SUPERSEDED 2026-11-23 (owner, iPhone + iPad: the text jumped on every hide and show, Bible and Journal):
+   the bar slides OVER the text and no hide / show changes layout. PAAppBar lifts an in-flow bar over its
+   scroller (scroller pulled up under the bar and padded by the same height, re-measured on resize), and
+   PANote's page clearance ignores `data-paab-hidden` (only the floating tools follow the bar). Hidden at the
+   top of a chapter / page, a bar-high strip stays blank: the price of a text that never moves.
+   Pinned by test/bar-no-jump-e2e.test.mjs (phone + iPad, both orientations, Chromium + WebKit).
 6. Bible phone (≤600px): the top-bar controls show one short line (`高亮 / 笔 / 笔记 / 问AI` via `data-short`);
    the full bilingual label stays as `aria-label` and `title`.
 
 ## Consequences
-- The page shifts up by the bar's height when the bar idles away, and back when it is pulled. Accepted: the
+- (Superseded by 5.) The page shifted up by the bar's height when the bar idled away, and back when it was pulled. Accepted then: the
   owner wants the full screen; the shift never happens mid-stroke (rule 3).
 - A finger drawing downward with finger-draw on shows the bar (only the Pencil is excluded).
 - The safe-area strip itself is the shell's `#frame.peek` padding (shell `--bg`), outside the app frame; the

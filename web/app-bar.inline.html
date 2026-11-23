@@ -18,7 +18,7 @@
      Driven by test/app-bar.test.mjs (no browser) and test/app-own-bar-e2e.test.mjs (Playwright). -->
 <style id="paab-style">
 /* PA_BAR_HANDLE_CSS */
-.paab-on{transition:transform .18s ease,margin-top .18s ease}
+.paab-on{transition:transform .18s ease}
 .paab-btn{font:inherit;font-weight:700;background:none;border:none;color:var(--accent,#0f6355);cursor:pointer;
   padding:4px 8px;min-height:36px;flex-shrink:0;white-space:nowrap}
 .paab-home{font-size:13px}.paab-dn{font-size:12px}.paab-up{font-size:15px}
@@ -42,7 +42,7 @@
   const TOUCH_MQ='(hover:none)';          // a phone / iPad with no mouse: touch until a mouse is used
   const touchFirst=()=>{ try{ return matchMedia(TOUCH_MQ).matches; }catch(_){ return false; /* no matchMedia: assume a mouse, the bar stays */ } };
   const TIP='主页和字号在这里；几秒后自动隐藏，下拉或点顶部把手返回 · Home and text size live here now — the bar hides after a few seconds; pull down or tap the top handle to bring it back';
-  const S={cfg:null,on:false,touch:false,bar:null,hidden:false,handle:null,idle:0,lastY:0,mark:0,t0:null,pen:false,ptrs:new Set(),touches:0,held:false,inputAt:0};
+  const S={lift:null,cfg:null,on:false,touch:false,bar:null,hidden:false,handle:null,idle:0,lastY:0,mark:0,t0:null,pen:false,ptrs:new Set(),touches:0,held:false,inputAt:0};
   const el=(v)=>typeof v==='function'?v():v;
   const post=(type,d)=>{ try{ parent.postMessage({pa:'shell',type,d:d||0},'*'); }
     catch(_){ /* no parent (page opened on its own): nothing to tell, and nothing was drawn */ } };
@@ -59,7 +59,7 @@
     catch(_){ return true; /* a broken check must never strand the user without the bar: keep it */ }
   }
   function arm(){ clearTimeout(S.idle); S.idle=S.hidden?0:setTimeout(onIdle,IDLE_MS); }
-  // Never mid-stroke, mid-tap or mid-scroll: hiding moves the page up by the bar's height (it gives the space back).
+  // Never mid-stroke, mid-tap or mid-scroll: a bar sliding over the page under a finger is still a surprise.
   // A pointer that is still down is never expired by time; only a real end signal clears it (pointerup,
   // lostpointercapture, blur, visibilitychange). A finger counts until touchend/touchcancel — iOS fires
   // pointercancel the moment native scrolling takes the touch while the finger is still on the glass.
@@ -74,15 +74,40 @@
     if(h===S.hidden){ if(!h) arm(); return; }
     if(h&&keepOpen()) return arm();
     S.hidden=h;
-    const flow=!/^(absolute|fixed)$/.test(getComputedStyle(b).position);
-    // In-flow (Bible #nav) the row gives its height back to the text; absolute (Journal .pan-top) slides,
-    // and its host reads data-paab-hidden to give the page the bar's height back (note-ui barClearance).
-    if(flow) b.style.marginTop=h?(-b.offsetHeight-1)+'px':'';
+    // The bar SLIDES over the text and never changes layout (owner 2026-11-23: the text must not jump on
+    // hide / show). An in-flow bar with a scroller (Bible #nav) was lifted over it by overlay(); an absolute
+    // one (Journal .pan-top) already overlays, and its host keeps the page's clearance constant (note-ui).
+    // Only an in-flow bar with no scroller to lay under it still gives its height back.
+    if(S.lift) for(const e of S.lift.chrome) e.style.transform=h?'translateY('+(-S.lift.gap-1)+'px)':'';
+    else if(!/^(absolute|fixed)$/.test(getComputedStyle(b).position)) b.style.marginTop=h?(-b.offsetHeight-1)+'px':'';
     else b.style.transform=h?'translateY(-101%)':'';
     b.inert=h;   // off-screen controls leave the tab order and VoiceOver / switch control (a11y)
     b.setAttribute('data-paab-hidden',h?'1':'0');
     S.handle.classList.toggle('on',h);
     arm();
+  }
+  // Lift an in-flow bar over its scroller: the scroller is pulled up under the bar (and any chrome between
+  // them, e.g. the Bible's daily banner) by that height, and padded by the same, so with the bar shown the
+  // first line sits right below it, and hiding / showing is a transform that moves no text. Re-measured
+  // when the bar or the chrome changes size (a phone row wrapping, a banner appearing).
+  function overlay(bar,sc){
+    if(/^(absolute|fixed)$/.test(getComputedStyle(bar).position)||bar.parentNode!==sc.parentNode) return;
+    const chrome=[]; for(let e=bar;e&&e!==sc;e=e.nextElementSibling) if(!/^(absolute|fixed)$/.test(getComputedStyle(e).position)) chrome.push(e);
+    const cs=getComputedStyle(sc), pad=parseFloat(cs.paddingTop)||0, mar=parseFloat(cs.marginTop)||0;
+    for(const e of chrome){ e.style.position='relative'; e.style.zIndex='5'; e.classList.add('paab-on'); }
+    S.lift={chrome,gap:0};
+    const measure=()=>{
+      const y=sc.scrollTop, old=S.lift.gap; sc.style.marginTop=''; sc.style.paddingTop='';
+      const gap=Math.max(0,sc.offsetTop-mar-bar.offsetTop+(parseFloat(getComputedStyle(bar).marginTop)||0));
+      S.lift.gap=gap; sc.style.marginTop=(mar-gap)+'px'; sc.style.paddingTop=(pad+gap)+'px'; sc.style.scrollPaddingTop=gap+'px';
+      // Mid-page, a banner appearing / expiring changes the padding by its height: scroll by the same so
+      // the line under the reader stays put. At the top the first line stays reachable (scrollTop 0).
+      sc.scrollTop=y>0&&old?y+gap-old:y;
+      if(S.hidden) for(const e of chrome) e.style.transform='translateY('+(-gap-1)+'px)';
+    };
+    measure();
+    if(window.ResizeObserver){ const ro=new ResizeObserver(measure); for(const e of chrome) ro.observe(e); }
+    addEventListener('resize',measure);
   }
   function sizeBtn(d){
     const b=document.createElement('button'); b.type='button';
@@ -121,7 +146,7 @@
     h.addEventListener('click',()=>{ if(pen){ pen=false; return; } setHidden(false); });
     document.body.appendChild(h);
     const sc=el(c.scroller);
-    if(sc){ S.lastY=sc.scrollTop; sc.addEventListener('scroll',()=>onScroll(sc),{passive:true}); }
+    if(sc){ overlay(bar,sc); S.lastY=sc.scrollTop; sc.addEventListener('scroll',()=>onScroll(sc),{passive:true}); }
     bindPull();
     if(window.PATips) window.PATips.register({id:'app-own-bar',anchor:()=>home,text:TIP,priority:true,dismissOnUse:true});   // F2-07: gone at the first tap   // first-use tip (ADR 0030); first: Home moved
     setHidden(false);   // shown on open, on the idle clock
