@@ -44,7 +44,7 @@ const WEB = fs.readFileSync(path.join(ROOT, 'web.mjs'), 'utf8');
 const CONFIG = fs.readFileSync(path.join(ROOT, 'lib', 'config.mjs'), 'utf8');
 
 test('the member lane drops the permission bypass — where the boundary starts', () => {
-  assert.match(CONFIG, /cfg\.member_args = cfg\.member_args \|\| \['--permission-mode', 'acceptEdits'\];/,
+  assert.match(CONFIG, /cfg\.member_args = cfg\.member_args \|\| \['--permission-mode', 'acceptEdits', '--strict-mcp-config'\];/,
     'members run under acceptEdits');
   assert.ok(!/member_args[^\n]*dangerously-skip-permissions/.test(CONFIG),
     'and never with the bypass');
@@ -63,7 +63,8 @@ test('laneArgs behaves, driven directly', () => {
   // Bash, and the CLI's own home (its auto-memory store and session transcripts), denied explicitly.
   const DENIES = ['--disallowedTools', ...CONFINED_DENIES];
   // What confines a lane comes FIRST and pins `default` (lib/agent-origin.mjs: the measured table).
-  const PIN = ['--permission-mode', 'default'];
+  // ...and every confined lane runs with no MCP server (--strict-mcp-config, never an --mcp-config).
+  const PIN = ['--permission-mode', 'default', '--strict-mcp-config'];
   // An app's turn writes nothing (ADR 0019): no allow rule, so `default` refuses every edit.
   const APP = [...DENIES, ...PIN];
   const base = ['--dangerously-skip-permissions'];
@@ -196,4 +197,18 @@ test('EVERY agent lane is resolved through agentArgs — none left raw', () => {
   // …and the lanes that DO exist go through it.
   assert.ok((WEB.match(/agentArgs\(user,/g) || []).length >= 4,
     'the chat, resolver, assess and app-agent lanes all resolve through it');
+});
+
+test('a confined lane loads no MCP server even when config.json adds one (GPT review 2026-11-22)', () => {
+  const member = { id: 'mia', role: 'member' };
+  const base = ['--mcp-config', '/x/servers.json', '{"mcpServers":{}}', '-p'];
+  const memberArgs = ['--permission-mode', 'acceptEdits', '--mcp-config=/y.json'];   // operator dropped the strict flag
+  for (const origin of [{ fromApp: false }, { fromApp: true, slug: 'bible' }]) {
+    const a = laneArgs(member, base, memberArgs, origin);
+    assert.ok(a.includes('--strict-mcp-config'), 'strict mode is always on');
+    assert.ok(!a.some((x) => String(x).startsWith('--mcp-config')), 'no --mcp-config survives');
+    assert.ok(!a.includes('/x/servers.json') && !a.includes('{"mcpServers":{}}'), 'nor its values');
+    assert.ok(a.includes('-p'), 'other flags are kept');
+  }
+  assert.deepEqual(laneArgs({ id: 'owner', role: 'owner' }, base, memberArgs, { fromApp: false }), base, "the owner's own chat is untouched");
 });

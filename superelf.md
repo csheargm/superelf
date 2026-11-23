@@ -470,7 +470,7 @@ markdown renderer, a model picker or a notepad canvas, stop — that component e
   PAOffline, broker kinds `data`/`save-data`), the drain with rule A per-page merge
   (`web/offline-sync.js`, `web/offline-merge.js`). Kinds that need the node answer
   `{ok:false, code:'offline', text:'Needs the home node · 需要家中节点'}` — show `text`.
-- **One state line** (`#offLine`): `Offline · 离线 — saving on this iPad · 保存在此 iPad · N to sync`,
+- **One state line** (`#offLine`): `Offline · 离线 — saving on this device · 保存在本设备 · N to sync`,
   `Syncing · 同步中`, `Sync failed · 同步失败 — <sentence> · tap to retry`, `Home node · 家中节点`.
 - **Home-node fallback** (`web/offline-origin.js` PAOrigin, lib/local-origin.mjs): config
   `local_origin` (Node settings, no restart) + `public_base_url`. When the public name fails

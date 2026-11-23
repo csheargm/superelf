@@ -51,7 +51,7 @@ test('drain: entries first, the last text per path, journal.json last; rows gone
   await queue(h, 'entry-a.json', nb(10, [page('p', 10)]));
   await queue(h, 'entry-a.json', nb(20, [page('p', 20)]));
   await queue(h, 'entry-b.json', nb(30, [page('q', 30)]));
-  assert.equal(h.line.textContent, 'Offline · 离线 — saving on this iPad · 保存在此 iPad · check Tailscale or the node · 请检查 Tailscale 或节点 · 4 to sync · 待同步');
+  assert.equal(h.line.textContent, 'Offline · 离线 — saving on this device · 保存在本设备 · check Tailscale or the node · 请检查 Tailscale 或节点 · 4 to sync · 待同步');
   h.o.noteNet(true);
   assert.equal(h.line.textContent, '4 to sync · 待同步', 'online with a queue, nothing running: the count');
   const seen = [];
@@ -103,7 +103,7 @@ test('no node: /api/build unanswered → nothing read or posted; a network failu
   h.node.reachable = true; h.node.readNet = true;
   assert.equal(await h.s.drain(), 'unreachable', 'the GET of the node\'s file failed as the network');
   assert.equal(h.o.offline(), true);
-  assert.equal(h.line.textContent, 'Offline · 离线 — saving on this iPad · 保存在此 iPad · check Tailscale or the node · 请检查 Tailscale 或节点 · 1 to sync · 待同步', 'no "Sync failed": the node is simply away again');
+  assert.equal(h.line.textContent, 'Offline · 离线 — saving on this device · 保存在本设备 · check Tailscale or the node · 请检查 Tailscale 或节点 · 1 to sync · 待同步', 'no "Sync failed": the node is simply away again');
   h.node.readNet = false; h.node.postFail = NET;
   assert.equal(await h.s.drain(), 'unreachable', 'the POST failed as the network');
   assert.equal(h.writes().length, 1);
@@ -175,7 +175,7 @@ test('broker flow: read online, save with the node gone, node back → one drain
   await B.post({ id: 2, kind: 'save-data', path: 'journal.json', data: '{"v":1,"entries":[{"id":"e1","updated":30}]}' }); await settle();
   await B.post({ id: 3, kind: 'save-data', path: 'entry-e1.json', data: nb(30, [page('p', 30, 'mine')]) }); await settle();
   assert.equal(B.reply(3).offline, true);
-  assert.equal(line.textContent, 'Offline · 离线 — saving on this iPad · 保存在此 iPad · check Tailscale or the node · 请检查 Tailscale 或节点 · 2 to sync · 待同步');
+  assert.equal(line.textContent, 'Offline · 离线 — saving on this device · 保存在本设备 · check Tailscale or the node · 请检查 Tailscale 或节点 · 2 to sync · 待同步');
   assert.equal(await B.sync.drain(), 'unreachable', 'still gone: the drain asks /api/build and stops');
   node.files.set('data/notes/entry-e1.json', nb(20, [page('p', 20, 'theirs')]));   // the Mac wrote meanwhile
   await node.listen(port);

@@ -129,7 +129,7 @@ body{display:flex;flex-direction:column}
   </div>
   <div id="search-results"></div>
 </div>
-<div id="verses"><div id="loading">Loading…</div></div>
+<div id="verses"><div id="loading">加载中… · Loading…</div></div>
 
 
 
@@ -646,20 +646,21 @@ document.getElementById('search-close').onclick=()=>{ document.getElementById('s
 async function runSearch(){
   const q=document.getElementById('search-inp').value.trim();
   const box=document.getElementById('search-results');
-  if(q.length<2){ box.innerHTML='<div style="padding:14px;color:var(--muted)">Type at least 2 characters.</div>'; return; }
+  // One Chinese character is a word (爱); one Latin letter is not (lib/bible.mjs searchBible, F2-04).
+  if(!q||(q.length<2&&!/[一-鿿]/.test(q))){ box.innerHTML='<div style="padding:14px;color:var(--muted)">请至少输入 2 个字母 · Type at least 2 letters</div>'; return; }
   box.innerHTML='<div style="padding:14px;color:var(--muted)">Searching…</div>';
   const r=await paSearch(q);
   // A search that FAILED is not a search with no hits — "No results." for a 401/500/dropped
   // connection is the same lie one level up (V6 re-audit). Say which one it was.
   if(!(r&&r.ok)){ box.innerHTML='<div style="padding:14px;color:var(--muted)">Search failed · 搜索失败 — '+esc((r&&r.error)||'try again 请重试')+'</div>'; return; }
-  const hits=r.results||[];
+  const all=Array.isArray(r.results)?r.results:((r.results&&r.results.hits)||[]), hits=all.slice(0,60), more=all.length>60||!!(r.results&&r.results.more);   // lib/bible.mjs bibleSearchWire: an array, one past the 60 cap when there is more
   if(!hits.length){ box.innerHTML='<div style="padding:14px;color:var(--muted)">No results · 无结果</div>'; return; }
   const re=q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   box.innerHTML=hits.map(v=>{
     const label=`${BOOKS[v.book-1]?BOOKS[v.book-1][0]+' · '+BOOKS[v.book-1][1]:''} ${v.chapter}:${v.verse}`;
     const txt=esc(v.text).replace(new RegExp('('+re+')','gi'),'<mark>$1</mark>');
     return `<div class="sr" data-b="${v.book}" data-c="${v.chapter}" data-v="${v.verse}"><div class="sr-ref">${esc(label)}</div><div class="sr-txt">${txt}</div></div>`;
-  }).join('');
+  }).join('')+(more?'<div style="padding:14px;color:var(--muted)">仅显示前 '+hits.length+' 条，再加一个词可缩小范围 · Showing the first '+hits.length+' — add a word to narrow it</div>':'');
 }
 document.getElementById('search-go').onclick=runSearch;
 document.getElementById('search-inp').addEventListener('keydown',e=>{ if(e.key==='Enter') runSearch(); });
@@ -693,7 +694,7 @@ async function load(){
   selV.clear(); updateFab(); followSelection();   // a new chapter/book has no selection: an open pane shows the whole-Bible state
   fillChapters();
   const wrap=document.getElementById('verses');
-  wrap.innerHTML='<div id="loading">Loading…</div>';
+  wrap.innerHTML='<div id="loading">加载中… · Loading…</div>';
   INK.load([]);                                    // the last chapter's undo history and ink go now, not after the read
   const annOk=await loadAnn(); if(g!==_loadSeq) return false;   // superseded: the newer load draws its own chapter
   if(annOk) INK.load(ANN.ink);                     // false = a later read (☰ delete) owns ANN and loads the ink itself              // this chapter's ink, before the text: a failed text load must never keep the last chapter's groups

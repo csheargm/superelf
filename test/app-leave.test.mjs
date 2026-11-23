@@ -36,7 +36,7 @@ const readOr = (rel) => { try { return fs.readFileSync(ws(rel), 'utf8'); } catch
 const scatter = () => fs.readdirSync(ws(''), { recursive: true }).map((f) => f.split(path.sep).join('/')).filter((f) => f.endsWith('.json') && !f.startsWith('data/'));
 const ACK = constant('APP_LEAVE_ACK_MS'), QUIET = constant('APP_LEAVE_QUIET_MS'), MAX = constant('APP_LEAVE_MAX_MS');
 const SAVE = (id) => ({ pa: 'req', id, kind: 'save-data', path: 'entry.json', data: '{}' });
-const NO_APP = 'Rejected · 请求被拒绝 — no app in view · 未打开应用。';
+const NO_APP = '请求被拒绝 · Rejected — no app in view · 未打开应用。';
 const broker = (app, { clock = fakeClock() } = {}) => loadShellBroker(base, { token: OWNER_TOKEN, app, timers: clock });
 // PALeave's hello, which every app page sends as it runs: until then the page has run none of its
 // own code, and leaving removes it at once instead of holding it (pinned below). Nothing else: the

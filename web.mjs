@@ -25,7 +25,7 @@ import { readJsonState, readJsonForUpdate, FILE_OK, FILE_ABSENT, FILE_UNREADABLE
 import { saveAppData, restoreAppData, appDataFile, noLinkOnTheWay, APP_DATA_DIR, UPLOADS_DIR } from './lib/appdata.mjs';
 import { loadProfile, loadProfileForUpdate, saveProfile, ageFromYear, sanitizeHealthThresholds, effectiveHealthThresholds, emailOk } from './lib/users.mjs';
 import { promote, rollback, unshare, listShared, fork, copyNoLinks, LINKED_SOURCE, FORK_REFUSED } from './lib/sharedapps.mjs';
-import { getChapter, searchBible, BIBLE_DATA_DIR } from './lib/bible.mjs';
+import { getChapter, bibleSearchWire, BIBLE_DATA_DIR } from './lib/bible.mjs';
 import { listBriefings, getBriefing, saveBriefing, pruneBriefings, pendingActions, runJob } from './lib/autonomy.mjs';
 import { settleProposals, annotateBriefing, expireStaleActions, sweepStrandedApprovals, isFlagSuppressed, recordReminderRetirement } from './lib/actions.mjs';
 import { decideAction, withUserLock } from './lib/decide.mjs';
@@ -81,7 +81,7 @@ import { pageImageFile, IMG_BAD_PATH, IMG_NOT_FOUND } from './lib/note-page-imag
 import { buildFollowup, followupDeps } from './lib/summary-followup.mjs';
 import { writerClaudeBase, writerLaneMs } from './lib/research-writer.mjs';
 import { snapshotApps, appBuildWarnings } from './lib/app-postcheck.mjs';
-import { isBlankAnswer, laneFailureText, shouldFallBackToAgent, fallbackStatusText, chatTurnLogLine } from './lib/chat-outcome.mjs';
+import { isBlankAnswer, laneFailureText, shouldFallBackToAgent, fallbackStatusText, chatTurnLogLine, turnErrorText } from './lib/chat-outcome.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 
@@ -1489,7 +1489,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
     line({ type: 'done', ok: r.ok, text: blank ? '' : (r.text || ''), by });
   } catch (e) {
     console.log(chatTurnLogLine({ app: tag, lane: chosen, ok: false, textLen: 0, ms: Date.now() - startedAt, code: e.code || e.status || e.name, fellBack }));
-    line({ type: 'error', text: e.message });
+    line({ type: 'error', text: turnErrorText(chosen, e) });
   } finally {
     clearInterval(beat);
     if (alive()) res.end();
@@ -1727,7 +1727,7 @@ const server = http.createServer(async (req, res) => {
       }
     }
     if (req.method === 'GET' && p === '/api/bible-search') {
-      try { return send(res, 200, 'application/json', JSON.stringify(searchBible(BIBLE_DATA, url.searchParams.get('q')))); }
+      try { return send(res, 200, 'application/json', JSON.stringify(bibleSearchWire(BIBLE_DATA, url.searchParams.get('q')))); }
       catch (e) { return send(res, 400, 'application/json', JSON.stringify({ error: e.message })); }
     }
     if (req.method === 'GET' && p === '/api/bible') {
@@ -1864,6 +1864,8 @@ const server = http.createServer(async (req, res) => {
       if (!slugOk(slug)) return send(res, 400, 'application/json', '{"error":"bad name"}');
       const dir = ownAppDir(user, slug);
       if (!dir) return send(res, 400, 'application/json', LINKED_APP);
+      // Not theirs (or mistyped): say so instead of a 200 for nothing deleted (F4-5).
+      if (!fs.existsSync(dir)) return send(res, 404, 'application/json', '{"error":"没有这个应用 · No such app"}');
       fs.rmSync(dir, { recursive: true, force: true });
       return send(res, 200, 'application/json', '{"ok":true}');
     }
@@ -2600,10 +2602,15 @@ const server = http.createServer(async (req, res) => {
           birthYear: Number(b.birthYear) || null, token: crypto.randomBytes(24).toString('base64url'),
           rel: `workspace-${id}`, workspace: path.join(ROOT, `workspace-${id}`),
           passHash: b.password ? hashPassword(b.password) : null, status: 'active' };
+        // A leftover folder (a removed member's, when setting it aside failed) would hand their private
+        // data to this new account — refuse rather than reuse it (GPT review 2026-11-22).
+        if (fs.existsSync(rec.workspace)) return send(res, 409, 'application/json', JSON.stringify({ error: `${path.basename(rec.workspace)} 文件夹还在，请先改名或删除 · the folder ${path.basename(rec.workspace)} still exists; rename or delete it first` }));
         provisionWorkspace(rec);
         await upsertUser(rec);
         audit('create', { who: id, name: rec.name, by: user.id });
-        return send(res, 200, 'application/json', JSON.stringify({ ok: true, id, hasPin: !!rec.passHash }));
+        // No password set → the token is how they first sign in (POST /api/login {token}), shown ONCE by
+        // Settings; with a password it could not sign in at all, so it is not handed out (F5-1).
+        return send(res, 200, 'application/json', JSON.stringify({ ok: true, id, hasPin: !!rec.passHash, ...(rec.passHash ? {} : { token: rec.token }) }));
       }
       if (p.startsWith('/api/admin/users/')) {
         const id = p.slice('/api/admin/users/'.length);
@@ -2611,6 +2618,9 @@ const server = http.createServer(async (req, res) => {
         if (!target) return send(res, 404, 'application/json', '{"error":"not found"}');
         if (req.method === 'PUT') {
           const b = await readBody(req, BODY_LIMITS.control);
+          // Owner resets a member's password (Settings "重设密码 · Reset password", F5-2): checked before
+          // anything is written; every session of theirs is signed out so the old password's reach ends.
+          if (b.password !== undefined && passwordError(b.password)) return send(res, 400, 'application/json', JSON.stringify({ error: passwordError(b.password) }));
           const prof = loadProfileForUpdate(target.workspace, { name: target.name }); // read-before-write: never rebuild a member's profile from a failed read
           if (typeof b.name === 'string' && b.name.trim()) { prof.name = b.name.trim().slice(0, 60); target.name = prof.name; }
           if (b.birthYear !== undefined) { prof.birthYear = Number(b.birthYear) || null; target.birthYear = prof.birthYear; }
@@ -2623,7 +2633,12 @@ const server = http.createServer(async (req, res) => {
           }
           prof.role = target.role;
           saveProfile(target.workspace, prof);
+          // The new password takes effect only once every check above passed and the profile saved:
+          // a refused role change must not leave a half-applied reset (GPT review, 2026-11-22).
+          const reset = b.password !== undefined;
+          if (reset) target.passHash = hashPassword(String(b.password));
           await upsertUser(target);
+          if (reset) { cfg.sessions.destroyUser(id); audit('password-reset', { who: id, by: user.id }); }
           return send(res, 200, 'application/json', '{"ok":true}');
         }
         if (req.method === 'DELETE') {
@@ -2720,7 +2735,7 @@ const server = http.createServer(async (req, res) => {
         const r = await enqueue(() => runAgent(message, agentArgs(user, fastBaseArgs(user, origin), origin), wsDir(user), 5 * 60000, agentCapabilities(laneRole(user, origin), APP_CONTRACT)));
         clearInterval(beat);
         res.end(JSON.stringify({ ok: r.ok, text: r.text }));
-      } catch (e) { clearInterval(beat); if (!res.writableEnded) res.end(JSON.stringify({ ok: false, text: e.message })); }
+      } catch (e) { clearInterval(beat); if (!res.writableEnded) res.end(JSON.stringify({ ok: false, text: turnErrorText(null, e) })); }
       return;
     }
     send(res, 404, 'text/plain', 'not found');

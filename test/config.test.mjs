@@ -228,3 +228,15 @@ test('model_review config (docs/adr/0017): defaults at load, a bad value refuses
   assert.equal(cfg.model_review.agent_lanes, true, 'the Claude and Codex lanes are measured by default (docs/adr/0017 decision 10)');
   assert.throws(() => validateConfig({ ...base(), model_review: { agent_lanes: 'on' } }, root), /model_review: agent_lanes must be true or false/);
 });
+
+// F4-1 (overnight test 2026-11-22): a family member's default lane listed the HOST account's
+// Gmail, Calendar and Drive connectors as usable — member_args carried no --strict-mcp-config,
+// so the CLI loaded every MCP server the machine's Claude account has. The member default loads none.
+test('member_args default loads no MCP server of the host account', () => {
+  const cfg = validateConfig(base(), root);
+  assert.ok(cfg.member_args.includes('--strict-mcp-config'), 'the default confines MCP to an explicit (empty) set');
+  assert.deepEqual(cfg.member_args.slice(0, 2), ['--permission-mode', 'acceptEdits'], 'the mode is unchanged');
+  // CONTROL: an operator's own member_args is kept as written.
+  const own = validateConfig({ ...base(), member_args: ['--permission-mode', 'acceptEdits'] }, root);
+  assert.deepEqual(own.member_args, ['--permission-mode', 'acceptEdits']);
+});
