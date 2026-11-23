@@ -89,9 +89,9 @@ jobs:
         # 2026-11-23: EVERY OS +1 (ubuntu 132, windows 215): note-link-e2e range-end check.
         include:
           - os: ubuntu-latest
-            max_skipped: 132
+            max_skipped: 133
           - os: windows-latest
-            max_skipped: 215
+            max_skipped: 216
     env:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED

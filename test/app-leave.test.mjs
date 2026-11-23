@@ -203,7 +203,7 @@ test('with no app slug, EVERY kind is refused in the shell\'s words, and none re
     assert.deepEqual(hits, [], 'nothing reached the server');
     const C = loadShellBroker(b, { app: 'notes' });
     await C.post({ id: 1, kind: 'data', path: 'x.json' });
-    assert.deepEqual(hits, ['/api/data/data/notes/x.json'], 'CONTROL: with a slug the same request goes out, namespaced');
+    assert.deepEqual(hits, ['/api/data/data/notes/x.json?absent=empty'], 'CONTROL: with a slug the same request goes out, namespaced');
   } finally { srv.closeAllConnections(); srv.close(); }
 });
 
