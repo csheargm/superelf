@@ -1634,12 +1634,13 @@ function clearSel(){
 (function(){
   const wrap=document.getElementById('verses');
   if(!wrap) return;
-  const palmIds=new Set();
-  const penSeen=(e)=>{ if(e.pointerType==='pen') _lastPen=Date.now(); };
+  const palmIds=new Set(), liveFingers=new Set();
+  // Only a Pencil ON the glass counts: hover (buttons 0, no pressure) must not swallow finger taps.
+  const penSeen=(e)=>{ if(e.pointerType==='pen'&&(e.buttons!==0||e.pressure>0)) _lastPen=Date.now(); };
   document.addEventListener('pointermove',penSeen,{capture:true,passive:true});
   for(const t of ['pointerup','pointercancel']) window.addEventListener(t,function(e){
     if(e.pointerType==='pen'){ _penDown=Math.max(0,_penDown-1); _lastPen=Date.now(); return; }
-    if(e.pointerType==='touch') _fingers=Math.max(0,_fingers-1);
+    if(e.pointerType==='touch'){ _fingers=Math.max(0,_fingers-1); liveFingers.delete(e.pointerId); }
     if(palmIds.delete(e.pointerId)){ _palmHeld=palmIds.size; _palmClick=true; _lastPen=Math.max(_lastPen,Date.now()); clearSel(); }   // the window runs on past a lifted palm
   },{capture:true,passive:true});
   // A palm resting on the glass while the Pencil is down: stop iOS's own long-press selection at the
@@ -1655,9 +1656,12 @@ function clearSel(){
   let pressed=null; const unpress=()=>{ if(pressed){ pressed.classList.remove('press'); pressed=null; } };
   document.addEventListener('pointerdown',function(e){
     if(!wrap.contains(e.target)) return;
-    if(e.pointerType==='pen'){ _penPress=true; _penDown++; _lastPen=Date.now(); lpCancel(); return; }
+    if(e.pointerType==='pen'){ _penPress=true; _penDown++; _lastPen=Date.now(); lpCancel();
+      // Palm first, Pencil second: every finger already resting is a palm from now on.
+      if(liveFingers.size){ for(const id of liveFingers) palmIds.add(id); _palmHeld=palmIds.size; unpress(); clearSel(); }
+      return; }
     _palmClick=false;
-    if(e.pointerType==='touch') _fingers++;
+    if(e.pointerType==='touch'){ _fingers++; liveFingers.add(e.pointerId); }
     if(e.pointerType==='touch'&&palmGuard()){ palmIds.add(e.pointerId); _palmHeld=palmIds.size; lpCancel(); return; }
     unpress(); pressed=e.target.closest?e.target.closest('.verse'):null; if(pressed) pressed.classList.add('press');
   },{capture:true,passive:true});

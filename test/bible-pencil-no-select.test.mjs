@@ -25,7 +25,7 @@ function run({ inkStopsPen = true, src = block } = {}) {
     h.touchstart({ touches, changedTouches: changed, preventDefault() { prevented = true; } }); return prevented; };
   const selectstart = () => { let p = false; doc.selectstart({ target: verse, preventDefault() { p = true; } }); return p; };
   return { down, up, hold, select, touchstart, selectstart, press: (t) => { down(t); up(t); }, timers: () => timers, asks: () => asks,
-    selected, tinted: () => cls.has('press'), wait: (ms) => { clock += ms; } };
+    selected, tinted: () => cls.has('press'), move: (e) => doc.pointermove(e), wait: (ms) => { clock += ms; } };
 }
 test('a Pencil press starts no long-press and its click never reaches the verse (ink layer stops the down)', () => {
   const r = run(); r.press('pen'); assert.equal(r.timers(), 0); assert.deepEqual(r.selected, []);
@@ -84,4 +84,24 @@ test('mutation control (R14): without the palm guard the resting palm asks AI', 
   const src = block.replace('const palmGuard=()=>', 'const palmGuard=()=>false, _off=()=>');
   assert.notEqual(src, block);
   const r = run({ src }); r.down('pen', 9); r.up('pen', 9); r.wait(100); r.down('touch', 2); r.hold(700); assert.equal(r.asks(), 1);
+});
+
+// GPT review blocking 1: palm FIRST, Pencil second (the common writing posture).
+test('palm first, then Pencil: the resting palm loses its tint, its selection, and its lift-click', () => {
+  const r = run(); r.wait(2000); r.down('touch', 2); assert.equal(r.tinted(), true);
+  r.wait(500); r.down('pen', 9);
+  assert.equal(r.tinted(), false, 'tint removed'); assert.equal(r.select(), 0, 'selection cleared');
+  r.up('pen', 9); r.wait(2000);
+  assert.equal(r.select(), 0, 'palm still held after the window: still cleared');
+  r.up('touch', 2); assert.deepEqual(r.selected, [], 'palm lift-click swallowed');
+});
+// GPT review blocking 2: Pencil hover must not lock out finger taps.
+test('Pencil hover (no contact) does not swallow a finger tap or a deliberate hold', () => {
+  const r = run(); r.wait(2000); r.move({ pointerType: 'pen', buttons: 0, pressure: 0 });
+  r.down('touch', 2); r.hold(600); assert.equal(r.asks(), 1);
+  r.up('touch', 2); assert.deepEqual(r.selected, [3]);
+});
+test('Pencil drag ON the glass still refreshes the palm window', () => {
+  const r = run(); r.wait(2000); r.move({ pointerType: 'pen', buttons: 1, pressure: 0.5 });
+  r.down('touch', 2); r.hold(700); assert.equal(r.asks(), 0);
 });
