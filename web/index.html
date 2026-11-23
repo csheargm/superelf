@@ -30,6 +30,8 @@ header h1{ font-size:18px; white-space:nowrap; min-width:0; overflow:hidden; tex
 .dot{ width:8px; height:8px; border-radius:50%; background:var(--danger); flex-shrink:0; }
 .dot.ok{ background:var(--accent); }
 header .spacer{ flex:1; }
+/* Phone: tighter header so the name is not cut to "M…" (F4-8); setHeaderName drops the product word next. */
+@media (max-width:440px){ header{ gap:4px; padding:12px 10px; } header .ibtn{ padding-left:4px; padding-right:4px; } }
 main{ max-width:720px; width:100%; margin:0 auto; padding:0 16px; flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; }
 #log{ flex:1; min-height:0; overflow-y:auto; padding:8px 0 var(--pill-clear, calc(104px + env(safe-area-inset-bottom,0px))); scroll-padding-bottom:var(--pill-clear, calc(104px + env(safe-area-inset-bottom,0px))); }
 #log{ display:flex; flex-direction:column; gap:10px; }
@@ -572,8 +574,29 @@ function closeDrawer(){ $('#drawer').classList.remove('open'); $('#backdrop').cl
 $('#menu').onclick=openDrawer; $('#backdrop').onclick=closeDrawer;
 $('#newChat').onclick=newConvo; $('#goHome').onclick=goHome;
 
+/* ── Header name (F4-8) ── "Mara’s 管家" when it fits; on a narrow phone just "Mara" — the product word
+   goes first, never the name cut to "M…". Re-fitted whenever the header's width changes. */
+function setHeaderName(name){
+  const h1=document.querySelector('header h1'); if(!h1) return;
+  const product=h1.dataset.product||'管家';
+  h1.dataset.full=name?name+'’s '+product:product; h1.dataset.short=name||product;
+  fitHeaderName();
+}
+function fitHeaderName(){
+  const h1=document.querySelector('header h1'); if(!h1||!h1.dataset.full) return;
+  h1.textContent=h1.dataset.full;
+  if(h1.scrollWidth>h1.clientWidth) h1.textContent=h1.dataset.short;
+}
+if(typeof ResizeObserver==='function') new ResizeObserver(fitHeaderName).observe(document.querySelector('header'));
+
+/* ── Replies never show an account's folder name ── (F4-8) The agent works in workspace-<id>
+   and sometimes says so; people see "your workspace" instead. Display only — the stored text is untouched. */
+const WORKSPACE_DIR_RE=/(?:\/?[\w.~-]+\/)*workspace-[a-z0-9_-]+\b/gi;
+const plainWorkspace=(t)=>String(t).replace(WORKSPACE_DIR_RE,'your workspace');
+
 /* ── Markdown renderer ── */
 function renderMd(raw){
+  raw=plainWorkspace(raw);
   const he=(s)=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const blocks=[]; let s=raw.replace(/```(\w*)\n?([\s\S]*?)```/g,(_,lang,code)=>{
     blocks.push(`<pre><code>${he(code.replace(/\n$/,''))}</code></pre>`);
@@ -641,7 +664,7 @@ const ACCOUNT_REMOVED_CODE='account_removed', ACCOUNT_REMOVED_TEXT='你的账号
 let accountRemoved=false;
 async function ping(signal){ if(!T) return false; const t0=T; let r; try{ r=await api('/api/ping',signal?{signal}:{}); }catch{ if(T===t0&&!signal) PAOffline.noteNet(false); return 'offline'; } if(T!==t0) return false;   // the session changed while this ping ran: its answer is not ours to apply
   if(signal){ let j0; try{ j0=await r.clone().json(); }catch{ return false; } if(T!==t0||!j0||!((r.ok&&typeof j0.ok==='boolean')||r.status===401)) return false; }   // a re-check needs the NODE: its ping reply or its 401 bad-token; a gateway error or HTML page does not count
-  PAOffline.noteNet(true); try{ const j=await r.json(); if(T!==t0) return false; accountRemoved=r.status===401&&j.code===ACCOUNT_REMOVED_CODE; if(accountRemoved){ T=null; try{ localStorage.removeItem('pa_session'); localStorage.removeItem(SW_UID_KEY); }catch{ /* blocked storage: nothing was kept to reopen offline */ } } if(j.ok){ UID=j.uid; PASW.remember(SW_UID_KEY,j.uid); const h1=document.querySelector('h1'); if(j.name) h1.textContent=j.name+'’s '+(h1.dataset.product||'管家'); else if(h1.dataset.product) h1.textContent=h1.dataset.product; } return j.ok; }catch{ return false; } }
+  PAOffline.noteNet(true); try{ const j=await r.json(); if(T!==t0) return false; accountRemoved=r.status===401&&j.code===ACCOUNT_REMOVED_CODE; if(accountRemoved){ T=null; try{ localStorage.removeItem('pa_session'); localStorage.removeItem(SW_UID_KEY); }catch{ /* blocked storage: nothing was kept to reopen offline */ } } if(j.ok){ UID=j.uid; PASW.remember(SW_UID_KEY,j.uid); setHeaderName(j.name); } return j.ok; }catch{ return false; } }
 // Offline is set by one failed request, and only a later success clears it. On a screen that makes no
 // requests (the home grid) that never came, so the line stayed on with the network back (owner 2026-11-21).
 // While offline and visible, ask the node again on a short beat, on return to the app and on 'online'.
