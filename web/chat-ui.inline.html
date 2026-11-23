@@ -723,9 +723,11 @@
     // TODO(R4 seam): grows this over-budget file by two lines; the seam is buildDrawer → web/drawer-ui.inline.html.
     if(window.PADrawerSummary) window.PADrawerSummary.attach({host,bar:bulkBar,head:q('.pac-dhead'),picked:()=>[..._picked].map(itemOf),items:()=>_items,done:()=>setMulti(false),hooks:c.summary||null});   // head: the header's Summarize (owner 2026-11-11)
 
+    // A tap outside closes the docked list on CLICK, not pointerdown: closing reflows the page beside it, and a
+    // reflow between press and release moved the header out from under the pointer, so that first click was lost (F3-01).
     let _docClose=null;
-    function close(){ if(_multi) setMulti(false); host.classList.remove('on'); list.classList.remove('on'); backdrop.classList.remove('on'); dockOff(host); if(_docClose){ document.removeEventListener('pointerdown',_docClose,true); _docClose=null; } }
-    async function open(){ sel=c.activeId?c.activeId():sel; await refresh(); host.classList.add('on'); list.classList.add('on'); backdrop.classList.add('on'); dockOn(host); if(!_docClose){ _docClose=e=>{ if(!host.contains(e.target)) close(); }; document.addEventListener('pointerdown',_docClose,true); } }
+    function close(){ if(_multi) setMulti(false); host.classList.remove('on'); list.classList.remove('on'); backdrop.classList.remove('on'); dockOff(host); if(_docClose){ document.removeEventListener('click',_docClose,true); _docClose=null; } }
+    async function open(){ sel=c.activeId?c.activeId():sel; await refresh(); host.classList.add('on'); list.classList.add('on'); backdrop.classList.add('on'); dockOn(host); if(!_docClose){ _docClose=e=>{ if(!host.contains(e.target)) close(); }; document.addEventListener('click',_docClose,true); } }
     // setActive(id): re-mark the ONE active row; redraws now if open, else the next open()
     // re-reads activeId() anyway.
     function setActive(id){ sel=(id==null?null:id); if(list.classList.contains('on')) draw(); }

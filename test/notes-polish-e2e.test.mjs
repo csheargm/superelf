@@ -109,3 +109,23 @@ test('F3-04: a plain click on a summary [n] link in Text mode opens its source n
   assert.deepEqual(await frame.evaluate(() => window.__opened), ['?note=abc&page=0'], 'a plain click on a web link while editing places the caret, opens nothing');
   await ctx.close();
 });
+
+test('F3-01: with the list docked, the FIRST click on a header button works (Draw switches mode; the header does not move between press and release)', { skip, timeout: 90000 }, async () => {
+  await seed();
+  for (const vp of [{ width: 1280, height: 850 }, { width: 1180, height: 820 }]) {
+    const ctx = await newContext({ viewport: vp }); const page = await ctx.newPage();
+    const frame = await openDocked(page);
+    assert.equal(await frame.evaluate(() => !!document.querySelector('.pac-drawerhost.on')), true, `${vp.width}: CONTROL: the list is docked`);
+    assert.equal(await frame.evaluate(() => !!document.querySelector('.pan-textlayer.pan-txted')), true, `${vp.width}: CONTROL: the typed note opened in Text`);
+    const fr = await page.locator('#fr').boundingBox();
+    const at = () => frame.evaluate(() => { const r = document.querySelector('.pan-mdraw').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+    const b = await at();
+    await page.mouse.move(fr.x + b.x, fr.y + b.y); await page.mouse.down();
+    await page.waitForTimeout(250);                                            // any reflow a press causes has happened by now
+    const moved = Math.round((await at()).x - b.x);
+    await page.mouse.up();
+    assert.equal(moved, 0, `${vp.width}: Draw stays under the pointer while pressed`);
+    await frame.waitForFunction(() => !document.querySelector('.pan-textlayer.pan-txted'), null, { timeout: 3000 });   // the click landed: Draw mode
+    await ctx.close();
+  }
+});
