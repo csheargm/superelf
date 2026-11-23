@@ -623,3 +623,42 @@ Without it they now FAIL (R14), not pass as `# pass 0 / # fail 0`. To run them:
   none, so a word split over two lines in them still comes apart in portrait; they are never moved, so the
   original writing stays exactly as written. A word written slowly (more than BURST_MS between strokes)
   across two lines is not tagged either. (2026-11-22)
+
+## Overnight test findings still open (2026-11-23 triage; fixed ones omitted)
+- F1-3/F1-6/F5-12/F4-7/F2-05/F3-09: bilingual sweep, 中文 first everywhere; one word for password vs PIN; no raw "role: owner".
+- F1-8: demo guest tip offers app-making but AI asks to sign in; typed question not shown; sign-in/waitlist popovers lack title and close.
+- F1-9: demo tiles English-only; "live from tasks.md" file-name jargon.
+- F5-4: login lockout keyed per IP, so one member's wrong passwords lock the whole family (one home IP) out.
+- F2-03: Bible reader has no next/previous chapter (no end-of-chapter button, swipe or ArrowRight).
+- F2-06: Bible top bar auto-hides even with a mouse; on phone a selected verse hides Ask AI.
+- F2-07: Bible first-use bar tip covers verse 1 / phone toolbar until closed.
+- F2-09: changing book logs an unread chapter 1 in reading history.
+- F2-11: /app/owner/bible/ opened directly shows bare "not found", not a sign-in prompt.
+- F2-12: highlighting a verse adds a "· Note" row in Notes & Chats with no note.
+- F2-13: real AI answer quality on try.superelf.app not yet judged (visitor cap blocked testing).
+- F3-01: first tap on a Journal header button is lost while the notes drawer is docked.
+- F3-02: Print unreachable on iPad portrait (820) with the drawer docked.
+- F3-03: AI summary contradicts itself on follow-ups.
+- F3-04: summary ref links [1] work only with Cmd-click; no way on iPad/phone.
+- F3-05: Ask AI model chip ("DeepSeek · 中文") disagrees with the reply footer ("Claude").
+- F3-06: first-use tips cover note text and drawer group headers.
+- F3-07: Escape closes neither the row ⋯ sheet nor Page settings.
+- F3-08: Page settings shows a developer readout and runs off the right edge.
+- F3-10: plural grammar ("1 pages", "1 to-dos"); summarize shows "已选 (0)" while sending 1 page.
+- F3-11: drawer row preview joins lines with no space ("#familyRemember").
+- F3-12: deleted note text stays in entry-<id>.json.bak on disk.
+- F3-13: "Note 笔记" / "Saved · 已存" chips wrap; phone summary row time clipped.
+- F3-14: a summary quoting a #tag picks up that tag in the drawer strip.
+- F3-15: first shell load prefetches all 1189 Bible chapters; heavy on a phone.
+- F4-2: test node "no AI" still runs host CLI lanes; a new member defaults to Claude; replies leak host jargon.
+- F4-3: main chat has no stop/cancel while a turn runs.
+- F4-4: member home requests notes/bible shelf apps -> 404; 401 /pa-sw-probe on every load.
+- F4-6: drawer lists an app twice (Family Shelf and Family Apps); owner's own apps show "by Owner (you)".
+- F4-8: phone header truncates "Mara's 管家"; replies show "workspace-mara".
+- F5-7: offline Family Apps says "None shared yet." and the title loses the owner's name.
+- F5-8: remove member fixed only in part; recheck the full flow.
+- F5-9: internal id "owner" shown instead of the chosen username; promote list shows slugs.
+- F5-10: activity log is a native alert() with jargon and UTC times.
+- F5-14: owner's starter apps (incl. Diabetes) shown to members by default; confirm intended.
+- F2-08/F3-INK (ink workflows): Pencil tip shown on phone/over chat; a stray mouse dot became ink.
+- test/family-settings-e2e.test.mjs sets up accounts unlike real sign-up; rewrite. Settings not run on webkit/iPad Safari.
