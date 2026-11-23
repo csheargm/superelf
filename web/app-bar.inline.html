@@ -97,10 +97,12 @@
     for(const e of chrome){ e.style.position='relative'; e.style.zIndex='5'; e.classList.add('paab-on'); }
     S.lift={chrome,gap:0};
     const measure=()=>{
-      const y=sc.scrollTop; sc.style.marginTop=''; sc.style.paddingTop='';
+      const y=sc.scrollTop, old=S.lift.gap; sc.style.marginTop=''; sc.style.paddingTop='';
       const gap=Math.max(0,sc.offsetTop-mar-bar.offsetTop+(parseFloat(getComputedStyle(bar).marginTop)||0));
       S.lift.gap=gap; sc.style.marginTop=(mar-gap)+'px'; sc.style.paddingTop=(pad+gap)+'px'; sc.style.scrollPaddingTop=gap+'px';
-      sc.scrollTop=y;
+      // Mid-page, a banner appearing / expiring changes the padding by its height: scroll by the same so
+      // the line under the reader stays put. At the top the first line stays reachable (scrollTop 0).
+      sc.scrollTop=y>0&&old?y+gap-old:y;
       if(S.hidden) for(const e of chrome) e.style.transform='translateY('+(-gap-1)+'px)';
     };
     measure();

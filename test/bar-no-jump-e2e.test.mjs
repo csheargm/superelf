@@ -96,3 +96,28 @@ for (const [name, vp] of Object.entries(VIEWPORTS)) {
     } finally { await ctx.close(); }
   });
 }
+
+// GPT review: the daily banner sits between the bar and the scroller, so its appearing / expiring changes
+// the lift's gap. Mid-chapter that must not move the verse the reader is on — bar shown OR hidden.
+for (const [name, vp] of Object.entries({ phone: VIEWPORTS.phone, ipad: VIEWPORTS.ipad })) {
+  test(`Bible ${name}: the daily banner appearing / expiring mid-chapter does not move the verse`, { skip, timeout: 90000 }, async () => {
+    const { ctx, page, frame } = await open('bible', BIBLE_READY, vp);
+    try {
+      await frame.evaluate(() => { document.getElementById('verses').scrollTop = 300; });
+      await frame.evaluate(() => { const v = [...document.querySelectorAll('.verse')].find((e) => e.getBoundingClientRect().top > innerHeight / 3); v.id = 'probe-v'; });
+      for (const hidden of [false, true]) {
+        await frame.evaluate((h) => (h ? PAAppBar.hide() : PAAppBar.show()), hidden); await page.waitForTimeout(SETTLE_MS);
+        const b0 = await topOf(page, frame, '#probe-v');
+        await frame.evaluate(() => { const b = document.getElementById('daily-banner'); b.textContent = 'banner'; b.classList.add('show'); });
+        await page.waitForTimeout(SETTLE_MS);
+        assert.ok(await frame.evaluate(() => document.getElementById('daily-banner').offsetHeight > 0), 'CONTROL: the banner showed');
+        const b1 = await topOf(page, frame, '#probe-v');
+        await frame.evaluate(() => document.getElementById('daily-banner').classList.remove('show'));
+        await page.waitForTimeout(SETTLE_MS);
+        const b2 = await topOf(page, frame, '#probe-v');
+        assert.ok(Math.abs(b1 - b0) <= TOL && Math.abs(b2 - b0) <= TOL, `bar ${hidden ? 'hidden' : 'shown'}: banner moved the verse ${b0} -> ${b1} -> ${b2}`);
+        console.log(`# measure banner ${name} hidden=${hidden} ${b0} ${b1} ${b2}`);
+      }
+    } finally { await ctx.close(); }
+  });
+}
