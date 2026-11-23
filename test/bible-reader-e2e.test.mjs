@@ -37,6 +37,23 @@ async function open({ viewport = { width: 1100, height: 850 }, touch = false } =
   return { ctx, page, frame };
 }
 
+// F2-07: the first-use bar tip leaves at the first tap anywhere (and is remembered). Runs first: tipsSeen lives on this server.
+test('F2-07: the app-bar tip is dismissed by the first tap on the page, and stays dismissed on reopen', { skip, timeout: 90000 }, async () => {
+  let { ctx, frame } = await open();
+  try {
+    await frame.waitForFunction(() => PATips.current() === 'app-own-bar');
+    await frame.locator('.verse').nth(3).click();
+    await frame.waitForFunction(() => !document.querySelector('.pat-tip'));
+    await frame.evaluate(() => PATips.whenIdle());
+  } finally { await ctx.close(); }
+  ({ ctx, frame } = await open());
+  try {
+    await frame.waitForTimeout(1500);
+    assert.notEqual(await frame.evaluate(() => PATips.current()), 'app-own-bar', 'not shown again');
+    assert.ok(await frame.evaluate(() => PATips.seen().includes('app-own-bar')));
+  } finally { await ctx.close(); }
+});
+
 // F2-12: a verse with only a highlight is listed as a Highlight row, not as a "Note".
 test('F2-12: ☰ lists a highlight-only verse as 高亮 · Highlight; a verse with note text stays Note', { skip, timeout: 90000 }, async () => {
   fs.mkdirSync(NOTES(), { recursive: true });

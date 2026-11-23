@@ -123,7 +123,7 @@
     const sc=el(c.scroller);
     if(sc){ S.lastY=sc.scrollTop; sc.addEventListener('scroll',()=>onScroll(sc),{passive:true}); }
     bindPull();
-    if(window.PATips) window.PATips.register({id:'app-own-bar',anchor:()=>home,text:TIP,priority:true});   // first-use tip (ADR 0030); first: Home moved
+    if(window.PATips) window.PATips.register({id:'app-own-bar',anchor:()=>home,text:TIP,priority:true,dismissOnUse:true});   // F2-07: gone at the first tap   // first-use tip (ADR 0030); first: Home moved
     setHidden(false);   // shown on open, on the idle clock
     post('ready');
   }

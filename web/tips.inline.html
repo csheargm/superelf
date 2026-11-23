@@ -14,6 +14,8 @@
          priority:true  goes ahead of every non-priority tip (owner 2026-11-13: "Home moved" must not wait
                         behind older unseen tips), and replaces one already on screen, unseen, so it shows THIS
                         open. Default false: registration order, as before.
+         dismissOnUse:true  the first press or key anywhere on the page also dismisses it for good (F2-07:
+                        the app-bar tip explains a bar that then moves; it must not outstay the first tap).
        PATips.check()   re-look now (a feature that just opened a sheet or dialog calls it)
        PATips.reset()   forget tipsSeen on the account (Settings: Show tips again · 重新显示提示)
        PATips.seen() / PATips.current() / PATips.whenIdle() — for tests and hosts.
@@ -137,7 +139,7 @@
   function register(o){
     if(!o||typeof o.id!=='string'||!o.id||typeof o.text!=='string'||!o.text||!o.anchor) throw new Error('PATips.register: id, text and anchor required');
     if(!regs.some(r=>r.id===o.id)){
-      const t={id:o.id,anchor:o.anchor,text:o.text,when:typeof o.when==='function'?o.when:null,priority:o.priority===true};
+      const t={id:o.id,anchor:o.anchor,text:o.text,when:typeof o.when==='function'?o.when:null,priority:o.priority===true,dismissOnUse:o.dismissOnUse===true};
       const at=t.priority?regs.findIndex(r=>!r.priority):-1;   // after earlier priority tips, before the rest
       if(at<0) regs.push(t); else regs.splice(at,0,t);
     }
@@ -181,6 +183,9 @@
     document.addEventListener('transitionend',onScroll,true);   // an ancestor's slide finished: re-place
     document.addEventListener('click',()=>{ follow(); later(check); },true);
     document.addEventListener('scroll',onScroll,true);
+    // dismissOnUse: the first press / key on the page (outside the tip, whose own click already dismisses).
+    const used=e=>{ if(cur&&cur.t.dismissOnUse&&!(e&&e.target&&cur.tip.contains&&cur.tip.contains(e.target))) dismiss(); };
+    document.addEventListener('pointerdown',used,true); document.addEventListener('keydown',used,true);
   }
   window.addEventListener('resize',()=>{ if(cur) follow(); else later(check); });
   window.PATips={register,check,reset,dismiss,PREF,CLOSE,
