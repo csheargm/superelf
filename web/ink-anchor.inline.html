@@ -224,7 +224,7 @@
         const rr=m.text.length?m.anchorRect(r.start,r.end,g.w):null, rect=rr&&rr.width>0?local(rr):local(el.getBoundingClientRect());
         out.push({g,at:place(g,rect),orphan:false});
       }
-      const fin=Frame.shiftClusters(out,env);   // a word across two lines stays one word on another width
+      const fin=Frame.followEnclosures(Frame.shiftClusters(out,env),groups,env);   // a word across lines stays one word; a circle keeps its words
       layoutBucket(container,bucket,fin.filter(p=>p.orphan),local);
       return fin;
     }

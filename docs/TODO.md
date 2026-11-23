@@ -5,6 +5,12 @@ that found it in brackets. Pick from here; do not open a side session per item.
 
 ## Verse ink: handwriting frame leftovers (GPT review 2026-11-22, web/ink-frame.inline.html)
 
+- Circle round words (followEnclosures, 2026-11-22): on another width a closed big stroke is re-anchored
+  to the characters whose middle lies inside it, and line-frame writing chained to it within NEAR moves
+  with it. Known limits: only CLOSED single strokes (an open bracket or underline is not re-anchored);
+  the written width must be on record (a ww/fw in the chapter that re-measures the stored run width) —
+  a chapter with no line-frame writing and no ww keeps the old placement; unrelated writing touching
+  the circle within NEAR is taken along with it.
 - Writing more onto a line whose handwriting is already shrunk to fit (a phone) and running past its
   right edge re-shrinks the whole block on lift, so the new stroke lands a little left of where it was
   drawn. Fix: solve the stroke's frame offset against the post-commit scale.
