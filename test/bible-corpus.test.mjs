@@ -49,12 +49,25 @@ test('a bad or missing reference throws — never an empty chapter', () => {
   assert.throws(() => getChapter(DATA, 43, 151), /bad reference/);
 });
 
+// F2-10 (overnight 2026-11-22): book=1.5 passed the range check and leaked Node's internal
+// 'The "path" argument must be of type string'; book=1e1 was read as 10. Whole numbers only.
+test('a reference that is not a plain whole number is a bad reference, not an internal error', () => {
+  for (const [b, c] of [['1.5', 1], ['1e1', 1], [43, '3.5'], [' 43', 3], ['0x2B', 3], [43, '']]) {
+    assert.throws(() => getChapter(DATA, b, c), /^Error: bad reference$/, `book=${b} chapter=${c}`);
+  }
+  assert.equal(getChapter(DATA, '43', '3').book, 43, 'a digit string still works (query params are strings)');
+});
+
 test('search: an English query reads the BSB, a Chinese one 和合本; capped; short queries empty', () => {
   const en = searchBible(DATA, 'so loved the world');
-  assert.ok(en.some((r) => r.book === 43 && r.chapter === 3 && r.verse === 16), 'John 3:16 found in English');
+  assert.ok(en.hits.some((r) => r.book === 43 && r.chapter === 3 && r.verse === 16), 'John 3:16 found in English');
+  assert.equal(en.more, false, 'every hit is listed');
   const zh = searchBible(DATA, '神爱世人');
-  assert.ok(zh.some((r) => r.book === 43 && r.chapter === 3 && r.verse === 16), 'John 3:16 found in Chinese');
-  assert.equal(searchBible(DATA, 'the').length, 60, 'capped at 60');
-  assert.deepEqual(searchBible(DATA, 'a'), []);
-  assert.deepEqual(searchBible(DATA, ''), []);
+  assert.ok(zh.hits.some((r) => r.book === 43 && r.chapter === 3 && r.verse === 16), 'John 3:16 found in Chinese');
+  // F2-01: a cap that says nothing reads as "these are all the verses" ("love" stopped at 1 Samuel).
+  const the = searchBible(DATA, 'the');
+  assert.equal(the.hits.length, 60, 'capped at 60');
+  assert.equal(the.more, true, 'the cap is said, so the reader knows to narrow the search');
+  assert.deepEqual(searchBible(DATA, 'a'), { hits: [], more: false });
+  assert.deepEqual(searchBible(DATA, ''), { hits: [], more: false });
 });

@@ -115,7 +115,7 @@ test('broker flow: public dead, home name up with the same build → the drain l
     const { B, line, clock } = broker(publicUrl, localUrl);
     await B.post({ id: 1, kind: 'save-data', path: 'entry-e1.json', data: nb(10) }); await settle();
     assert.equal(B.reply(1).offline, true, 'the public name refused the connection: queued');
-    assert.equal(line.textContent, 'Offline · 离线 — saving on this iPad · 保存在此 iPad · check Tailscale or the node · 请检查 Tailscale 或节点 · 1 to sync · 待同步');
+    assert.equal(line.textContent, 'Offline · 离线 — saving on this device · 保存在本设备 · check Tailscale or the node · 请检查 Tailscale 或节点 · 1 to sync · 待同步');
     B.triggers.online[0](); await settle(200);
     assert.deepEqual(local.posts, ['data/notes/entry-e1.json'], 'the queued save went to the home name');
     assert.equal(local.auth, 'Bearer test-token', 'the same session token');
@@ -153,7 +153,7 @@ test('broker flow: a home name with a DIFFERENT build is never used (the save st
     await B.post({ id: 1, kind: 'save-data', path: 'entry-e1.json', data: nb(10) }); await settle();
     assert.equal(await B.sync.drain(), 'unreachable');
     assert.deepEqual(other.posts, []); assert.equal(B.base(), ''); assert.equal(B.origin.status().last, 'different-build');
-    assert.equal(line.textContent, 'Offline · 离线 — saving on this iPad · 保存在此 iPad · check Tailscale or the node · 请检查 Tailscale 或节点 · 1 to sync · 待同步');
+    assert.equal(line.textContent, 'Offline · 离线 — saving on this device · 保存在本设备 · check Tailscale or the node · 请检查 Tailscale 或节点 · 1 to sync · 待同步');
     assert.equal(f.rows('pa-offline', 'writes').length, 1);
     const { B: C } = broker(publicUrl, null);
     await C.post({ id: 1, kind: 'save-data', path: 'entry-e1.json', data: nb(10) }); await settle();
