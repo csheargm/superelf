@@ -35,7 +35,9 @@ async function openBible(page) {
   return frame;
 }
 const where = (f) => f.evaluate(() => [+document.getElementById('book-sel').value, document.getElementById('ch-label').value]);
-const go = async (f, b, c) => { await f.evaluate(([b, c]) => { bookIdx = b; chapter = c; document.getElementById('book-sel').value = b; return load(); }, [b, c]); await f.evaluate(() => RH.idle()); };
+// F2-09: a chapter records once READ (scrolled, or open RH_DWELL_MS) — `read` scrolls it, as a reader would.
+const read = async (f) => { await f.evaluate(() => { const v = document.getElementById('verses'); v.scrollTop += 200; }); await f.waitForTimeout(150); await f.evaluate(() => RH.idle()); };
+const go = async (f, b, c) => { await f.evaluate(([b, c]) => { bookIdx = b; chapter = c; document.getElementById('book-sel').value = b; return load(); }, [b, c]); await read(f); };
 const rows = (f) => f.evaluate(() => [...document.querySelectorAll('#search-results .prh-row')].map((r) => r.querySelector('.prh-name').textContent + ' | ' + r.querySelector('.prh-when').textContent));
 
 test('the Bible reopens where you were reading; Search lists the history newest first; tap opens; Clear empties', { skip, timeout: 120000 }, async () => {
@@ -45,6 +47,7 @@ test('the Bible reopens where you were reading; Search lists the history newest 
   try {
     let f = await openBible(page);
     assert.deepEqual(await where(f), [42, '3'], 'control: first ever open is John 3');
+    await read(f);
     await go(f, 0, 1); await go(f, 0, 2);
     await page.reload();
     f = await openBible(page);
@@ -66,7 +69,7 @@ test('the Bible reopens where you were reading; Search lists the history newest 
     await f.evaluate(() => document.querySelectorAll('#search-results .prh-row')[2].click());
     await f.waitForFunction(() => !document.getElementById('search-overlay').classList.contains('on') && document.getElementById('ch-label').value === '3' && document.querySelector('.verse'));
     assert.deepEqual(await where(f), [42, '3'], 'the tapped row opened John 3');
-    await f.evaluate(() => RH.idle());
+    await read(f);
     await f.evaluate(() => document.getElementById('search-btn').click());
     assert.match((await rows(f))[0], /^约翰福音 John 第 3 章/, 'and it is now newest');
     // Clear asks first: one tap arms, the second clears.
@@ -78,6 +81,7 @@ test('the Bible reopens where you were reading; Search lists the history newest 
     await f.evaluate(() => RH.idle());
     await page.reload(); f = await openBible(page);
     assert.deepEqual(await where(f), [42, '3'], 'clearing the list keeps the place you were reading');
+    await read(f);
     await f.evaluate(() => document.getElementById('search-btn').click());
     assert.equal((await rows(f)).length, 1, 'only the chapter reopened just now');
   } finally { await ctx.close(); }

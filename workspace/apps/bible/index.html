@@ -629,6 +629,19 @@ let _hashBoot=false, _rhBoot=RH.restore(), _loadSeq=0;
 async function restoreReading(g){ const p=_rhBoot; _rhBoot=null; if(!p||_hashBoot) return;
   const l=await Promise.race([p, new Promise(res=>setTimeout(()=>res(null),RH_BOOT_WAIT_MS))]);
   if(l&&g===_loadSeq&&BOOKS[l.b]){ bookIdx=l.b; chapter=Math.min(l.c,BOOKS[l.b][2]); bookSel.value=bookIdx; } }
+// F2-09: a chapter joins the history only once it is READ — open RH_DWELL_MS, or scrolled RH_SCROLL_PX —
+// never because a book change auto-loaded its chapter 1 on the way to another chapter. A newer load
+// cancels the wait (it owns the chapter now), so passing chapters never record.
+const RH_DWELL_MS=4000, RH_SCROLL_PX=40;
+let _rhStop=null;
+function recordWhenRead(g,b,c){
+  if(_rhStop) _rhStop();
+  const sc=document.getElementById('verses'), y0=sc.scrollTop||0;
+  const stop=()=>{ clearTimeout(t); sc.removeEventListener('scroll',onScroll); if(_rhStop===stop) _rhStop=null; };
+  const go=()=>{ stop(); if(g===_loadSeq&&b===bookIdx&&c===chapter) RH.record(b,c); };
+  const onScroll=()=>{ if(Math.abs((sc.scrollTop||0)-y0)>RH_SCROLL_PX) go(); };
+  const t=setTimeout(go,RH_DWELL_MS); sc.addEventListener('scroll',onScroll,{passive:true}); _rhStop=stop;
+}
 function searchIdle(){ const box=document.getElementById('search-results'); box.innerHTML=SEARCH_HINT; const l=document.createElement('div'); box.appendChild(l); RH.render(l); }
 function paSearch(q){ return new Promise(res=>{ const id=++_id; _wait[id]=res; parent.postMessage({pa:'req',id,kind:'bible-search',q},'*'); }); }
 function openSearch(focus){ document.getElementById('search-overlay').classList.add('on'); document.getElementById('search-inp').value=''; searchIdle(); if(focus) setTimeout(()=>document.getElementById('search-inp').focus(),100); }
@@ -706,7 +719,7 @@ async function load(){
   if(g!==_loadSeq) return false;                         // superseded while the text loaded: never paint an old chapter or its timeout over the new one
   if(!r){ wrap.innerHTML='<div id="loading">无法加载 · Could not load — 请检查网络后重试 · check the connection and retry</div>'; return; }
   const vs=(r.ok&&r.data&&r.data.verses)?r.data.verses:[];
-  renderVerses(vs); if(vs.length&&g===_loadSeq&&b0===bookIdx&&c0===chapter) RH.record(b0,c0);   // a superseded load never records
+  renderVerses(vs); if(vs.length&&g===_loadSeq&&b0===bookIdx&&c0===chapter) recordWhenRead(g,b0,c0);   // a superseded load never records
 }
 
 // ── Note/draw keys ──
