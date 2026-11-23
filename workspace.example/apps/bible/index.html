@@ -641,6 +641,9 @@ document.getElementById('log-btn').onclick=()=>{ hideBackPill();
   // user actually asks for one, by tapping a chat row or ＋.
   chatUI().showListOnly(); };
 // ── Notes list (used by listAugment) ──
+// The drawer row's kind: a verse with ONLY marks (no text, no handwriting) is a Highlight row, not a
+// Note (F2-12); every other row keeps the drawer's default 'Note'.
+const rowChip=(n)=>(n.marks&&!n.hasDraws&&!n.hasText)?PAVerseMarks.TXT.chip:undefined;
 function paNotesList(){ return new Promise(res=>{ const id=++_id; _wait[id]=res; parent.postMessage({pa:'req',id,kind:'notes-list'},'*'); }); }
 document.getElementById('search-close').onclick=()=>{ document.getElementById('search-overlay').classList.remove('on'); };
 async function runSearch(){
@@ -1105,7 +1108,7 @@ const chatData={
         // falls back to the general scope and shows a different (empty) note.
         const free=n.verseKey&&n.verseKey.startsWith('free-')?n.verseKey:null;
         setTimeout(()=>openPanel(free?'draw':(n.hasDraws?'draw':'note'),free,free?n.title:undefined,rowId,at),120); };
-      items.push({id:rowId,title:n.title,preview:n.preview||'',chip:n.marks?PAVerseMarks.TXT.chip:undefined,updated:n.updated||0,created:n.created||0,doc:{path:chapterFile(n.bookIdx,n.chapter),scope:n.verseKey||''},onClick:(_id,at)=>{   // which file + draws key this row is, for the drawer's note search; `at` is the hit (phase 3)
+      items.push({id:rowId,title:n.title,preview:n.preview||'',chip:rowChip(n),updated:n.updated||0,created:n.created||0,doc:{path:chapterFile(n.bookIdx,n.chapter),scope:n.verseKey||''},onClick:(_id,at)=>{   // which file + draws key this row is, for the drawer's note search; `at` is the hit (phase 3)
         aiChat.hide();
         if(n.bookIdx!==bookIdx||n.chapter!==chapter){ bookIdx=n.bookIdx; chapter=n.chapter; bookSel.value=bookIdx; load().then(ok=>{ if(ok!==false) doOpen(at); }); }
         else doOpen(at);
