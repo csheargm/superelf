@@ -32,10 +32,15 @@ async function signIn(page, u, p) {
   await page.fill('#luser', u); await page.fill('#lpin', p); await page.click('#loginBtn');
   await page.waitForFunction(() => !document.querySelector('#login[open]'));
 }
+// WebKit: once web/sw.js controls the page, Playwright's page.route no longer sees its fetches (the
+// worker does not answer /api/family-apps — it passes through — but the interception is lost), so the
+// "node unreachable" stub would never apply. Block the worker in these contexts: the feature under
+// test is the page's own saved list, and sw.js leaves every /api/* except /api/bible untouched.
+const NO_SW = { serviceWorkers: 'block' };
 const family = (page) => page.evaluate(async () => { await loadFamilyApps(); return document.querySelector('#dFamily').textContent; });
 
 test('offline: the last Family Apps list and the name, marked offline — never "None shared yet."', { skip, timeout: 60000 }, async () => {
-  const ctx = await browser.newContext({ viewport: { width: 1000, height: 800 } }); const page = await ctx.newPage();
+  const ctx = await browser.newContext({ ...NO_SW, viewport: { width: 1000, height: 800 } }); const page = await ctx.newPage();
   await signIn(page, 'kid', 'kid-pass-12345');
   await page.waitForFunction(() => document.querySelector('header h1').textContent.startsWith('Kid'));
   const online = await family(page);
@@ -52,7 +57,7 @@ test('offline: the last Family Apps list and the name, marked offline — never 
 });
 
 test('offline with nothing saved says it cannot load, not "None shared yet."; another account sees none of Kid\'s list', { skip, timeout: 60000 }, async () => {
-  const ctx = await browser.newContext(); const page = await ctx.newPage();
+  const ctx = await browser.newContext(NO_SW); const page = await ctx.newPage();
   await page.goto(`http://127.0.0.1:${port}/`);
   await page.evaluate(() => { localStorage.setItem('pa_family', JSON.stringify({ uid: 'kid', name: 'Kid', apps: [{ uid: 'x', slug: 's', title: 'KIDS SECRET', desc: '', author: 'Kid' }] })); });
   await page.route('**/api/family-apps', (r) => r.abort());   // this account never had an online list
@@ -65,7 +70,7 @@ test('offline with nothing saved says it cannot load, not "None shared yet."; an
 
 // GPT review: a 401/403 is the server refusing, not offline — the saved list is dropped and never redisplayed.
 test('a refused /api/family-apps (403) drops the saved list instead of showing it as offline', { skip, timeout: 60000 }, async () => {
-  const ctx = await browser.newContext(); const page = await ctx.newPage();
+  const ctx = await browser.newContext(NO_SW); const page = await ctx.newPage();
   await page.goto(`http://127.0.0.1:${port}/`);
   await signIn(page, 'kid', 'kid-pass-12345');
   assert.match(await family(page), /Chores/, 'CONTROL: the online list is saved');
@@ -75,4 +80,19 @@ test('a refused /api/family-apps (403) drops the saved list instead of showing i
   assert.match(denied, /Family Apps cannot load right now/);
   assert.equal(await page.evaluate(() => localStorage.getItem('pa_family')), null, 'the saved list is gone');
   await ctx.close();
+});
+
+// The real offline path, service worker ON (the Safari home-screen app): the device goes offline,
+// the worker serves the shell, /api/family-apps fails, and the saved list shows with its mark.
+test('service worker on, device offline: the saved Family Apps list shows, marked offline', { skip, timeout: 60000 }, async () => {
+  const ctx = await browser.newContext(); const page = await ctx.newPage();
+  await signIn(page, 'kid', 'kid-pass-12345');
+  assert.match(await family(page), /Chores/, 'CONTROL: online list');
+  // A first load is not controlled until the worker claims it; one reload then must be (a second miss throws).
+  await page.waitForFunction(() => navigator.serviceWorker && navigator.serviceWorker.controller, null, { timeout: 20000 }).catch(async () => { await page.reload(); await page.waitForFunction(() => navigator.serviceWorker.controller, null, { timeout: 20000 }); });
+  await ctx.setOffline(true);
+  const off = await family(page);
+  assert.match(off, /离线 · Offline — 上次保存的列表 · the last saved list/);
+  assert.match(off, /Chores/);
+  await ctx.setOffline(false); await ctx.close();
 });
