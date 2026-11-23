@@ -49,7 +49,7 @@ import { claudeToken } from './lib/claude-token.mjs';
 import { runCodexLane, codexFallback } from './lib/lane-codex.mjs';
 import { modelReviewJobs } from './lib/model-review.mjs';
 // (listFamilyApps defined below near listApps)
-import { hashPassword, verifyPassword, makeAudit, readAudit } from './lib/auth.mjs';
+import { hashPassword, verifyPassword, makeAudit, readAudit, ACCOUNT_REMOVED_BODY } from './lib/auth.mjs';
 import { notifyBriefingEmail } from './lib/notify.mjs';
 import { readShell } from './lib/shellhtml.mjs';
 import { makeBuildId, BUILD_MARKER, readRevision } from './lib/buildid.mjs';
@@ -1693,7 +1693,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     const user = userFor(req);
-    if (!user) return send(res, 401, 'application/json', '{"error":"bad token"}');
+    if (!user) return send(res, 401, 'application/json', cfg.sessions.wasRemoved(bearerOf(req), Date.now()) ? ACCOUNT_REMOVED_BODY : '{"error":"bad token"}');
 
     // ── Web search for apps · 应用联网搜索 ────────────────────────────────────────────────
     // THE SERVER performs the search; the app and the agent never do. A non-owner's agent runs
@@ -2644,7 +2644,7 @@ const server = http.createServer(async (req, res) => {
         if (req.method === 'DELETE') {
           if (id === user.id) return send(res, 400, 'application/json', '{"error":"cannot delete yourself"}');
           if (target.role === 'owner' && cfg.users.filter((u) => u.role === 'owner').length === 1) return send(res, 400, 'application/json', '{"error":"cannot delete the last owner"}');
-          cfg.sessions.destroyUser(id);
+          cfg.sessions.removeUser(id);   // signed out now; their own browser is told why (ACCOUNT_REMOVED_CODE)
           // Tombstone their workspace so a future same-username account starts clean. This is a
           // PRIVACY boundary, not tidiness: provisioning reuses any directory that already
           // exists, so a tombstone that silently did not happen hands one person's conversations,
