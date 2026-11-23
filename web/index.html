@@ -363,10 +363,11 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
 <dialog id="setup"><form method="dialog">
   <h3 style="margin-bottom:6px">Welcome to superelf</h3>
   <p style="color:var(--muted);font-size:14px;margin-bottom:12px">Create your master account. You'll manage the family from here.</p>
-  <input id="sUser" placeholder="username" autocapitalize="none" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
-  <input id="sName" placeholder="Your name" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
-  <input id="sPin" type="password" placeholder="password (8+ characters) · 密码（至少 8 位）" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
-  <input id="sCode" placeholder="setup code (server log / setup-code file) · 初始化码" autocapitalize="characters" autocomplete="off" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
+  <input id="sUser" placeholder="用户名 · username" autocapitalize="none" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
+  <input id="sName" placeholder="你的名字 · your name" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
+  <input id="sPin" type="password" placeholder="密码（至少 8 位）· password" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
+  <input id="sCode" placeholder="初始化码 · setup code" autocapitalize="characters" autocomplete="off" style="width:100%;padding:9px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)">
+  <div style="color:var(--muted);font-size:12px;margin:-4px 0 8px">初始化码在服务器日志或 setup-code 文件里 · The setup code is in the server log or the setup-code file</div>
   <div id="setupErr" style="color:var(--danger);font-size:13px;min-height:18px"></div>
   <button class="primary" id="setupBtn" style="width:100%;padding:10px;margin-top:6px">Create master account</button>
 </form></dialog>

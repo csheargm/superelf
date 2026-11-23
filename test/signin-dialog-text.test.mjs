@@ -25,3 +25,19 @@ test('F1-4: error lines are 中文 first and carry no HTTP status code', async (
     assert.match(g.text, /^[^A-Za-z]*[㐀-鿿]/, `${status}: 中文 first in "${g.text}"`);
   }
 });
+
+// A placeholder wider than a phone's input is cut mid-word (390 px screen ≈ 30 Latin chars, CJK counts double).
+const PHONE_PLACEHOLDER_UNITS = 30;
+const widthUnits = (s) => [...s].reduce((n, c) => n + (/[㐀-鿿（）]/.test(c) ? 2 : 1), 0);
+const placeholderOf = (id) => (SHELL.match(new RegExp(`id="${id}"[^>]*placeholder="([^"]*)"`)) || [])[1];
+
+test('F5-13: setup placeholders fit a phone and are 中文 first; the code hint is its own line', () => {
+  for (const id of ['sUser', 'sName', 'sPin', 'sCode']) {
+    const ph = placeholderOf(id);
+    assert.ok(ph, `${id} has a placeholder`);
+    assert.ok(widthUnits(ph) <= PHONE_PLACEHOLDER_UNITS, `${id} "${ph}" fits a phone`);
+    assert.match(ph, /^[㐀-鿿]/, `${id} "${ph}" is 中文 first`);
+  }
+  const setup = SHELL.slice(SHELL.indexOf('<dialog id="setup"'), SHELL.indexOf('<dialog id="login"'));
+  assert.match(setup, /setup-code/, 'where to find the setup code is still said, outside the placeholder');
+});
