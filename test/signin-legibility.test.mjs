@@ -79,7 +79,7 @@ test('one word for the secret: "password" on sign-in, Settings and the length ru
   const html = fs.readFileSync(new URL('../web/index.html', import.meta.url), 'utf8');
   assert.match(html, /id="lpin" type="password" placeholder="密码 · Password"/);
   const dlg = fs.readFileSync(new URL('../web/settings-dialog.html', import.meta.url), 'utf8');
-  assert.match(dlg, /修改密码 · Change password/);
+  assert.match(dlg, /修改密码（可选）· Change password/);
   assert.match(dlg, /id="pPin" type="password" placeholder="新密码 · new password"/);
   assert.equal(/Change PIN|new PIN/.test(dlg), false);
   const { passwordError } = await import('../lib/owner.mjs');

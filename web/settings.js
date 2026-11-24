@@ -4,7 +4,7 @@ async function loadProfile(){
   try{ ME=await (await api('/api/profile')).json(); }catch{ ME={}; }
   $('#pName').value=ME.name||''; $('#pAbout').value=ME.about||''; $('#pPrefs').value=ME.prefs||'Short and plain, no preamble · bullet points, not paragraphs · EN + 中文 for technical terms · explain simply · be direct';
   $('#pAutoUpdate').checked=!!ME.autoUpdateApps;
-  $('#pAge').textContent = ME.age!=null ? `Age ${ME.age} · role: ${ME.role}` : `role: ${ME.role||'member'}`;
+  $('#pAge').textContent = (ME.age!=null?`年龄 ${ME.age} · Age ${ME.age} · `:'')+roleLine(ME.role||'member');
   $('#pBriefEmail').value=ME.briefingEmail||'';
   $('#pRetainDays').value=ME.briefingRetainDays||30;
   $('#pPostcode').value=ME.postcode||'';
@@ -488,7 +488,7 @@ function markNewSel(sel,key){ markNew($(sel),key); }
     dlg.showModal();
   }
 })();
-$('#settings').onclick=async()=>{ await loadProfile(); if(ME.role==='owner'){ await loadFamily(); await loadShelf(); $('#auditBtn').style.display='inline-block'; } $('#cfg').showModal(); };
+$('#settings').onclick=async()=>{ await loadProfile(); if(ME.role==='owner'){ await loadFamily(); await loadShelf(); $('#auditBtn').style.display='inline-block'; } $('#cfg').showModal(); cfgMarkClean(); };
 $('#auditBtn').onclick=(e)=>{ e.preventDefault(); showActivityLog(); };   // web/activity-log.js (F5-10)
 $('#pSave').onclick=async(e)=>{
   e.preventDefault();
@@ -506,7 +506,7 @@ $('#pSave').onclick=async(e)=>{
   if(!g.ok){ alert(g.text); return; }
   $('#pPin').value='';
   if(ME.name!==$('#pName').value){ ME.name=$('#pName').value; }
-  $('#cfg').close();
+  cfgMarkClean(); $('#cfg').close();
 };
 async function loadShelf(){
   const box=$('#shelf'); box.style.display='block';
@@ -514,13 +514,13 @@ async function loadShelf(){
   try{ shelf=await (await api('/api/admin/shared')).json(); }catch{}
   try{ cand=await (await api('/api/admin/share/candidates')).json(); }catch{}
   const opts=cand.flatMap(u=>u.apps.map(a=>`<option value="${esc(u.user)}|${esc(a)}">${esc(u.name)} · ${esc((u.titles&&u.titles[a])||a)}</option>`)).join('');   // titles, not slugs (F5-9)
-  box.innerHTML='<b>Shared apps (family shelf)</b>'+
+  box.innerHTML='<b>共享应用（家庭书架）· Shared apps (family shelf)</b>'+
     (shelf.map(a=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)">
-      <span style="flex:1">${esc(a.title)} <small style="color:var(--muted)">by ${esc(a.sharedBy||'?')}${a.versions?' · '+a.versions+' old ver':''}</small></span>
-      ${a.versions?`<button class="plain" style="font-size:12px;padding:3px 8px" data-rb="${esc(a.name)}">Roll back</button>`:''}
-      <button class="plain" style="font-size:12px;padding:3px 8px" data-un="${esc(a.name)}">Remove</button>
-    </div>`).join('')||'<div style="color:var(--muted);font-size:13px;padding:4px 0">Nothing shared yet.</div>')+
-    `<div style="display:flex;gap:6px;margin-top:10px"><select id="promoteSel" style="flex:1;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text)"><option value="">Promote an app to the shelf…</option>${opts}</select><button class="primary" id="promoteBtn" style="padding:6px 10px">Promote</button></div>`;
+      <span style="flex:1">${esc(a.title)} <small style="color:var(--muted)">作者 ${esc(a.sharedBy||'?')} · by ${esc(a.sharedBy||'?')}${a.versions?' · '+a.versions+' 个旧版本 · '+a.versions+' old version'+(a.versions>1?'s':''):''}</small></span>
+      ${a.versions?`<button class="plain" style="font-size:12px;padding:3px 8px" data-rb="${esc(a.name)}">回退 · Roll back</button>`:''}
+      <button class="plain" style="font-size:12px;padding:3px 8px" data-un="${esc(a.name)}">移除 · Remove</button>
+    </div>`).join('')||'<div style="color:var(--muted);font-size:13px;padding:4px 0">还没有共享的应用 · Nothing shared yet.</div>')+
+    `<div style="display:flex;gap:6px;margin-top:10px"><select id="promoteSel" style="flex:1;min-width:0;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text)"><option value="">把应用放上书架… · Promote an app to the shelf…</option>${opts}</select><button class="primary" id="promoteBtn" style="padding:6px 10px">放上书架 · Promote</button></div>`;
   box.querySelectorAll('[data-rb]').forEach(b=>b.onclick=async()=>{ if(confirm('Roll back "'+b.dataset.rb+'" to the previous version?')){ await api('/api/admin/shared/'+b.dataset.rb+'/rollback',{method:'POST'}); loadShelf(); loadApps(); } });
   box.querySelectorAll('[data-un]').forEach(b=>b.onclick=async()=>{ if(confirm('Remove "'+b.dataset.un+'" from the shelf? (archived, not deleted)')){ await api('/api/admin/shared/'+b.dataset.un+'/unshare',{method:'POST'}); loadShelf(); loadApps(); } });
   $('#promoteBtn').onclick=async(e)=>{ e.preventDefault(); const v=$('#promoteSel').value; if(!v) return; const [from,slug]=v.split('|'); const r=await api('/api/admin/share',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({from,slug})}); const j=await r.json(); if(!j.ok){alert(j.error||'failed');return;} loadShelf(); loadApps(); };
@@ -535,9 +535,9 @@ async function loadFamily(){
   // the row (and the whole Settings page) sideways (F5-5).
   const FIELD='min-width:0;width:100%;box-sizing:border-box;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text)';
   let list=[]; try{ list=await (await api('/api/admin/users')).json(); }catch{}
-  box.innerHTML='<b>Family accounts</b>'+list.map(u=>
+  box.innerHTML='<b>家庭账号 · Family accounts</b>'+list.map(u=>
     `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)">
-      <span style="flex:1;min-width:0;overflow-wrap:anywhere">${esc(u.name)} <small style="color:var(--muted)">${u.status==='pending'?'等待批准 · Waiting for approval':u.role}${u.age!=null?' · age '+u.age:''}</small></span>
+      <span style="flex:1;min-width:0;overflow-wrap:anywhere">${esc(u.name)} <small style="color:var(--muted)">${u.status==='pending'?'等待批准 · Waiting for approval':roleLabel(u.role)}${u.age!=null?' · 年龄 '+u.age+' · age '+u.age:''}</small></span>
       ${u.role!=='owner'&&u.status!=='pending'?`<label style="font-size:12px;display:flex;align-items:center;gap:4px" title="${esc(AGENT_TOOLS_HINT)}"><input type="checkbox" data-agent="${esc(u.id)}"${u.agent?' checked':''}>${AGENT_TOOLS_LABEL}</label>`:''}
       ${u.status==='pending'?`<button class="primary" data-approve="${esc(u.id)}">批准 · Approve</button>`:''}
       ${u.id!=='owner'?`${u.status==='pending'?'':`<button class="plain" data-pw="${esc(u.id)}">重设密码 · Reset password</button>`}<button class="plain" data-del="${esc(u.id)}">×</button>`:''}
@@ -546,8 +546,8 @@ async function loadFamily(){
       <input id="nId" placeholder="用户名（如 mia）· id" style="${FIELD}">
       <input id="nName" placeholder="名字 · Name" style="${FIELD}">
       <input id="nYear" placeholder="出生年份 · Birth year" inputmode="numeric" style="${FIELD}">
-      <input id="nPass" type="password" autocomplete="new-password" placeholder="起始密码（可不填）· Starting password (optional)" style="${FIELD}">
-      <button class="primary" id="addU" style="padding:6px">Add member</button>
+      <input id="nPass" type="password" autocomplete="new-password" placeholder="初始密码 · Password" title="初始密码（可选）· Starting password (optional)" style="${FIELD}">
+      <button class="primary" id="addU" style="padding:6px">添加成员 · Add member</button>
     </div>`;
   // preventDefault: these buttons sit inside Settings' <form method="dialog">, so a bare click also
   // submitted it and closed the whole Settings page (F5-8).
