@@ -3,6 +3,10 @@
 Problems found while doing an asked-for task, not needed for that task. One line each; the task
 that found it in brackets. Pick from here; do not open a side session per item.
 
+## App faces after home v2 · 新首页后的应用面板数字
+- `faceAge`/`faceHtml`/`FACE_FRESH_MS` in `web/index.html` and the `.ecard .face` CSS (index.html, shell-look.css) are unused since home v2 moved faces to the chips row; delete them with their tests in `test/app-face.test.mjs`.
+- The chips row shows a face value without its age, so a stale count can look live; port the age rule into `PAHome.chips` first.
+
 ## Change this app · 改这个应用 (ADR 0040, Phase 1 shipped 2026-11-24)
 - Phase 2: members and demo guests, the no-tools server-written lane (plan "Phase 2"); until then the server refuses them.
 - Phase 3: member Publish as PR with their own token (plan "Phase 3"); needs the owner's OK for per-user token storage.
