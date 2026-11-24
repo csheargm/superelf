@@ -23,7 +23,7 @@ test('API keys are in a closed Advanced fold with a purpose line each; values st
   try {
     await page.goto(`http://127.0.0.1:${port}/`);
     await page.waitForFunction(() => document.querySelector('#dot.ok'));
-    await page.click('#settings');
+    await page.click('#hmore'); await page.click('#settings');
     await page.click('#nodeCfgWrap > summary');
     await page.waitForSelector('#cfgAdv');
     const adv = page.locator('#cfgAdv');

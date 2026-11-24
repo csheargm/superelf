@@ -96,11 +96,11 @@ test('USER FLOW: tiles with icons, drawer 5 + More, one Aa, and the app page wea
   const page = await ctxB.newPage();
   try {
     await page.goto(`http://127.0.0.1:${port}/`);
-    await page.waitForSelector('#eApps .ecard .app-ic svg');
+    await page.waitForSelector('#hStart .ecard svg');   // one app: it leads Start here, the dock is empty
     assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), 'rgb(0, 0, 0)', 'dark: true black');
     // Aa: the pair is hidden until the one control is tapped
     assert.equal(await page.isVisible('header .fs-up'), false);
-    await page.click('header .aa-btn');
+    await page.click('#hmore'); await page.click('header .aa-btn');
     assert.equal(await page.isVisible('header .fs-up'), true);
     const fs = () => page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--fs')) || 1);
     const before = await fs();
@@ -111,11 +111,11 @@ test('USER FLOW: tiles with icons, drawer 5 + More, one Aa, and the app page wea
     await page.keyboard.press('Escape');
     assert.equal(await page.isVisible('header .fs-up'), false, 'Escape closes it');
     assert.equal(await page.getAttribute('header .aa-btn', 'aria-expanded'), 'false');
-    await page.click('header .aa-btn');
+    await page.click('#hmore'); await page.click('header .aa-btn');
     await page.mouse.click(200, 400);
     assert.equal(await page.isVisible('header .fs-up'), false, 'an outside tap closes it');
     // Drawer: 5 recent chats + More (3), then all 8
-    await page.click('#menu');
+    await page.click('#hmore'); await page.click('#menu');
     await page.waitForSelector('#convos .convo');
     assert.equal(await page.locator('#convos .convo').count(), 5);
     assert.equal((await page.textContent('[data-more-chats]')).trim(), '更多 · More (3)');

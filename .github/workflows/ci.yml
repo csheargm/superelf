@@ -105,11 +105,13 @@ jobs:
         #   confirm, Not today, member sees nothing, reduced motion + 375px, data box + reload mid-fix), skipped on CI by PA_E2E_SKIP.
         # 2026-11-24: EVERY OS +2 (ubuntu 180, windows 265): stray-square-e2e (1600x900, 1180x820), skipped on CI by PA_E2E_SKIP.
         # 2026-11-24: EVERY OS +1 (ubuntu 181, windows 266): app-chat-honesty-e2e (note + Change this app → panel prefilled), skipped on CI by PA_E2E_SKIP.
+        # 2026-11-24: EVERY OS +3 (ubuntu 184, windows 269): home-v2 (owner: chips + More menu + alert dot; member: Start here;
+        #   demo guest: welcome, Sign in, Diabetes hidden, Make an app, 390 width, reduced motion), skipped on CI by PA_E2E_SKIP.
         include:
           - os: ubuntu-latest
-            max_skipped: 181
+            max_skipped: 184
           - os: windows-latest
-            max_skipped: 266
+            max_skipped: 269
     env:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED

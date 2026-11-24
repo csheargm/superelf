@@ -55,7 +55,7 @@ async function openMenu(port, token, ctxOpts = {}) {
 
 async function reopenMenu(page, port, reload = true) {
   if (reload) { await page.goto(`http://127.0.0.1:${port}/`); await page.waitForFunction(() => document.querySelector('#dot.ok')); }
-  await page.click('#menu');
+  await page.click('#hmore'); await page.click('#menu');
   await page.click('#dApps [data-appmenu="myapp"]');
   await page.waitForSelector('#appMenu');
 }

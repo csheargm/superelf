@@ -68,7 +68,7 @@ test('the owner ticks "AI 工具 · Agent tools" in Settings; the member then re
   await page.waitForSelector('#login[open]');
   await page.fill('#luser', 'mom'); await page.fill('#lpin', 'owner-pass-123'); await page.click('#loginBtn');
   await page.waitForFunction(() => !document.querySelector('#login[open]'));
-  await page.click('#settings');
+  await page.click('#hmore'); await page.click('#settings');
   const box = page.locator('#family [data-agent="mara"]');
   await box.waitFor();
   assert.match(await page.locator('#family label:has([data-agent="mara"])').textContent(), /AI 工具 · Agent tools/);

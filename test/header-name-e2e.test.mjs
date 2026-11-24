@@ -31,7 +31,9 @@ test('phone: the header shows the whole name, not "M…"; a wide window shows "M
   assert.ok(phone.text.startsWith('Mara'), phone.text);
   await page.setViewportSize({ width: 1200, height: 800 });
   await page.waitForFunction(() => document.querySelector('header h1').textContent === 'Mara’s 管家');
-  await page.setViewportSize({ width: 320, height: 700 });
+  await page.setViewportSize({ width: 320, height: 700 });   // the home header keeps only avatar + More: the whole name fits at 320
+  await page.waitForFunction(() => { const h = document.querySelector('header h1'); return h.textContent.startsWith('Mara') && h.scrollWidth <= h.clientWidth; });
+  await page.setViewportSize({ width: 200, height: 700 });   // too narrow for "Mara’s 管家": the short name, never "M…"
   await page.waitForFunction(() => document.querySelector('header h1').textContent === 'Mara');
   const html = await page.evaluate(() => renderMd('Saved to /Users/x/superelf/workspace-mara/apps/notes and `workspace-mara/memory`.'));
   assert.ok(!/workspace-mara/.test(html), html);

@@ -59,7 +59,7 @@ test('signed out: one Sign in in the header (like its buttons), an email popover
   const b = page.locator('header #demoSignin');
   await b.waitFor();
   assert.equal(await b.textContent(), SIGNIN_LABELS.in);
-  assert.equal(await b.getAttribute('class'), 'ibtn', 'the header button style, not a box');
+  assert.match(await b.getAttribute('class'), /^ibtn h-signin$/, 'a header button (the Sign in pill), not a box');
   assert.equal(await page.locator('#logoutBtn').isVisible(), false);
   assert.equal(await page.locator('text=Delete my account').count(), 0);
   await b.click();
@@ -73,7 +73,7 @@ test('signed in: no floating buttons; the Settings Sign out ends the visit and r
   const { ctx, page, a, node } = await signedIn('ui-out');
   assert.equal(await noFloatingBox(page), 0, 'no floating account box');
   assert.equal(await page.locator('#demoSignin').count(), 0);
-  await page.click('#settings');
+  await page.click('#hmore'); await page.click('#settings');
   await page.locator('#demoDel').waitFor({ state: 'visible' });
   assert.equal(await page.locator('#pPin').isVisible(), false, 'no PIN change on the demo');
   const before = sb.calls.length;
@@ -87,7 +87,7 @@ test('signed in: no floating buttons; the Settings Sign out ends the visit and r
 
 test('Delete my account in Settings asks first, deletes, then signs out fully', { skip }, async () => {
   const { ctx, page, a, node } = await signedIn('ui-del');
-  await page.click('#settings');
+  await page.click('#hmore'); await page.click('#settings');
   await page.locator('#demoDel').waitFor({ state: 'visible' });
   page.once('dialog', (d) => d.dismiss());
   await page.click('#demoDel');
@@ -192,7 +192,9 @@ test('the scroll-to-bottom button sits above the taller demo input bar, never on
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } }); const page = await ctx.newPage();
   await page.goto(`http://127.0.0.1:${port}/`);
   await settled(page);
-  await page.locator('#demoTip').waitFor();
+  await page.locator('#emptyState').waitFor();
+  await page.evaluate(() => hideEmptyState());   // the home holds the input row; measure the bar as a chat shows it
+  await page.waitForFunction(() => document.documentElement.style.getPropertyValue('--pill-clear') === (document.getElementById('f').offsetHeight + 12) + 'px');   // the bar's ResizeObserver ran
   const [btnBottom, formTop] = await page.evaluate(() => { const b = document.getElementById('scrollBtn'); b.style.display = 'flex';
     return [b.getBoundingClientRect().bottom, document.getElementById('f').getBoundingClientRect().top]; });
   assert.ok(btnBottom <= formTop, `button bottom ${btnBottom} above the bar top ${formTop}`);

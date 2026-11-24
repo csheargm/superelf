@@ -50,9 +50,9 @@ async function signIn(opts, user, pass) {
 test('owner: amber dot on ☰ → card with the problem, its meaning and the tip → Free up space → done, dot gone; tip once', { skip, timeout: 90000 }, async () => {
   setHealth(FULL);
   const { ctx, page } = await signIn({}, 'mom', 'owner-pass-123');
-  await page.waitForSelector('#menu .oa-dot');
+  await page.waitForSelector('#menu .oa-dot', { state: 'attached' });
   assert.notEqual(await page.$eval('#menu .oa-dot', (e) => getComputedStyle(e).animationName), 'none', 'it pulses');
-  await page.click('#menu'); await page.waitForSelector('#oaCard');
+  await page.click('#hmore'); await page.click('#menu'); await page.waitForSelector('#oaCard');
   const text = await page.locator('#oaCard').innerText();
   assert.match(text, /需要处理 · Needs attention/);
   assert.match(text, /系统盘已用 92% · The system disk is 92% full/);
@@ -63,8 +63,8 @@ test('owner: amber dot on ☰ → card with the problem, its meaning and the tip
   assert.equal(await page.$('#menu .oa-dot'), null, 'the check passed: no dot');
   assert.doesNotMatch(await page.locator('#oaCard').innerText(), /92%/);
   setHealth(FULL);
-  await page.reload(); await page.waitForSelector('#menu .oa-dot');
-  await page.click('#menu'); await page.waitForSelector('#oaCard');
+  await page.reload(); await page.waitForSelector('#menu .oa-dot', { state: 'attached' });
+  await page.click('#hmore'); await page.click('#menu'); await page.waitForSelector('#oaCard');
   assert.doesNotMatch(await page.locator('#oaCard').innerText(), /新：/, 'the tip shows once');
   await ctx.close();
 });
@@ -72,7 +72,7 @@ test('owner: amber dot on ☰ → card with the problem, its meaning and the tip
 test('owner: Claude down → Rebuild asks to confirm with the downtime first; Ask 管家 fills the chat, never sends', { skip, timeout: 90000 }, async () => {
   setHealth({ ...FULL, problems: [{ kind: 'claude' }] });
   const { ctx, page } = await signIn({}, 'mom', 'owner-pass-123');
-  await page.waitForSelector('#menu .oa-dot'); await page.click('#menu'); await page.waitForSelector('#oaCard [data-oa="rebuild-node"]');
+  await page.waitForSelector('#menu .oa-dot', { state: 'attached' }); await page.click('#hmore'); await page.click('#menu'); await page.waitForSelector('#oaCard [data-oa="rebuild-node"]');
   await page.click('#oaCard [data-oa="rebuild-node"]');
   assert.match(await page.locator('#oaCard [data-oa="rebuild-node"]').innerText(), /约 2 分钟.*about 2 minutes offline/);
   assert.equal(fs.existsSync(path.join(root, ACTIONS_DIR, 'req', 'rebuild-node')), false, 'nothing asked before the confirm');
@@ -85,7 +85,7 @@ test('owner: Claude down → Rebuild asks to confirm with the downtime first; As
 test('owner: Not today hides the dot and the card until tomorrow', { skip, timeout: 60000 }, async () => {
   setHealth(FULL); fs.rmSync(path.join(root, 'node-alerts-snooze.json'), { force: true });
   const { ctx, page } = await signIn({}, 'mom', 'owner-pass-123');
-  await page.waitForSelector('#menu .oa-dot'); await page.click('#menu'); await page.waitForSelector('#oaCard [data-snooze]');
+  await page.waitForSelector('#menu .oa-dot', { state: 'attached' }); await page.click('#hmore'); await page.click('#menu'); await page.waitForSelector('#oaCard [data-snooze]');
   await page.click('#oaCard [data-snooze]');
   await page.waitForFunction(() => !document.querySelector('#menu .oa-dot') && !document.querySelector('#oaCard'));
   fs.rmSync(path.join(root, 'node-alerts-snooze.json'), { force: true });
@@ -97,7 +97,7 @@ test('member: no dot, no card, never asks for alerts', { skip, timeout: 60000 },
   const asked = [];
   const { ctx, page } = await signIn({}, 'kid', 'kid-pass-12345');
   page.on('request', (r) => { if (r.url().includes('/api/admin/alerts')) asked.push(r.url()); });
-  await page.click('#menu'); await page.waitForTimeout(800);
+  await page.click('#hmore'); await page.click('#menu'); await page.waitForTimeout(800);
   assert.equal(await page.$('#menu .oa-dot'), null);
   assert.equal(await page.$('#oaCard'), null);
   assert.deepEqual(asked, []);
@@ -107,9 +107,9 @@ test('member: no dot, no card, never asks for alerts', { skip, timeout: 60000 },
 test('reduced motion: the dot is steady; phone width 375: the card fits, no sideways scroll', { skip, timeout: 60000 }, async () => {
   setHealth(FULL);
   const { ctx, page } = await signIn({ reducedMotion: 'reduce', viewport: { width: 375, height: 812 } }, 'mom', 'owner-pass-123');
-  await page.waitForSelector('#menu .oa-dot');
+  await page.waitForSelector('#menu .oa-dot', { state: 'attached' });
   assert.equal(await page.$eval('#menu .oa-dot', (e) => getComputedStyle(e).animationName), 'none');
-  await page.click('#menu'); await page.waitForSelector('#oaCard');
+  await page.click('#hmore'); await page.click('#menu'); await page.waitForSelector('#oaCard');
   const box = await page.$eval('#oaCard', (e) => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right }; });
   assert.ok(box.l >= 0 && box.r <= 375, JSON.stringify(box));
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
@@ -119,17 +119,17 @@ test('reduced motion: the dot is steady; phone width 375: the card fits, no side
 test('a full DATA box offers no prune (it frees only the system disk); a reload mid-fix keeps following it; a rebuild confirm resets on reopen', { skip, timeout: 90000 }, async () => {
   setHealth({ ...FULL, problems: [{ kind: 'disk', box: 'private', pct: 91 }, { kind: 'claude' }] });
   const { ctx, page } = await signIn({}, 'mom', 'owner-pass-123');
-  await page.waitForSelector('#menu .oa-dot'); await page.click('#menu'); await page.waitForSelector('#oaCard');
+  await page.waitForSelector('#menu .oa-dot', { state: 'attached' }); await page.click('#hmore'); await page.click('#menu'); await page.waitForSelector('#oaCard');
   assert.equal(await page.$('#oaCard [data-oa="cleanup-disk"]'), null);
   assert.match(await page.locator('#oaCard').innerText(), /what is left is your own data/);
   assert.doesNotMatch(await page.locator('#oaCard').innerText(), /Already cleaned up/);
   await page.click('#oaCard [data-oa="rebuild-node"]');
-  await page.evaluate(() => closeDrawer()); await page.click('#menu'); await page.waitForSelector('#oaCard [data-oa="rebuild-node"]');
+  await page.evaluate(() => closeDrawer()); await page.click('#hmore'); await page.click('#menu'); await page.waitForSelector('#oaCard [data-oa="rebuild-node"]');
   await page.waitForFunction(() => !/Confirm/.test(document.querySelector('#oaCard [data-oa="rebuild-node"]').innerText));
   hostPaused = true;
   await page.click('#oaCard [data-oa="recheck"]');
   await page.waitForFunction(() => /Working/.test(document.querySelector('#oaCard')?.innerText || ''));
-  await page.reload(); await page.click('#menu');
+  await page.reload(); await page.click('#hmore'); await page.click('#menu');
   await page.waitForFunction(() => /Working/.test(document.querySelector('#oaCard')?.innerText || ''), null, { timeout: 10000 });
   hostPaused = false;
   await page.waitForFunction(() => /完成 · Done/.test(document.querySelector('#oaCard')?.innerText || ''), null, { timeout: 20000 });

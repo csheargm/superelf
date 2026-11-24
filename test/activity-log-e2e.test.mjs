@@ -46,7 +46,7 @@ async function signIn() {
 }
 const auditPath = () => path.join(root, fs.readdirSync(root, { recursive: true }).map(String).find((f) => /audit.*\.(jsonl|log)$/.test(f)));
 const shot = async (page, name) => { if (process.env.PA_SHOTS) await page.locator('#activityLog').screenshot({ path: path.join(process.env.PA_SHOTS, name + '.png') }); };
-const openLog = async (page) => { if (!(await page.evaluate(() => document.querySelector('#cfg').open))) await page.click('#settings'); await page.waitForSelector('#cfg[open] #auditBtn:visible'); await page.click('#auditBtn'); await page.waitForSelector('#activityLog[open] .act-body'); };
+const openLog = async (page) => { if (!(await page.evaluate(() => document.querySelector('#cfg').open))) { await page.click('#hmore'); await page.click('#settings'); } await page.waitForSelector('#cfg[open] #auditBtn:visible'); await page.click('#auditBtn'); await page.waitForSelector('#activityLog[open] .act-body'); };
 
 test('Activity log: only what matters, plain sentences, local time; app change → diff and Undo', { skip, timeout: 90000 }, async () => {
   const { ctx, page } = await signIn();

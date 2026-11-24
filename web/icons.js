@@ -26,6 +26,7 @@ const PAIcons=(function(){
     news:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h10M7 16h6"/>',
     cal:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
     leaf:'<path d="M5 19C5 10 10 5 20 4c-1 10-6 15-15 15z"/><path d="M5 19l8-8"/>',
+    flower:'<path d="M12 21v-8"/><path d="M12 17c-3 0-5-2-5-5 3 0 5 2 5 5zM12 15c2 0 4-1.5 4-4-2 0-4 1.5-4 4z"/><circle cx="12" cy="5.5" r="2"/><circle cx="6.5" cy="4.5" r=".9"/><circle cx="17.5" cy="4" r=".9"/>',
     heart:'<path d="M12 20s-8-5-8-11a4.5 4.5 0 0 1 8-3 4.5 4.5 0 0 1 8 3c0 6-8 11-8 11z"/>',
     mic:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
     grid:'<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
@@ -46,11 +47,11 @@ const PAIcons=(function(){
   // First match wins; slug and title are both searched, lower-cased. Colours are mid-tone so the
   // white glyph on the gradient keeps >= 3:1 (non-text UI) in both themes.
   const RULES=[
-    [/bible|圣经|scripture/,'book','#3f6b8f'],[/sunday|study|查经/,'users','#7a5aa6'],[/church|教会/,'church','#a06a3a'],
+    [/value|价值/,'heart','#a2456e'],[/bible|圣经|scripture/,'book','#3f6b8f'],[/sunday|study|查经/,'users','#7a5aa6'],[/church|教会/,'church','#a06a3a'],
     [/journal|note|手写|笔记/,'pen','#3f7d64'],[/task|todo|待办/,'check','#d0603b'],[/digest|brief|news|简报|新闻/,'news','#2f7d8c'],
-    [/calendar|日历|schedule/,'cal','#c2463c'],[/rise|morning|晨/,'sun','#c98a1c'],[/allerg|pollen|花粉/,'leaf','#4f8a32'],
+    [/calendar|日历|schedule/,'cal','#c2463c'],[/rise|morning|晨/,'sun','#c98a1c'],[/allerg|pollen|花粉/,'flower','#4f8a32'],
     [/diabet|glucose|血糖/,'drop','#c24b6a'],[/longev|health|reserve|长寿|健康/,'pulse','#2f8a6a'],[/family|家庭/,'home','#6b6fb3'],
-    [/food|cook|meal|kitchen|厨房|食/,'pot','#c27a2c'],[/value|价值/,'heart','#a2456e'],[/conf|event|会议/,'mic','#4a5bb8'],
+    [/food|cook|meal|kitchen|厨房|食/,'pot','#c27a2c'],[/conf|event|会议/,'mic','#4a5bb8'],
     [/productiv|hub|效率/,'grid','#5b6470'],[/brainstorm|idea|头脑|想法/,'bulb','#b8901a'],[/club|grade|school|社团|年级/,'flag','#2e7fb8'],
     [/math|algebra|代数|数学/,'sigma','#7b4fb0'],[/rent|house|home-hunt|房/,'key','#8a6d3b'],[/research|研究/,'flask','#2f8f86'],
     [/semi|chip|半导体/,'chip','#44607a'],[/chat|对话/,'chat','#3a6fd0'],

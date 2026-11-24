@@ -9,6 +9,7 @@
     "save_max_mb": 2,
     "app_model": "gpt-oss:120b",
     "home_url": "https://superelf.app",
+    "home_hide": ["diabetes"],
     "chat_timeout_s": 300,
     "app_builds_per_user_per_day": 5,
     "app_builds_per_ip_per_day": 15,
