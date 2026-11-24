@@ -1,4 +1,12 @@
 {
+  "v5.10.0": {
+    "date": "2026-11-24",
+    "features": [
+      "应用改动历史 · App change history for the AI"
+    ],
+    "fixes": [],
+    "through": "97a9d2bca6ac1b867431527bc6404093f74e8fb5"
+  },
   "v5.9.3": {
     "date": "2026-11-24",
     "features": [],
