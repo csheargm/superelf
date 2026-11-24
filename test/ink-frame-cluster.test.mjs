@@ -138,8 +138,11 @@ test('gate: within 1px of the written column the placement list comes back untou
   const o = open(W0); o.I.load(F3);
   const placed = F3.map((g, i) => ({ g, at: { ox: i, oy: i, s: 1 }, orphan: false }));
   const env = (cw) => ({ lineEl: () => ({ getBoundingClientRect: () => ({}) }), local: (r) => r, colW: () => cw });
-  assert.equal(o.Frame.shiftClusters(placed, env(W0 - 2 * PADL + 1)), placed);
+  const real = o.I.placements();   // as written: every stroke where its rel says
+  assert.equal(o.Frame.shiftClusters(real, env(W0 - 2 * PADL + 1)), real);
   assert.notEqual(o.Frame.shiftClusters(placed, env(W0 - 2 * PADL + 2)), placed);
+  // 经文顺序: on the written column, strokes NOT where their rel says (the lines moved apart) are re-placed
+  assert.notEqual(o.Frame.shiftClusters(placed, env(W0 - 2 * PADL + 1)), placed);
 });
 
 // ── GPT round 1 regressions (df0b443) ──
@@ -183,4 +186,26 @@ test('erased anchor: the member with the smallest rel stands in, the word stays 
   assert.deepStrictEqual(out[1].at, { ox: 315, oy: 80, s: 1 }, 'the other keeps its offset from it');
   // CONTROL: with only one rel-member left nothing is re-placed (no false anchor)
   const one = [m1]; assert.equal(o.Frame.shiftClusters(one, stubEnv(600)), one);
+});
+
+// 经文顺序 (owner 2026-11-24): the Bible can swap a verse's 中文 and English lines at the SAME width. A word
+// written across the two lines keeps its shape (each stroke's offset from the word's anchor), while
+// the one-line ink stays exactly as before; swapping back draws it exactly as written (7fe85a8 identity).
+// The fake canvas draws what the PREVIOUS reflow placed (as on origin/main), so a layout change takes two.
+const settle = (o) => { view(o); return view(o); };
+test('verse order flip at the written width: a cross-line word keeps its written offsets; back again it is drawn as stored', () => {
+  const F3 = written(writeF3);
+  const o = open(W0); o.I.load(F3);
+  const off = (at) => at.slice(1).map((x) => [Math.round((x.ox - at[0].ox) * 100) / 100, Math.round((x.oy - at[0].oy) * 100) / 100]);
+  const before = view(o), shape = off(before.at);
+  o.dom.L.zhFirst = true; o.dom.flush();
+  const flipped = settle(o);
+  assert.ok(Math.abs(flipped.at[0].oy - before.at[0].oy) > 5, 'CONTROL: the anchor\'s line really moved');
+  assert.deepStrictEqual(off(flipped.at), shape, 'every stroke keeps its offset from the anchor');
+  // CONTROL (R14): on the engine before this fix the word split apart on the flip
+  const r = open(W0, true); r.I.load(F3.map(strip)); r.dom.L.zhFirst = true; r.dom.flush();
+  assert.notDeepStrictEqual(off(settle(r).at), shape, 'the unfixed engine splits the word (else this test proves nothing)');
+  o.dom.L.zhFirst = false; o.dom.flush();
+  assert.deepStrictEqual(settle(o), before, 'back in the written order: exactly as written (placements and every point)');
+  assert.deepStrictEqual(o.I.groups(), F3, 'stored records never rewritten');
 });

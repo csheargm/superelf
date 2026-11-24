@@ -49,7 +49,8 @@ export function makeDom({ width = 400, childrenCount = false, src = COMPONENT, f
   const bucketH = () => { const b = bucketEl(); return b ? parseFloat(b.style.height) || 0 : 0; };
   function layout() {   // stacks the verses; returns the content height
     let y = PADT;
-    for (const v of verses) { y += VNUM; v.en.top = y; y += rowsOf(v.en.text()) * RH + GAP; v.zh.top = y; y += rowsOf(v.zh.text()) * RH + 10; }
+    // L.zhFirst: the Bible's 经文顺序 with 中文 above English (the lines swap places, same gaps)
+    for (const v of verses) { const [a, b] = L.zhFirst ? [v.zh, v.en] : [v.en, v.zh]; y += VNUM; a.top = y; y += rowsOf(a.text()) * RH + GAP; b.top = y; y += rowsOf(b.text()) * RH + 10; }
     return y;
   }
   function addVerse(n, en, zh) {
