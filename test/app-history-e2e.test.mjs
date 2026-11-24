@@ -54,7 +54,7 @@ test('Change this app: "what changed?" is answered from the saved version, its r
   const out = await chat({ message: 'what has been changed on this app?', edit: 'todo' });
   assert.match(out, /SYSTEM:/, 'the fake echoed its system line');
   assert.match(out, /Saved versions of this app/);
-  assert.match(out, /copy from BEFORE the change asked as: "make it red" by owner/);
+  assert.match(out, /copy from BEFORE the change asked as: "make it red" by "owner"/);
   assert.match(out, /- <!doctype html><html><body><h1>Hi<\/h1>/);
   assert.match(out, /\+ <!doctype html><html><body><h1 style="color:red">Hi<\/h1>/);
   assert.match(out, /answer from the FACTS below/);
@@ -63,7 +63,7 @@ test('Change this app: "what changed?" is answered from the saved version, its r
 test("an app's own chat gets the about-this-app facts with release-notes lines, and the no-invented-UI rule", { timeout: 60000 }, async () => {
   const out = await chat({ message: 'what was published just now?', app: 'sunday-study' }, { 'x-superelf-origin': 'app' });
   assert.match(out, /App: "Sunday Study" \(sunday-study\)/);
-  assert.match(out, /Release-notes lines naming this app[^\n]*\n- v[\d.]+[^\n]*Sunday Study/, 'a real release-notes line (version-notes.json) names the app');
+  assert.match(out, /Release-notes lines naming this app[^\n]*\n- "v[\d.]+[^\n]*Sunday Study/, 'a real release-notes line (version-notes.json) names the app');
   assert.match(out, /version line at the bottom of the home screen/);
   assert.doesNotMatch(out, /Saved versions of this app/, 'the version list belongs to the edit panel');
 });

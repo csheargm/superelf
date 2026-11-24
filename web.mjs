@@ -1264,6 +1264,7 @@ async function chat(req, res, user, body) {
 // TODO(R4 seam): leaves web.mjs with the edit-turn wiring (lib/chat-turn split).
 function appTurnFacts(user, edit, app) {
   const notes = () => { try { return JSON.parse(appNotesJson(ROOT, undefined, buildId.head())); } catch { return {}; /* notes unreadable: the block says "none" */ } };
+  if (edit && edit.undo) return '';   // a typed Undo calls no model: no facts to build
   if (edit && !edit.superelf) return editHistoryContext({ slug: edit.slug, appDir: edit.dir, versionsRoot: path.join(wsDir(user), VERSIONS_DIR), versionsRel: VERSIONS_DIR, repoRoot: ROOT, notes: notes() });
   if (edit || typeof app !== 'string' || !slugOk(app)) return '';
   const dir = path.join(appsDir(user), app);
@@ -1483,7 +1484,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
           // override replaces the guard above, and a capability list it could delete is not one
           // any app author could rely on. A oneShot turn builds no app, so it skips the ~3.7k-char
           // app contract; the language rule and the confined note still ride.
-          systemPrompt: [agentPrompts.global, agentPrompts.app, turnFacts, agentCapabilities(laneRole(user, origin), oneShot ? null : APP_CONTRACT)].filter(Boolean).join('\n\n'),
+          systemPrompt: [agentPrompts.global, agentPrompts.app, agentCapabilities(laneRole(user, origin), oneShot ? null : APP_CONTRACT), turnFacts].filter(Boolean).join('\n\n'),   // facts LAST: the runner's cap cuts them, never the capability text
         resumeId, timeoutMs: cfg.task_timeout_minutes * 60000, onChild: cancel ? cancel.onChild : undefined,
         onDelta: (t) => line({ type: 'delta', text: t }), onTool: (n, b) => line({ type: 'status', text: `${n}${b ? ` — ${b}` : ''}` }) };
       r = await enqueue(async () => {
