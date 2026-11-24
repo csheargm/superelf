@@ -159,7 +159,7 @@ nav button.active {
   transition: background .2s, color .2s;
 }
 .pomo-modes button.active {
-  background: var(--accent);
+  background:var(--accent-fill,var(--accent));
   color: #fff;
   border-color: var(--accent);
 }
@@ -188,7 +188,7 @@ nav button.active {
   border-radius: 8px;
   font-size: .95rem;
   cursor: pointer;
-  background: var(--accent);
+  background:var(--accent-fill,var(--accent));
   color: #fff;
   transition: opacity .2s;
 }
@@ -250,7 +250,7 @@ nav button.active {
 .tasks-add input::placeholder { color: var(--sub); }
 .tasks-add button {
   padding: .6rem 1rem;
-  background: var(--accent);
+  background:var(--accent-fill,var(--accent));
   border: none;
   border-radius: 8px;
   color: #fff;
@@ -271,7 +271,7 @@ nav button.active {
   cursor: pointer;
 }
 .tasks-filters button.active {
-  background: var(--accent);
+  background:var(--accent-fill,var(--accent));
   border-color: var(--accent);
   color: #fff;
 }
@@ -359,7 +359,7 @@ nav button.active {
 .notes-new {
   width: 100%;
   padding: .4rem;
-  background: var(--accent);
+  background:var(--accent-fill,var(--accent));
   border: none;
   border-radius: 8px;
   color: #fff;
@@ -380,7 +380,7 @@ nav button.active {
   color: var(--text);
 }
 .note-item.active {
-  background: var(--accent);
+  background:var(--accent-fill,var(--accent));
   color: #fff;
 }
 .note-item-title { font-weight: 500; }

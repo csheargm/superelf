@@ -13,18 +13,18 @@ h2{ font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--
 .item{ background:var(--card); border:1px solid var(--line); border-radius:8px; padding:10px 10px; margin-bottom:6px; display:flex; gap:10px; align-items:flex-start; }
 .item.done .label{ opacity:.5; text-decoration:line-through; }
 .cb{ flex-shrink:0; width:22px; height:22px; border:2px solid var(--line); border-radius:5px; cursor:pointer; display:flex; align-items:center; justify-content:center; background:none; font-size:13px; color:var(--accent); transition:border-color .15s; }
-.cb.checked{ border-color:var(--accent); background:var(--accent); color:#fff; }
+.cb.checked{ border-color:var(--accent); background:var(--accent-fill,var(--accent)); color:#fff; }
 .label{ flex:1; cursor:pointer; word-break:break-word; }
 .edit-row{ display:flex; gap:6px; width:100%; }
 .edit-row textarea{ flex:1; font:inherit; font-size:14px; padding:6px 8px; border:1px solid var(--accent); border-radius:6px; background:var(--bg); color:var(--text); resize:vertical; min-height:60px; }
 .edit-row .btns{ display:flex; flex-direction:column; gap:4px; }
 .btn{ font:inherit; font-size:13px; padding:5px 10px; border-radius:6px; cursor:pointer; border:none; }
-.btn.save{ background:var(--accent); color:#fff; }
+.btn.save{ background:var(--accent-fill,var(--accent)); color:#fff; }
 .btn.cancel{ background:none; border:1px solid var(--line); color:var(--muted); }
 .btn.del{ background:none; border:1px solid var(--danger); color:var(--danger); }
 #add-bar{ position:fixed; bottom:0; left:0; right:0; display:flex; gap:8px; padding:10px 12px; background:var(--bg); border-top:1px solid var(--line); }
 #add-bar input{ flex:1; font:inherit; font-size:14px; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--text); }
-#add-bar button{ background:var(--accent); color:#fff; border:none; border-radius:8px; padding:0 14px; font:inherit; font-size:14px; cursor:pointer; }
+#add-bar button{ background:var(--accent-fill,var(--accent)); color:#fff; border:none; border-radius:8px; padding:0 14px; font:inherit; font-size:14px; cursor:pointer; }
 #add-bar :disabled{ opacity:.5; cursor:default; }
 #status{ font-size:12px; color:var(--muted); text-align:center; margin:8px 0 0; min-height:18px; }
 </style>

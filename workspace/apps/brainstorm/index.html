@@ -20,7 +20,7 @@ body{display:flex;flex-direction:column}
 #nav{display:flex;align-items:center;gap:8px;padding:calc(10px + var(--sat)) 14px 10px;border-bottom:1px solid var(--line);background:var(--card);flex-shrink:0}
 #back-btn{display:none;background:none;border:none;font-size:15px;color:var(--accent);cursor:pointer;padding:4px 8px 4px 0;line-height:1;font-weight:600;white-space:nowrap}
 #nav-title{flex:1;font-size:17px;font-weight:700}
-#new-btn{background:var(--accent);color:#fff;border:none;border-radius:20px;padding:6px 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+#new-btn{background:var(--accent-fill,var(--accent));color:#fff;border:none;border-radius:20px;padding:6px 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
 #new-btn:active{opacity:.85}
 #new-btn:disabled{opacity:.4;cursor:default}
 
@@ -57,7 +57,7 @@ body{display:flex;flex-direction:column}
 .msg.u{align-self:flex-end;align-items:flex-end}
 .msg.a{align-self:flex-start;align-items:flex-start}
 .bub{padding:10px 13px;border-radius:16px;font-size:14px;line-height:1.55;word-break:break-word}
-.msg.u .bub{background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+.msg.u .bub{background:var(--accent-fill,var(--accent));color:#fff;border-bottom-right-radius:4px}
 .msg.a .bub{background:var(--card);border:1px solid var(--line);border-bottom-left-radius:4px}
 .msg.a .bub p{margin-bottom:7px}
 .msg.a .bub p:last-child{margin-bottom:0}
@@ -89,7 +89,7 @@ body{display:flex;flex-direction:column}
 #ibar{display:flex;gap:8px;padding:10px 12px calc(10px + var(--sab));background:var(--card);border-top:1px solid var(--line);flex-shrink:0}
 #inp{flex:1;font:inherit;font-size:15px;padding:8px 13px;border:1.5px solid var(--line);border-radius:20px;background:var(--bg);color:var(--text);outline:none;resize:none;max-height:100px;min-height:38px;line-height:1.4;-webkit-appearance:none}
 #inp:focus{border-color:var(--accent)}
-#send-btn{width:38px;height:38px;background:var(--accent);border:none;border-radius:50%;color:#fff;font-size:18px;cursor:pointer;flex-shrink:0;align-self:flex-end;display:flex;align-items:center;justify-content:center}
+#send-btn{width:38px;height:38px;background:var(--accent-fill,var(--accent));border:none;border-radius:50%;color:#fff;font-size:18px;cursor:pointer;flex-shrink:0;align-self:flex-end;display:flex;align-items:center;justify-content:center}
 #send-btn:disabled{opacity:.35;cursor:default}
 
 /* New session sheet */
@@ -101,7 +101,7 @@ body{display:flex;flex-direction:column}
 #sheet-inp:focus{border-color:var(--accent)}
 #sheet-btns{display:flex;gap:10px}
 #sheet-cancel{flex:1;padding:11px;border:1px solid var(--line);border-radius:10px;background:none;font:inherit;font-size:15px;color:var(--muted);cursor:pointer}
-#sheet-start{flex:2;padding:11px;background:var(--accent);color:#fff;border:none;border-radius:10px;font:inherit;font-size:15px;font-weight:600;cursor:pointer}
+#sheet-start{flex:2;padding:11px;background:var(--accent-fill,var(--accent));color:#fff;border:none;border-radius:10px;font:inherit;font-size:15px;font-weight:600;cursor:pointer}
 </style>
 </head>
 <body>
