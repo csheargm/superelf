@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" media="(prefers-color-scheme:light)" content="#f6f3ee">
+<meta name="theme-color" media="(prefers-color-scheme:dark)" content="#17171c">
+<title>Sunday Study 主日查经</title>
+<style>
+html{font-size:calc(17px * var(--fs,1))}
+:root{--bg:#f6f3ee;--card:#fff;--text:#25222b;--muted:#7a7480;--line:#e4dfd8;--accent:#5b4a9e;--gold:#b8862b;--bad:#c0392b}
+@media(prefers-color-scheme:dark){:root{--bg:#17171c;--card:#23232b;--text:#ece9f2;--muted:#9a95a6;--line:#34343f;--accent:#9d8bec;--gold:#d9a84a;--bad:#ef7a6c}}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--text);font:1rem/1.5 -apple-system,system-ui,sans-serif;min-height:100dvh;display:flex;flex-direction:column}
+#nav{display:flex;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top,0px) + 10px) 14px 10px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+#nav h1{flex:1;font-size:1.1rem}
+button{font:inherit;cursor:pointer}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:8px 14px;font-weight:600}
+.btn.ghost{background:none;color:var(--accent);border:1.5px solid var(--accent)}
+.btn.arm,.x.arm{background:var(--bad);color:#fff;border-color:var(--bad)}
+main{flex:1;padding:14px 14px calc(env(safe-area-inset-bottom,0px) + 70px)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px}
+.row{display:flex;align-items:center;gap:8px}.row .grow{flex:1;min-width:0}
+.t{font-weight:700}.m{color:var(--muted);font-size:.85rem}
+.x{background:none;border:0;color:var(--muted);font-size:1.1rem;padding:2px 8px;border-radius:8px}
+input,textarea{font:inherit;width:100%;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:9px 10px;margin-bottom:8px}
+textarea{min-height:90px;resize:vertical}
+label{display:block;font-size:.75rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--gold);margin:6px 0 4px}
+.empty{text-align:center;color:var(--muted);padding:30px 10px}
+.item{cursor:pointer}
+.next{border-color:var(--gold)}
+.sec{font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:14px 0 8px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+#status{position:fixed;left:14px;right:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);background:var(--card);color:var(--bad);border:1.5px solid var(--bad);border-radius:12px;padding:9px 12px;font-size:.85rem;text-align:center}
+#status:empty{display:none}
+#editor{display:none}
+#photos{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.ph{position:relative;width:96px;height:96px;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--bg)}
+.ph img{width:100%;height:100%;object-fit:cover;display:block}
+.ph .x{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.55);color:#fff;font-size:.8rem;padding:2px 7px}
+.ph .x.arm{background:var(--bad)}
+#viewer{display:none;position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.92);align-items:center;justify-content:center;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
+#viewer img{max-width:100%;max-height:100%;object-fit:contain}
+</style>
+</head>
+<body>
+<div id="nav"><h1>📖 主日查经 · Sunday Study</h1><button class="btn ghost" id="ask" type="button">✨ 提问 · Ask</button></div>
+<main>
+  <section id="listView">
+    <button class="btn" id="new" type="button" style="width:100%;margin-bottom:12px">＋ 新查经 · New study</button>
+    <div id="list"></div>
+  </section>
+  <section id="editor">
+    <div class="row" style="margin-bottom:8px">
+      <button class="btn ghost" id="back" type="button">← 返回 · Back</button>
+      <div class="grow"></div>
+      <button class="btn" id="aiq" type="button">✨ 讨论题 · Questions</button>
+    </div>
+    <div class="card">
+      <label>日期 · Date</label><input id="f-date" type="date">
+      <label>经文 · Passage</label><input id="f-passage" placeholder="e.g. John 3:1-21">
+      <label>主题 · Theme</label><input id="f-theme" placeholder="一句话 · One line">
+      <label>重点经节 · Key verses</label><textarea id="f-verses"></textarea>
+      <label>观察 · Observations (what does it say?)</label><textarea id="f-obs"></textarea>
+      <label>讨论题 · Questions (what does it mean?)</label><textarea id="f-q"></textarea>
+      <label>应用 · Application (what will I do?)</label><textarea id="f-app"></textarea>
+      <label>祷告 · Prayer</label><textarea id="f-prayer"></textarea>
+      <label>讲道照片 · Sermon photos</label>
+      <div id="photos"></div>
+      <div class="bar" style="margin-bottom:10px">
+        <button class="btn ghost" id="shoot" type="button">📷 拍照 · Take photo</button>
+        <button class="btn ghost" id="lib" type="button">🖼 相册 · Library</button>
+      </div>
+      <div class="bar">
+        <button class="btn" id="save" type="button">保存 · Save</button>
+        <button class="btn ghost" id="del" type="button">删除 · Delete</button>
+      </div>
+    </div>
+  </section>
+</main>
+<div id="viewer"></div>
+<div id="status"></div>
+
+<!--PA_CHAT_UI-->
+<!--PA_SETTINGS_UI-->
+<script>
+const SYSTEM='You are a thoughtful companion for preparing and leading a Sunday Bible study. Help with reading a passage in context (who, when, why), observations, open discussion questions, cross-references and practical application. Quote Scripture accurately and name the reference; say plainly where Christians disagree. Keep it short and plain; key terms in English / 中文.';
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const ymd=(d)=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const today=()=>ymd(new Date());
+function nextSunday(){const d=new Date();d.setDate(d.getDate()+((7-d.getDay())%7));return ymd(d);}
+const FIELDS={date:'f-date',passage:'f-passage',theme:'f-theme',verses:'f-verses',obs:'f-obs',q:'f-q',app:'f-app',prayer:'f-prayer'};
+
+let data={studies:[]};
+let cur=null;   // id of the study being edited
+const file=PAStore.file('sunday-study.json',{
+  shape:(d)=>(d&&Array.isArray(d.studies)?'':'no studies list'),
+  unreadable:(why)=>'查经数据无法读取 · Study file unreadable ('+why+')',
+});
+const setStatus=(t)=>{$('status').textContent=t||'';};
+
+function nextStudy(){const t=today();return data.studies.filter(s=>s.date>=t).sort((a,b)=>a.date.localeCompare(b.date))[0];}
+function writeFace(){
+  const n=nextStudy();
+  PA.req('save-data',{path:'face.json',what:'data',data:{value:n?(n.passage||n.theme||n.date):'none',ts:Date.now()}}).catch(()=>{});
+}
+async function persist(){
+  if(!file.loaded){setStatus(file.error||'尚未读取 · Not loaded yet');return false;}
+  const e=await file.save(data); setStatus(e); if(!e) writeFace(); return !e;
+}
+
+function renderList(){
+  const l=[...data.studies].sort((a,b)=>b.date.localeCompare(a.date)),nx=nextStudy();
+  $('list').innerHTML=l.length?l.map(s=>'<div class="card item'+(nx&&nx.id===s.id?' next':'')+'" data-open="'+esc(s.id)+'"><div class="t">'+esc(s.passage||'(未填经文 · no passage)')+'</div>'
+    +'<div class="m">'+esc(s.date)+(s.theme?' · '+esc(s.theme):'')+(nx&&nx.id===s.id?' · ⭐ 下一次 · next':'')+'</div></div>').join('')
+    :'<div class="empty">还没有查经 · No studies yet<br>点 ＋ 开始准备 · Tap ＋ to prepare Sunday</div>';
+}
+const photoUrls={};   // path -> data: URL, filled through attach-url
+const phArm=PATwoTap.rows();
+function curStudy(){return data.studies.find(x=>x.id===cur);}
+function renderPhotos(){
+  const s=curStudy(); if(!s) return; const l=s.photos||[];
+  $('photos').innerHTML=l.length?l.map(p=>'<div class="ph" data-ph="'+esc(p.id)+'">'
+    +(photoUrls[p.path]?'<img alt="" src="'+esc(photoUrls[p.path])+'">':'')
+    +'<button class="x'+(phArm.asking(p.id)?' arm':'')+'" type="button" data-phdel="'+esc(p.id)+'">'+(phArm.asking(p.id)?PATwoTap.LABEL:'×')+'</button></div>').join('')
+    :'<div class="m">还没有照片 · No photos yet</div>';
+  l.filter(p=>photoUrls[p.path]===undefined).forEach(async p=>{
+    photoUrls[p.path]='';   // requested
+    const r=await PA.req('attach-url',{path:p.path});
+    if(r&&r.ok&&r.dataUrl){photoUrls[p.path]=r.dataUrl; if(cur===s.id) renderPhotos();}
+    else delete photoUrls[p.path];
+  });
+}
+async function addPhotos(files){
+  const s=curStudy(); if(!s) return;
+  if(!file.loaded){setStatus(file.error||'尚未读取 · Not loaded yet');return;}
+  if(!window.PAPhoto){setStatus('照片功能不可用 · Photo tool not available');return;}
+  setStatus('上传中… · Uploading…');
+  let bad='';
+  for(const f of files){
+    const r=await PAPhoto.upload(f,{what:'Photo'});
+    if(!r.ok){bad=r.text||r.error||'上传失败 · Upload failed';continue;}
+    (s.photos=s.photos||[]).push({id:uid(),path:r.path,ts:Date.now()});
+    if(r.dataUrl) photoUrls[r.path]=r.dataUrl;
+  }
+  if(cur===s.id) readForm(s);
+  const saved=await persist();
+  if(bad) setStatus(bad); else if(saved) setStatus('');
+  if(cur===s.id) renderPhotos();
+}
+async function takePhoto(camera){
+  const p=await PAPhoto.pick({camera,multiple:!camera});
+  if(p.ok) await addPhotos(p.files);
+}
+$('shoot').addEventListener('click',()=>takePhoto(true));
+$('lib').addEventListener('click',()=>takePhoto(false));
+$('photos').addEventListener('click',async(ev)=>{
+  const s=curStudy(); if(!s) return;
+  const d=ev.target.closest('[data-phdel]');
+  if(d){
+    if(!phArm.press(d.dataset.phdel,renderPhotos)) return;
+    s.photos=(s.photos||[]).filter(p=>p.id!==d.dataset.phdel);
+    readForm(s); await persist(); renderPhotos(); return;
+  }
+  const o=ev.target.closest('[data-ph]'); if(!o) return;
+  const p=(s.photos||[]).find(x=>x.id===o.dataset.ph);
+  if(p&&photoUrls[p.path]){$('viewer').innerHTML='<img alt="" src="'+esc(photoUrls[p.path])+'">';$('viewer').style.display='flex';}
+});
+$('viewer').addEventListener('click',()=>{$('viewer').style.display='none';$('viewer').innerHTML='';});
+
+function show(editing){$('listView').style.display=editing?'none':'block';$('editor').style.display=editing?'block':'none';window.scrollTo(0,0);}
+function openStudy(s){
+  cur=s.id;
+  for(const k in FIELDS) $(FIELDS[k]).value=s[k]||'';
+  PATwoTap.disarm($('del')); renderPhotos(); show(true);
+}
+function readForm(s){for(const k in FIELDS) s[k]=$(FIELDS[k]).value.trim();return s;}
+function studyText(s){
+  return 'Study date: '+s.date+'\nPassage: '+s.passage+'\nTheme: '+s.theme+'\nKey verses: '+s.verses+'\nMy observations: '+s.obs+'\nMy questions: '+s.q+'\nApplication: '+s.app;
+}
+
+$('new').addEventListener('click',()=>{
+  if(!file.loaded){setStatus(file.error||'尚未读取 · Not loaded yet');return;}
+  const s={id:uid(),date:nextSunday(),passage:'',theme:'',verses:'',obs:'',q:'',app:'',prayer:'',photos:[]};
+  data.studies.push(s); openStudy(s);
+});
+$('back').addEventListener('click',async()=>{ // auto-save on the way out
+  const s=data.studies.find(x=>x.id===cur); if(s){readForm(s); await persist();}
+  cur=null; renderList(); show(false);
+});
+$('save').addEventListener('click',async()=>{
+  const s=data.studies.find(x=>x.id===cur); if(!s) return;
+  readForm(s); if(await persist()) setStatus('');
+});
+$('del').addEventListener('click',async()=>{
+  if(!PATwoTap.press($('del'))) return;
+  data.studies=data.studies.filter(x=>x.id!==cur); cur=null;
+  await persist(); renderList(); show(false);
+});
+$('list').addEventListener('click',(ev)=>{
+  const o=ev.target.closest('[data-open]'); if(!o) return;
+  const s=data.studies.find(x=>x.id===o.dataset.open); if(s) openStudy(s);
+});
+$('aiq').addEventListener('click',()=>{
+  const s=data.studies.find(x=>x.id===cur); if(!s) return; readForm(s);
+  openChat('Help me lead this Sunday Bible study. Give 5 open discussion questions (observation, meaning, application), 2 cross-references, and one short opening prayer prompt.\n\n'+studyText(s));
+});
+
+const chat=PAChat.fullscreen({
+  defaultModel:'claude',placeholder:'Ask about the passage…',system:SYSTEM,
+  greeting:'平安 · Peace。问点什么 · Ask about a passage or how to lead the study。',
+  getLabel:()=>'Sunday Study 主日查经',persist:'sunday-study-chats',
+});
+function openChat(seed){chat.open('general',seed?{seed}:undefined);}
+$('ask').addEventListener('click',()=>openChat());
+PASettings.attach({host:$('nav'),appPrompt:SYSTEM});
+PABusy.watch(()=>cur!==null);   // an open editor may hold unsaved edits
+window.addEventListener('pagehide',()=>{
+  const s=cur&&data.studies.find(x=>x.id===cur); if(s&&file.loaded){readForm(s); file.save(data);}
+});
+
+(async()=>{
+  const r=await file.load();
+  if(r.state==='ok') data=r.value; else if(r.state==='failed') setStatus(r.text);
+  renderList();
+  if(file.loaded) writeFace();
+})();
+</script>
+</body>
+</html>
