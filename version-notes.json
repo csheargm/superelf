@@ -1,4 +1,12 @@
 {
+  "v5.5.4": {
+    "date": "2026-11-24",
+    "features": [],
+    "fixes": [
+      "发布功能补强 · Publish hardening"
+    ],
+    "through": "a267a4422cc7a2b6d1c79c7ba38bb17aea2c0581"
+  },
   "v5.5.3": {
     "date": "2026-11-23",
     "features": [],
