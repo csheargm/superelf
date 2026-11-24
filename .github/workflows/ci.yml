@@ -107,11 +107,13 @@ jobs:
         # 2026-11-24: EVERY OS +1 (ubuntu 181, windows 266): app-chat-honesty-e2e (note + Change this app → panel prefilled), skipped on CI by PA_E2E_SKIP.
         # 2026-11-24: EVERY OS +3 (ubuntu 184, windows 269): home-v2 (owner: chips + More menu + alert dot; member: Start here;
         #   demo guest: welcome, Sign in, Diabetes hidden, Make an app, 390 width, reduced motion), skipped on CI by PA_E2E_SKIP.
+        # 2026-11-24: EVERY OS +7 (ubuntu 191, windows 276): drawer-sections-e2e (first open, remembered taps, keyboard,
+        #   header one line at 390/1180/dark, short-screen scroll), skipped on CI by PA_E2E_SKIP.
         include:
           - os: ubuntu-latest
-            max_skipped: 184
+            max_skipped: 191
           - os: windows-latest
-            max_skipped: 269
+            max_skipped: 276
     env:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED
