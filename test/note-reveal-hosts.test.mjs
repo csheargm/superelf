@@ -40,7 +40,7 @@ test('the Bible forwards the hit from the ☰ row through openPanel/openDrawFull
   for (const app of ['bible (template)', 'bible (live)']) {
     const src = APP_SRC[app];
     assert.match(src, /onClick:\(_id,at\)=>\{/, `${app}: the augment row takes the hit`);
-    assert.match(src, /load\(\)\.then\(ok=>\{ if\(ok!==false\) doOpen\(at\); \}\); \}\n\s+else doOpen\(at\);/, `${app}: both branches hand it to doOpen (never load()'s own result)`);
+    assert.match(src, /goChapter\(n\.bookIdx,n\.chapter\)\.then\(ok=>\{ if\(ok!==false\) doOpen\(at\); \}\); \}\n\s+else doOpen\(at\);/, `${app}: both branches hand it to doOpen (never goChapter()'s own result)`);
     assert.match(src, /const doOpen=\(at\)=>\{/, `${app}: doOpen takes it`);
     assert.match(src, /openPanel\(free\?'draw':\(n\.hasDraws\?'draw':'note'\),free,free\?n\.title:undefined,rowId,at\),120\)/, `${app}: and passes it on`);
     assert.match(src, /async function openPanel\(pane,forceKey,forceTitle,rowId,at\)\{\n  return openDrawFull\(forceKey,forceTitle,rowId,at\);/, `${app}: openPanel forwards`);
