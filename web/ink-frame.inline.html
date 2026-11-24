@@ -143,7 +143,8 @@
     const el=g.ww>0&&env.lineEl(g.verse,g.lang); if(!el) return false;
     return Math.abs(env.colW(env.local(el.getBoundingClientRect()))-g.ww)>EPS_W;
   }
-  // placed: [{g,at,orphan}]. Returns the SAME array unless some cluster spans lines on a changed width.
+  // placed: [{g,at,orphan}]. Returns the SAME array unless some cluster spans lines on a changed width
+  // (or on its own width, lines that moved apart).
   // The anchor is the record with no rel; if it was erased, the member with the smallest rel stands in
   // (the anchor's place is derived from it). Only members written on the anchor's column (ww) belong;
   // the gate is the anchor's ww alone. A word pushed past the column's right edge moves left as one unit.
@@ -152,9 +153,13 @@
   function clusterShift(ps,env){
     const a=ps.reduce((b,p)=>relLen(p)<relLen(b)?p:b), ww=a.g.ww, el=ww>0&&env.lineEl(a.g.verse,a.g.lang);
     const mem=ps.filter(p=>Math.abs((p.g.ww||0)-ww)<=EPS_W);
-    if(!el||mem.length<2||mem.every(p=>sameLine(p.g,a.g))||!widthChanged(a.g,env)) return null;
+    if(!el||mem.length<2||mem.every(p=>sameLine(p.g,a.g))) return null;
     const [ax,ay,ak]=a.g.rel||[0,0,1], As=a.at.s/ak, A={ox:a.at.ox-ax*As,oy:a.at.oy-ay*As}, out=new Map();
     for(const p of mem){ if(!p.g.rel&&p!==a) continue; const [rx,ry,rk]=p.g.rel||[0,0,1]; out.set(p,{ox:A.ox+rx*As,oy:A.oy+ry*As,s:As*rk}); }
+    // On the written column the word is drawn as stored, unless its lines moved apart since (the Bible's
+    // 经文顺序 flip swaps a verse's 中文 and English lines at the same width, 2026-11-24): then, as on another
+    // width, it keeps its written offsets from the anchor's line.
+    if(!widthChanged(a.g,env)&&[...out].every(([p,at])=>Math.abs(at.ox-p.at.ox)<=EPS_W&&Math.abs(at.oy-p.at.oy)<=EPS_W)) return null;
     const lr=env.local(el.getBoundingClientRect()), over=Math.max(...[...out].map(([p,at])=>rightOf(p.g,at)))-(lr.left+env.colW(lr));
     const dx=over>0?Math.min(over,Math.min(...[...out.values()].map(at=>at.ox))-lr.left):0;
     if(dx>0) for(const at of out.values()) at.ox-=dx;
