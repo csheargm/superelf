@@ -1214,7 +1214,7 @@ function appMenu(name, anchor){
     }
     else if(a==='delete'){ if(confirm(`Delete "${name}"?`)){ await api('/api/apps/'+encodeURIComponent(name),{method:'DELETE'}); loadApps(); } }
   };
-  if(ROLE==='owner'){ PAAppEdit.armTip(); PAPublish.armTip(); }
+  if(ROLE==='owner'){ PAAppEdit.armTip(); PAPublish.armTip(name); }
   armMenuPop();
 }
 $('#dApps').onclick=async(e)=>{

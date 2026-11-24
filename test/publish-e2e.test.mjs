@@ -15,7 +15,8 @@ import { startFakeGitHub, FAKE_TOKEN } from './helpers-fake-github.mjs';
 const MEMBER_TOKEN = 'test-member-token-0123456789abcdef';
 const ENV = { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@example.com', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@example.com' };
 const git = (cwd, ...a) => execFileSync('git', a, { cwd, env: ENV, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-let browser, gh; const roots = [], webs = [];
+let browser, gh, gh2; const roots = [], webs = [];
+const SHOTS = process.env.PUB_SHOT_DIR || '';   // optional: where to save the sheet screenshots
 
 function remote(root) {
   const work = path.join(root, 'pubwork'); fs.mkdirSync(work);
@@ -44,20 +45,23 @@ async function node(extra, { terms = true } = {}) {
   return { port, root };
 }
 
-async function openMenu(port, token) {
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+async function openMenu(port, token, ctxOpts = {}) {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, ...ctxOpts });
   await ctx.addInitScript((t) => { try { localStorage.setItem('pa_session', t); } catch { /* no storage */ } }, token);
   const page = await ctx.newPage();
-  await page.goto(`http://127.0.0.1:${port}/`);
-  await page.waitForFunction(() => document.querySelector('#dot.ok'));
-  await page.click('#menu');
-  await page.click('#dApps [data-appmenu="myapp"]');
-  await page.waitForSelector('#appMenu');
+  await reopenMenu(page, port);
   return { ctx, page };
 }
 
+async function reopenMenu(page, port, reload = true) {
+  if (reload) { await page.goto(`http://127.0.0.1:${port}/`); await page.waitForFunction(() => document.querySelector('#dot.ok')); }
+  await page.click('#menu');
+  await page.click('#dApps [data-appmenu="myapp"]');
+  await page.waitForSelector('#appMenu');
+}
+
 before(async () => { if (skip) return; browser = await chromium.launch(); });
-after(async () => { if (browser) await browser.close(); for (const w of webs) await stopWeb(w); for (const r of roots) rmTemp(r); if (gh) await gh.close(); });
+after(async () => { if (browser) await browser.close(); for (const w of webs) await stopWeb(w); for (const r of roots) rmTemp(r); if (gh) await gh.close(); if (gh2) await gh2.close(); });
 
 test('owner: ⋯ → Publish (with its one-time tip) → files sheet → Publish → "已发布 v5.1.0 · Published"', { skip, timeout: 90000 }, async () => {
   let rem;
@@ -105,4 +109,54 @@ test('a member never sees Publish in the ⋯ menu', { skip, timeout: 60000 }, as
     assert.equal(await page.locator('#appMenu [data-a="publish"]').count(), 0);
     assert.ok(await page.locator('#appMenu [data-a="delete"]').count(), 'the menu itself is there');
   } finally { await ctx.close(); }
+});
+
+// Owner feedback: Publish / Close must look like buttons, and the wait sheet must say the owner may
+// close it. The result still reaches them after Close (the watcher keeps polling) and after they
+// left the page (the next ⋯ open shows it once).
+test('sheet buttons look like buttons; wait text says "you can close"; result shows after Close and after leaving', { skip, timeout: 90000 }, async () => {
+  gh2 = await startFakeGitHub(); gh2.st.checks = 'pending';
+  const { port } = await node({ github_publish_token: FAKE_TOKEN, github_api_url: gh2.url, publish_poll_ms: 50, publish_max_polls: 100000 });
+  const { ctx, page } = await openMenu(port, OWNER_TOKEN);
+  const look = (sel) => page.locator(sel).evaluate((b) => { const c = getComputedStyle(b); const w = b.closest('#pubSheet').getBoundingClientRect().width;
+    return { bg: c.backgroundColor, border: c.borderTopStyle, radius: parseFloat(c.borderTopLeftRadius), narrow: b.getBoundingClientRect().width < w / 2, right: b.getBoundingClientRect().right }; });
+  try {
+    await page.click('#pubItem'); await page.waitForSelector('#pubGo');
+    const go = await look('#pubGo'), close = await look('#pubClose');
+    assert.notEqual(go.bg, 'rgba(0, 0, 0, 0)', 'Publish is a filled button');
+    assert.ok(go.radius > 0 && go.narrow, 'Publish is rounded and auto width');
+    assert.equal(close.border, 'solid', 'Close is an outlined secondary button');
+    assert.ok(close.narrow && go.right > close.right, 'Publish sits right of Close');
+    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'confirm-light.png') });
+    await page.click('#pubGo'); await page.waitForSelector('#pubWait');
+    assert.match(await page.locator('#pubWait').innerText(), /CI 约需 5–10 分钟。可以关闭.* · Publishing — CI takes about 5–10 minutes\. You can close this/);
+    assert.equal(await page.locator('#pubGo').count(), 0, 'no second Publish on the wait sheet');
+    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'waiting-light.png') });
+    await page.click('#pubClose'); assert.equal(await page.locator('#pubSheet').count(), 0);
+    gh2.st.checks = 'failure';
+    await page.waitForSelector('#pubFail', { timeout: 30000 });     // after Close: the watcher still tells
+    assert.match(await page.locator('#pubFail').innerText(), /CI is red/);
+    await reopenMenu(page, port);                                   // already seen: not shown again
+    await page.waitForTimeout(500);
+    assert.equal(await page.locator('#pubSheet').count(), 0, 'a seen result is not shown again');
+  } finally { await ctx.close(); }
+});
+
+test('a result that finished while the owner was away shows on the next ⋯ open (dark)', { skip, timeout: 90000 }, async () => {
+  const g = await startFakeGitHub(); g.st.checks = 'pending';
+  try {
+    const { port } = await node({ github_publish_token: FAKE_TOKEN, github_api_url: g.url, publish_poll_ms: 50, publish_max_polls: 100000 });
+    const { ctx, page } = await openMenu(port, OWNER_TOKEN, { colorScheme: 'dark' });
+    try {
+      await page.click('#pubItem'); await page.waitForSelector('#pubGo');
+      if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'confirm-dark.png') });
+      await page.click('#pubGo'); await page.waitForSelector('#pubWait');
+      await page.goto('about:blank');                               // the owner leaves the app
+      g.st.checks = 'failure';
+      const api = `http://127.0.0.1:${port}/api/apps/myapp/publish`;
+      for (let i = 0; i < 200; i++) { const r = await fetch(api, { headers: { authorization: `Bearer ${OWNER_TOKEN}` } }); const j = await r.json(); if (j.status?.state === 'failed') break; await new Promise((r2) => setTimeout(r2, 50)); }
+      await reopenMenu(page, port);
+      await page.waitForSelector('#pubFail', { timeout: 10000 });
+    } finally { await ctx.close(); }
+  } finally { await g.close(); }
 });
