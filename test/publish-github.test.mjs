@@ -8,8 +8,11 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { startFakeGitHub, FAKE_TOKEN } from './helpers-fake-github.mjs';
 import { startPublish } from '../lib/publish/run.mjs';
+import { collectApp, snapshotHash } from '../lib/publish/collect.mjs';
 import { cutRelease } from '../lib/publish/release.mjs';
 import { sha256 } from '../lib/publish/github.mjs';
+
+const hashOf = (dir) => snapshotHash(collectApp(dir, 'myapp').files);   // what the preview handed the owner
 
 const ENV = { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@example.com', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@example.com' };
 const git = (cwd, ...a) => execFileSync('git', a, { cwd, env: ENV, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
@@ -48,7 +51,7 @@ test('PR has the code files (no data/), the builtin-versions entry and the bilin
   const fx = fixture();
   const gh = await startFakeGitHub({ versions: { other: ['00'] }, onMerge: (pr) => fx.doMerge(pr) });
   try {
-    const { status, done } = await startPublish({ appDir: fx.a, slug: 'myapp', title: 'My App', options: opts(fx, gh) });
+    const { status, done } = await startPublish({ appDir: fx.a, expectHash: hashOf(fx.a), slug: 'myapp', title: 'My App', options: opts(fx, gh) });
     assert.equal(status.state, 'checking');
     const pr = gh.st.pulls[0];
     assert.equal(pr.title, '发布 My App · Publish My App');
@@ -72,7 +75,7 @@ test('red CI: the PR stays open, nothing merged or released', async () => {
   try {
     gh.st.checks = 'failure';
     const before = git(fx.bare, 'rev-parse', 'main');
-    const end = await (await startPublish({ appDir: fx.a, slug: 'myapp', title: 'My App', options: opts(fx, gh) })).done;
+    const end = await (await startPublish({ appDir: fx.a, expectHash: hashOf(fx.a), slug: 'myapp', title: 'My App', options: opts(fx, gh) })).done;
     assert.equal(end.state, 'failed'); assert.equal(end.code, 'CI_RED'); assert.match(end.pr, /pull\/1$/);
     assert.ok(!gh.st.pulls[0].merged); assert.equal(git(fx.bare, 'rev-parse', 'main'), before);
   } finally { await gh.close(); fs.rmSync(fx.d, { recursive: true, force: true }); }
@@ -82,14 +85,14 @@ test('no check runs at all is pending, never green (R14): times out with the PR 
   const fx = fixture(); const gh = await startFakeGitHub();
   try {
     gh.st.checks = 'none';
-    const end = await (await startPublish({ appDir: fx.a, slug: 'myapp', title: 'My App', options: opts(fx, gh, { maxPolls: 3 }) })).done;
+    const end = await (await startPublish({ appDir: fx.a, expectHash: hashOf(fx.a), slug: 'myapp', title: 'My App', options: opts(fx, gh, { maxPolls: 3 }) })).done;
     assert.equal(end.code, 'CI_TIMEOUT'); assert.ok(!gh.st.pulls[0].merged);
   } finally { await gh.close(); fs.rmSync(fx.d, { recursive: true, force: true }); }
 });
 
 test('failure paths: bad token, branch exists, merge refused, scan hit, missing terms, one publish at a time', async () => {
   const fx = fixture(); const gh = await startFakeGitHub();
-  const go = (o = {}) => startPublish({ appDir: fx.a, slug: 'myapp', title: 'My App', options: opts(fx, gh, o) });
+  const go = (o = {}) => startPublish({ appDir: fx.a, expectHash: hashOf(fx.a), slug: 'myapp', title: 'My App', options: opts(fx, gh, o) });
   try {
     let s = (await go({ token: 'wrong-token' })).status;
     assert.equal(s.code, 'TOKEN_REJECTED'); assert.ok(!s.error.includes('wrong-token'));
@@ -133,13 +136,13 @@ test('public text outside the files is scanned: refused names stay off GitHub; a
   const fx = fixture(); const gh = await startFakeGitHub({ onMerge: (pr) => fx.doMerge(pr) });
   try {
     fs.writeFileSync(path.join(fx.a, 'notes-Zorblax.txt'), 'x'); fs.writeFileSync(path.join(fx.a, '.env'), 'K=1');
-    const end = await (await startPublish({ appDir: fx.a, slug: 'myapp', options: opts(fx, gh) })).done;
+    const end = await (await startPublish({ appDir: fx.a, expectHash: hashOf(fx.a), slug: 'myapp', options: opts(fx, gh) })).done;
     assert.equal(end.state, 'published');
     const body = gh.st.pulls[0].body;
     assert.doesNotMatch(body, /Zorblax|\.env/); assert.match(body, /Not published: 2 non-code file\(s\)\./);
     fs.rmSync(path.join(fx.a, 'notes-Zorblax.txt')); fs.rmSync(path.join(fx.a, '.env'));
     fs.writeFileSync(path.join(fx.a, 'meta.json'), '{"title":"\\u005aorblax app"}');
-    const s = (await startPublish({ appDir: fx.a, slug: 'myapp', options: opts(fx, gh) })).status;
+    const s = (await startPublish({ appDir: fx.a, expectHash: hashOf(fx.a), slug: 'myapp', options: opts(fx, gh) })).status;
     assert.equal(s.state, 'blocked'); assert.ok(s.hits.some((h) => h.file === '(PR title)'), JSON.stringify(s.hits));
     assert.equal(gh.st.pulls.length, 1, 'the blocked title opened no PR');
   } finally { await gh.close(); fs.rmSync(fx.d, { recursive: true, force: true }); }
@@ -149,7 +152,7 @@ test('only an unrelated early check green: the required CI jobs are missing, so 
   const fx = fixture(); const gh = await startFakeGitHub();
   try {
     gh.st.checks = 'early-only';
-    const end = await (await startPublish({ appDir: fx.a, slug: 'myapp', options: opts(fx, gh, { maxPolls: 3 }) })).done;
+    const end = await (await startPublish({ appDir: fx.a, expectHash: hashOf(fx.a), slug: 'myapp', options: opts(fx, gh, { maxPolls: 3 }) })).done;
     assert.equal(end.code, 'CI_TIMEOUT'); assert.ok(!gh.st.pulls[0].merged);
   } finally { await gh.close(); fs.rmSync(fx.d, { recursive: true, force: true }); }
 });
@@ -157,5 +160,8 @@ test('only an unrelated early check green: the required CI jobs are missing, so 
 test('publish_terms_root points the gate at the term files (the private image ships none)', async () => {
   const { publishOptions } = await import('../lib/publish/run.mjs');
   assert.equal(publishOptions({ publish_terms_root: '/data/.publish-terms' }, '/app').termsRoot, '/data/.publish-terms');
-  assert.equal(publishOptions({}, '/app').termsRoot, '/app');
+  assert.equal(publishOptions({}, '/app', () => false).termsRoot, '/app');
+  // /data/.publish-terms is the default when it exists: no live config edit; the key still wins.
+  assert.equal(publishOptions({}, '/app', (p) => p === '/data/.publish-terms').termsRoot, '/data/.publish-terms');
+  assert.equal(publishOptions({ publish_terms_root: '/x' }, '/app', () => true).termsRoot, '/x');
 });

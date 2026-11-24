@@ -52,7 +52,8 @@ test('with a token: preview lists files, publish opens the PR; the token is in n
   assert.deepEqual(pv.preview.files.map((f) => f.path), ['workspace.example/apps/myapp/index.html', 'workspace.example/apps/myapp/meta.json']);
   assert.deepEqual(pv.preview.hits, []);
   assert.equal(gh.st.requests.length, 0, 'preview sends nothing to GitHub');
-  const r = await api(port, '/api/apps/myapp/publish', { method: 'POST', body: '{}' });
+  assert.match(pv.preview.hash, /^[0-9a-f]{64}$/);
+  const r = await api(port, '/api/apps/myapp/publish', { method: 'POST', body: JSON.stringify({ hash: pv.preview.hash }) });
   const text = await r.text();
   assert.equal(r.status, 202, text);
   assert.equal(JSON.parse(text).status.state, 'checking');
@@ -63,4 +64,28 @@ test('with a token: preview lists files, publish opens the PR; the token is in n
   assert.ok(!all.includes(FAKE_TOKEN), 'token never returned or logged');
   const m = await api(port, '/api/apps/myapp/publish', { method: 'POST', body: '{}', headers: { authorization: `Bearer ${MEMBER_TOKEN}` } });
   assert.equal(m.status, 403);
+});
+
+test('publish needs the preview snapshot: no hash, or an app changed after the preview, is refused', async () => {
+  const g2 = await startFakeGitHub({ versions: {} });
+  try {
+    const { port, root } = await node({ github_publish_token: FAKE_TOKEN, github_api_url: g2.url });
+    const pub = (body) => api(port, '/api/apps/myapp/publish', { method: 'POST', body: JSON.stringify(body) });
+    const pv = await (await pub({ preview: true })).json();
+    const none = await pub({});
+    assert.equal(none.status, 422); assert.equal((await none.json()).status.code, 'SNAPSHOT_CHANGED');
+    fs.writeFileSync(path.join(root, 'workspace', 'apps', 'myapp', 'index.html'), '<h1>Changed</h1>\n');
+    const changed = await pub({ hash: pv.preview.hash });
+    assert.equal(changed.status, 422); assert.equal((await changed.json()).status.code, 'SNAPSHOT_CHANGED');
+    assert.equal(g2.st.requests.length, 0, 'nothing reached GitHub');
+  } finally { await g2.close(); }
+});
+
+test('a forked app is refused on the server for preview and publish (not only hidden in the UI)', async () => {
+  const { port, root } = await node({ github_publish_token: FAKE_TOKEN, github_api_url: 'http://127.0.0.1:9' });
+  fs.writeFileSync(path.join(root, 'workspace', 'apps', 'myapp', 'meta.json'), JSON.stringify({ title: 'My App', forkedFrom: { uid: 'kid', slug: 'theirs' } }));
+  const pv = await api(port, '/api/apps/myapp/publish', { method: 'POST', body: '{"preview":true}' });
+  assert.equal(pv.status, 422); assert.equal((await pv.json()).code, 'FORKED_APP');
+  const r = await api(port, '/api/apps/myapp/publish', { method: 'POST', body: '{"hash":"x"}' });
+  assert.equal(r.status, 422); assert.equal((await r.json()).status.code, 'FORKED_APP');
 });
