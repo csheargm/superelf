@@ -57,6 +57,7 @@ async function reopenMenu(page, port, reload = true) {
   if (reload) { await page.goto(`http://127.0.0.1:${port}/`); await page.waitForFunction(() => document.querySelector('#dot.ok')); }
   await page.click('#hmore'); await page.click('#menu');
   // My Apps starts closed (web/drawer-sections.js); open it only when it is, the state is remembered.
+  await page.waitForSelector('#dApps [data-appmenu="myapp"]', { state: 'attached' });   // rendered after the profile's saved sections apply
   if (await page.getAttribute('#secApps .dsec-head', 'aria-expanded') === 'false') await page.click('#secApps .dsec-head');
   await page.click('#dApps [data-appmenu="myapp"]');
   await page.waitForSelector('#appMenu');
