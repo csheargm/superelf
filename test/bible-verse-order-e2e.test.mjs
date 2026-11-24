@@ -47,7 +47,7 @@ async function open(viewport) {
   await frame.waitForFunction(ready, null, { timeout: 90000 });
   await frame.evaluate(() => PAAppPrefs.whenIdle());
   await frame.waitForTimeout(300);                 // the boot readOrder() reply
-  await frame.evaluate(() => { if (window.PATips) PATips.dismiss(); });
+  await frame.evaluate(() => { if (window.PATips) PATips.dismiss(); return PAAppPrefs.whenIdle(); });   // its tipsSeen write settles first: a pending prefs write racing a ⚙ Save is docs/TODO.md
   return { ctx, page, frame };
 }
 // Which line is first in each of the first verses: 'zh' or 'en', by DOM order AND by what is drawn higher.
@@ -87,7 +87,7 @@ test('⚙ Settings: the 经文顺序 tick (with its first-use tip) puts English 
       await frame.waitForFunction(() => { const t = document.querySelector('.pat-tip.on'); return t && getComputedStyle(t).opacity === '1'; });
       assert.ok(await frame.evaluate(() => { const t = document.querySelector('.pat-tip').getBoundingClientRect(), e = document.elementFromPoint(t.left + t.width / 2, t.top + t.height / 2); return !!(e && e.closest('.pat-tip')); }), 'the tip is on top, visible');
       await shot(page, 'settings-row-tip.png');
-      await frame.evaluate(() => PATips.dismiss());
+      await frame.evaluate(() => { PATips.dismiss(); return PAAppPrefs.whenIdle(); });
     }
     await frame.waitForFunction(() => !document.querySelector('.pag-go').disabled);
     if ((await box.isChecked()) !== on) await box.click();
@@ -129,8 +129,8 @@ const TARGETS = [[1, 'en', 'Nicodemus'], [1, 'zh', '尼哥底母'], [2, 'en', 't
 const MARKS = { v1: [{ kind: 'hl', color: 'yellow', lang: 'en', quote: 'Pharisees', start: 27, end: 36 }, { kind: 'hl', color: 'green', lang: 'zh', quote: '法利赛人', start: 3, end: 7 }],
   v2: [{ kind: 'hl', color: 'blue', lang: 'zh', quote: '耶稣', start: 6, end: 8 }] };
 // Each ink record's placement minus its word's top-left, and each highlight's text + line.
-async function measure(frame) {
-  await frame.evaluate(() => INK.reflow());
+async function measure(frame, { reflow = true } = {}) {
+  if (reflow) await frame.evaluate(() => INK.reflow());
   const words = []; for (const [n, lang, w] of TARGETS) words.push(await wordAt(frame, n, lang, w));
   const at = await frame.evaluate(() => INK.placements().map((p) => p.at && { ox: p.at.ox, oy: p.at.oy, verse: p.g.verse, lang: p.g.lang, quote: p.g.quote }));
   const ink = TARGETS.map(([n, lang], i) => { const p = at.find((a) => a && a.verse === n && a.lang === lang); assert.ok(p, `ink on ${n}/${lang}: ${JSON.stringify(at)}`); return { dx: p.ox - words[i].x, dy: p.oy - words[i].y, quote: p.quote }; });
@@ -164,6 +164,16 @@ for (const [vp, name] of [[PORTRAIT, 'ipad-portrait'], [LANDSCAPE, 'ipad-landsca
         assert.deepEqual(before.marks, ['1/en:Pharisees', '1/zh:法利赛人', '2/zh:耶稣']);
         await shot(page, `ink-${name}-written-${writtenEnFirst ? 'en' : 'zh'}-first.png`);
         await setOrder(frame, !writtenEnFirst);
+        // LIVE flip, the path a ⚙ Save takes (onSave → readOrder), on the open page: the ink is redrawn at
+        // once (INK.render runs) and sits on the same words with no reflow forced by the test.
+        const renders = await frame.evaluate(async () => { let n = 0; const r = INK.render; INK.render = function (...a) { n++; return r.apply(this, a); }; await readOrder(); INK.render = r; return n; });
+        assert.ok(renders >= 1, 'the flip redraws the ink');
+        assert.equal((await orders(frame))[0], writtenEnFirst ? 'zh' : 'en', 'flipped live');
+        const live = await measure(frame, { reflow: false });
+        live.ink.forEach((x, i) => assert.ok(Math.abs(x.dx - before.ink[i].dx) <= TOL && Math.abs(x.dy - before.ink[i].dy) <= TOL, `live: ink on "${TARGETS[i][2]}" kept its place: ${JSON.stringify(before.ink[i])} -> ${JSON.stringify(x)}`));
+        assert.deepEqual(live.marks, before.marks, 'live: highlights on the same words');
+        await frame.waitForTimeout(1500);
+        assert.equal(fs.readFileSync(FILE(), 'utf8'), before.bytes, 'live: the flip writes nothing');
       } finally { await ctx.close(); }
       ({ ctx, page, frame } = await open(vp));
       try {
@@ -181,3 +191,18 @@ for (const [vp, name] of [[PORTRAIT, 'ipad-portrait'], [LANDSCAPE, 'ipad-landsca
     });
   }
 }
+
+// The member template (workspace.example) carries the same rule, and its ⚙ dialog opens: it handed the
+// dialog chatData.system (a function), which cannot cross postMessage, so the dialog never loaded there.
+test('workspace.example copy: 中文 first, and its ⚙ dialog opens with the 经文顺序 row', { skip, timeout: 120000 }, async () => {
+  { const o = await open(PHONE); try { await setOrder(o.frame, false); } finally { await o.ctx.close(); } }   // the default, whatever the tests above left
+  const served = path.join(root, 'workspace', 'apps', 'bible', 'index.html'), keep = fs.readFileSync(served);
+  fs.copyFileSync(path.join(ROOT, 'workspace.example', 'apps', 'bible', 'index.html'), served);
+  const { ctx, frame } = await open(PHONE);
+  try {
+    assert.deepEqual(await orders(frame), ['zh', 'zh', 'zh', 'zh', 'zh']);
+    await frame.locator('.pag-gear').click();
+    await frame.locator('label.pag-chk', { hasText: '经文顺序' }).locator('input').waitFor();
+    await frame.waitForFunction(() => !document.querySelector('.pag-go').disabled && !document.querySelector('.pag-msg.pag-err'));
+  } finally { await ctx.close(); fs.writeFileSync(served, keep); }
+});

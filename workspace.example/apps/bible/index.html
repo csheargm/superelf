@@ -1560,7 +1560,7 @@ document.getElementById('daily-btn').onclick=dailyRead;
 // very much in effect. Read from chatData so there is exactly one copy of that text (R3).
 if(window.PASettings&&PASettings.available){
   window.PAVerseOrderHost=true;   // shows the 经文顺序 row in the dialog (PASettingsRows)
-  PASettings.attach({ host:document.getElementById('nav'), onSave:readOrder, appPrompt:chatData.system, extras:[INK_READOUT] });
+  PASettings.attach({ host:document.getElementById('nav'), onSave:readOrder, appPrompt:chatData.system(), extras:[INK_READOUT] });   // system(): a string — a function cannot cross postMessage (the dialog never opened)
 }
 
 // ── Start ──
