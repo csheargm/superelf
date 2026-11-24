@@ -1,4 +1,12 @@
 {
+  "v5.12.1": {
+    "date": "2026-11-24",
+    "features": [],
+    "fixes": [
+      "修复 CI · prompt-chain test pins after honest app chat"
+    ],
+    "through": "10ddce3efdbe2b73eece4135df9de7b2f1d5689b"
+  },
   "v5.12.0": {
     "date": "2026-11-24",
     "features": [
