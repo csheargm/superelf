@@ -1252,7 +1252,7 @@ $('#eApps').onclick=async e=>{
   const c=e.target.closest('.ecard'); if(c) openApp(c.dataset.eu,c.dataset.es,c.dataset.et);
 };
 async function showUpdateSheet(slug,title){
-  $('#usTitle').textContent=`Update available: ${esc(title)}`;
+  $('#usTitle').textContent=`Update available: ${title}`;   // textContent: no escaping (it showed &amp;)
   $('#usChangelog').innerHTML='<span style="color:var(--muted);font-size:13px">加载中… · Loading</span>';
   $('#usInstall').onclick=async()=>{ $('#updateSheet').close(); await doAppUpdate(slug); };
   $('#usCancel').onclick=()=>$('#updateSheet').close();
