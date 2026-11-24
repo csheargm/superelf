@@ -36,8 +36,8 @@ const PAPublish=(()=>{
       let j; try{ const r=await api(url(slug)); j=await r.json(); }catch{ continue; /* offline for a beat: the publish runs on the node; look again */ }
       if(j&&j.status){ if(TERMINAL.has(j.status.state)){ notice(j.status); return; } } }
   }
-  async function go(slug){
-    const r=await post(slug,{}); const j=await r.json().catch(()=>({error:'回复无效 · Bad answer'}));
+  async function go(slug,hash){
+    const r=await post(slug,{hash}); const j=await r.json().catch(()=>({error:'回复无效 · Bad answer'}));
     if(j.code==='TOKEN_MISSING') return tokenNeeded(j);
     if(!j.status) return sheet(`<p id="pubFail">发布失败 · Publish failed: ${esc(j.error||r.status)}</p>`);
     notice(j.status); if(!TERMINAL.has(j.status.state)) watch(slug);
@@ -50,10 +50,11 @@ const PAPublish=(()=>{
     if(p.hits.length) return sheet(hitsHtml(p.hits));
     const s=sheet(`<p><b>将公开以下文件 · These files will be public</b></p><ul id="pubFiles">${p.files.map(f=>`<li><code>${esc(f.path)}</code> (${f.bytes} B)</li>`).join('')}</ul>`
       +(p.refused.length?`<p>不发布 · Not published: ${p.refused.map(x=>esc(x.file)).join(', ')}</p>`:'')
+      +`<p id="pubRepo">目标仓库 · Repository: <code>${esc(p.repo||'')}</code></p>`
       +'<p>隐私检查通过；CI 通过后自动合并并发版 · Privacy scan clean; merges and releases when CI is green.</p>'
       +'<button data-pub="go" id="pubGo">发布 · Publish</button>');
     // ONE handler, replaced on every sheet (sheet() resets onclick): a stale preview can never publish.
-    const close=s.onclick; s.onclick=(e)=>{ if(e.target.closest('[data-pub="go"]')){ s.onclick=null; go(slug); } else close(e); };
+    const close=s.onclick; s.onclick=(e)=>{ if(e.target.closest('[data-pub="go"]')){ s.onclick=null; go(slug,p.hash); } else close(e); };
   }
   return { item, armTip, open };
 })();

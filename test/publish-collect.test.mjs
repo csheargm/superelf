@@ -14,7 +14,7 @@ function app() {
   const d = tmp(); const a = path.join(d, 'myapp');
   fs.mkdirSync(path.join(a, 'data'), { recursive: true }); fs.mkdirSync(path.join(a, 'img'));
   fs.writeFileSync(path.join(a, 'index.html'), '<h1>hi</h1>');
-  fs.writeFileSync(path.join(a, 'meta.json'), JSON.stringify({ title: 'My App', shared: true, forkedFrom: { uid: 'x' }, gitRef: 'abc' }));
+  fs.writeFileSync(path.join(a, 'meta.json'), JSON.stringify({ title: 'My App', shared: true, forkedFrom: null, gitRef: 'abc' }));
   fs.writeFileSync(path.join(a, 'app.js'), 'export const x = 1;');
   fs.writeFileSync(path.join(a, 'img', 'a.svg'), '<svg/>');
   fs.writeFileSync(path.join(a, 'data', 'notes.json'), '{"secret":"diary"}');
@@ -86,4 +86,45 @@ test('github_publish_token is a write-only secret under Advanced: the view never
   const view = JSON.stringify(adminConfigView({ github_publish_token: tok }));
   assert.ok(!view.includes(tok), 'value never serialized');
   assert.ok(view.includes('github_publish_token'));
+});
+
+test('a global PII rule cannot skip a match through lastIndex (scanLabels and scanFiles)', async () => {
+  const { PII_RULES, scanLabels, ruleHits } = await import('../lib/publish/scan.mjs');
+  const g = /\d{3}-\d{3}-\d{4}/g;
+  PII_RULES.push(['test rule', g]);
+  try {
+    const line = 'call 555-123-4567';
+    assert.equal(ruleHits(g, line), true); assert.equal(ruleHits(g, line), true, 'second call still hits');
+    assert.equal(g.lastIndex, 0);
+    const hits = scanLabels({ a: line, b: line }, ['Zorblax']).filter((h) => h.rule === 'test rule');
+    assert.equal(hits.length, 2, 'both labels hit');
+    const f = (p) => ({ path: p, content: Buffer.from(line) });
+    assert.equal(scanFiles([f('x.js'), f('y.js')], ['Zorblax']).filter((h) => h.rule === 'test rule').length, 2);
+  } finally { PII_RULES.pop(); }
+});
+
+test('collect refuses a forked app; the snapshot hash changes with any byte', async () => {
+  const { snapshotHash } = await import('../lib/publish/collect.mjs');
+  const { d, a } = app();
+  try {
+    const h1 = snapshotHash(collectApp(a, 'myapp').files);
+    assert.equal(h1, snapshotHash(collectApp(a, 'myapp').files), 'same bytes, same hash');
+    fs.writeFileSync(path.join(a, 'app.js'), 'export const x = 2;');
+    assert.notEqual(snapshotHash(collectApp(a, 'myapp').files), h1);
+    fs.writeFileSync(path.join(a, 'meta.json'), JSON.stringify({ title: 'T', forkedFrom: { uid: 'x' } }));
+    assert.throws(() => collectApp(a, 'myapp'), (e) => e.code === 'FORKED_APP');
+  } finally { fs.rmSync(d, { recursive: true, force: true }); }
+});
+
+test('the fork check runs before exclusions and fails closed: oversize or linked meta.json refuses', () => {
+  const { d, a } = app();
+  try {
+    const pad = ' '.repeat(MAX_FILE_BYTES + 1);
+    fs.writeFileSync(path.join(a, 'meta.json'), `{"title":"T","forkedFrom":{"uid":"x"}}${pad}`);
+    assert.throws(() => collectApp(a, 'myapp'), (e) => e.code === 'BAD_META', 'oversize meta cannot be skipped');
+    fs.rmSync(path.join(a, 'meta.json'));
+    fs.writeFileSync(path.join(d, 'fork-meta.json'), '{"forkedFrom":{"uid":"x"}}');
+    fs.symlinkSync(path.join(d, 'fork-meta.json'), path.join(a, 'meta.json'));
+    assert.throws(() => collectApp(a, 'myapp'), (e) => e.code === 'BAD_META', 'linked meta cannot be skipped');
+  } finally { fs.rmSync(d, { recursive: true, force: true }); }
 });

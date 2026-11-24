@@ -122,3 +122,20 @@ test('real start-up: an owner and two members — the unedited member Bible is u
       assert.match(log, /builtin-apps-update[^\n]*workspace-ben[^\n]*"edited":\["bible"\]/, 'the kept edit is reported');
     } finally { await stopWeb(web); fs.rmSync(root, { recursive: true, force: true }); }
   });
+
+test('a page copied into the repo from a node (PAST_VERSIONS) is a known version, so that node upgrades', async () => {
+  const { PAST_VERSIONS } = await import('../lib/builtin-app-past-versions.mjs');
+  const k = known();
+  for (const [slug, hashes] of Object.entries(PAST_VERSIONS)) for (const h of hashes) {
+    assert.match(h, /^[0-9a-f]{64}$/);
+    assert.ok((k[slug] || []).includes(h), `${slug} ${h.slice(0, 8)} missing: rerun tools/gen-builtin-app-versions.mjs`);
+  }
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'past-'));
+  try {
+    put(path.join(d, 'src', 'sunday-study', 'index.html'), 'new page');
+    put(path.join(d, 'dest', 'sunday-study', 'index.html'), 'the original');
+    const r = updateInstalledApps(path.join(d, 'src'), path.join(d, 'dest'), { 'sunday-study': [sha256('the original')] });
+    assert.deepEqual(r.updated, ['sunday-study']);
+    assert.equal(fs.readFileSync(path.join(d, 'dest', 'sunday-study', 'index.html'), 'utf8'), 'new page');
+  } finally { fs.rmSync(d, { recursive: true, force: true }); }
+});

@@ -7,6 +7,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { PAST_VERSIONS } from '../lib/builtin-app-past-versions.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const git = (...a) => execFileSync('git', a, { cwd: REPO, maxBuffer: 1 << 28 });
@@ -23,6 +24,7 @@ for (const root of ['workspace/apps', 'workspace.example/apps', 'shared-apps']) 
   const d = path.join(REPO, root);
   if (fs.existsSync(d)) for (const slug of fs.readdirSync(d)) { const f = path.join(d, slug, 'index.html'); if (fs.existsSync(f)) add(slug, fs.readFileSync(f)); }
 }
+for (const [slug, hashes] of Object.entries(PAST_VERSIONS)) for (const h of hashes) (out[slug] ||= new Set()).add(h);   // originals from before the repo had them
 const sorted = Object.fromEntries(Object.keys(out).sort().map((k) => [k, [...out[k]].sort()]));
 fs.writeFileSync(path.join(REPO, 'lib', 'builtin-app-versions.json'), JSON.stringify(sorted, null, 1) + '\n');
 console.log(`${Object.keys(sorted).length} apps, ${Object.values(sorted).reduce((n, v) => n + v.length, 0)} versions`);
