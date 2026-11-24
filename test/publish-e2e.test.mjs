@@ -175,6 +175,8 @@ test('⋯ Publish line: not in repo / up to date (disabled) / N changes; the she
     assert.equal(await line(), '分享为公开应用（所有人可见） · Share as a public app (everyone can see it)');
     assert.equal(await page.locator('#pubItem').isDisabled(), false);
     await shot('menu-not-in-repo.png');
+    const bottom = await page.evaluate(() => document.querySelector('#appMenu').getBoundingClientRect().bottom);
+    assert.ok(bottom <= 820, 'the menu stays on screen after the line arrives');
     await page.click('#pubItem'); await page.waitForSelector('#pubWhat');
     assert.match(await page.locator('#pubWhat').innerText(), /^发布会先检查隐私.*pull request on GitHub.*CI checks pass it merges.*everyone.*demo after the next deploy/);
     const repo = path.join(root, 'workspace.example', 'apps', 'myapp'); fs.mkdirSync(repo, { recursive: true });

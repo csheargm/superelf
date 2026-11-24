@@ -30,6 +30,8 @@ const PAPublish=(()=>{
     const l=b&&b.isConnected&&b.querySelector('#pubState'); if(!l) return;
     l.textContent=stateText(repo);
     const off=!!(repo&&repo.upToDate); b.disabled=off; b.style.opacity=off?'.5':''; b.style.pointerEvents=off?'none':'';   // a tap on the line text must not reach the menu's handler
+    // The line arrives after the menu was placed: keep the menu's bottom on screen.
+    const m=b.closest('#appMenu'); if(m&&m.style.top){ const over=m.getBoundingClientRect().bottom-(innerHeight-6); if(over>0) m.style.top=Math.max(6,parseFloat(m.style.top)-over)+'px'; }
   }
   // armTip(slug) runs each time the owner's ⋯ menu opens: it also shows a publish result the owner
   // has not seen yet (they closed the wait sheet, or left the app), and re-attaches the watcher to
