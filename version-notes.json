@@ -1,4 +1,12 @@
 {
+  "v5.9.2": {
+    "date": "2026-11-24",
+    "features": [],
+    "fixes": [
+      "CI 跳过上限 +2（发布页 e2e） · CI skip ceiling +2 for publish-sheet e2e"
+    ],
+    "through": "41dbd933767ec18f188ab38475234a6869e30a55"
+  },
   "v5.9.1": {
     "date": "2026-11-24",
     "features": [],
