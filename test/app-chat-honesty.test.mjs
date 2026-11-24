@@ -38,6 +38,7 @@ const CLAIMS = [
   "I've added a week view button for you.",
   'The app now supports dark mode.',
   'A year view has been added to the calendar.',
+  'I added a week view to the calendar.',   // GPT review: the plain past tense
   '已添加日/周/月/年视图切换功能。',
   '好的，已经修改了按钮的颜色。',
   '改好了，现在应用里有周视图。',
@@ -46,6 +47,7 @@ const HONEST = [
   'This chat cannot change the app. Tap 改这个应用 · Change this app to ask for it.',
   'To add an event, type the title and press Add.',
   'I added up the hours: 12 in total.',   // no app word: not a claim about the app
+  'Once done, reopen the app to see it.',   // GPT review: "done" mid-sentence is not a claim
   '这个对话不能修改应用，请用「改这个应用」。',
   '你今天有三个会议。',
 ];

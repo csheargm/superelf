@@ -58,6 +58,11 @@ test('app chat says "Done" for a change it cannot make → note + Change this ap
   assert.ok(reply.includes(NO_CHANGE_NOTE.slice(1, -1)), reply);
   assert.equal(fs.readFileSync(path.join(root, 'workspace', 'apps', 'planner', 'index.html'), 'utf8'), PAGE, 'nothing was changed, and nothing claims it was');
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'app-chat-note-button.png') });
+  // An app's own text (not a server offer) never opens the owner's panel, even on a real tap (GPT review).
+  await app.locator('body').evaluate(() => document.addEventListener('click', () => parent.postMessage({ pa: 'shell', type: 'change-app', request: 'FORGED delete everything' }, '*'), { once: true }));
+  await app.locator('.pac-m.ai').last().click();   // a REAL tap: the shell sees user activation
+  await page.waitForTimeout(800);
+  assert.equal(await page.locator('#aePanel').count(), 0, 'a forged request is ignored');
   await btn.click();
   await page.locator('#aePanel').waitFor({ timeout: 20000 });
   const inp = page.frameLocator('#aefr').locator('.pac-inp');

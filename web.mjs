@@ -1551,7 +1551,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
     }
     const edited = finishAppEdit(edit, editCtx, { wsDir: wsDir(user) });   // inline checks; a failing change is rolled back
     editCtx = null;
-    if (edited) { audit('app-edit', { who: user.id, app: edit.slug, changed: edited.line.changed, applied: edited.line.applied }); line(edited.line); if (!edited.note) edited.note = editUnchangedNote(r.text, edited.line); if (edited.note) { r = { ...r, text: `${r.text || ''}\n\n${edited.note}` }; line({ type: 'delta', text: `\n\n${edited.note}` }); } }
+    if (edited) { audit('app-edit', { who: user.id, app: edit.slug, changed: edited.line.changed, applied: edited.line.applied }); line(edited.line); edited.note = [editUnchangedNote(r.text, edited.line), edited.note].filter(Boolean).join('\n\n'); if (edited.note) { r = { ...r, text: `${r.text || ''}\n\n${edited.note}` }; line({ type: 'delta', text: `\n\n${edited.note}` }); } }
     // by: the lane that ACTUALLY answered (a confined turn's GPT pick runs on Claude), shown under the answer.
     const by = ml.blocked ? '' : chosen ? chosen.label : 'Claude';
     const mdMsg = { role: 'md', text: r.text || '', ms: turnMs, by, ...(blank ? { failed: true } : {}) };

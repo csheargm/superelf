@@ -130,11 +130,16 @@ const PAAppEdit=(()=>{
   function syncBar(uid){ const more=$('#fmore'); if(more) more.style.display=owner()&&uid===UID?'':'none'; }
   // The app's chat said it cannot change the app and offered this button (lib/app-chat-honesty.mjs). Only the page
   // open in #fr, only on a real tap (an app cannot open the owner's panel by itself), only where the panel works.
+  // Only a request the SERVER offered to this frame's chat may prefill the panel (GPT review): a tap anywhere in an
+  // app also counts as activation here, so the app's own text must never reach the owner's panel.
+  const offers=new WeakMap();   // frame element → Set of offered requests
+  function noteOffer(el,req){ if(!el||typeof req!=='string') return; if(!offers.has(el)) offers.set(el,new Set()); offers.get(el).add(req); }
   function fromApp(e){
     const m=e.data, fr=$('#fr');
     if(!fr||e.source!==fr.contentWindow||e.origin!=='null'||!canEdit()) return;
+    if(typeof m.request!=='string'||!(offers.get(fr)||new Set()).has(m.request)) return;
     if(!(navigator.userActivation&&navigator.userActivation.isActive)) return;
     open(frameSlug(),$('#ftitle').textContent,typeof m.request==='string'?m.request:'');
   }
-  return {item,armTip,open,close,onEvent,frameRec,kindOk,bindBar,syncBar,fromApp,editAppFromBar:()=>{ if(canEdit()) open(frameSlug(),$('#ftitle').textContent); }};
+  return {item,armTip,open,close,onEvent,frameRec,kindOk,bindBar,syncBar,fromApp,noteOffer,editAppFromBar:()=>{ if(canEdit()) open(frameSlug(),$('#ftitle').textContent); }};
 })();
