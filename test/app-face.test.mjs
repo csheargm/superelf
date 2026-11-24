@@ -165,11 +165,12 @@ test('faceHtml renders the value and escapes it; no face renders nothing', () =>
   assert.doesNotMatch(evil, /<b>x/);
 });
 
-test('the tile falls back to the description when there is no face', () => {
-  // The one line of the shelf that has to get this right: face OR description, never neither.
-  const card = SHELL.match(/const card=\(uid,a,badge\)=>[^\n]*/)[0];
-  assert.match(card, /\$\{faceHtml\(a\)\|\|`<small>\$\{esc\(a\.desc\|\|a\.name\)\}<\/small>`\}/,
-    'the plain tile must remain the fallback, so a missing face is invisible rather than blank');
+test('a dock tile is never blank: it always shows the app name, face or not', () => {
+  // Home v2 moved faces to the chips row; the dock tile shows the name, with the description on hover.
+  const home = fs.readFileSync(path.join(ROOT, 'web/home-v2.js'), 'utf8');
+  const card = home.match(/const card=\(u,a,badge\)=>[\s\S]*?\};/)[0];
+  assert.match(card, /<b>\$\{name2\(zh,en,esc\)\}<\/b>/, 'the name is always on the tile');
+  assert.match(card, /title="\$\{esc\(a\.desc\|\|a\.title\)\}"/, 'description, else title, on hover');
 });
 
 // ── the wired app: tasks, end to end ──────────────────────────────────────────────────────
