@@ -1,4 +1,12 @@
 {
+  "v5.7.0": {
+    "date": "2026-11-24",
+    "features": [
+      "全新外观 · A fresh, modern look"
+    ],
+    "fixes": [],
+    "through": "38ab16c77e00e2086373810a090803c975f3cc4a"
+  },
   "v5.6.0": {
     "date": "2026-11-24",
     "features": [
