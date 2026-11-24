@@ -18,17 +18,33 @@ export const FIX_COMMAND = 'node tools/bump-version.mjs && git commit -am "relea
 export function run(root, argv, exec = (args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })) {
   const pkgFile = path.join(root, 'package.json'), notesFile = path.join(root, 'version-notes.json');
   const pkg = JSON.parse(fs.readFileSync(pkgFile, 'utf8'));
+  const notesNow = JSON.parse(fs.readFileSync(notesFile, 'utf8'));
+  const newest = Object.keys(notesNow).filter((k) => notesNow[k] && notesNow[k].through)
+    .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))[0];
   const { merges } = pendingMerges(root, exec);
-  const releases = planReleases(pkg.version, merges);
+  // Plan from the newest release ENTRY (the cursor), so an interrupted bump re-runs to the same result.
+  const releases = planReleases(newest ? newest.slice(1) : pkg.version, merges);
   if (argv.includes('--check')) {
+    // An interrupted bump (one file written, the other not) must not pass as "covered".
+    if (newest && newest !== `v${pkg.version}`) return { code: 1, out: `package.json v${pkg.version} != newest release ${newest}.\nFix: set package.json to ${newest.slice(1)} and commit` };
+    // The bump must be COMMITTED: a working-tree-only bump would pass while the push sends the old files.
+    let dirty = '';
+    try { dirty = exec(['status', '--porcelain', '--', 'package.json', 'version-notes.json']).trim(); } catch (e) { throw new Error(`cannot read git status: ${e.message}`); }
+    if (dirty) return { code: 1, out: `package.json / version-notes.json have uncommitted changes.\nFix: ${FIX_COMMAND}` };
     if (!releases.length) return { code: 0, out: `version v${pkg.version} covers every merge` };
     return { code: 1, out: `${merges.length} merge(s) since v${pkg.version} are not in the release notes.\nFix: ${FIX_COMMAND}` };
   }
+  if (!releases.length && newest && newest !== `v${pkg.version}`) {   // finish an interrupted bump
+    pkg.version = newest.slice(1);
+    fs.writeFileSync(pkgFile, JSON.stringify(pkg, null, 2) + '\n');
+    return { code: 0, out: `v${pkg.version}` };
+  }
   if (!releases.length) return { code: 0, out: `v${pkg.version} (nothing new)` };
   if (argv.includes('--dry-run')) return { code: 0, out: JSON.stringify(releases, null, 2) };
-  const notes = JSON.parse(fs.readFileSync(notesFile, 'utf8'));
-  fs.writeFileSync(notesFile, JSON.stringify(applyReleases(notes, releases), null, 2) + '\n');
   pkg.version = releases[releases.length - 1].version;
+  // Notes (the cursor) first: a crash before package.json is finished by the next run, and --check
+  // refuses the mismatch meanwhile.
+  fs.writeFileSync(notesFile, JSON.stringify(applyReleases(notesNow, releases), null, 2) + '\n');
   fs.writeFileSync(pkgFile, JSON.stringify(pkg, null, 2) + '\n');
   return { code: 0, out: `v${pkg.version}` };
 }

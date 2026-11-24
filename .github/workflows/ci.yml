@@ -99,7 +99,7 @@ jobs:
           - os: ubuntu-latest
             max_skipped: 150
           - os: windows-latest
-            max_skipped: 234
+            max_skipped: 236
     env:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED

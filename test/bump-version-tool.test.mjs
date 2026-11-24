@@ -87,3 +87,45 @@ test('git failure is loud, never "nothing new" (R14)', () => {
     assert.throws(() => run(d, ['--check'], (a) => { if (a[0] === 'log') throw new Error('boom'); return 'v5.0.0\n'; }), /cannot list merges/);
   } finally { fs.rmSync(d, { recursive: true, force: true }); }
 });
+
+// GPT review round 1 (2026-11-23): each case below once passed --check or mis-bumped.
+test('a BREAKING CHANGE footer is major; a subject that only mentions it is not', () => {
+  assert.equal(classifyBranch([{ subject: 'fix(x): a', body: 'why\n\nBREAKING CHANGE: drops v1\n' }]).level, 'major');
+  assert.equal(classifyBranch(['fix: explain BREAKING CHANGE wording']).level, 'patch');
+});
+
+test('dates A, B, A keep `through` in first-parent order (never moves back)', () => {
+  const rel = planReleases('5.0.0', [M('1', '2026-11-22', 'Merge: a', ['fix: a']), M('2', '2026-11-21', 'Merge: b', ['fix: b']), M('3', '2026-11-22', 'Merge: c', ['fix: c'])]);
+  assert.deepEqual(rel.map((r) => r.entry.through), ['1', '2', '3']);
+});
+
+test('--check refuses: no release base, an uncommitted bump, a half-written bump', () => {
+  const { d, g } = repo();
+  try {
+    assert.throws(() => run(d, ['--check'], (a) => (a[0] === 'for-each-ref' ? '' : '')), /no release base/);
+    run(d, []);
+    const unc = run(d, ['--check']);
+    assert.equal(unc.code, 1); assert.match(unc.out, /uncommitted/);
+    g('commit', '-qam', 'release');
+    assert.equal(run(d, ['--check']).code, 0);
+    const pf = path.join(d, 'package.json');
+    fs.writeFileSync(pf, JSON.stringify({ version: '5.0.0' })); g('commit', '-qam', 'half');   // crash after notes
+    const half = run(d, ['--check']);
+    assert.equal(half.code, 1); assert.match(half.out, /!= newest release v5\.1\.0/);
+    assert.equal(run(d, []).out, 'v5.1.0', 'a re-run finishes the bump, no double bump');
+  } finally { fs.rmSync(d, { recursive: true, force: true }); }
+});
+
+test('pre-push hook runs --check for a push to remote main from another branch', { skip: needBash }, () => {
+  const { d, g } = repo();
+  try {
+    fs.mkdirSync(path.join(d, 'tools'));
+    for (const f of ['pre-push.sh', 'bump-version.mjs']) fs.copyFileSync(path.join(ROOT, 'tools', f), path.join(d, 'tools', f));
+    fs.symlinkSync(path.join(ROOT, 'lib'), path.join(d, 'lib'));
+    g('checkout', '-qb', 'other');
+    const head = g('rev-parse', 'HEAD').trim();
+    let err = '';
+    try { execFileSync('sh', [path.join(d, 'tools/pre-push.sh'), 'origin'], { cwd: d, input: `refs/heads/other ${head} refs/heads/main ${'0'.repeat(40)}\n`, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }); } catch (e) { err = String(e.stderr); }
+    assert.match(err, /not in the release notes/);
+  } finally { fs.rmSync(d, { recursive: true, force: true }); }
+});
