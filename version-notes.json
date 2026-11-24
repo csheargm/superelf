@@ -1,4 +1,12 @@
 {
+  "v5.11.0": {
+    "date": "2026-11-24",
+    "features": [
+      "主人提醒灯与一键修复 · Owner alert light with fixes"
+    ],
+    "fixes": [],
+    "through": "a5eecde7524d48e0aafa2e17404c2c51c2cfd421"
+  },
   "v5.10.1": {
     "date": "2026-11-24",
     "features": [],
