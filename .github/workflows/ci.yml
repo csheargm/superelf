@@ -95,11 +95,12 @@ jobs:
         # 2026-11-24: WINDOWS ONLY +2 (windows 234): revision-stamp runs the Dockerfile stamp + entrypoint tar in POSIX bash.
         # 2026-11-23: EVERY OS +1 (ubuntu 150, windows 236): release-notes-e2e (bumped version is current);
         #   windows +1 more: bump-version-tool's version.sh parity check needs bash.
+        # 2026-11-24: EVERY OS +7 (ubuntu 157, windows 242): settings-close-e2e (sticky bar, discard guard, slow Save).
         include:
           - os: ubuntu-latest
-            max_skipped: 150
+            max_skipped: 157
           - os: windows-latest
-            max_skipped: 236
+            max_skipped: 242
     env:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED
