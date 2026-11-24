@@ -20,7 +20,7 @@ const TEMPLATE = APP_SRC['bible (template)'], LIVE = APP_SRC['bible (live)'];
 const HOOKS = [
   '<!--PA_INK_ANCHOR_UI-->',
   'ANN.ink=migrateKeys(o.ink||{});',
-  'if(annOk) INK.load(ANN.ink);',
+  'if(annOk){ followSelection(); INK.load(ANN.ink); }',
   'VM.render(); INK.render();',
   'for(const src of [ANN.notes,ANN.draws,ANN.chat,ANN.marks,ANN.ink])',
   '&&await loadAnn()){ renderDots(); VM.render(); INK.load(ANN.ink); }',

@@ -1102,20 +1102,27 @@ const chatUI=()=>railChat||aiChat;
 // TODO(R4 seam): BIBLE_SUMMARY + chatData are the Ask AI host hooks — move them to their own inlined part.
 // A run's follow-up after the reader changed chapter (review 2026-11-12): read THAT chapter's file, replace only the
 // run note's page 0 text, write the whole object back (every other key kept as read). Not loaded = not written (R5).
-async function summaryOffChapter(b,ch,key,html){
+// key null (review 2026-11-23): a run's FIRST save after the reader moved on — a NEW note in the chapter the run was asked in.
+async function summaryOffChapter(b,ch,key,html,period){
   const p=`notes/${b+1}-${ch}.json`, r=await DATA.read(p);
-  if(r.status!==DATA.ST.loaded||!r.data) return {ok:false,error:'无法读取该章 · that chapter could not be read'};
-  const o=r.data, d=o.draws&&o.draws[key]; if(!d||!Array.isArray(d.pages)||!d.pages.length) return {ok:false,gone:true};
-  const now=Date.now(); o.draws[key]=Object.assign({},d,{updated:now,pages:[Object.assign({},d.pages[0],{updated:now,pageHtml:html})].concat(d.pages.slice(1))});
+  if(!(r.status===DATA.ST.loaded&&r.data)&&!(key==null&&r.status===DATA.ST.absent)) return {ok:false,error:'无法读取该章 · that chapter could not be read'};
+  const o=r.data||{notes:{},draws:{},chat:{},titles:{},pins:{}}, now=Date.now(); if(!o.draws) o.draws={};
+  if(key==null){ let t=now; while(o.draws['free-'+t]) t++; key='free-'+t;
+    o.draws[key]={v:2,id:key,created:now,updated:now,template:'plain',summary:period||undefined,pages:[{id:'p0',created:now,updated:now,strokes:[],pageHtml:html,images:[]}]}; }
+  else { const d=o.draws[key]; if(!d||!Array.isArray(d.pages)||!d.pages.length) return {ok:false,gone:true};
+    o.draws[key]=Object.assign({},d,{updated:now,pages:[Object.assign({},d.pages[0],{updated:now,pageHtml:html})].concat(d.pages.slice(1))}); }
   const w=await saveAnnAt(p,JSON.stringify(o)); return w&&w.ok?{ok:true,key,id:`file:${b}:${ch}:${key}`}:(w||{ok:false,error:'not saved'}); }
+const SUMMARY_AT={};   // summary scope → {b,ch}: the chapter a run was asked in, so its first save lands there (review 2026-11-23)
 const BIBLE_SUMMARY={
   run:async({scope,message,images,model})=>{   // images + model: the summary's page images and lane (note-features.md I)
+    SUMMARY_AT[scope]={b:bookIdx,ch:chapter};
     if(!splitOn()){ if(await aiChat.open(scope)===false) return false; return aiChat.send(message,{attachments:images||[],model}); }
     rail.open(); rail.expand('chat'); if(await railChat.open(scope)===false) return false; return railChat.send(message,{attachments:images||[],model}); },
-  saveNote:async({id:runId,html,period,quiet})=>{   // quiet: written, not opened (the follow-up's second save, web/summary-followup.inline.html)
+  saveNote:async({id:runId,html,period,quiet,scope})=>{   // quiet: written, not opened (the follow-up's second save, web/summary-followup.inline.html)
     if(ANN_BLOCKED) return {ok:false,error:ANN_BLOCKED};
     const rid=runId!=null?String(runId).split(':'):null;   // file:<bookIdx>:<chapter>:<key>, the row id the first save answered
     if(rid&&rid.length===4&&(Number(rid[1])!==bookIdx||Number(rid[2])!==chapter)) return summaryOffChapter(Number(rid[1]),Number(rid[2]),rid[3],html);   // the reader moved on: write THAT chapter's file
+    const at=!rid&&SUMMARY_AT[scope]; if(at&&(at.b!==bookIdx||at.ch!==chapter)) return summaryOffChapter(at.b,at.ch,null,html,period);   // first save, reader moved on: a new note in the run's chapter
     const old=rid?rid[rid.length-1]:null; if(old&&!ANN.draws[old]) return {ok:false,gone:true};   // its run's note, by the row id it answered
     const now=Date.now(); let t=now; while(!old&&ANN.draws['free-'+t]) t++;   // two runs in one ms stay two notes
     const k=old||'free-'+t, prev=old?ANN.draws[k]:null;

@@ -1118,6 +1118,7 @@
     bigAct:' — pick a smaller photo, or crop it 请选择更小的照片或裁剪后重试',
     failed:'照片未添加 · Photo not added',
     broken:'无法添加照片 · Could not add photo',
+    moved:'笔记已切换，照片未添加 · Note changed — photo not added',
     // Reachable only on a page that mounts this pad WITHOUT PAPhoto. Deliberately the heading
     // only — the full sentence belongs to chat-ui's PAC_NO_PHOTO and is not copied here (R3),
     // the same rule PAPhoto's own `bigNoChat` follows.
@@ -2222,6 +2223,9 @@
       // The one refusal the user can act on. It states the cap, not the photo's size: "12 MB" tells
       // nobody what would fit. Bilingual, and word-for-word the shell's own sentence (R3).
       if(!window.PAPhoto&&file&&file.size>PHOTO_MAX_BYTES){ flash(PHOTO_TXT.big(PHOTO_MAX_BYTES)+PHOTO_TXT.bigAct); return; }
+      // The note the photo was picked FOR (review 2026-11-23): an upload is slow, and the pane may
+      // load another note (a chapter change) before it answers. Never insert into that one.
+      const nb0=NB, pg0=page();
       try{
         const r=await opts.uploadImage(file);
         const path=(r&&typeof r==='object')?(r.ok===false?'':(r.path||'')):r;
@@ -2231,6 +2235,7 @@
         if(!path){ flash(PHOTO_TXT.failed+((r&&(r.text||r.error))?' — '+(r.text||r.error):'')); return; }
         const url=await opts.imageUrl(path);
         const ratio=url?await primeImage(path,url):0.75;
+        if(NB!==nb0||page()!==pg0){ flash(PHOTO_TXT.moved); return; }   // after the LAST await
         pushUndo();
         const w=0.5;                                           // half page width; keep aspect
         const x=at?at.x:0.25, y=at?at.y:0.18;

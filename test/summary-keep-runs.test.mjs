@@ -130,6 +130,37 @@ for (const app of ['bible (template)', 'bible (live)']) {
   });
 }
 
+for (const app of ['bible (template)', 'bible (live)']) {
+  test(`${app}: a run asked in John 3 whose FIRST save comes after the reader moved to John 4 is a new note in John 3; CONTROL: unmoved, it is in the chapter on screen`, async () => {
+    const h = await startHarness('bible');
+    try {
+      h.put('notes/43-3.json', { notes: {}, draws: {}, chat: {}, titles: {} });
+      h.put('notes/43-4.json', { notes: {}, draws: {}, chat: {}, titles: {}, pins: { v1: true } });
+      const A = runApp(app, h.relay, ['BIBLE_SUMMARY', 'loadAnn', 'get ANN(){return ANN}', 'get BOOTED(){return _booted}', 'setCh:(b,c)=>{bookIdx=b;chapter=c;}', 'mark:(s)=>{SUMMARY_AT[s]={b:bookIdx,ch:chapter};}'], { clampTimers: true });
+      for (let i = 0; i < 200 && !A.BOOTED; i++) await new Promise((r) => setTimeout(r, 10));
+      A.setCh(42, 3); await A.loadAnn();
+      A.mark('summary:2026-W46');                                          // what run() records, the line pinned below
+      const c = await A.BIBLE_SUMMARY.saveNote({ html: '<div>here</div>', period: '2026-W46', scope: 'summary:2026-W46', quiet: true });
+      assert.ok(c.ok && c.id.startsWith('file:42:3:'), 'CONTROL: unmoved, the chapter on screen');
+      A.mark('summary:2026-W47');
+      A.setCh(42, 4); await A.loadAnn();
+      const r = await A.BIBLE_SUMMARY.saveNote({ html: '<div>late</div>', period: '2026-W47', scope: 'summary:2026-W47', quiet: true });
+      assert.ok(r.ok && r.id === `file:42:3:${r.key}`, JSON.stringify(r));
+      const j3 = JSON.parse(fs.readFileSync(h.file('notes/43-3.json'), 'utf8')), j4 = JSON.parse(fs.readFileSync(h.file('notes/43-4.json'), 'utf8'));
+      assert.equal(j3.draws[r.key].pages[0].pageHtml, '<div>late</div>'); assert.equal(j3.draws[r.key].template, 'plain'); assert.equal(j3.draws[r.key].summary, '2026-W47');
+      assert.equal(j3.draws[c.key].pages[0].pageHtml, '<div>here</div>', 'the earlier note is kept');
+      assert.deepEqual(j4.draws, {}, 'John 4 got nothing'); assert.deepEqual(j4.pins, { v1: true }); assert.deepEqual(A.ANN.draws, {});
+    } finally { await h.stop(); }
+  });
+}
+
+test('run() records the chapter a summary was asked in, in both Bibles', () => {
+  for (const p of ['workspace/apps/bible/index.html', 'workspace.example/apps/bible/index.html']) {
+    const src = fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
+    assert.match(src, /run:async\(\{scope,message,images,model\}\)=>\{[^\n]*\n\s*SUMMARY_AT\[scope\]=\{b:bookIdx,ch:chapter\};/, p);
+  }
+});
+
 test('a run title reads cleanly: its link label has no repeated date, displayTitle keeps the run time, scopeOfLabel finds the period', () => {
   const win = { PA_SUMMARY_NOW: RUN1 }; const R = loadRefs(win); const Title = win.PASummaryTitle;
   const t = Title.runTitleOf('2026-W46', RUN1);

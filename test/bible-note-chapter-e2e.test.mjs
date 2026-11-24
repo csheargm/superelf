@@ -73,6 +73,10 @@ const PATHS = {
   'daily reading': (f) => f.evaluate(() => document.getElementById('daily-btn').click()),
   'verse link': (f) => f.evaluate(() => jumpToRef(42, 4, [1])),
 };
+// Where each path must arrive (review 2026-11-23: "left John 3" alone would pass a path that went nowhere useful).
+// null: the daily plan's chapter depends on the date, so only "left John 3" is checked.
+const ARRIVE = { 'next button': [42, 4], 'swipe': [42, 4], 'arrow key': [42, 4], 'chapter dropdown': [42, 4], 'book picker': [43, 1],
+  'search result': [42, 4], 'reading history': [42, 4], 'daily reading': null, 'verse link': [42, 4] };
 // One test per copy (CI skips e2e, and every test is a counted skip there); each path is a subtest-free loop step
 // whose assertion messages name the path.
 for (const slug of Object.keys(COPIES)) test(`${slug}: an unsaved ${HOME} note stays in ${HOME} whichever way the chapter changes`, { skip, timeout: 600000 }, async () => {
@@ -88,6 +92,7 @@ for (const slug of Object.keys(COPIES)) test(`${slug}: an unsaved ${HOME} note s
       const word = `typed-${name.replace(/\W/g, '')}-${Date.now()}`;
       await page.keyboard.type(word);
       if (go) { await go(frame); await frame.waitForFunction(() => !(bookIdx === 42 && chapter === 3)); }   // well inside the 700 ms save debounce
+      if (go && ARRIVE[name]) assert.deepEqual(await frame.evaluate(() => [bookIdx, chapter]), ARRIVE[name], `${name}: arrived where it should`);
       for (let i = 0; i < 100 && !homeText(slug).includes(word); i++) await page.waitForTimeout(100);
       await page.waitForTimeout(1500);                                     // any late write to the new chapter would land by now
       assert.ok(homeText(slug).includes(word), `${name}: the note is saved under ${HOME}`);
@@ -97,4 +102,49 @@ for (const slug of Object.keys(COPIES)) test(`${slug}: an unsaved ${HOME} note s
       fs.rmSync(path.join(NOTES(slug), HOME_FILE), { force: true }); for (const f of fs.readdirSync(NOTES(slug))) if (f.endsWith('.bak')) fs.rmSync(path.join(NOTES(slug), f));
     } finally { await ctx.close(); }
   }
+});
+
+// A photo picked in John 3 whose upload answers after the reader moved to John 4 (review 2026-11-23): the
+// pane has reloaded into John 4's note by then, so inserting into page() would put John 3's photo in John 4.
+// The upload is held open by a stub PAPhoto; CONTROL: the same held upload, released without moving, lands in John 3.
+const PHOTO = 'uploads/held-photo.png';
+async function heldPhoto(slug, move) {
+  const { ctx, page, frame } = await open(slug);
+  try {
+    await frame.evaluate(() => { bookIdx = 42; chapter = 3; document.getElementById('book-sel').value = 42; return load(); });
+    await frame.waitForFunction(() => document.querySelectorAll('.verse').length > 5 && !ANN_LOADING);
+    const before = others(slug);
+    await frame.locator('#top-note').click();
+    await frame.waitForFunction(() => document.querySelector('.pan-photoopt[data-photo="library"]'));
+    await frame.evaluate((p) => {
+      window.PAScan = undefined;
+      const real = window.PAPhoto;
+      window.PAPhoto = Object.assign({}, real, {
+        pick: async () => ({ ok: true, files: [new File([new Uint8Array([1, 2, 3])], 'held.png', { type: 'image/png' })] }),
+        upload: () => new Promise((r) => { window.__releasePhoto = () => r({ ok: true, path: p }); }),
+      });
+      document.querySelector('.pan-photoopt[data-photo="library"]').click();
+    }, PHOTO);
+    await frame.waitForFunction(() => typeof window.__releasePhoto === 'function');
+    if (move) {
+      await frame.evaluate(() => document.getElementById('end-next').click());
+      await frame.waitForFunction(() => bookIdx === 42 && chapter === 4 && !ANN_LOADING);
+      await page.waitForTimeout(500);                                     // the pane reloads into John 4's note
+    }
+    await frame.evaluate(() => window.__releasePhoto());
+    for (let i = 0; i < 30 && !(homeText(slug).includes(PHOTO)); i++) await page.waitForTimeout(100);
+    await frame.evaluate(() => drawPad.flush && drawPad.flush());
+    await page.waitForTimeout(1500);
+    const after = others(slug);
+    for (const [f, body] of Object.entries(after)) assert.ok(!body.includes(PHOTO), `${f} must not hold the John 3 photo`);
+    if (move) assert.deepEqual(after, before, 'no other chapter file was created or changed');
+    return homeText(slug).includes(PHOTO);
+  } finally {
+    await ctx.close();
+    fs.rmSync(path.join(NOTES(slug), HOME_FILE), { force: true }); for (const f of fs.readdirSync(NOTES(slug))) if (f.endsWith('.bak')) fs.rmSync(path.join(NOTES(slug), f));
+  }
+}
+test('bible: a photo whose upload answers after a chapter change goes into no other chapter; CONTROL: unmoved, it lands in John 3', { skip, timeout: 120000 }, async () => {
+  assert.equal(await heldPhoto('bible', false), true, 'CONTROL: the held upload, released in place, is in John 3');
+  await heldPhoto('bible', true);
 });
