@@ -89,3 +89,14 @@ test('a forked app is refused on the server for preview and publish (not only hi
   const r = await api(port, '/api/apps/myapp/publish', { method: 'POST', body: '{"hash":"x"}' });
   assert.equal(r.status, 422); assert.equal((await r.json()).status.code, 'FORKED_APP');
 });
+
+test('the confirmed hash binds the destination: a repo change after the preview refuses', async () => {
+  const { startPublish, previewPublish } = await import('../lib/publish/run.mjs');
+  const { root } = await node({});
+  const appDir = path.join(root, 'workspace', 'apps', 'myapp');
+  const o = { token: FAKE_TOKEN, repo: 'csheargm/superelf', api: 'http://127.0.0.1:9', termsRoot: root };
+  const pv = previewPublish({ appDir, slug: 'myapp', options: o });
+  assert.equal(pv.repo, 'csheargm/superelf');
+  const { status } = await startPublish({ appDir, slug: 'myapp', options: { ...o, repo: 'someone/else' }, expectHash: pv.hash });
+  assert.equal(status.code, 'SNAPSHOT_CHANGED');
+});

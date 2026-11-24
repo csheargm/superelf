@@ -50,6 +50,7 @@ const PAPublish=(()=>{
     if(p.hits.length) return sheet(hitsHtml(p.hits));
     const s=sheet(`<p><b>将公开以下文件 · These files will be public</b></p><ul id="pubFiles">${p.files.map(f=>`<li><code>${esc(f.path)}</code> (${f.bytes} B)</li>`).join('')}</ul>`
       +(p.refused.length?`<p>不发布 · Not published: ${p.refused.map(x=>esc(x.file)).join(', ')}</p>`:'')
+      +`<p id="pubRepo">目标仓库 · Repository: <code>${esc(p.repo||'')}</code></p>`
       +'<p>隐私检查通过；CI 通过后自动合并并发版 · Privacy scan clean; merges and releases when CI is green.</p>'
       +'<button data-pub="go" id="pubGo">发布 · Publish</button>');
     // ONE handler, replaced on every sheet (sheet() resets onclick): a stale preview can never publish.
