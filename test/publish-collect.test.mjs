@@ -115,3 +115,16 @@ test('collect refuses a forked app; the snapshot hash changes with any byte', as
     assert.throws(() => collectApp(a, 'myapp'), (e) => e.code === 'FORKED_APP');
   } finally { fs.rmSync(d, { recursive: true, force: true }); }
 });
+
+test('the fork check runs before exclusions and fails closed: oversize or linked meta.json refuses', () => {
+  const { d, a } = app();
+  try {
+    const pad = ' '.repeat(MAX_FILE_BYTES + 1);
+    fs.writeFileSync(path.join(a, 'meta.json'), `{"title":"T","forkedFrom":{"uid":"x"}}${pad}`);
+    assert.throws(() => collectApp(a, 'myapp'), (e) => e.code === 'BAD_META', 'oversize meta cannot be skipped');
+    fs.rmSync(path.join(a, 'meta.json'));
+    fs.writeFileSync(path.join(d, 'fork-meta.json'), '{"forkedFrom":{"uid":"x"}}');
+    fs.symlinkSync(path.join(d, 'fork-meta.json'), path.join(a, 'meta.json'));
+    assert.throws(() => collectApp(a, 'myapp'), (e) => e.code === 'BAD_META', 'linked meta cannot be skipped');
+  } finally { fs.rmSync(d, { recursive: true, force: true }); }
+});
