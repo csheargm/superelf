@@ -1,4 +1,12 @@
 {
+  "v5.3.2": {
+    "date": "2026-11-23",
+    "features": [],
+    "fixes": [
+      "single census entry for the bump tool"
+    ],
+    "through": "154f0c41d8e4c8ac03c115b478198cdbf4f46890"
+  },
   "v5.3.1": {
     "date": "2026-11-23",
     "features": [],
