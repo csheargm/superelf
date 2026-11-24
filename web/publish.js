@@ -7,13 +7,28 @@ const PAPublish=(()=>{
   const TIP_KEY='tip:publish';
   // CI_MINUTES: measured from recent CI runs on main (4-9 min, 2026-11-24; PR 1 took 4.5 min).
   const WAIT_TEXT='正在发布，CI 约需 5–10 分钟。可以关闭此窗口，完成后会提示（或下次打开 ⋯ 菜单时显示） · Publishing — CI takes about 5–10 minutes. You can close this; you\'ll be told when it\'s done (or see it next time you open the ⋯ menu).';
+  const WHAT_TEXT='发布会先检查隐私，再在 GitHub 上开一个合并请求（PR）；CI 检查通过后自动合并，此应用成为 superelf 的一部分，所有人可见，下次部署后出现在演示站。 · Publishing first scans for private data, then opens a pull request on GitHub; when CI checks pass it merges, the app becomes part of superelf for everyone, and it appears on the demo after the next deploy.';
   const url=(slug)=>'/api/apps/'+encodeURIComponent(slug)+'/publish';
   const post=(slug,body)=>api(url(slug),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body||{})});
   // The menu item; the first time it is on screen it carries the one-time bilingual tip line.
+  // The second line (#pubState) says what Publish would do for THIS app; check() fills it in.
   function item(){
     const seen=_SEEN.has(TIP_KEY);
-    return '<button data-a="publish" id="pubItem">发布到公开仓库 · Publish'
+    return '<button data-a="publish" id="pubItem">发布到公开仓库 · Publish to the public repo'
+      +'<span id="pubState" style="display:block;font-size:11px;opacity:.65"></span>'
       +(seen?'':'<span class="pub-tip" style="display:block;font-size:11px;opacity:.75">新：审核后公开分享此应用 · New: share this app publicly after a privacy check</span>')+'</button>';
+  }
+  // repo: { inRepo, upToDate, changedFiles } from the server (lib/publish/status.mjs), or null.
+  function stateText(repo){
+    if(!repo) return '';
+    if(!repo.inRepo) return '分享为公开应用（所有人可见） · Share as a public app (everyone can see it)';
+    if(repo.upToDate) return '已是最新 · Already up to date';
+    return `有 ${repo.changedFiles} 处改动未发布 · ${repo.changedFiles} change${repo.changedFiles===1?'':'s'} not yet published`;
+  }
+  function showState(repo){
+    const b=$('#pubItem'), l=$('#pubState'); if(!b||!l) return;
+    l.textContent=stateText(repo);
+    const off=!!(repo&&repo.upToDate); b.disabled=off; b.style.opacity=off?'.5':'';
   }
   // armTip(slug) runs each time the owner's ⋯ menu opens: it also shows a publish result the owner
   // has not seen yet (they closed the wait sheet, or left the app), and re-attaches the watcher to
@@ -25,6 +40,7 @@ const PAPublish=(()=>{
   const watching=new Set();
   async function check(slug){
     let j; try{ const r=await api(url(slug)); j=await r.json(); }catch{ return; /* offline: the next ⋯ open looks again */ }
+    showState(j&&j.repo);
     const st=j&&j.status; if(!st) return;
     if(TERMINAL.has(st.state)){ if(seenAt(slug)!==String(st.at)){ notice(st); markSeen(slug,st); } }
     else watch(slug);
@@ -65,12 +81,12 @@ const PAPublish=(()=>{
     if(!j.preview) return sheet(`<p id="pubFail">${esc(j.error||'发布失败 · Publish failed')}</p>`);
     const p=j.preview;
     if(p.hits.length) return sheet(hitsHtml(p.hits));
-    const s=sheet(`<p><b>将公开以下文件 · These files will be public</b></p><ul id="pubFiles">${p.files.map(f=>`<li><code>${esc(f.path)}</code> (${f.bytes} B)</li>`).join('')}</ul>`
+    const s=sheet(`<p id="pubWhat">${WHAT_TEXT}</p><p><b>将公开以下文件 · These files will be public</b></p><ul id="pubFiles">${p.files.map(f=>`<li><code>${esc(f.path)}</code> (${f.bytes} B)</li>`).join('')}</ul>`
       +(p.refused.length?`<p>不发布 · Not published: ${p.refused.map(x=>esc(x.file)).join(', ')}</p>`:'')
       +`<p id="pubRepo">目标仓库 · Repository: <code>${esc(p.repo||'')}</code></p>`
       +'<p>隐私检查通过；CI 通过后自动合并并发版 · Privacy scan clean; merges and releases when CI is green.</p>',true);
     // ONE handler, replaced on every sheet (sheet() resets onclick): a stale preview can never publish.
     const close=s.onclick; s.onclick=(e)=>{ if(e.target.closest('[data-pub="go"]')){ s.onclick=null; go(slug,p.hash); } else close(e); };
   }
-  return { item, armTip, open, WAIT_TEXT };
+  return { item, armTip, open, stateText, WAIT_TEXT, WHAT_TEXT };
 })();
