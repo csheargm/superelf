@@ -1,4 +1,12 @@
 {
+  "v5.14.0": {
+    "date": "2026-11-24",
+    "features": [
+      "侧栏分组更清楚 · Clearer drawer sections"
+    ],
+    "fixes": [],
+    "through": "5a6133ae46d5b4add66cb73aa69699b15fd6e732"
+  },
   "v5.13.1": {
     "date": "2026-11-24",
     "features": [],
