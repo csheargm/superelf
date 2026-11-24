@@ -85,7 +85,8 @@ import { pageImageFile, IMG_BAD_PATH, IMG_NOT_FOUND } from './lib/note-page-imag
 import { buildFollowup, followupDeps } from './lib/summary-followup.mjs';
 import { writerClaudeBase, writerLaneMs } from './lib/research-writer.mjs';
 import { snapshotApps, appBuildWarnings } from './lib/app-postcheck.mjs';
-import { appEditOf, refuseIfEditBusy, dropAppHistory, editSystemPrompt, beginAppEdit, finishAppEdit, undoAppEdit } from './lib/app-edit.mjs';
+import { appEditOf, refuseIfEditBusy, dropAppHistory, editSystemPrompt, beginAppEdit, finishAppEdit, undoAppEdit, VERSIONS_DIR } from './lib/app-edit.mjs';
+import { APP_CHAT_EVIDENCE_RULE, appAboutContext, editHistoryContext } from './lib/app-history.mjs';
 import { isBlankAnswer, laneFailureText, shouldFallBackToAgent, fallbackStatusText, chatTurnLogLine, turnErrorText } from './lib/chat-outcome.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -1257,6 +1258,20 @@ async function chat(req, res, user, body) {
   } finally { if (unstop) unstop(); }
 }
 
+// The facts an app turn is given about its app (lib/app-history.mjs): the edit panel gets the saved
+// versions too; an app's own chat gets the about lines and APP_CHAT_EVIDENCE_RULE. Read from THIS
+// user's workspace only. '' for a main-chat turn.
+// TODO(R4 seam): leaves web.mjs with the edit-turn wiring (lib/chat-turn split).
+function appTurnFacts(user, edit, app) {
+  const notes = () => { try { return JSON.parse(appNotesJson(ROOT, undefined, buildId.head())); } catch { return {}; /* notes unreadable: the block says "none" */ } };
+  if (edit && edit.undo) return '';   // a typed Undo calls no model: no facts to build
+  if (edit && !edit.superelf) return editHistoryContext({ slug: edit.slug, appDir: edit.dir, versionsRoot: path.join(wsDir(user), VERSIONS_DIR), versionsRel: VERSIONS_DIR, repoRoot: ROOT, notes: notes() });
+  if (edit || typeof app !== 'string' || !slugOk(app)) return '';
+  const dir = path.join(appsDir(user), app);
+  if (!noLinkOnTheWay(wsDir(user), path.join(dir, 'index.html'))) return APP_CHAT_EVIDENCE_RULE;
+  return [APP_CHAT_EVIDENCE_RULE, appAboutContext({ slug: app, appDir: dir, repoRoot: ROOT, notes: notes() })].filter(Boolean).join('\n\n');
+}
+
 async function chatTurn(req, res, user, body, hold, cancel = null) {
   const { message, convoId, attachments, app, label, model, assess } = body;
   const oneShot = body.oneShot === true;   // the literal true only (docs/adr/0008)
@@ -1267,6 +1282,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
   try { edit = appEditOf({ user, body, headers: req.headers, appsDir: appsDir(user) }); if (edit) refuseIfEditBusy(edit, wsDir(user)); }
   catch (e) { if (!e.status) throw e; if (res.headersSent) { res.end(JSON.stringify({ type: 'error', text: e.message }) + '\n'); return; } return send(res, e.status, 'application/json', JSON.stringify({ error: e.message, code: e.code })); }
   const system = edit ? editSystemPrompt(edit) : body.system;
+  const turnFacts = appTurnFacts(user, edit, app);   // what changed on this app: facts, outside the override chain
   // A oneShot caller that left while this turn was queued: nothing is saved, nothing spawns.
   if (cancel && cancel.signal.aborted) { audit('chat-cancelled', { who: user.id, convo: convoId || '', queued: true }); if (!res.writableEnded) res.end(); return; }
   // Decided ONCE per turn, from the shell relay's header OR the app slug (lib/agent-origin.mjs),
@@ -1390,7 +1406,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
       // lane: prompts.global is replaceable by a profile override, and being answered in your own
       // language must not be something a customised assistant can lose. It matters most here —
       // most fast lanes are Chinese-trained models.
-      const sys = [prompts.global, prompts.app, REPLY_LANGUAGE_RULE]   // each piece capped by resolveSystemPrompts
+      const sys = [prompts.global, prompts.app, REPLY_LANGUAGE_RULE, turnFacts]   // each piece capped by resolveSystemPrompts
         .filter(Boolean).map((c) => ({ role: 'system', content: c }));
       const history = [...sys, ...convo.messages.slice(-20).filter((m) => !m.failed)   // a stored lane failure is not an answer to learn from
         .map((m) => ({ role: m.role === 'md' ? 'assistant' : 'user', content: String(m.text || '') }))
@@ -1468,7 +1484,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
           // override replaces the guard above, and a capability list it could delete is not one
           // any app author could rely on. A oneShot turn builds no app, so it skips the ~3.7k-char
           // app contract; the language rule and the confined note still ride.
-          systemPrompt: [agentPrompts.global, agentPrompts.app, agentCapabilities(laneRole(user, origin), oneShot ? null : APP_CONTRACT)].filter(Boolean).join('\n\n'),
+          systemPrompt: [agentPrompts.global, agentPrompts.app, agentCapabilities(laneRole(user, origin), oneShot ? null : APP_CONTRACT), turnFacts].filter(Boolean).join('\n\n'),   // facts LAST: the runner's cap cuts them, never the capability text
         resumeId, timeoutMs: cfg.task_timeout_minutes * 60000, onChild: cancel ? cancel.onChild : undefined,
         onDelta: (t) => line({ type: 'delta', text: t }), onTool: (n, b) => line({ type: 'status', text: `${n}${b ? ` — ${b}` : ''}` }) };
       r = await enqueue(async () => {

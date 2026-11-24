@@ -52,3 +52,21 @@ agent plant CLAUDE.md/AGENTS.md that later runs obey.
   Only problems the change introduced block it; a blocked change is rolled back at once.
   "Loads headless" is approximated by the script compile: the node has no browser (docs/TODO.md).
 - Not built here: Phase 2 (members/guests), Phase 3 (member PRs), the nightly review and Review now.
+
+## Addendum 2026-11-24 — "what changed?" · 这个应用改了什么
+
+Owner screenshots: the panel said it had no change history (it has 20 saved versions), and an app's
+own chat invented a per-app "What's new" list. Both now get read-only FACTS on their system line,
+built by `lib/app-history.mjs` and marked as data, not instructions:
+
+- **Change this app**: the saved versions (time, size, and the request that caused each change, now
+  stored in `<versions>/<slug>/.requests.json`), a bounded diff of the newest three changes, and the
+  release-notes and git lines that name the app. Owner-only, as before; read from the turn's own workspace.
+- **An app's own chat**: title, version, page date and the same release-notes lines, plus
+  `APP_CHAT_EVIDENCE_RULE` (one constant): never name UI it has no evidence for; point to the release
+  notes (version line on home) or ⋯ → 改这个应用.
+
+Skipped: a "历史 · History" list with Undo-to-this in the panel header. Undo today walks back one
+edit and keeps what it replaced; restoring an arbitrary version needs its own route and an undo
+story for the versions it skips, which is not cheap. The agent can already read and compare any
+saved copy. Noted in docs/TODO.md.
