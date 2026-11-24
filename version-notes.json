@@ -1,4 +1,14 @@
 {
+  "v5.3.0": {
+    "date": "2026-11-23",
+    "features": [
+      "the version number rises with every shipped change"
+    ],
+    "fixes": [
+      "revision-stamp bash checks skip on Windows"
+    ],
+    "through": "48741c691532785a95b6717816e2a93e491b04c2"
+  },
   "v5.2.0": {
     "date": "2026-11-23",
     "features": [
