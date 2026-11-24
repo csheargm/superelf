@@ -16,6 +16,7 @@ const SECRET_SENTINELS = {
   tavily_key: 'SENTINEL-tavily-4f9a', exa_key: 'SENTINEL-exa-8c21', firecrawl_key: 'SENTINEL-fire-77aa',
   agentmail_key: 'SENTINEL-agentmail-b0b0', telegram_bot_token: 'SENTINEL-tg-123456',
   gmail_app_password: 'SENTINEL-gmailapp-dd11', google_client_id: 'SENTINEL-gcid-9911', google_client_secret: 'SENTINEL-gcsec-3344',
+  github_publish_token: 'SENTINEL-ghpub-5566',
 };
 const CFG = { chat_models: [
   { id: 'deepseek', provider: 'ollama', model: 'x' },

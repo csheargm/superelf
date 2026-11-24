@@ -11,6 +11,7 @@ import { appPageCookie, clearAppPageCookie, appPageToken, appPageCookieToken, ap
 import { injectDemoBoot } from './lib/demo-boot.mjs';
 import { makeSigninGate, authConfig } from './lib/demo-auth.mjs';
 import { makeDemoRoutes } from './lib/demo-routes.mjs';
+import { handlePublishRoute } from './lib/publish/routes.mjs';
 import { loadConfig, configPath, fastLaneGuard, GUARD_DEFAULT_SURFACE, agentCapabilities, appContract, REPLY_LANGUAGE_RULE, OVERRIDABLE_PROMPT_MAX } from './lib/config.mjs';
 import { runClaude } from './lib/runner.mjs';
 import { agentAllowed, lanesFor, memberLane, NO_PLAIN_LANE_TEXT, AGENT_OFF_TEXT } from './lib/member-lanes.mjs';
@@ -1762,6 +1763,7 @@ const server = http.createServer(async (req, res) => {
     // Each app is listed once (F4-6): your own apps are in "My apps", and an app on the family shelf is under the shelf.
     if (req.method === 'GET' && p === '/api/family-apps') { const shelf = new Set(demoOn(cfg) ? [] : listShared(SHARED).map((a) => a.name));
       return send(res, 200, 'application/json', JSON.stringify(listFamilyApps().filter((a) => a.uid !== user.id && !shelf.has(a.slug)))); }
+    if (await handlePublishRoute(req, res, p, { user, cfg, root: ROOT, slugOk, ownAppDir, readBody: (r) => readBody(r, BODY_LIMITS.control), send, audit, demo: demoOn(cfg) })) return;   // owner-only Publish (docs/adr/0039)
     if (req.method === 'PATCH' && p.endsWith('/share') && p.startsWith('/api/apps/')) {
       const slug = p.slice('/api/apps/'.length, -'/share'.length);
       if (!slugOk(slug)) return send(res, 400, 'application/json', '{"error":"bad name"}');

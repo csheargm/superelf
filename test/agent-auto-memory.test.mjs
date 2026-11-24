@@ -196,6 +196,7 @@ const PROCESS_STARTS = {
   'lib/note-ocr.mjs': { why: 'tools/panote-ocr (Apple Vision) and swiftc that builds it: not claude; a minimal env (OCR_CHILD_ENV_KEYS), never process.env', refs: ['execFile(s.file'] },
   'lib/vernotes.mjs': { why: 'git', refs: ["execFileSync('git'"] },
   'lib/version-auto.mjs': { why: 'git', refs: ["execFileSync('git'"] },
+  'lib/publish/release.mjs': { why: 'git clone/fetch/commit/push of the public repo for the release cut (docs/adr/0039)', refs: ["execFileSync('git'", "execFileSync('git'"] },
   'tools/fetch-daily-digest.mjs': { why: 'node tools/websearch.mjs (its claude run goes through lib/runner.mjs runClaude)',
     refs: ['execFileSync(process.execPath'] },
   'tools/gen-builtin-app-versions.mjs': { why: 'git log, show (builds lib/builtin-app-versions.json)', refs: ["execFileSync('git'"] },
