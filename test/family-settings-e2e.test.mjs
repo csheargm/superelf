@@ -32,7 +32,7 @@ async function openSettings({ viewport = { width: 1024, height: 800 }, answer = 
     const a = answer(d); if (a === false) await d.dismiss(); else await d.accept(typeof a === 'string' ? a : undefined); });
   await page.goto(`http://127.0.0.1:${port}/`);
   await page.waitForFunction(() => document.querySelector('#dot.ok'));
-  await page.click('#settings');
+  await page.click('#hmore'); await page.click('#settings');
   await page.waitForSelector('#addU');
   return { ctx, page, dialogs };
 }

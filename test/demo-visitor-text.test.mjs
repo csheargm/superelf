@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { injectDemoBoot, SIGNIN_LABELS, DEMO_APP_TIP } from '../lib/demo-boot.mjs';
+import { injectDemoBoot, SIGNIN_LABELS } from '../lib/demo-boot.mjs';
 
 const REPO = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BANNED = /scripturetolife/i;
@@ -22,7 +22,7 @@ function filesUnder(dir) {
 
 test('the served demo shell and its labels never name scripturetolife', () => {
   const shell = injectDemoBoot(fs.readFileSync(path.join(REPO, 'web/index.html'), 'utf8'), demoCfg);
-  assert.ok(shell.includes(JSON.stringify(DEMO_APP_TIP)), 'the injection ran');
+  assert.ok(shell.includes('"hide":['), 'the injection ran');
   assert.doesNotMatch(shell, BANNED);
   for (const [k, v] of Object.entries(SIGNIN_LABELS)) assert.doesNotMatch(v, BANNED, `label ${k}`);
 });
@@ -37,8 +37,8 @@ test('the starter apps never name scripturetolife', () => {
   for (const f of files) assert.doesNotMatch(fs.readFileSync(f, 'utf8'), BANNED, path.relative(REPO, f));
 });
 
-test('the app tip and the notice sit INSIDE the fixed input bar, so neither hides under the input', () => {
+test('no full-width tip strip (the tip is the home ask box placeholder); the notice sits INSIDE the fixed input bar', () => {
   const shell = injectDemoBoot(fs.readFileSync(path.join(REPO, 'web/index.html'), 'utf8'), demoCfg);
-  assert.ok(shell.includes("t.id='demoTip'") && shell.includes('f.insertBefore(t,f.firstChild)'), 'tip: first child, above the chip');
+  assert.ok(!shell.includes("t.id='demoTip'"), 'the old #demoTip strip is gone');
   assert.ok(shell.includes("n.id='demoNotice'") && shell.includes('f.appendChild(n)'), 'notice: last child, below the input');
 });

@@ -316,6 +316,7 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
   @page{margin:10mm}
 }
 /* PA_SHELL_LOOK_CSS */
+/* PA_HOME_V2_CSS */
 </style>
 </head>
 <body>
@@ -333,13 +334,17 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
   <div id="chatSearch"><div class="cs-bar"><input id="csInp" placeholder="搜索对话 · Search chats" autocomplete="off"><button class="plain" id="csClose" title="关闭 · Close" aria-label="关闭 · Close" data-icon="close"></button></div><div id="csResults"></div></div>
 </aside>
 <header>
-  <button class="ibtn" id="menu" title="菜单 · Menu" aria-label="菜单 · Menu" data-icon="menu"></button>
+  <div class="greet"><svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><path class="spark" d="M16 2 L19 13 L30 16 L19 19 L16 30 L13 19 L2 16 L13 13 Z"/><circle class="blink" cx="26" cy="6" r="3"/></svg><h1>管家</h1></div>
   <span class="dot" id="dot"></span>
-  <div class="greet"><h1>管家</h1></div>
-  <span class="aa"><button class="ibtn aa-btn" type="button" title="字号 · Text size" aria-label="字号 · Text size" aria-expanded="false">Aa</button><span class="aa-set"><button class="ibtn fs-dn">A−</button><button class="ibtn fs-up">A+</button></span></span>
-  <button class="ibtn" id="reload" title="刷新 · Refresh" aria-label="刷新 · Refresh" data-icon="refresh"></button>
-  <button class="ibtn" id="settings" title="设置 · Settings" aria-label="设置 · Settings" data-icon="gear"></button>
-  <button class="plain" id="newSession" title="新对话 · New chat"><span class="lbl">Main</span></button>
+  <button class="h-avatar" id="hAvatar" type="button" title="设置 · Settings" aria-label="设置 · Settings" hidden></button>
+  <button class="ibtn" id="hmore" type="button" title="更多 · More" aria-label="更多 · More" aria-expanded="false" aria-controls="hmenu" data-icon="more"></button>
+  <div id="hmenu" class="cmenu-pop" hidden>   <!-- web/home-v2.js PAHome: the header's More menu -->
+    <button class="ibtn" id="menu" title="应用与对话 · Apps & chats" aria-label="应用与对话 · Apps & chats" data-icon="menu"><span class="hm-l">应用与对话 · Apps &amp; chats</span></button>
+    <span class="aa"><button class="ibtn aa-btn" type="button" title="字号 · Text size" aria-label="字号 · Text size" aria-expanded="false">Aa<span class="hm-l">字号 · Text size</span></button><span class="aa-set"><button class="ibtn fs-dn">A−</button><button class="ibtn fs-up">A+</button></span></span>
+    <button class="ibtn" id="reload" title="刷新 · Refresh" aria-label="刷新 · Refresh" data-icon="refresh"><span class="hm-l">刷新 · Refresh</span></button>
+    <button class="ibtn" id="settings" title="设置 · Settings" aria-label="设置 · Settings" data-icon="gear"><span class="hm-l">设置 · Settings</span></button>
+    <button class="plain" id="newSession" title="新对话 · New chat"><span class="lbl">Main</span></button>
+  </div>
   <div class="hsub" id="hsub"></div>
 </header>
 <!-- Outside <header>: the toast also answers the app bar's A-/A+, and the header is inert while an app is open. -->
@@ -347,7 +352,18 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
 <span id="offLine" class="fs-toast"></span>   <!-- the offline state line, PAOffline (web/offline-client.js): "离线 · Offline — 保存在本设备 · saving on this device", the queued count -->
 <span id="fsToast" class="fs-toast"></span>
 <main>
-  <div id="emptyState" style="display:none"><div class="grid" id="eApps"></div></div>
+  <!-- TODO(R4): index.html is over budget; split seam: this home markup + the header row move into a home-v2 HTML part inlined like settings-dialog.html. -->
+  <div id="emptyState" style="display:none">   <!-- the home (web/home-v2.js PAHome.render) -->
+    <div class="home-hello" id="hHello"></div>
+    <div class="home-chips" id="hChips"></div>
+    <p class="home-sub" id="hWelcome" hidden>这是演示版 · 点任一应用试试，或在下方让我做一个新应用<span class="en">This is the demo — open any app, or ask below for a new one.</span></p>
+    <form class="home-ask" id="homeForm"><span class="ph" id="hPh" aria-hidden="true"></span></form>   <!-- the composer row #frow moves in here while the home shows -->
+    <p class="home-keep" id="hKeep" hidden><a href="#">登录后可保存 · Sign in to keep your work</a></p>
+    <p class="home-notice" id="hNotice"></p>
+    <div class="home-start" id="hStart"></div>
+    <div class="home-dockhead" id="hDockHead">更多应用 · More apps</div>
+    <div class="grid" id="eApps"></div>
+  </div>
   <div id="log"></div>
 </main>
 <form id="f">
@@ -403,8 +419,9 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
 <script>
 /* PA_ICONS_JS */
 /* PA_HOME_LOOK_JS */
+/* PA_HOME_V2_JS */
 const $=(s)=>document.querySelector(s);
-PAIcons.hydrate(); PAHomeLook.bindAa();
+PAIcons.hydrate(); PAHomeLook.bindAa(); PAHome.bind();
 $('#newSession').insertAdjacentHTML('beforeend',PAIcons.svg('down'));
 let T=localStorage.getItem('pa_session')||'';
 let API_BASE='';   // '' = this page's origin; the home node's name while the public one is away (web/offline-origin.js PAOrigin). TODO(R4 seam): with api() into web/api.js
@@ -548,7 +565,7 @@ $('#convos').onclick=(e)=>{
 // pointerdown ON a menu item must NOT remove the menu before that item's click fires, or
 // the action never runs (this was breaking app move/share/delete AND chat rename/delete).
 let _menuOutside=null;
-function closeMenuPop(){ document.querySelectorAll('.cmenu-pop').forEach((m)=>m.remove()); if(_menuOutside){ document.removeEventListener('click',_menuOutside,true); _menuOutside=null; } }
+function closeMenuPop(){ document.querySelectorAll('.cmenu-pop:not(#hmenu)').forEach((m)=>m.remove()); if(_menuOutside){ document.removeEventListener('click',_menuOutside,true); _menuOutside=null; } }
 function armMenuPop(){
   // Dismiss on a click OUTSIDE the popup, handled in the CAPTURE phase and stopped there so
   // it never reaches what's underneath (e.g. the drawer backdrop's close-on-click). So the
@@ -604,6 +621,7 @@ function setHeaderName(name){
   const h1=document.querySelector('header h1'); if(!h1) return;
   const product=h1.dataset.product||'管家';
   h1.dataset.full=name?name+'’s '+product:product; h1.dataset.short=name||product;
+  PAHome.setName(name);
   fitHeaderName();
 }
 function fitHeaderName(){
@@ -1052,8 +1070,8 @@ function shellTag(t){
 }
 /* ══ SHELL_BEHIND_APP_END ══ */
 
-function showEmptyState(){ if(!$('#log').children.length){ $('#emptyState').style.display='block'; } }
-function hideEmptyState(){ $('#emptyState').style.display='none'; }
+function showEmptyState(){ if(!$('#log').children.length){ $('#emptyState').style.display='flex'; document.body.classList.add('home-on'); PAHome.dockInput(true); } }
+function hideEmptyState(){ $('#emptyState').style.display='none'; document.body.classList.remove('home-on'); PAHome.dockInput(false); }
 
 // My-Apps ordering — persisted SERVER-SIDE in the user's profile (ME.appOrder), so the
 // order follows the account across devices (iPhone + Mac). Value is an array of app slugs
@@ -1168,18 +1186,14 @@ async function loadApps(){
       ${PAIcons.tileIcon(a)}<span class="dapp-name">${esc(a.title)}${a.sharedBy?` <small style="color:var(--muted)">· ${esc(a.sharedBy)}</small>`:''}</span>
       ${ownNames.has(a.name)?'<small style="color:var(--accent);font-size:11px">✓ copied</small>':`<button class="plain" style="font-size:12px;padding:3px 8px" data-fork="${esc(a.name)}">Fork</button>`}
     </div>`).join(''):'');
-  // Empty state grid: own then shelf (promoted + family-shared)
-  const card=(uid,a,badge)=>`<div class="ecard" data-eu="${esc(uid)}" data-es="${esc(a.name)}" data-et="${esc(a.title)}">${PAIcons.tileIcon(a)}<b>${esc(a.title)}${badge||''}${a.hasUpdate?`<span class="update-dot" data-update="${esc(a.name)}" data-title="${esc(a.title)}" title="有新版本 · Update available"></span>`:''}</b>${faceHtml(a)||`<small>${esc(a.desc||a.name)}</small>`}</div>`;
-  const familyShelf=shelf.filter(a=>a.fromFamily);
-  const shelfBadge=(a)=>a.fromFamily?`<button class="plain" style="font-size:11px;padding:2px 7px;margin-left:4px" data-fget="${esc(a.uid)}" data-fslug="${esc(a.name)}">Get</button>`:'<span class="star">★</span>';
-  $('#eApps').innerHTML=own.map(a=>card(UID,a,'')).join('')
-    +(shelf.length?`<div class="grid-sep">家庭书架 · Family shelf</div>`+shelf.map(a=>card(a.uid,a,shelfBadge(a))).join(''):'');
+  // Home: greeting, ask box, Start here, then the dock with the Family shelf (web/home-v2.js PAHome).
+  PAHome.render({own,shelf,uid:UID,esc});
   // Blue dot on each new app — the existing markNew system (key + _SEEN), so it clears on
   // first tap and stays cleared across reloads. The shelf is usually off-screen when an app
   // is created, so the ☰ that opens it is dotted too, or there is no cue to look.
   if(fresh.size){
     $('#dApps').querySelectorAll('.dapp').forEach(el=>{ if(el.dataset.u===UID&&fresh.has(el.dataset.n)) markNew(el,'app:'+el.dataset.n); });
-    $('#eApps').querySelectorAll('.ecard').forEach(el=>{ if(el.dataset.eu===UID&&fresh.has(el.dataset.es)) markNew(el,'app:'+el.dataset.es); });
+    document.querySelectorAll('#eApps .ecard,#hStart .ecard').forEach(el=>{ if(el.dataset.eu===UID&&fresh.has(el.dataset.es)) markNew(el,'app:'+el.dataset.es); });
     markNewSel('#menu','apps:'+[...fresh].sort().join(','));
   }
   $('#hsub').innerHTML=PAHomeLook.headerSub(ownApps,esc);
@@ -1238,7 +1252,7 @@ $('#eApps').onclick=async e=>{
   const c=e.target.closest('.ecard'); if(c) openApp(c.dataset.eu,c.dataset.es,c.dataset.et);
 };
 async function showUpdateSheet(slug,title){
-  $('#usTitle').textContent=`Update available: ${esc(title)}`;
+  $('#usTitle').textContent=`Update available: ${title}`;   // textContent: no escaping (it showed &amp;)
   $('#usChangelog').innerHTML='<span style="color:var(--muted);font-size:13px">加载中… · Loading</span>';
   $('#usInstall').onclick=async()=>{ $('#updateSheet').close(); await doAppUpdate(slug); };
   $('#usCancel').onclick=()=>$('#updateSheet').close();

@@ -9,6 +9,7 @@
     "save_max_mb": 2,
     "app_model": "gpt-oss:120b",
     "home_url": "https://superelf.app",
+    "home_hide": ["diabetes"],
     "chat_timeout_s": 300,
     "app_builds_per_user_per_day": 5,
     "app_builds_per_ip_per_day": 15,
@@ -17,7 +18,7 @@
     "ai_calls_node_per_day": 3000,
     "parallel_chats": 3,
     "title": "superelf",
-    "notice": "AI answers come from third-party cloud models (Ollama). Don't enter sensitive personal information. · AI 回答来自第三方云端模型（Ollama），请勿输入敏感个人信息。",
+    "notice": "AI 回答来自第三方云端模型（Ollama），请勿输入敏感个人信息。 · AI answers come from third-party cloud models (Ollama). Don't enter sensitive personal information.",
     "blocked_users": [],
     "auth": {
       "supabase_url": "https://lafipstknsudjtfxbkkn.supabase.co",

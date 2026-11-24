@@ -14,7 +14,6 @@ import { rmTemp } from './helpers-tmp.mjs';
 import { waitBuilt } from './helpers-demo-build.mjs';
 import { QUOTA_MESSAGES } from '../lib/demo-quota.mjs';
 import { APP_MARKER, DEMO_APP_MESSAGES, parseIntent, parseApp, slugFrom } from '../lib/demo-app.mjs';
-import { DEMO_APP_TIP } from '../lib/demo-boot.mjs';
 
 const REPO = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MODELS = [{ id: 'fast', label: 'Fast', group: 'Fast', provider: 'ollama', model: 'fake-fast' }];
@@ -136,12 +135,12 @@ test('over the disk cap the build is refused with the quota message', async () =
   assert.ok(!fs.existsSync(path.join(v.dir, 'hello-world')));
 });
 
-test('an ordinary question streams as before; the shell shows the first-use tip', async () => {
+test('an ordinary question streams as before; the shell carries the home ask box', async () => {
   const v = await visit();
   const ev = await chat(v, 'what is 2+2');
   assert.equal(doneOf(ev).text, 'PLAIN-ANSWER');
   assert.ok(ev.some((e) => e.type === 'delta'));
-  assert.ok((await (await req('/')).text()).includes(JSON.stringify(DEMO_APP_TIP)));
+  assert.ok((await (await req('/')).text()).includes('id="homeForm"'));
 });
 
 test('parsing: lenient marker, traversal-proof slugs, size cap', () => {

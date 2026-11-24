@@ -60,7 +60,7 @@ for (const vp of VIEWPORTS) test(`no stray square over an app or the Change-this
     assert.ok(box.x < 60, 'the input sits at the left edge');
     assert.deepEqual(await leaks(page.mainFrame()), [], 'the closed shell drawer paints nothing');
     await page.waitForTimeout(SETTLE_MS);   // the bar slides away over a freshly opened app
-    if (await page.evaluate(() => document.querySelector('#ftitle').getBoundingClientRect().top < 0)) { await page.click('#barpeek'); await page.waitForFunction(() => document.querySelector('#ftitle').getBoundingClientRect().top >= 0); }
+    if (await page.evaluate(() => document.querySelector('#ftitle').getBoundingClientRect().top < 0)) { await page.click('#barpeek'); await page.waitForFunction(() => document.querySelector('#ftitle').getBoundingClientRect().top >= 0 && !document.querySelector('#frame .bar').getAnimations().length); }   // slid fully in: a box read mid-slide puts the press above the title
     const t = await page.locator('#ftitle').boundingBox();
     await page.mouse.move(t.x + 10, t.y + t.height / 2); await page.mouse.down(); await page.waitForTimeout(LONG_PRESS_MS); await page.mouse.up();
     await page.locator('#aePanel').waitFor();

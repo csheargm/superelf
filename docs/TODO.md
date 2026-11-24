@@ -700,3 +700,8 @@ Without it they now FAIL (R14), not pass as `# pass 0 / # fail 0`. To run them:
 - Owner alerts, GPT round 2 (capped rare races): a reload can read `pending` just before the host writes its result, then treat that result as the baseline and show "no result"; correlate by request id if it is ever seen. superelf-health.sh's df on an unmounted data folder reports / (pre-existing): check the mount first.
 - Activity log / Undo (GPT review 2026-11-24, not fixed): a fork update (POST app update from the family copy) overwrites the live app without an edit copy, so Undo of the last edit (panel or log) also erases that update, and the edit's diff includes it. Fix: take an edit-history copy before an app update. (feat/activity-log)
 - Activity log (GPT round 3, edge cases past the 3-round cap): an app bump (meta.json version) also bypasses edit history, so Undo can revert it; a diff opened during a running edit can include that unfinished edit; an edit kept or rolled back on chat()'s error path writes no app-edit audit line. (feat/activity-log)
+
+## Home v2 (ask-first home) — accessibility leftovers (GPT review, 2026-11-24)
+- The update dot on Start/dock tiles is pointer-only; make it a real button reachable by keyboard (web/home-v2.js updDot).
+- Family-shelf dock tiles (role=button) nest the Get button, so the tile's accessible name includes "Get"; split the tile and its Get control.
+- The one-time ⋯ tip covers part of the greeting on phones until dismissed.

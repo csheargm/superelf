@@ -189,3 +189,7 @@ const FILE_SHA256 = 'ca22c42909b589bf10aec93dd684f8ea4632ad81e632f77ee0e84934914
 test('page matches the claims-verified version', () => {
   assert.equal(sha(file), FILE_SHA256, 'page changed: re-verify claims, links, contrast and the script, then update FILE_SHA256');
 });
+
+test('a Chinese browser opens the front page in 中文 (owner 2026-11-24); a stored choice still wins', () => {
+  assert.ok(file.includes("if (l !== 'zh' && l !== 'en') l = /^zh\\b/i.test(navigator.language || '') ? 'zh' : 'en';"), 'navigator.language zh* → 中文 when no stored choice');
+});

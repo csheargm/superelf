@@ -27,7 +27,7 @@ async function openSettings(viewport) {
   const page = await ctx.newPage();
   await page.goto(`http://127.0.0.1:${port}/`);
   await page.waitForFunction(() => document.querySelector('#dot.ok'));
-  await page.click('#settings');
+  await page.click('#hmore'); await page.click('#settings');
   await page.waitForSelector('#addU');   // the owner's Family list has rendered: the page is at full length
   return { ctx, page };
 }
@@ -133,7 +133,7 @@ test('a slow Save: one PUT only, an edit typed meanwhile keeps Settings open and
     await page.fill('#pPin', 'draftpass123');
     await page.click('#cfgClose');   // dialog accepted: discard
     await page.waitForFunction(() => !document.querySelector('#cfg').open);
-    await page.click('#settings');
+    await page.click('#hmore'); await page.click('#settings');
     await page.waitForSelector('#addU');
     assert.equal(await page.inputValue('#pPin'), '', 'password draft cleared on open');
     assert.equal(await page.inputValue('#pAbout'), 'first', 'the saved value, not the discarded one');
