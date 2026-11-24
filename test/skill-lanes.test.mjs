@@ -87,7 +87,7 @@ test('BOTH lanes resolve the skill the same way — one function, two callers', 
   // array: the lane also appends server-owned capability text that no profile override may delete
   // (agentCapabilities), and forbidding anything after `app` would make this test fail on an
   // addition it has no opinion about.
-  assert.match(WEB, /systemPrompt: agentSystemPrompt\(\[agentPrompts\.global, agentPrompts\.app\]/,
+  assert.match(WEB, /systemPrompt: agentSystemPrompt\(\[agentPrompts\.global, agentPrompts\.app[,\]]/,
     'and the agent lane must actually pass what it resolved');
   // Precedence stays one definition (R3): profile override → config → built-in.
   assert.equal((WEB.match(/function resolveSystemPrompts/g) || []).length, 1);
