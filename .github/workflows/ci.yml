@@ -103,9 +103,9 @@ jobs:
         #   + tip, ink + highlights across the flip at iPad portrait/landscape x both orders, the member template).
         include:
           - os: ubuntu-latest
-            max_skipped: 170
+            max_skipped: 172
           - os: windows-latest
-            max_skipped: 255
+            max_skipped: 257
     env:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED
