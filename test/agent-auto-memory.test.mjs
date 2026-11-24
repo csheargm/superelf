@@ -194,6 +194,7 @@ const PROCESS_STARTS = {
   'lib/codex.mjs': { why: 'the codex CLI: not claude, so no auto-memory', refs: ['spawn(spec.file'] },
   'lib/runner.mjs': { why: 'claude; taskkill', claude: true, refs: ["spawn('taskkill'", 'spawn(spec.file'] },
   'lib/note-ocr.mjs': { why: 'tools/panote-ocr (Apple Vision) and swiftc that builds it: not claude; a minimal env (OCR_CHILD_ENV_KEYS), never process.env', refs: ['execFile(s.file'] },
+  'lib/app-history.mjs': { why: 'git log of a built-in app (2 s timeout)', refs: ["execFileSync('git'"] },
   'lib/vernotes.mjs': { why: 'git', refs: ["execFileSync('git'"] },
   'lib/version-auto.mjs': { why: 'git', refs: ["execFileSync('git'"] },
   'lib/publish/release.mjs': { why: 'git clone/fetch/commit/push of the public repo for the release cut (docs/adr/0039)', refs: ["execFileSync('git'", "execFileSync('git'"] },
