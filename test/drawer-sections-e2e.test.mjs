@@ -13,6 +13,7 @@ import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, OWNER_TOKEN } from '
 import { rmTemp } from './helpers-tmp.mjs';
 
 const DAY = 864e5;
+const DEFAULTS = { secApps: false, secFamily: false, secBriefs: false, secChats: true };   // = PADrawerSections.DEFAULT_OPEN spelled out
 let port, root, web, browser;
 before(async () => {
   port = await freePort(); root = mkWebRoot({ port });
@@ -73,7 +74,7 @@ test('a tap is remembered on the account: reload AND a fresh device open the sam
   await p2.waitForFunction(() => document.querySelector('#secApps').classList.contains('open'));
   st = await states(p2); assert.equal(st.secChats.open, false, 'the other device: Chats closed too'); await c2.close();
   // Put the defaults back for the other tests (only taps are stored).
-  await fetch(`http://127.0.0.1:${port}/api/profile`, { method: 'PUT', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + await session() }, body: JSON.stringify({ drawerOpen: {} }) });
+  await fetch(`http://127.0.0.1:${port}/api/profile`, { method: 'PUT', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + await session() }, body: JSON.stringify({ drawerOpen: DEFAULTS }) });
 });
 
 test('keyboard: headers are buttons; Enter and Space toggle and aria-expanded follows', { skip, timeout: 60000 }, async () => {
@@ -85,7 +86,7 @@ test('keyboard: headers are buttons; Enter and Space toggle and aria-expanded fo
   await page.keyboard.press(' ');
   await page.waitForFunction(() => document.querySelector('#secBriefs .dsec-head').getAttribute('aria-expanded') === 'false');
   await page.waitForTimeout(300);   // the last save lands before the reset
-  await fetch(`http://127.0.0.1:${port}/api/profile`, { method: 'PUT', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + await session() }, body: JSON.stringify({ drawerOpen: {} }) });
+  await fetch(`http://127.0.0.1:${port}/api/profile`, { method: 'PUT', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + await session() }, body: JSON.stringify({ drawerOpen: DEFAULTS }) });
   await c.close();
 });
 
@@ -111,4 +112,12 @@ test('profile route keeps only known section ids with boolean values (lib/webuti
   const { drawerOpenOf } = await import('../lib/webutil.mjs');
   assert.deepEqual(drawerOpenOf({ secApps: true, secChats: false, evil: true, secBriefs: 'yes' }), { secApps: true, secChats: false });
   for (const bad of [null, [], 'x', 3, undefined]) assert.deepEqual(drawerOpenOf(bad), {});
+});
+
+test('the route MERGES taps: two devices tapping different sections both stick', { timeout: 30000 }, async () => {
+  const put = async (d) => (await fetch(`http://127.0.0.1:${port}/api/profile`, { method: 'PUT', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + await session() }, body: JSON.stringify({ drawerOpen: d }) })).status;
+  assert.equal(await put({ secBriefs: true }), 200); assert.equal(await put({ secFamily: true }), 200);
+  const got = await (await fetch(`http://127.0.0.1:${port}/api/profile`, { headers: { authorization: 'Bearer ' + await session() } })).json();
+  assert.equal(got.drawerOpen.secBriefs, true); assert.equal(got.drawerOpen.secFamily, true);
+  await put(DEFAULTS);
 });

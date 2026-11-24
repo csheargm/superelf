@@ -514,9 +514,9 @@ async function loadBriefs(){
   // Three-state on purpose: a FAILURE must not look like an empty feed. A silently blank
   // section reads as "nothing happened" when the truth is "we could not look" (R5).
   try{ const r=await api('/api/briefings'); if(r.ok) list=await r.json(); }catch{ /* list stays null */ }
+  PADrawerSections.count('secBriefs',Array.isArray(list)?Math.min(list.length,BRIEFS_MAX):0);
   if(!Array.isArray(list)){ box.innerHTML='<div style="padding:16px;color:var(--danger);font-size:14px">无法加载简报 · Could not load briefings</div>'; return; }
   if(!list.length){ box.innerHTML='<div class="d-empty">暂无简报 · No briefings yet</div>'; return; }
-  PADrawerSections.count('secBriefs',Math.min(list.length,BRIEFS_MAX));
   box.innerHTML=list.slice(0,BRIEFS_MAX).map((b)=>
     `<div class="convo${b.id===briefId?' active':''}" data-brief="${esc(b.id)}"><div class="t">
        <div style="display:flex;gap:8px;align-items:baseline"><span style="color:var(--muted);font-size:12px;flex-shrink:0">${esc(briefWhen(b.created))}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(b.title||b.job||'Briefing')}</span></div>
@@ -1172,7 +1172,6 @@ async function loadApps(){
   const ownNames=new Set(own.map(a=>a.name));
   // Drawer: own apps (share/delete) + a labelled Family shelf (open/fork, read-only)
   const promotedInShelf=shelf.filter(a=>a.uid==='shared');
-  PADrawerSections.count('secApps',own.length);
   $('#dApps').innerHTML=(own.map((a,i,arr)=>
     `<div class="dapp" data-u="${esc(UID)}" data-n="${esc(a.name)}">
       ${PAIcons.tileIcon(a)}<span class="dapp-name">${esc(a.title)}</span>
@@ -1183,6 +1182,7 @@ async function loadApps(){
       ${PAIcons.tileIcon(a)}<span class="dapp-name">${esc(a.title)}${a.sharedBy?` <small style="color:var(--muted)">· ${esc(a.sharedBy)}</small>`:''}</span>
       ${ownNames.has(a.name)?'<small style="color:var(--accent);font-size:11px">✓ copied</small>':`<button class="plain" style="font-size:12px;padding:3px 8px" data-fork="${esc(a.name)}">Fork</button>`}
     </div>`).join(''):'');
+  PADrawerSections.count('secApps',$('#dApps').querySelectorAll('.dapp').length);   // own + shelf rows, as shown
   // Home: greeting, ask box, Start here, then the dock with the Family shelf (web/home-v2.js PAHome).
   PAHome.render({own,shelf,uid:UID,esc});
   // Blue dot on each new app — the existing markNew system (key + _SEEN), so it clears on
@@ -1290,10 +1290,10 @@ async function loadFamilyApps(){
   catch{ offline=!denied; apps=denied?null:(recallFamily().apps||null); }   // R5: the failure is shown below (the offline mark, or the could-not-load line)
   let myNames=new Set(); try{ (await (await api('/api/apps')).json()).forEach(a=>myNames.add(a.name)); }catch{ (PASW.recall(SW_APPS_KEY)||[]).forEach(a=>myNames.add(a.name)); }
   const el=$('#dFamily');
+  PADrawerSections.count('secFamily',apps?apps.length:0);
   if(!apps){ el.innerHTML=`<span style="color:var(--muted);font-size:13px">${FAMILY_UNREADABLE}</span>`; return; }
   const mark=offline?`<div class="fc-offline" style="color:var(--muted);font-size:12px;margin-bottom:6px">${FAMILY_OFFLINE}</div>`:'';
   if(!apps.length){ el.innerHTML=mark+`<span style="color:var(--muted);font-size:13px">${FAMILY_NONE}</span>`; return; }
-  PADrawerSections.count('secFamily',apps.length);
   el.innerHTML=mark+apps.map(a=>{
     const have=myNames.has(a.slug);   // never your own app: the node lists each app once (F4-6)
     return`<div class="family-card" style="margin-bottom:6px">

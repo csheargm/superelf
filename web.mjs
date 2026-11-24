@@ -2489,6 +2489,10 @@ const server = http.createServer(async (req, res) => {
       // (empty-overwrite class). The throw lands in the catch-all → 500
       // file_unreadable, and nothing is written.
       const defaults = { name: user.name, role: user.role, birthYear: user.birthYear || null, about: '', prefs: '' };
+      // The body is read BEFORE the profile, so the read-modify-write below runs with no await between the
+      // load and the write: two overlapping PUTs (a drawer tap and a settings save) cannot both start from the
+      // same old profile and erase each other's change (GPT review 2026-11-24).
+      const b = req.method === 'PUT' ? await readBody(req, BODY_LIMITS.profile) : null;
       const prof = req.method === 'PUT' ? loadProfileForUpdate(wsDir(user), defaults) : (loadProfile(wsDir(user)) || defaults);
       if (req.method === 'GET') return send(res, 200, 'application/json', JSON.stringify({ ...prof, id: user.id, role: user.role, age: ageFromYear(prof.birthYear, thisYear()), appOrder: Array.isArray(prof.appOrder) ? prof.appOrder : [],
         // The user's own prompt overrides (may be empty), plus the config defaults so the
@@ -2518,7 +2522,6 @@ const server = http.createServer(async (req, res) => {
         drawerOpen: drawerOpenOf(prof.drawerOpen),
         autoUpdateApps: !!prof.autoUpdateApps }));
       if (req.method === 'PUT') {
-        const b = await readBody(req, BODY_LIMITS.profile);
         if (typeof b.name === 'string' && b.name.trim()) prof.name = b.name.trim().slice(0, 60);
         if (typeof b.about === 'string') prof.about = b.about.slice(0, 1000);
         if (typeof b.prefs === 'string') prof.prefs = b.prefs.slice(0, 1000);
@@ -2628,7 +2631,8 @@ const server = http.createServer(async (req, res) => {
           else return send(res, 400, 'application/json', JSON.stringify({ error: 'Invalid postcode · 邮编格式无效' }));
         }
         if (typeof b.autoUpdateApps === 'boolean') prof.autoUpdateApps = b.autoUpdateApps;
-        if (b.drawerOpen !== undefined) prof.drawerOpen = drawerOpenOf(b.drawerOpen);   // unknown keys dropped: a view state, not data
+        // MERGED, not replaced: the shell sends only the section tapped, so a tap on the phone never undoes one made on the Mac.
+        if (b.drawerOpen !== undefined) prof.drawerOpen = drawerOpenOf({ ...drawerOpenOf(prof.drawerOpen), ...drawerOpenOf(b.drawerOpen) });
         if (!user.demo && typeof b.password === 'string' && b.password) {   // a demo visitor has no account to set a PIN on (lib/demo.mjs)
            if (apiKeyBlocked(req, user)) return send(res, 403, 'application/json', API_KEY_REFUSED);
            if (passwordError(b.password)) return send(res, 400, 'application/json', JSON.stringify({ error: passwordError(b.password) }));   // refused loudly, never silently dropped (R5)

@@ -177,6 +177,7 @@ test('the demo drawer keeps Family Apps with the private-hosting note, muted, an
   assert.equal(await page.evaluate(() => window.__noteAtParse), true, 'the note is there at parse time, before any boot fetch (GPT r2)');
   await page.evaluate(() => openDrawer());
   await page.locator('#drawer.open').waitFor();
+  await page.click('#secFamily .dsec-head');   // closed by default since the drawer redesign (web/drawer-sections.js)
   const note = page.locator('#secFamily #dFamilyDemo');
   await note.waitFor({ state: 'visible' });
   assert.equal(await note.textContent(), '家庭应用仅在私有部署的 superelf 上可用 · Family Apps are available on a privately hosted superelf');

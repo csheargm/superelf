@@ -40,11 +40,14 @@ const PADrawerSections=(()=>{
     s.querySelector('.dsec-head').setAttribute('aria-expanded',String(on)); } }
   // A refused save leaves the tap in effect for this session — a view state is not worth reverting under
   // the finger — and says so in the console (R5: no user-facing line is about a drawer pref).
-  async function save(){ const next=Object.assign({},stored(),local);
-    try{ const r=await api('/api/profile',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({drawerOpen:next})});
-      if(r.ok){ const o=me(); if(o&&typeof o==='object') o.drawerOpen=next; } else console.warn('[PADrawerSections] not saved: HTTP '+r.status); }
-    catch(e){ console.warn('[PADrawerSections] not saved',e); } }
-  function toggle(id){ local[id]=!isOpen(id); paint(); return save(); }
+  // Only the tapped section goes up (the route merges it), and saves go one after another, so a fast
+  // double tap cannot land out of order.
+  let chain=Promise.resolve();
+  function save(id,on){ chain=chain.then(async()=>{
+    try{ const r=await api('/api/profile',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({drawerOpen:{[id]:on}})});
+      if(r.ok){ const o=me(); if(o&&typeof o==='object') o.drawerOpen=Object.assign({},stored(),{[id]:on}); } else console.warn('[PADrawerSections] not saved: HTTP '+r.status); }
+    catch(e){ console.warn('[PADrawerSections] not saved',e); } }); return chain; }
+  function toggle(id){ local[id]=!isOpen(id); paint(); return save(id,local[id]); }
   function bind(){ for(const s of secs()){ const h=s.querySelector('.dsec-head');
     h.setAttribute('aria-controls',s.id+'Body'); s.querySelector('.dsec-body').id=s.id+'Body';
     h.onclick=()=>toggle(s.id); } paint(); }
