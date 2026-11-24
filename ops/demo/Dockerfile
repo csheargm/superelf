@@ -8,10 +8,15 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 # AGENT_CLIS (the private owner node only, ops/private/docker-compose.yml): the Claude Code and
 # Codex CLIs the owner lane runs. Empty for the demo, which stays Ollama-only. Pinned versions.
+# Each CLI must RUN after install: a build that lost an optional native package fails here.
 ARG AGENT_CLIS=
 RUN if [ -n "$AGENT_CLIS" ]; then \
       apt-get update && apt-get install -y --no-install-recommends git ripgrep && rm -rf /var/lib/apt/lists/* \
-      && npm install -g --no-fund --no-audit $AGENT_CLIS && npm cache clean --force; \
+      && npm install -g --no-fund --no-audit --include=optional $AGENT_CLIS && npm cache clean --force \
+      && for c in $AGENT_CLIS; do \
+           case "$c" in @anthropic-ai/claude-code@*) b=claude;; @openai/codex@*) b=codex;; *) echo "no run check known for $c; add one here" >&2; exit 1;; esac; \
+           "$b" --version >/dev/null || { echo "$c installed but '$b --version' fails (optional native package missing? disk full?)" >&2; exit 1; }; \
+         done; \
     fi
 WORKDIR /opt/superelf
 COPY . /opt/superelf

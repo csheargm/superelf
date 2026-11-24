@@ -5,7 +5,7 @@
     "ai_calls_per_ip_per_day": 150,
     "new_users_per_ip_per_day": 10,
     "user_disk_mb": 20,
-    "total_disk_gb": 5,
+    "total_disk_gb": 0.5,
     "save_max_mb": 2,
     "app_model": "gpt-oss:120b",
     "home_url": "https://superelf.app",
