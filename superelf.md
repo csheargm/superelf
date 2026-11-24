@@ -450,8 +450,10 @@ Use the raw broker for a genuinely custom UI. If you are about to write a chat l
 markdown renderer, a model picker or a notepad canvas, stop — that component exists.
 
 ## Versions and self-update（版本与自动更新）— ADR 0026
-- **Version scheme.** `v<package.json version>+<N>`, N = merge commits on main since the newest git
-  tag (`lib/version-auto.mjs`); no bump, no tag needed. N = 0 shows the plain tag version. The
+- **Version scheme.** `v<package.json version>+<N>`, N = merge commits on main since the newest
+  release (`releaseBase()` in `lib/version-auto.mjs`: the newest version-notes entry's `through`,
+  else the newest tag). Ship flow bumps it: `node tools/bump-version.mjs` then commit
+  `release: vX.Y.Z` (ADR 0038); deploy-vm.sh and pre-push refuse while merges are unreleased. N = 0 shows the plain tag version. The
   Release Notes sheet lists `v5.0.0+N` first, badged `auto · 自动`, with the merge titles as items;
   the curated tag entries follow. Cached by HEAD, so a merge shows without a restart.
 - **`GET /api/build`** → `{build, version}` (`no-store`, unauthenticated like the shell page, which

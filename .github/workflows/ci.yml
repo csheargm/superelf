@@ -93,9 +93,11 @@ jobs:
         # 2026-11-23: EVERY OS +1 (ubuntu 148, windows 231): bible-note-chapter-e2e held-photo check.
         # 2026-11-23: EVERY OS +1 (ubuntu 149, windows 232): revision-update-e2e (PAUpdate after a REVISION change).
         # 2026-11-24: WINDOWS ONLY +2 (windows 234): revision-stamp runs the Dockerfile stamp + entrypoint tar in POSIX bash.
+        # 2026-11-23: EVERY OS +1 (ubuntu 150, windows 236): release-notes-e2e (bumped version is current);
+        #   windows +1 more: bump-version-tool's version.sh parity check needs bash.
         include:
           - os: ubuntu-latest
-            max_skipped: 149
+            max_skipped: 150
           - os: windows-latest
             max_skipped: 234
     env:
