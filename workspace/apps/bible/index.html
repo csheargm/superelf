@@ -47,7 +47,7 @@ body{display:flex;flex-direction:column}
 /* Top bar pane toggles (plan item 1): pressed = that pane is open. Narrow screens wrap the label. */
 #top-panes{margin-left:auto;display:flex;gap:6px;flex-shrink:0}
 .top-pane{font:inherit;font-size:13px;padding:0 10px;height:36px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer;white-space:nowrap}
-.top-pane.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.top-pane.on{background:var(--accent-fill,var(--accent));color:#fff;border-color:var(--accent)}
 .top-pane:disabled{opacity:.45;cursor:default}
 /* Phone: one short line per control (owner 2026-11-13: the bilingual labels wrapped to two lines); the full
    label stays the accessible name (aria-label) and the tooltip. */
@@ -65,7 +65,7 @@ body{display:flex;flex-direction:column}
    which is exactly the V2 defect: a static in-flow element painted under every overlay, plus a
    greeting and a data-loss report fighting over one element. The failure surface is now its own
    fixed element (PA_NOTICE below) and this one is back to doing one thing. */
-#daily-banner{display:none;background:var(--accent);color:#fff;text-align:center;font-size:13px;font-weight:600;padding:7px 12px;flex-shrink:0;letter-spacing:.01em}
+#daily-banner{display:none;background:var(--accent-fill,var(--accent));color:#fff;text-align:center;font-size:13px;font-weight:600;padding:7px 12px;flex-shrink:0;letter-spacing:.01em}
 #daily-banner.show{display:block}
 /* ══ PA_NOTICE_CSS_BEGIN ══ the save/load-failure surface, mirrored verbatim in every app ══
    V2 SCAR (2026-09-02, round 2): this app's only save-failure surface was a STATIC in-flow
@@ -100,7 +100,7 @@ body{display:flex;flex-direction:column}
 .vref{color:var(--accent);border-bottom:1px dashed color-mix(in srgb,var(--accent) 55%,transparent);cursor:pointer;font-weight:600;white-space:nowrap}
 .vref:active{background:color-mix(in srgb,var(--accent) 16%,transparent);border-radius:3px}
 /* Floating pill to return to the chat after jumping to a referenced verse */
-#back-chat{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(88px + var(--sab));z-index:12;display:none;align-items:center;gap:6px;background:var(--accent);color:#fff;border:0;border-radius:22px;padding:9px 16px;font:inherit;font-size:14px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.28);cursor:pointer}
+#back-chat{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(88px + var(--sab));z-index:12;display:none;align-items:center;gap:6px;background:var(--accent-fill,var(--accent));color:#fff;border:0;border-radius:22px;padding:9px 16px;font:inherit;font-size:14px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.28);cursor:pointer}
 #back-chat.show{display:inline-flex}
 #back-chat:active{filter:brightness(.93)}
 /* The draw pad narrows with the docked drawer, like the chat surface does. It used to be
