@@ -46,8 +46,11 @@ test('first open: all closed but Chats; Chats shows only today/yesterday + More;
   const st = await states(page);
   for (const id of ['secApps', 'secFamily', 'secBriefs']) assert.deepEqual(st[id], { open: false, aria: 'false', shown: false }, id);
   assert.deepEqual(st.secChats, { open: true, aria: 'true', shown: true });
-  assert.equal(await page.locator('#convos .convo').count(), 4, 'the 4 recent chats, not all 10');
-  assert.match(await page.textContent('#convos .more-chats'), /更多 · More \(6\)/);
+  // The page's own clock decides "yesterday" (a run across midnight sees 3, not 4): ask it, then pin the range.
+  const want = await page.evaluate(() => PAHomeLook.recentCount(allConvos, new Date()));
+  assert.ok(want === 4 || want === 3, `today + yesterday: ${want}`);
+  assert.equal(await page.locator('#convos .convo').count(), want, 'only the recent chats, not all 10');
+  assert.match(await page.textContent('#convos .more-chats'), new RegExp(`更多 · More \\(${10 - want}\\)`));
   assert.equal(await page.textContent('#secChats .dsec-n'), '10', 'the pill counts every chat');
   assert.match(await page.textContent('#secApps .dsec-head'), /我的应用\s*My Apps/, '中文 first');
   assert.equal(await page.$eval('#secApps .dsec-head b', (e) => getComputedStyle(e).fontWeight), '800', 'the label is bold');
