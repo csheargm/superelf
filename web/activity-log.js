@@ -26,7 +26,8 @@ function activitySentence(r,n){
     'node-health-failed':['节点健康检查发现问题','The node health check found a problem'], 'save-data-failed':['数据保存失败','Saving data failed'],
   };
   if(r.ev==='app-edit'&&!r.applied) return [`应用「${app}」的修改没通过检查，已还原`,`A change to "${app}" failed its checks and was rolled back`];
-  if(r.ev==='app-publish'&&r.state==='failed') return [`应用「${app}」发布失败`,`Publishing "${app}" failed`];
+  if(r.ev==='app-publish'&&r.state!=='failed'&&r.state!=='blocked'&&r.state!=='published') return [`${who} 开始发布应用「${app}」`,`${who} started publishing "${app}"`];
+  if(r.ev==='app-publish'&&r.state!=='published') return [`应用「${app}」发布失败`,`Publishing "${app}" failed`];
   if(S[r.ev]) return S[r.ev];
   const plain=String(r.ev||'').replace(/-error$/,'-failed').replace(/-/g,' '), what=[app,job].filter(Boolean).join(' ');
   return ['失败',plain.charAt(0).toUpperCase()+plain.slice(1)+(what?` (${what})`:'')];

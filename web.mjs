@@ -1409,7 +1409,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
     // TODO(R4 seam): the retry loop and the lane dispatch inside it leave chat() together (see the seam named below).
     for (;;) {
     if (ml.blocked) r = { ok: false, text: NO_PLAIN_LANE_TEXT };   // no plain lane for this member: said, never the agent
-    else if (edit && edit.undo) { r = undoAppEdit(edit, { wsDir: wsDir(user) }); line(r.line); }   // a typed "undo": no model
+    else if (edit && edit.undo) { r = undoAppEdit(edit, { wsDir: wsDir(user) }); line(r.line); audit('app-edit-undo', { who: user.id, app: edit.slug, undone: !!r.line.undone }); }   // a typed "undo": no model
     else if (chosen && chosen.provider === 'ollama') {
       // Fast lane: text-only Ollama model. Stateless, so send recent history for context.
       // Global honesty guard + the app's own directive (e.g. the Bible app's "reply in Chinese

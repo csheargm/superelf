@@ -18,6 +18,7 @@ test('activityKind: security, failure, app — and routine is dropped', () => {
   for (const ev of ['create', 'delete', 'approve', 'password-reset', 'set-pin', 'token-rotate']) assert.equal(k({ ev }), 'security', ev);
   for (const ev of ['job-failed', 'job-retries-exhausted', 'node-health-failed', 'builtin-apps-update-failed', 'job-state-error']) assert.equal(k({ ev }), 'failure', ev);
   assert.equal(k({ ev: 'app-publish', state: 'failed' }), 'failure');
+  assert.equal(k({ ev: 'app-publish', state: 'blocked' }), 'failure');
   assert.equal(k({ ev: 'app-edit', changed: true, applied: false }), 'failure');
   assert.equal(k({ ev: 'app-edit', changed: true, applied: true }), 'app');
   assert.equal(k({ ev: 'app-edit-undo', undone: true }), 'app');
@@ -65,6 +66,10 @@ test('app-edit rows carry the request; Undo only on the newest; diff = that chan
     assert.match(changeDiff(f.ws, 'notes', f.v2), /\+ <p>three<\/p>/);
     assert.throws(() => changeDiff(f.ws, 'notes', '../x'), /no longer kept/);
     assert.throws(() => changeDiff(f.ws, '../etc', f.v1), /no such app/);
+    // A linked live app is never read (diff of the newest change reads the live folder).
+    const real = f.app + '-real'; fs.renameSync(f.app, real); fs.symlinkSync(real, f.app);
+    assert.throws(() => changeDiff(f.ws, 'notes', f.v2), /no such app/);
+    fs.unlinkSync(f.app); fs.renameSync(real, f.app);
     // Stale undo from an older row is refused; the newest passes.
     assert.throws(() => refuseStaleUndo(f.ws, 'notes', f.v1), (e) => e.status === 409);
     refuseStaleUndo(f.ws, 'notes', f.v2); refuseStaleUndo(f.ws, 'notes', null);
