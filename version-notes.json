@@ -1,4 +1,12 @@
 {
+  "v5.11.2": {
+    "date": "2026-11-24",
+    "features": [],
+    "fixes": [
+      "修复左上角的灰色小方块 · closed drawers no longer paint a stray square over app content"
+    ],
+    "through": "a79212e31edbaa4f3cdde996bcdd164fcb366bd2"
+  },
   "v5.11.1": {
     "date": "2026-11-24",
     "features": [],
