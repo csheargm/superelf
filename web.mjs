@@ -164,7 +164,7 @@ function commitShelf(slug, message) {
 const GIT_QUIET = { stdio: ['ignore', 'pipe', 'ignore'] };
 const gitHead = () => { try { return execSync('git rev-parse HEAD', { cwd: ROOT, encoding: 'utf8', ...GIT_QUIET }).trim(); } catch { return readRevision(ROOT); } };   // no .git: the deploy's REVISION (lib/buildid.mjs)
 // The commit date of that sha: git when there is a .git, else REVISION's line 2 (the image build).
-const gitDate = (sha) => { try { return execSync(`git log -1 --format=%cs ${sha}`, { cwd: ROOT, encoding: 'utf8', ...GIT_QUIET }).trim(); } catch { return readRevisionDate(ROOT); } };
+const gitDate = (sha) => { try { return execFileSync('git', ['log', '-1', '--format=%cs', sha], { cwd: ROOT, encoding: 'utf8', ...GIT_QUIET }).trim(); } catch { return readRevisionDate(ROOT); } };
 const buildId = makeBuildId(ROOT, gitHead, undefined, (sha) => (GIT_REF_RE.test(sha) ? gitDate(sha) : null));
 const GIT_REF_RE = /^[0-9a-f]{7,40}$/;
 const bumpPatch = (v) => { const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(v || ''); return m ? `${m[1]}.${m[2]}.${+m[3] + 1}` : '1.0.0'; };
