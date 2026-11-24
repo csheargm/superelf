@@ -1,4 +1,12 @@
 {
+  "v5.6.0": {
+    "date": "2026-11-24",
+    "features": [
+      "应用内修改 · Change an app from inside it"
+    ],
+    "fixes": [],
+    "through": "3182bc4b0baa00a65ff3c903b196e1191da06bcb"
+  },
   "v5.5.5": {
     "date": "2026-11-24",
     "features": [],
