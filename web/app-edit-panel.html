@@ -1,0 +1,75 @@
+<!doctype html>
+<!-- 改这个应用 · Change this app — the panel page (docs/adr/0040-change-this-app.md). Served by the
+     node at /api/app-edit/panel (owner only), built like an app page (sendAppHtml inlines PAChat),
+     and loaded by the shell into its own sandboxed iframe beside the app (web/app-edit.js). It is a
+     SHELL page, never an app's: the broker knows it by its window and files its chat as the owner's
+     edit turn for the app the shell opened it on. The shell says which with {pa:'edit-init'}. -->
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+// FIRST script of the panel (sendAppHtml puts only the shared helpers ahead of it): every message that
+// is not from the shell is stopped here. An app in a sibling frame can post to this window; a forged
+// broker reply rendered by PAChat would run in the panel, whose chat is the owner's full agent
+// (GPT review 2026-11-24). Capture listeners on the target fire before the bubbling ones the helpers
+// registered, so they never see it.
+addEventListener('message',function(e){ if(e.source!==parent) e.stopImmediatePropagation(); },true);
+</script>
+<style>
+:root{--bg:#fafaf7;--card:#fff;--text:#1a1a1a;--muted:#777;--line:#e4e2dc;--accent:#0f6355}
+@media(prefers-color-scheme:dark){:root{--bg:#16181a;--card:#1f2224;--text:#eee;--muted:#9a9a9a;--line:#33373a;--accent:#4fb39b}}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px -apple-system,system-ui,sans-serif}
+#chat{height:100%}
+#mk{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.85);display:none;flex-direction:column}
+#mk.on{display:flex}
+#mk .row{display:flex;gap:8px;justify-content:flex-end;padding:8px}
+#mk button{font:inherit;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--text)}
+#mk canvas{flex:1;min-height:0;max-width:100%;object-fit:contain;touch-action:none;margin:auto}
+.pac-chip img{cursor:pointer}
+</style></head><body>
+<div id="chat"></div>
+<div id="mk" aria-label="标注截图 · Mark up the screenshot"><div class="row"><span style="flex:1;color:#fff;align-self:center">用笔圈出要改的地方 · Draw on what to change</span><button id="mkClear">清除 · Clear</button><button id="mkCancel">取消 · Cancel</button><button id="mkDone">完成 · Done</button></div><canvas id="mkc"></canvas></div>
+<!--PA_CHAT_UI-->
+<script>
+(function(){
+  let chat=null, inited=false;
+  const note=(t,id)=>{ const log=document.querySelector('.pac-log'); if(!log) return; const d=document.createElement('div'); d.className='pac-m status'; if(id) d.id=id; d.textContent=t; log.appendChild(d); };
+  const NO_SHOT='未能自动截图，请用 ＋ 添加照片或截屏 · Could not capture the screen — add a photo or a screenshot with ＋';
+  function mount(m){
+    chat=PAChat.mount(document.getElementById('chat'),{
+      placeholder:'说说想怎么改 · Say what to change',
+      greeting:'改「'+m.title+'」：说说你想改什么，截图已附上 · Change “'+m.title+'”: say what you want, the screenshot is attached. 输入「撤销」可撤销 · Type “undo” to undo.',
+    });
+    chat.open('edit');
+    if(m.shot&&m.shot.path) chat.attach({name:m.shot.name||'screen.png',path:m.shot.path,thumb:m.shot.thumb});
+    else setTimeout(()=>note(NO_SHOT,'noShot'),0);
+  }
+  addEventListener('message',(e)=>{
+    const m=e.data; if(!m||e.source!==parent) return;
+    if(m.pa==='edit-init'&&!inited){ inited=true; mount(m); }
+    else if(m.pa==='edit-note'&&typeof m.text==='string') note(m.text);   // the shell's Undo result, said in the log
+  });
+  // ── Mark up · 标注: tap the screenshot chip, draw, Done → the marked picture replaces it. ──
+  const mk=document.getElementById('mk'), cv=document.getElementById('mkc'), g=cv.getContext('2d');
+  let src=null, chip=null, down=false;
+  document.addEventListener('click',(e)=>{
+    const im=e.target.closest&&e.target.closest('.pac-chip img'); if(!im) return;
+    chip=im.closest('.pac-chip'); src=new Image();
+    src.onload=()=>{ cv.width=src.naturalWidth; cv.height=src.naturalHeight; g.drawImage(src,0,0); mk.classList.add('on'); };
+    src.src=im.src;
+  });
+  const at=(e)=>{ const r=cv.getBoundingClientRect(); return [(e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height]; };
+  cv.addEventListener('pointerdown',(e)=>{ down=true; cv.setPointerCapture(e.pointerId); const [x,y]=at(e); g.beginPath(); g.moveTo(x,y);
+    g.strokeStyle='#e5322d'; g.lineWidth=Math.max(4,cv.width/160); g.lineCap='round'; g.lineJoin='round'; });
+  cv.addEventListener('pointermove',(e)=>{ if(!down) return; const [x,y]=at(e); g.lineTo(x,y); g.stroke(); });
+  cv.addEventListener('pointerup',()=>{ down=false; });
+  document.getElementById('mkClear').onclick=()=>{ if(src) g.drawImage(src,0,0); };
+  document.getElementById('mkCancel').onclick=()=>mk.classList.remove('on');
+  document.getElementById('mkDone').onclick=async()=>{
+    const url=cv.toDataURL('image/png'); mk.classList.remove('on');
+    const r=await PA.req('upload',{name:'screen-marked.png',data:url.split(',')[1],what:'photo'});
+    if(!(r&&r.ok)){ note((r&&r.text)||'上传失败 · Upload failed'); return; }   // no alert(): the sandbox has no allow-modals
+    const x=chip&&chip.querySelector('button'); if(x) x.click();   // the old chip's own ✕: PAChat removes it
+    chat.attach({name:'screen-marked.png',path:r.path,thumb:url});
+  };
+})();
+</script>
+</body></html>

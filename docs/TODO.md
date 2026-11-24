@@ -3,6 +3,20 @@
 Problems found while doing an asked-for task, not needed for that task. One line each; the task
 that found it in brackets. Pick from here; do not open a side session per item.
 
+## Change this app · 改这个应用 (ADR 0040, Phase 1 shipped 2026-11-24)
+- Phase 2: members and demo guests, the no-tools server-written lane (plan "Phase 2"); until then the server refuses them.
+- Phase 3: member Publish as PR with their own token (plan "Phase 3"); needs the owner's OK for per-user token storage.
+- Nightly review run + "审核一下 · Review now" (plan "Review"): a second model reviews the day's edits; not built.
+- Inline check "loads headless" is only a script compile (lib/app-edit.mjs): runtime errors are not caught; a real headless load needs a browser on the node.
+- The one-edit-per-app lock is in-process memory: fine for one node process; it resets on restart.
+- The panel stops non-shell messages with a capture listener (web/app-edit-panel.html); apps' own broker listeners (broker, chat-ui, photo-ui, app-prefs) still accept a sibling frame's forged reply — a source===parent check there breaks ~40 unit harnesses that post without a source; fix harnesses + guard in one change.
+- A turn during which the app's data changed is said, not blocked (the open app saves while the agent works); corrupt data is caught only when the app itself changed.
+- The owner panel runs the full agent on app files that may come from a member's shelf app (a fork): prompt-injection risk the composer already has; Phase 2's no-tools lane could be offered for forked apps.
+- Own-bar long-press needs navigator.userActivation (Safari 16.4+); older engines refuse the press (fail closed).
+- PASnap: inner iframes are blank; :hover / live scroll inside sticky layers drawn at rest; real iPad Safari not yet checked (Playwright WebKit draws it).
+- Undo walks back through edits; there is no Redo button (the replaced copy is kept as <stamp>-undo in .app-versions).
+- Pre-existing, seen while testing: test/member-plain-lane-e2e "owner ticks Agent tools" fails on origin/main too (checkbox click does not change state); WebKit app-own-bar-e2e "Journal pen stroke" fails on origin/main too.
+
 ## Verse ink: handwriting frame leftovers (GPT review 2026-11-22, web/ink-frame.inline.html)
 
 - Circle round words (followEnclosures, 2026-11-22): on another width a closed big stroke is re-anchored

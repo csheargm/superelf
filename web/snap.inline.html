@@ -1,0 +1,87 @@
+<script>
+// PASnap — a picture of what this app shows right now（应用截图）, for 改这个应用 · Change this app
+// (docs/adr/0040-change-this-app.md). No app carries its marker: web.mjs puts PA_SNAP_UI on EVERY
+// served app page, after PABusy. The shell asks {pa:'snap',id}; this page answers
+// {pa:'snap-res',id,ok,dataUrl} or {pa:'snap-res',id,ok:false,error}. It answers only its parent.
+//
+// HOW. The page is cloned, scripts and frames dropped, every <canvas> (ink) copied in as an <img>,
+// form values written into the clone, inner scroll positions kept by shifting the scrolled box's
+// children. The clone goes into an SVG <foreignObject>, the SVG is drawn on a canvas, the canvas
+// becomes a PNG. The sandbox has connect-src 'none', so the only images and fonts a page has are
+// data: ones, which travel inside the clone.
+// FAILS CLOSED. WebKit (iPad Safari) taints a canvas that drew a foreignObject, so toDataURL throws:
+// the answer is ok:false and the panel asks for a photo instead (the user adds one with ＋).
+// Known limits: a cross-document <iframe> inside the app is blank; CSS that depends on :hover or
+// on an element's live scroll is drawn as at rest. Unit + e2e: test/app-edit-snap*.test.mjs.
+// `var`, and kept if already present (the PA / PABusy rule): one instance even if the marker appears twice.
+var PASnap = PASnap || (function(){
+  const MAX_BYTES=2*1024*1024, MAX_SIDE=1600, SHRINK=0.6, TRIES=3;
+  function copyLive(src,dst){
+    const a=src.querySelectorAll('*'), b=dst.querySelectorAll('*');   // the same tree, so the same order
+    for(let i=0;i<a.length&&i<b.length;i++){
+      const s=a[i], d=b[i];
+      if(s.tagName==='CANVAS'){ const im=document.createElement('img'); const r=s.getBoundingClientRect();
+        try{ im.src=s.toDataURL('image/png'); }catch(_){ /* a canvas the page itself tainted: drawn blank, the rest still shows */ }
+        im.setAttribute('style',(s.getAttribute('style')||'')+';width:'+r.width+'px;height:'+r.height+'px');
+        if(s.className) im.className=s.className; d.replaceWith(im); continue; }
+      if(s.tagName==='INPUT'){ if(s.type==='checkbox'||s.type==='radio'){ if(s.checked) d.setAttribute('checked',''); else d.removeAttribute('checked'); } else d.setAttribute('value',s.value); }
+      else if(s.tagName==='TEXTAREA') d.textContent=s.value;
+      else if(s.tagName==='SELECT'){ const o=d.options&&d.options[s.selectedIndex]; if(o) o.setAttribute('selected',''); }
+      if(s.scrollTop>0||s.scrollLeft>0){ d.style.overflow='hidden';
+        for(const k of d.children) k.style.transform='translate('+(-s.scrollLeft)+'px,'+(-s.scrollTop)+'px)'; }
+    }
+  }
+  function svgOf(w,h){
+    const root=document.documentElement, clone=root.cloneNode(true);
+    copyLive(root,clone);
+    clone.querySelectorAll('script,iframe,noscript').forEach((n)=>n.remove());
+    clone.style.transform='translate('+(-scrollX)+'px,'+(-scrollY)+'px)';
+    const xml=new XMLSerializer().serializeToString(clone);
+    return '<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'"><foreignObject x="0" y="0" width="100%" height="100%">'+xml+'</foreignObject></svg>';
+  }
+  // The page's own background: body's, else the root's, else white (a transparent PNG reads as a black box).
+  function pageBg(){
+    for(const el of [document.body,document.documentElement]){ const c=el&&getComputedStyle(el).backgroundColor;
+      if(c&&c!=='transparent'&&!/rgba\([^)]*,\s*0\)$/.test(c)) return c; }
+    return '#fff';
+  }
+  // Every sampled pixel the same colour = nothing was drawn over the background fill.
+  function blank(g,c){
+    const d=g.getImageData(0,0,c.width,c.height).data, step=4*Math.max(1,Math.floor(c.width*c.height/4096));
+    for(let i=step;i<d.length;i+=step) if(d[i]!==d[0]||d[i+1]!==d[1]||d[i+2]!==d[2]) return false;
+    return true;
+  }
+  function draw(svg,w,h,scale){
+    return new Promise((res,rej)=>{
+      const img=new Image();
+      img.onload=()=>{ try{
+        const c=document.createElement('canvas'); c.width=Math.max(1,Math.round(w*scale)); c.height=Math.max(1,Math.round(h*scale));
+        const g=c.getContext('2d'); g.fillStyle=pageBg(); g.fillRect(0,0,c.width,c.height);
+        g.drawImage(img,0,0,c.width,c.height);
+        const url=c.toDataURL('image/png');   // throws on a tainted canvas (WebKit): fail closed
+        if(blank(g,c)) throw new Error('the picture came out blank');   // an engine that draws nothing is a failure, never an empty "screenshot" (R14)
+        res(url);
+      }catch(e){ rej(e); } };
+      img.onerror=()=>rej(new Error('the page could not be drawn'));
+      img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+    });
+  }
+  async function shot(){
+    const w=Math.max(1,innerWidth), h=Math.max(1,innerHeight);
+    const svg=svgOf(w,h);
+    let scale=Math.min(devicePixelRatio||1,MAX_SIDE/Math.max(w,h));
+    for(let i=0;i<TRIES;i++){
+      const url=await draw(svg,w,h,scale);
+      if(url.length*0.75<=MAX_BYTES) return url;
+      scale*=SHRINK;
+    }
+    throw new Error('the picture is too large');
+  }
+  addEventListener('message',(e)=>{
+    const m=e.data; if(!m||m.pa!=='snap'||e.source!==parent) return;
+    shot().then((dataUrl)=>parent.postMessage({pa:'snap-res',id:m.id,ok:true,dataUrl},'*'),
+      (err)=>parent.postMessage({pa:'snap-res',id:m.id,ok:false,error:String((err&&err.message)||err)},'*'));
+  });
+  return {shot};
+})();
+</script>

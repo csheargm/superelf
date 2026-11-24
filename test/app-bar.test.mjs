@@ -257,3 +257,16 @@ test('F2-06: the Bible keeps the bar while a verse or words are selected (both c
   for (const f of ['workspace/apps/bible/index.html', 'workspace.example/apps/bible/index.html'])
     assert.match(read(f), /keepOpen:\(\)=>INK_PEN\.isOpen\(\)\|\|barPaneUp\(\)\|\|markVerses\(\)\.length>0\|\|/, f);
 });
+
+test('ADR 0040: a long press on ← Home asks the shell for 改这个应用 (edit-app), and is not also a Home tap', () => {
+  const { win, bar, clock } = run();
+  const posts = []; win.parent.postMessage = (m) => posts.push(m.type);
+  const home = bar.children.find((c) => c.className === 'paab-btn paab-home');
+  fire(home, 'pointerdown'); clock.advance(200); fire(home, 'pointerup'); fire(home, 'click');
+  assert.deepEqual(posts, ['home'], 'a tap is Home');
+  posts.length = 0;
+  fire(home, 'pointerdown'); clock.advance(700); fire(home, 'pointerup'); fire(home, 'click');
+  assert.deepEqual(posts, ['edit-app'], 'a long press is edit-app only');
+  posts.length = 0; fire(home, 'pointerdown'); clock.advance(100); fire(home, 'click');
+  assert.deepEqual(posts, ['home'], 'the next tap is Home again');
+});

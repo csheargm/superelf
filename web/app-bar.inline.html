@@ -125,7 +125,11 @@
     const home=document.createElement('button'); home.type='button'; home.className='paab-btn paab-home';
     home.title='主页 · Home'; home.setAttribute('aria-label','主页 · Home');
     home.innerHTML='← <span class="paab-lbl">Home</span>';
-    home.addEventListener('click',()=>post('home'));
+    // A long press asks the shell for 改这个应用 · Change this app (ADR 0040; the shell decides who may). It is not also a Home tap.
+    let pressT=0, pressed=false;
+    home.addEventListener('pointerdown',()=>{ pressed=false; clearTimeout(pressT); pressT=setTimeout(()=>{ pressed=true; post('edit-app'); },RESET_PRESS_MS); });
+    for(const ev of ['pointerup','pointerleave','pointercancel']) home.addEventListener(ev,()=>clearTimeout(pressT));
+    home.addEventListener('click',()=>{ if(pressed){ pressed=false; return; } post('home'); });
     const hs=el(c.homeSlot)||bar; hs.insertBefore(home,hs.firstChild);
     const dn=sizeBtn(-1), up=sizeBtn(1), row=document.createElement('div'); row.className='paab-narrow';
     // A phone row with no room left (Journal at 375px) takes A-/A+ into an existing menu: no new button.
