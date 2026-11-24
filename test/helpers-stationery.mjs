@@ -263,13 +263,18 @@ export function mountStudio(mutate, studioMutate, channel, win, opts) {
 
 // The Journal's studio as the person uses it (the simplify suites' user flow; R3: one copy): Design is pressed with 'pink
 // dots', reply(text) answers that AI turn and lets the page settle, `saved` holds what Keep stored. Ends with the test.
+const REPLY_MS = 2000;
 export function draftFlow(t, mutate, studioMutate) {
   const turns = [], saved = [], ai = () => new Promise((res) => turns.push(res));
   const store = { saveMine: async (tpl) => { saved.push(tpl); return { ok: true }; } };
   const m = mountStudio(mutate, studioMutate, ai, undefined, { studio: { ai, store, upload: async () => ({ ok: false }) } });
   t.after(async () => { for (const res of turns) res({ ok: false, error: 'test over' }); await m.end(); });
   m.btn('✨').click(); m.btn('Design ·').click();
-  return { ...m, saved, reply: async (text) => { turns.shift()({ ok: true, text, convoId: 'c1', error: '' }); await settle(); } };
+  // Settles, then (a slow Windows runner) waits up to REPLY_MS for the answer to show: drawn, or an error. The
+  // test's own assertions still decide; a draft never drawn just reaches them after the wait.
+  const shown = () => m.drawn() || m.msg.classList.contains('err');
+  return { ...m, saved, reply: async (text) => { turns.shift()({ ok: true, text, convoId: 'c1', error: '' }); await settle();
+    for (const t0 = Date.now(); !shown() && Date.now() - t0 < REPLY_MS;) await new Promise((r) => setTimeout(r, 5)); } };
 }
 
 // The WHOLE shipped chat-ui script, run against a small recording DOM: the real window.PAChat, plus
