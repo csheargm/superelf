@@ -34,6 +34,8 @@ after(async () => { if (browser) await browser.close(); if (web) await stopWeb(w
 const leaks = (frame) => frame.evaluate(() => {
   const W = innerWidth, H = innerHeight, out = [];
   for (const d of document.querySelectorAll('.pac-list:not(.on),#drawer:not(.open)')) {
+    // A closed drawer's own box sits just off screen, but its shadow reaches in: it must not paint at all.
+    if (getComputedStyle(d).visibility !== 'hidden') out.push((d.id || d.className) + ' is not hidden');
     for (const e of [d, ...d.querySelectorAll('*')]) {
       const r = e.getBoundingClientRect();
       if (getComputedStyle(e).visibility !== 'hidden' && r.width && r.height && r.right > 0 && r.left < W && r.bottom > 0 && r.top < H) out.push(e.className + ' @' + Math.round(r.left));
@@ -62,8 +64,8 @@ for (const vp of VIEWPORTS) test(`no stray square over an app or the Change-this
     const t = await page.locator('#ftitle').boundingBox();
     await page.mouse.move(t.x + 10, t.y + t.height / 2); await page.mouse.down(); await page.waitForTimeout(LONG_PRESS_MS); await page.mouse.up();
     await page.locator('#aePanel').waitFor();
-    const fr = page.frames().find((f) => f.url() === 'about:srcdoc');
-    await fr.waitForSelector('.pac-m.ai');
+    await page.frameLocator('#aefr').locator('.pac-m.ai').waitFor();   // srcdoc is set after an async fetch
+    const fr = await (await page.$('#aefr')).contentFrame();
     assert.deepEqual(await leaks(fr), [], 'the closed ☰ list paints nothing in the panel');
     const hit = await fr.evaluate(() => { const r = document.querySelector('.pac-m.ai').getBoundingClientRect(); const e = document.elementFromPoint(r.left + 14, r.top + 16); return e && e.closest('.pac-m.ai') ? 'greeting' : (e && e.className); });
     assert.equal(hit, 'greeting', 'the greeting\'s first character is not covered');

@@ -214,7 +214,7 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
   padding-top:env(safe-area-inset-top); }
 /* Hidden once slid out: its lift shadow otherwise drew a thin edge down the left of every page (owner 2026-11-24). */
 #drawer.open{ transform:none; visibility:visible; transition:transform .2s; }
-@media (prefers-reduced-motion:reduce){ #drawer{ transition:none; } }
+@media (prefers-reduced-motion:reduce){ #drawer,#drawer.open{ transition:none; } }
 .dhead{ display:flex; align-items:center; padding:14px 16px; border-bottom:1px solid var(--line); }
 .dhead b, .dhead #goHome{ flex:1; text-align:left; font-weight:700; font-size:inherit; color:var(--text); padding:0; }
 #goHome{ cursor:pointer; }
