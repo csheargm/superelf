@@ -13,7 +13,7 @@ import { makeSigninGate, authConfig } from './lib/demo-auth.mjs';
 import { makeDemoRoutes } from './lib/demo-routes.mjs';
 import { handlePublishRoute } from './lib/publish/routes.mjs';
 import { handleAlertsRoute } from './lib/node-alerts.mjs';
-import { handleActivityRoute } from './lib/activity-view.mjs';
+import { handleActivityRoute, refuseStaleUndo } from './lib/activity-view.mjs';
 import { loadConfig, configPath, fastLaneGuard, GUARD_DEFAULT_SURFACE, agentCapabilities, appContract, REPLY_LANGUAGE_RULE, OVERRIDABLE_PROMPT_MAX } from './lib/config.mjs';
 import { runClaude, APPEND_SYSTEM_PROMPT_MAX } from './lib/runner.mjs';
 import { agentAllowed, lanesFor, memberLane, NO_PLAIN_LANE_TEXT, AGENT_OFF_TEXT } from './lib/member-lanes.mjs';
@@ -1847,6 +1847,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && /^\/api\/apps\/[^/]+\/undo$/.test(p)) {
       try {
         const edit = appEditOf({ user, body: { edit: decodeURIComponent(p.split('/')[3]), message: 'undo' }, headers: req.headers, appsDir: appsDir(user) });
+        refuseStaleUndo(wsDir(user), edit.slug, url.searchParams.get('v'));   // Activity log: undo THAT change only, never a newer one
         const u = undoAppEdit(edit, { wsDir: wsDir(user) });
         audit('app-edit-undo', { who: user.id, app: edit.slug, undone: !!u.line.undone });
         return send(res, 200, 'application/json', JSON.stringify({ ok: true, text: u.text, undone: !!u.line.undone }));

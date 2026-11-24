@@ -9,7 +9,6 @@ const ACTIVITY_EMPTY='没有需要你留意的事：这里只记安全事件、�
 const ACTIVITY_UNREADABLE='无法加载活动记录 · Could not load the activity log';
 const ACTIVITY_TIP_KEY='tip:activity-app-changes', ACTIVITY_TIP='新：应用改动可以在这里撤销或查看改动 · New: undo an app change or see the difference here';
 const ACTIVITY_BTN={undo:'撤销 · Undo', diff:'查看改动 · See the difference', fix:'去处理 · Fix it', back:'返回 · Back'};
-const ACTIVITY_CRITICAL=new Set(['node-health-failed','job-retries-exhausted','save-data-failed']), ACTIVITY_PIN_MS=7*24*3600_000;
 // One sentence per row: [中文, English]. n = a person's name (or what we know of them).
 function activitySentence(r,n){
   const who=n(r.who), by=n(r.by||r.who), app=r.app||r.slug||'', job=r.job||'';
@@ -33,9 +32,9 @@ function activitySentence(r,n){
   return ['失败',plain.charAt(0).toUpperCase()+plain.slice(1)+(what?` (${what})`:'')];
 }
 const activityTime=(at)=>{ const d=new Date(at); return isNaN(d)?'':d.toLocaleString(undefined,{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}); };
-// Critical failures pinned on top for a week (docs/adr/0041); runs of the same sentence fold into "×N".
-function activityGroups(rows,n,now=Date.now()){
-  const pin=(r)=>ACTIVITY_CRITICAL.has(r.ev)&&now-Date.parse(r.at)<ACTIVITY_PIN_MS, key=(r)=>activitySentence(r,n).join();
+// Critical failures (r.crit, marked by lib/activity-view.mjs) pinned on top; runs of the same sentence fold into "×N".
+function activityGroups(rows,n){
+  const pin=(r)=>!!r.crit, key=(r)=>activitySentence(r,n).join();
   const out=rows.filter(pin).map((r)=>({r,n:1,crit:true}));
   for(const r of rows){ if(pin(r)) continue; const last=out[out.length-1];
     if(last&&!last.crit&&r.kind!=='app'&&key(last.r)===key(r)) last.n++; else out.push({r,n:1,crit:false}); }
@@ -52,7 +51,7 @@ function activityRowHtml({r,n,crit},names){
 async function activityAct(d,b){
   if(b.dataset.k==='fix'){ d.close(); const c=$('#cfg'); if(c&&c.open) c.close(); openDrawer(); return; }
   if(b.dataset.k==='undo'){ b.disabled=true; let t;
-    try{ const r=await api('/api/apps/'+encodeURIComponent(b.dataset.app)+'/undo',{method:'POST'}); t=(await r.json()).text||r.statusText; }catch(e){ t=ACTIVITY_UNREADABLE+': '+e.message; }
+    try{ const r=await api('/api/apps/'+encodeURIComponent(b.dataset.app)+'/undo?v='+encodeURIComponent(b.dataset.v),{method:'POST'}); const j=await r.json(); t=j.text||j.error||r.statusText; }catch(e){ t=ACTIVITY_UNREADABLE+': '+e.message; }
     return showActivityLog(t); }
   let t; try{ const r=await api('/api/admin/activity/diff?app='+encodeURIComponent(b.dataset.app)+'&v='+encodeURIComponent(b.dataset.v)); const j=await r.json(); t=r.ok?j.text:j.error; }catch(e){ t=ACTIVITY_UNREADABLE+': '+e.message; }
   d.querySelector('.act-body').innerHTML=`<pre class="act-diff" style="max-height:60vh;overflow:auto;font-size:12px;white-space:pre-wrap">${esc(t||'')}</pre><button class="plain" id="activityBack">${ACTIVITY_BTN.back}</button>`;
