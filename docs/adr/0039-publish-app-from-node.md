@@ -81,3 +81,13 @@ Publish action that does the same path with the same guards.
 - Preview answers a sha256 of the collected snapshot; Publish collects again and refuses unless the
   hash matches (`SNAPSHOT_CHANGED`), so the owner publishes exactly the bytes they confirmed.
 - PII rules are tested with lastIndex reset, so a /g rule can never skip a match.
+
+## Addendum (2026-11-24): Publish says what it does
+- The ⋯ item reads "发布到公开仓库 · Publish to the public repo" with a second line from
+  `GET /api/apps/<slug>/publish` → `repo: { inRepo, upToDate, changedFiles }` (lib/publish/status.mjs):
+  not in the repo → "Share as a public app"; same bytes as the repo copy → greyed "Already up to date";
+  else "N changes not yet published". The repo copy is `<code root>/workspace.example/apps/<slug>/`
+  collected exactly as Publish collects (meta sanitized); local only, no GitHub call, cached 10 s.
+  After a publish it reads "changed" until the release is deployed to this node.
+- The confirm sheet's first line explains the whole path: privacy scan, PR on GitHub, CI, merge,
+  part of superelf for everyone, on the demo after the next deploy.

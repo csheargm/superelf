@@ -163,3 +163,36 @@ test('a result that finished while the owner was away shows on the next ⋯ open
     } finally { await ctx.close(); }
   } finally { await g.close(); }
 });
+
+// Owner: "I have not changed this app, but it still lets me Publish — what does publish mean?"
+// The item's second line says what Publish would do; an app equal to the repo copy is greyed out.
+test('⋯ Publish line: not in repo / up to date (disabled) / N changes; the sheet says what happens', { skip, timeout: 90000 }, async () => {
+  const { port, root } = await node({ github_publish_token: FAKE_TOKEN });
+  const { ctx, page } = await openMenu(port, OWNER_TOKEN, { viewport: { width: 1180, height: 820 } });
+  const line = async () => { await page.waitForFunction(() => document.querySelector('#pubState')?.textContent); return page.locator('#pubState').innerText(); };
+  const shot = (n) => SHOTS && page.screenshot({ path: path.join(SHOTS, n) });
+  try {
+    assert.equal(await line(), '分享为公开应用（所有人可见） · Share as a public app (everyone can see it)');
+    assert.equal(await page.locator('#pubItem').isDisabled(), false);
+    await shot('menu-not-in-repo.png');
+    const bottom = await page.evaluate(() => document.querySelector('#appMenu').getBoundingClientRect().bottom);
+    assert.ok(bottom <= 820, 'the menu stays on screen after the line arrives');
+    await page.click('#pubItem'); await page.waitForSelector('#pubWhat');
+    assert.match(await page.locator('#pubWhat').innerText(), /^发布会先检查隐私.*pull request on GitHub.*CI checks pass it merges.*everyone.*demo after the next deploy/);
+    const repo = path.join(root, 'workspace.example', 'apps', 'myapp'); fs.mkdirSync(repo, { recursive: true });
+    fs.writeFileSync(path.join(repo, 'index.html'), '<h1>My App</h1>\n'); fs.writeFileSync(path.join(repo, 'meta.json'), JSON.stringify({ title: 'My App' }, null, 2) + '\n');
+    await page.waitForTimeout(10100);                                // past the status cache
+    await reopenMenu(page, port);
+    assert.equal(await line(), '已是最新 · Already up to date');
+    assert.equal(await page.locator('#pubItem').isDisabled(), true, 'nothing to publish: greyed out');
+    await page.locator('#pubState').click({ force: true }); await page.waitForTimeout(300);
+    assert.equal(await page.locator('#pubSheet').count(), 0, 'a tap on the greyed line opens nothing');
+    await shot('menu-up-to-date.png');
+    fs.writeFileSync(path.join(repo, 'index.html'), '<h1>Old</h1>\n');
+    await page.waitForTimeout(10100);
+    await reopenMenu(page, port);
+    assert.equal(await line(), '有 1 处改动未发布 · 1 change not yet published');
+    assert.equal(await page.locator('#pubItem').isDisabled(), false);
+    await shot('menu-changed.png');
+  } finally { await ctx.close(); }
+});
