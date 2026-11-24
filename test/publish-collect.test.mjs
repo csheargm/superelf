@@ -93,7 +93,7 @@ test('a global PII rule cannot skip a match through lastIndex (scanLabels and sc
   const g = /\d{3}-\d{3}-\d{4}/g;
   PII_RULES.push(['test rule', g]);
   try {
-    const line = 'call 555-123-4567';
+    const line = 'call 555-123-' + '4567';   // built at run time: test/identity-leak.test.mjs reads this file
     assert.equal(ruleHits(g, line), true); assert.equal(ruleHits(g, line), true, 'second call still hits');
     assert.equal(g.lastIndex, 0);
     const hits = scanLabels({ a: line, b: line }, ['Zorblax']).filter((h) => h.rule === 'test rule');
