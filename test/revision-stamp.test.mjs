@@ -13,6 +13,7 @@ import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readRevision, readRevisionDate } from '../lib/buildid.mjs';
 import { ROOT } from './helpers-panote-routing.mjs';
+import { needPosixOps } from './helpers-platform.mjs';
 
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const DOCKERFILE = read('ops/demo/Dockerfile');
@@ -41,7 +42,7 @@ test('the Dockerfile declares REVISION/REVISION_DATE and writes REVISION after t
   assert.ok(src > 0 && build > src, 'rebuild-demo.sh resolves the revision BEFORE compose build, and stops if it cannot');
 });
 
-test('the build stamp: right args write sha + date; a missing or bad arg FAILS the build (no silent stale stamp)', () => {
+test('the build stamp: right args write sha + date; a missing or bad arg FAILS the build (no silent stale stamp)', { skip: needPosixOps }, () => {
   const d = tmp(), out = path.join(d, 'REVISION');
   const ok = runStamp({ REVISION: SHA_A, REVISION_DATE: '2026-11-23' }, out);
   assert.equal(ok.status, 0, ok.stderr);
@@ -86,7 +87,7 @@ test('revision.sh: a deploy-vm REVISION, or the git checkout; neither, or the tw
   assert.match(r.stderr, /REVISION says aaaaaaa but git HEAD is/);
 });
 
-test('entrypoint copy (simulated): the image REVISION replaces the stale one in the node folder', () => {
+test('entrypoint copy (simulated): the image REVISION replaces the stale one in the node folder', { skip: needPosixOps }, () => {
   const ep = read('ops/demo/entrypoint.sh');
   const copy = /^tar -C \/opt\/superelf -cf - \. \| tar -C "\$NODE_DIR" -xf -$/m;
   assert.match(ep, copy, 'the entrypoint copies the whole image folder (REVISION included)');

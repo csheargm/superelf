@@ -92,11 +92,12 @@ jobs:
         # 2026-11-23: EVERY OS +2 (ubuntu 147, windows 230): bible-note-chapter-e2e, one test per shipped Bible copy.
         # 2026-11-23: EVERY OS +1 (ubuntu 148, windows 231): bible-note-chapter-e2e held-photo check.
         # 2026-11-23: EVERY OS +1 (ubuntu 149, windows 232): revision-update-e2e (PAUpdate after a REVISION change).
+        # 2026-11-24: WINDOWS ONLY +2 (windows 234): revision-stamp runs the Dockerfile stamp + entrypoint tar in POSIX bash.
         include:
           - os: ubuntu-latest
             max_skipped: 149
           - os: windows-latest
-            max_skipped: 232
+            max_skipped: 234
     env:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED
