@@ -20,7 +20,7 @@ import { agentAllowed, lanesFor, memberLane, NO_PLAIN_LANE_TEXT, AGENT_OFF_TEXT 
 import { cancelOnClose, createTurnCancel, createTurnStops } from './lib/turn-stop.mjs';
 import { watchConfig } from './lib/config-watch.mjs';
 import { oneShotBaseArgs, oneShotModel, yieldSettings } from './lib/one-shot.mjs';
-import { safeJoin, slugOk, tokenOk, dataContentType, readBody, writeFileAtomic, renameWithRetry, decodeBase64Strict, bodyErrorResponse, BODY_LIMITS } from './lib/webutil.mjs';
+import { safeJoin, slugOk, drawerOpenOf, tokenOk, dataContentType, readBody, writeFileAtomic, renameWithRetry, decodeBase64Strict, bodyErrorResponse, BODY_LIMITS } from './lib/webutil.mjs';
 import { createConvoLocks, withConvoTurn, QUEUED_TURN_TEXT } from './lib/convo-lock.mjs';
 import { readJsonState, readJsonForUpdate, FILE_OK, FILE_ABSENT, FILE_UNREADABLE, FILE_UNREADABLE_CODE } from './lib/readjson.mjs';
 // Every readBody call below states its cap explicitly from BODY_LIMITS (R3,
@@ -2513,6 +2513,9 @@ const server = http.createServer(async (req, res) => {
         // How many days of briefings to show (default 30). Edited in profile.json or via PUT.
         briefingRetainDays: typeof prof.briefingRetainDays === 'number' ? prof.briefingRetainDays : 30,
         postcode: typeof prof.postcode === 'string' ? prof.postcode : '',
+        // ☰ drawer sections the member opened or closed（侧栏分组的展开状态）: {secId: true|false}. On the
+        // account so a phone and a Mac open the same way; only taps are stored, the shell owns the defaults.
+        drawerOpen: drawerOpenOf(prof.drawerOpen),
         autoUpdateApps: !!prof.autoUpdateApps }));
       if (req.method === 'PUT') {
         const b = await readBody(req, BODY_LIMITS.profile);
@@ -2625,6 +2628,7 @@ const server = http.createServer(async (req, res) => {
           else return send(res, 400, 'application/json', JSON.stringify({ error: 'Invalid postcode · 邮编格式无效' }));
         }
         if (typeof b.autoUpdateApps === 'boolean') prof.autoUpdateApps = b.autoUpdateApps;
+        if (b.drawerOpen !== undefined) prof.drawerOpen = drawerOpenOf(b.drawerOpen);   // unknown keys dropped: a view state, not data
         if (!user.demo && typeof b.password === 'string' && b.password) {   // a demo visitor has no account to set a PIN on (lib/demo.mjs)
            if (apiKeyBlocked(req, user)) return send(res, 403, 'application/json', API_KEY_REFUSED);
            if (passwordError(b.password)) return send(res, 400, 'application/json', JSON.stringify({ error: passwordError(b.password) }));   // refused loudly, never silently dropped (R5)

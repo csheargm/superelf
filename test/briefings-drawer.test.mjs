@@ -12,6 +12,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readShell } from '../lib/shellhtml.mjs';
 
+import { DRAWER_SECTIONS } from '../lib/webutil.mjs';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SHELL = readShell(ROOT);
 const WEB = fs.readFileSync(path.join(ROOT, 'web.mjs'), 'utf8');
@@ -20,7 +21,8 @@ test('it is a PEER of My Apps, not nested inside anything', () => {
   const order = [...SHELL.matchAll(/<div class="dsec[^"]*" id="(sec[A-Za-z]+)"/g)].map((m) => m[1]);
   assert.deepEqual(order, ['secApps', 'secFamily', 'secBriefs', 'secChats'],
     'briefings sit at drawer level, between the app sections and chats');
-  assert.match(SHELL, /<div class="dsec-head">简报 · Briefings<\/div>/, 'bilingual heading, like its neighbours');
+  assert.match(SHELL, /class="dsec-head"[^>]*>.*?<b>简报<\/b><span class="en">Briefings<\/span>/, 'bilingual heading (中文 first), like its neighbours');
+  assert.deepEqual(order, [...DRAWER_SECTIONS], 'the profile route stores exactly these section ids (lib/webutil.mjs, R3)');
 });
 
 test('it refreshes when the drawer opens — a stale feed is a wrong answer', () => {

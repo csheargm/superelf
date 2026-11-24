@@ -39,8 +39,8 @@ test('chats group by day; 5 recent then 更多 · More with the hidden count', (
   assert.deepEqual([...g.groups.map((x) => x.label)], ['今天 · Today', '昨天 · Yesterday', '11月21日 · Sat']);
   assert.equal(g.groups[0].items[0].id, 'c0', 'newest first, whatever order the list came in');
   const html = PAHomeLook.convosHtml(list, 'c1', false, esc, NOW);
-  assert.equal((html.match(/class="convo/g) || []).length, 5);
-  assert.match(html, /data-more-chats>更多 · More \(3\)</);
+  assert.equal((html.match(/class="convo/g) || []).length, 4, 'closed-up: only today + yesterday (4 of them)');
+  assert.match(html, /data-more-chats>更多 · More \(4\)</);
   assert.match(html, /class="convo active" data-id="c1"/);
   assert.match(html, /data-menu="c0"[^>]*><svg class="pi"/, 'the ⋯ is an icon, still carrying data-menu');
   const all = PAHomeLook.convosHtml(list, null, true, esc, NOW);
@@ -134,4 +134,12 @@ test('USER FLOW: tiles with icons, drawer 5 + More, one Aa, and the app page wea
     assert.match(src, /lastIndexOf\('<\/head>', bodyAt >= 0 \? bodyAt : Infinity\)/, 'the last </head> before <body>, not one quoted in a script');
     assert.match(src, /never before the doctype/, 'no head and no body: after the doctype');
   } finally { await ctxB.close(); }
+});
+
+test('closed-up chats: today + yesterday, at most RECENT; none that recent → the newest FALLBACK', () => {
+  const mk = (days) => days.map((d, i) => ({ id: 'r' + i, updated: NOW.getTime() - d * DAY }));
+  assert.equal(PAHomeLook.recentCount(mk([0, 0, 0, 0, 0, 0, 0]), NOW), PAHomeLook.RECENT, 'capped at RECENT');
+  assert.equal(PAHomeLook.recentCount(mk([0, 1, 2, 3]), NOW), 2, 'two-days-old is not recent');
+  assert.equal(PAHomeLook.recentCount(mk([4, 5, 6, 7, 8]), NOW), PAHomeLook.FALLBACK, 'CONTROL: nothing recent still shows a few');
+  assert.equal(PAHomeLook.recentCount([], NOW), PAHomeLook.FALLBACK);
 });
