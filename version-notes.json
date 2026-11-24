@@ -1,4 +1,12 @@
 {
+  "v5.10.1": {
+    "date": "2026-11-24",
+    "features": [],
+    "fixes": [
+      "能力说明始终在最后 · capability text stays last with app facts"
+    ],
+    "through": "589d0917724f6b6d63053593b3f1d16d34042593"
+  },
   "v5.10.0": {
     "date": "2026-11-24",
     "features": [
