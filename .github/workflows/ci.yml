@@ -98,11 +98,12 @@ jobs:
         # 2026-11-24: EVERY OS +7 (ubuntu 157, windows 242): settings-close-e2e (sticky bar, discard guard, slow Save).
         # 2026-11-24: EVERY OS +3 (ubuntu 160, windows 245): publish-e2e (owner publish, token-needed, member hidden).
         # 2026-11-24: EVERY OS +2 (ubuntu 162, windows 247): app-edit-e2e (panel + change + undo, menu + phone sheet).
+        # 2026-11-24: EVERY OS +1 (ubuntu 163, windows 248): new-look (tiles, drawer 5 + More, Aa, app palette).
         include:
           - os: ubuntu-latest
-            max_skipped: 162
+            max_skipped: 163
           - os: windows-latest
-            max_skipped: 247
+            max_skipped: 248
     env:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED
