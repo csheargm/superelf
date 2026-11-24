@@ -100,6 +100,12 @@ test('long-press the title → panel docks beside the app with its picture; a ch
   if (gotShot) assert.match(await chip.getAttribute('src'), /^data:image\/png;base64,/);
   if (gotShot && SHOTS) fs.writeFileSync(path.join(SHOTS, `cta-snap-${ENGINE}.png`), Buffer.from((await chip.getAttribute('src')).split(',')[1], 'base64'));   // the picture the agent gets
   await shot(page, 'cta-panel-desktop');
+  // A sibling app frame cannot reach the panel's listeners (a forged broker reply would render as the panel's own HTML).
+  await p.locator('body').evaluate(() => { window.__got = []; addEventListener('message', (e) => window.__got.push(e.data && e.data.tag)); });
+  await page.frameLocator('#fr').locator('body').evaluate(() => { for (let i = 0; i < parent.frames.length; i++) if (parent.frames[i] !== window) parent.frames[i].postMessage({ pa: 'res', id: 'pac1', tag: 'forged' }, '*'); });
+  await page.evaluate(() => document.querySelector('#aefr').contentWindow.postMessage({ pa: 'x', tag: 'shell' }, '*'));
+  await p.locator('body').evaluate(() => new Promise((r) => setTimeout(r, 300)));
+  assert.deepEqual(await p.locator('body').evaluate(() => window.__got), ['shell'], 'only the shell is heard; the sibling app is stopped');
   await sendInPanel(page, 'make it red');
   await page.locator('#aeUndo').waitFor({ state: 'visible', timeout: 20000 });
   await page.frameLocator('#fr').locator('#t').waitFor();

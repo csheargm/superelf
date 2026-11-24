@@ -5,6 +5,14 @@
      SHELL page, never an app's: the broker knows it by its window and files its chat as the owner's
      edit turn for the app the shell opened it on. The shell says which with {pa:'edit-init'}. -->
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+// FIRST script of the panel (sendAppHtml puts only the shared helpers ahead of it): every message that
+// is not from the shell is stopped here. An app in a sibling frame can post to this window; a forged
+// broker reply rendered by PAChat would run in the panel, whose chat is the owner's full agent
+// (GPT review 2026-11-24). Capture listeners on the target fire before the bubbling ones the helpers
+// registered, so they never see it.
+addEventListener('message',function(e){ if(e.source!==parent) e.stopImmediatePropagation(); },true);
+</script>
 <style>
 :root{--bg:#fafaf7;--card:#fff;--text:#1a1a1a;--muted:#777;--line:#e4e2dc;--accent:#0f6355}
 @media(prefers-color-scheme:dark){:root{--bg:#16181a;--card:#1f2224;--text:#eee;--muted:#9a9a9a;--line:#33373a;--accent:#4fb39b}}

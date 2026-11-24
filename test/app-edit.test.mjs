@@ -151,8 +151,8 @@ test('GPT review 2026-11-24: one edit per app at a time; undo waits; a data-only
     assert.equal(undoAppEdit(e, { wsDir: w }).ok, false, 'undo cannot take the in-flight copy');
     fs.writeFileSync(path.join(w, 'data', 'todo', 'items.json'), '[1,2,3]');
     const out = finishAppEdit(e, ctx, { wsDir: w });
-    assert.equal(out.line.applied, false, 'a turn that wrote only data is not a clean change');
-    assert.match(out.note, /data\/todo/);
+    assert.equal(out.line.changed, false, 'only data moved (the open app may save during a turn): not an app change');
+    assert.match(out.note, /data\/todo/, 'but it is said');
     assert.notEqual(code(() => beginAppEdit(e, { wsDir: w })), 'edit_busy', 'released after finish');
     const w2 = fs.mkdtempSync(path.join(os.tmpdir(), 'pa-edit-l-'));
     fs.symlinkSync(path.join(w, 'apps'), path.join(w2, 'apps'));
@@ -175,5 +175,17 @@ test('GPT review 2026-11-24: VERSIONS_KEPT edits give VERSIONS_KEPT undos; an un
     let n = 0; while (undoAppEdit(e, { wsDir: w }).line.undone) n += 1;
     assert.equal(n, VERSIONS_KEPT);
     assert.equal(fs.readFileSync(page, 'utf8'), PAGE);
+  } finally { rmTemp(w); }
+});
+
+test('GPT review round 2: deleting an app drops its undo history', async () => {
+  const { dropAppHistory } = await import('../lib/app-edit.mjs');
+  const w = ws();
+  try {
+    const e = ed(w, { edit: 'todo', message: 'x' });
+    const c = beginAppEdit(e, { wsDir: w }); fs.writeFileSync(path.join(w, 'apps', 'todo', 'index.html'), PAGE.replace('Hi', 'v')); finishAppEdit(e, c, { wsDir: w });
+    dropAppHistory(w, 'todo');
+    assert.deepEqual(listVersions(path.join(w, VERSIONS_DIR), 'todo'), []);
+    assert.equal(undoAppEdit(e, { wsDir: w }).line.undone, undefined);
   } finally { rmTemp(w); }
 });

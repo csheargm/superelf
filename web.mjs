@@ -85,7 +85,7 @@ import { pageImageFile, IMG_BAD_PATH, IMG_NOT_FOUND } from './lib/note-page-imag
 import { buildFollowup, followupDeps } from './lib/summary-followup.mjs';
 import { writerClaudeBase, writerLaneMs } from './lib/research-writer.mjs';
 import { snapshotApps, appBuildWarnings } from './lib/app-postcheck.mjs';
-import { appEditOf, refuseIfEditBusy, editSystemPrompt, beginAppEdit, finishAppEdit, undoAppEdit } from './lib/app-edit.mjs';
+import { appEditOf, refuseIfEditBusy, dropAppHistory, editSystemPrompt, beginAppEdit, finishAppEdit, undoAppEdit } from './lib/app-edit.mjs';
 import { isBlankAnswer, laneFailureText, shouldFallBackToAgent, fallbackStatusText, chatTurnLogLine, turnErrorText } from './lib/chat-outcome.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -1924,6 +1924,7 @@ const server = http.createServer(async (req, res) => {
       // Not theirs (or mistyped): say so instead of a 200 for nothing deleted (F4-5).
       if (!fs.existsSync(dir)) return send(res, 404, 'application/json', '{"error":"没有这个应用 · No such app"}');
       fs.rmSync(dir, { recursive: true, force: true });
+      dropAppHistory(wsDir(user), slug);   // a new app under this name must not undo into the deleted one (ADR 0040)
       return send(res, 200, 'application/json', '{"ok":true}');
     }
     if (req.method === 'GET' && p.startsWith('/api/data/')) {
