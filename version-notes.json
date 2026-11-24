@@ -1,4 +1,12 @@
 {
+  "v5.15.0": {
+    "date": "2026-11-24",
+    "features": [
+      "发布说清楚 · Publish says what it does"
+    ],
+    "fixes": [],
+    "through": "6e7f8437bfd9329002d1fd7c95e55fea6f46bca6"
+  },
   "v5.14.0": {
     "date": "2026-11-24",
     "features": [
