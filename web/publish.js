@@ -25,10 +25,11 @@ const PAPublish=(()=>{
     if(repo.upToDate) return '已是最新 · Already up to date';
     return `有 ${repo.changedFiles} 处改动未发布 · ${repo.changedFiles} change${repo.changedFiles===1?'':'s'} not yet published`;
   }
-  function showState(repo){
-    const b=$('#pubItem'), l=$('#pubState'); if(!b||!l) return;
+  // b: the item of the menu that asked — a late answer for app A never touches app B's menu.
+  function showState(b,repo){
+    const l=b&&b.isConnected&&b.querySelector('#pubState'); if(!l) return;
     l.textContent=stateText(repo);
-    const off=!!(repo&&repo.upToDate); b.disabled=off; b.style.opacity=off?'.5':'';
+    const off=!!(repo&&repo.upToDate); b.disabled=off; b.style.opacity=off?'.5':''; b.style.pointerEvents=off?'none':'';   // a tap on the line text must not reach the menu's handler
   }
   // armTip(slug) runs each time the owner's ⋯ menu opens: it also shows a publish result the owner
   // has not seen yet (they closed the wait sheet, or left the app), and re-attaches the watcher to
@@ -39,8 +40,9 @@ const PAPublish=(()=>{
   const markSeen=(slug,st)=>{ try{ localStorage.setItem(SEEN_KEY(slug),String(st.at)); }catch{ /* no storage: the result may show once more */ } };
   const watching=new Set();
   async function check(slug){
+    const b=$('#pubItem');
     let j; try{ const r=await api(url(slug)); j=await r.json(); }catch{ return; /* offline: the next ⋯ open looks again */ }
-    showState(j&&j.repo);
+    showState(b,j&&j.repo);
     const st=j&&j.status; if(!st) return;
     if(TERMINAL.has(st.state)){ if(seenAt(slug)!==String(st.at)){ notice(st); markSeen(slug,st); } }
     else watch(slug);

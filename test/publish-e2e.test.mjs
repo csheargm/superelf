@@ -183,6 +183,8 @@ test('⋯ Publish line: not in repo / up to date (disabled) / N changes; the she
     await reopenMenu(page, port);
     assert.equal(await line(), '已是最新 · Already up to date');
     assert.equal(await page.locator('#pubItem').isDisabled(), true, 'nothing to publish: greyed out');
+    await page.locator('#pubState').click({ force: true }); await page.waitForTimeout(300);
+    assert.equal(await page.locator('#pubSheet').count(), 0, 'a tap on the greyed line opens nothing');
     await shot('menu-up-to-date.png');
     fs.writeFileSync(path.join(repo, 'index.html'), '<h1>Old</h1>\n');
     await page.waitForTimeout(10100);

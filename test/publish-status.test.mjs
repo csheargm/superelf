@@ -26,15 +26,15 @@ test('same code as the repo copy (local meta fields ignored): up to date', () =>
   try { copyAsPublished(mine, repo); assert.deepEqual(repoStatus(args), { inRepo: true, upToDate: true, changedFiles: 0 }); } finally { fs.rmSync(root, { recursive: true }); }
 });
 
-test('changed, added and removed files each count once; data/ never counts', () => {
+test('changed and added files count once; repo-only files and data/ never count (Publish cannot remove)', () => {
   const { root, mine, repo, args } = setup();
   try {
     copyAsPublished(mine, repo);
     fs.writeFileSync(path.join(mine, 'index.html'), '<h1>changed</h1>');   // changed
     fs.writeFileSync(path.join(mine, 'app.js'), 'x');                      // added
-    fs.writeFileSync(path.join(repo, 'old.css'), 'a{}');                    // removed
+    fs.writeFileSync(path.join(repo, 'old.css'), 'a{}');                    // repo-only: not counted
     fs.mkdirSync(path.join(mine, 'data')); fs.writeFileSync(path.join(mine, 'data', 'n.json'), '{}');
-    assert.deepEqual(repoStatus(args), { inRepo: true, upToDate: false, changedFiles: 3 });
+    assert.deepEqual(repoStatus(args), { inRepo: true, upToDate: false, changedFiles: 2 });
   } finally { fs.rmSync(root, { recursive: true }); }
 });
 
