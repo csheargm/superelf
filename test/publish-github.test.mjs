@@ -7,12 +7,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { startFakeGitHub, FAKE_TOKEN } from './helpers-fake-github.mjs';
-import { startPublish } from '../lib/publish/run.mjs';
+import { startPublish, destOf } from '../lib/publish/run.mjs';
 import { collectApp, snapshotHash } from '../lib/publish/collect.mjs';
 import { cutRelease } from '../lib/publish/release.mjs';
 import { sha256 } from '../lib/publish/github.mjs';
 
-const hashOf = (dir, o) => snapshotHash(collectApp(dir, 'myapp').files, `${o.repo}\0${o.api || ''}`);   // what the preview handed the owner
+const hashOf = (dir, o) => snapshotHash(collectApp(dir, 'myapp').files, destOf(o));   // what the preview handed the owner
 
 const ENV = { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@example.com', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@example.com' };
 const git = (cwd, ...a) => execFileSync('git', a, { cwd, env: ENV, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });

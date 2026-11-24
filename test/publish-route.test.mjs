@@ -99,4 +99,6 @@ test('the confirmed hash binds the destination: a repo change after the preview 
   assert.equal(pv.repo, 'csheargm/superelf');
   const { status } = await startPublish({ appDir, slug: 'myapp', options: { ...o, repo: 'someone/else' }, expectHash: pv.hash });
   assert.equal(status.code, 'SNAPSHOT_CHANGED');
+  const r2 = await startPublish({ appDir, slug: 'myapp', options: { ...o, remoteUrl: 'https://elsewhere.invalid/x.git' }, expectHash: pv.hash });
+  assert.equal(r2.status.code, 'SNAPSHOT_CHANGED', 'the release remote is bound too');
 });
