@@ -27,7 +27,7 @@ apps from `workspace.example` — nothing else.
 | `searches_per_user_per_day` / `_per_ip_` | 200 / 600 | 429 (Bible search) |
 | `new_users_per_ip_per_day` | 10 | 429 |
 | `user_disk_mb` | 20 | 507 on chat and save |
-| `total_disk_gb` | 5 | 507; new visitors refused |
+| `total_disk_gb` | 0.5 (5 when unset) | 507; new visitors refused |
 | `app_builds_per_user_per_day` / `_per_ip_` | 5 / 15 | the build stops with the EN + 中文 reason |
 | `web_search_per_day` / `web_search_per_ip_per_day` | 10 / 50 | said in a status line; the answer comes without search |
 | `ai_calls_node_per_day` | 3000 | 429 for everyone: the hosted-model cost ceiling |
@@ -35,7 +35,7 @@ apps from `workspace.example` — nothing else.
 Models, Ask AI in demo apps and web search: see `docs/demo-models.md`.
 
 Days are UTC. Caps are checked before each write, so one write can cross a cap; the hard stop
-is the data disk itself, a 16 GB ext4 image (`DEMO_DISK_GB`; 5 GB of data plus room to stage a backup and a restore), so the host disk can never fill. The
+is the data disk itself, a 1 GB ext4 image (`DEMO_DISK_GB`, default 1; the data plus room to stage a backup and a restore), so the host disk can never fill. The
 container refuses to start unless that disk is mounted (marker `.superelf-demo-disk`).
 
 ## Sign-in · 登录 (lib/demo-auth.mjs, lib/demo-boot.mjs)

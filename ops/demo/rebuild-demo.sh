@@ -6,7 +6,7 @@
 # BACKUP_REMOTE (.env; default gdrive:superelf-demo-backups) is where "latest" is looked for.
 # Run from the repo checkout (meant for ~/sandbox/superelf-demo). Touches only the Compose project
 # `superelf-demo`; publishes no port. Data lives on a size-capped loop-mounted ext4 image
-# (DEMO_DISK_GB, default 16: 5 GB of demo data + room to stage a backup and a restore) so a full demo can never fill the host disk. docs/demo-node.md.
+# (DEMO_DISK_GB, default 1: the demo's data + room to stage a backup and a restore; frugal on a small VM) so a full demo can never fill the host disk. docs/demo-node.md.
 set -euo pipefail
 cd "$(dirname "$0")"
 PROJECT=superelf-demo
@@ -36,7 +36,8 @@ unset DEMO_DATA_DIR BACKUP_REMOTE
 for k in TUNNEL_TOKEN OLLAMA_API_KEY DEMO_DATA_DIR DEMO_DISK_GB BACKUP_REMOTE; do
   v=$(envval "$k"); if [[ -n "$v" ]]; then printf -v "$k" '%s' "$v"; fi
 done
-DISK_GB=${DEMO_DISK_GB:-16}
+DISK_GB=${DEMO_DISK_GB:-1}
+[[ "$DISK_GB" =~ ^[1-9][0-9]*$ ]] || die "DEMO_DISK_GB must be a whole number of GB"
 [[ -n "${TUNNEL_TOKEN:-}" ]] || die "TUNNEL_TOKEN is empty in .env"
 [[ -n "${OLLAMA_API_KEY:-}" ]] || die "OLLAMA_API_KEY is empty in .env"
 # Compose reads a bare name ("data") as a named volume, so the path must start with / or ./
@@ -90,6 +91,7 @@ if [[ -z "$RESTORE" ]] && sudo test -e "$DATA/.restoring"; then
   die "a restore did not finish: empty $DATA/superelf (docs/demo-node.md) and run --restore again"
 fi
 # The image stamps the commit it holds (REVISION); unknown or conflicting → stop here (revision.sh).
+. ./disk-hygiene.sh; superelf_disk_guard rebuild-demo || exit 1
 . ./revision.sh; superelf_revision "$(cd ../.. && pwd)" || die "cannot tell which commit is being built"
 compose build
 if [[ -n "$RESTORE" ]]; then
@@ -145,4 +147,5 @@ for _ in $(seq 1 20); do   # the log is read whole first: grep -q closing the pi
   [[ "$LOG" == *'Registered tunnel connection'* ]] && { TUNNEL=ok; break; }; sleep 3
 done
 [[ "${TUNNEL:-}" == ok ]] || { compose logs --tail 30 cloudflared >&2; die "cloudflared did not connect; check TUNNEL_TOKEN"; }
+superelf_prune rebuild-demo
 echo "Up. Logs: docker compose -p $PROJECT logs -f superelf"
