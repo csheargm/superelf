@@ -200,6 +200,7 @@ const PROCESS_STARTS = {
   'tools/fetch-daily-digest.mjs': { why: 'node tools/websearch.mjs (its claude run goes through lib/runner.mjs runClaude)',
     refs: ['execFileSync(process.execPath'] },
   'tools/gen-builtin-app-versions.mjs': { why: 'git log, show (builds lib/builtin-app-versions.json)', refs: ["execFileSync('git'"] },
+  'tools/bump-version.mjs': { why: 'git log, merge-base (reads merges on main for the version bump)', refs: ["execFileSync('git'", "execFileSync('git'"] },
   'tools/privacy-scan.mjs': { why: 'git ls-files, rev-list, show (the public privacy scan)', refs: ["execFileSync('git'", "execFileSync('git'"] },
   'web.mjs': { why: 'git', refs: ["execFileSync('git'", "execFileSync('git'", "execSync('git rev-parse HEAD'", "execFileSync('git'"] },
 };
