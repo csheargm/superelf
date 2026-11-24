@@ -1,4 +1,12 @@
 {
+  "v5.9.0": {
+    "date": "2026-11-24",
+    "features": [
+      "发布 Sunday Study 主日查经 · Publish Sunday Study 主日查经"
+    ],
+    "fixes": [],
+    "through": "bbb180c1132ac7f73aa3fba400c896bae1a27fba"
+  },
   "v5.8.1": {
     "date": "2026-11-24",
     "features": [],
