@@ -838,9 +838,9 @@ function sendAppHtml(res, file, type, extra) {
     catch (e) { return send(res, 500, 'text/plain', 'component unavailable'); }   // fail loud, like a missing component (R5)
     // After the app's own styles; a page with no </head> (legal HTML) gets it before <body>, else first.
     const themeTag = '<style id="pa-theme">' + theme + '</style>';
-    // The LAST </head>: one quoted earlier inside a head script or comment must not take the CSS.
-    const headEnd = html.toLowerCase().lastIndexOf('</head>');
+    // The last </head> BEFORE <body>: one quoted inside a head script, or a body script, must not take the CSS.
     const bodyAt = html.search(/<body\b/i);
+    const headEnd = html.toLowerCase().lastIndexOf('</head>', bodyAt >= 0 ? bodyAt : Infinity);
     const doctype = html.match(/^\s*<!doctype[^>]*>/i);
     if (headEnd >= 0) html = html.slice(0, headEnd) + themeTag + html.slice(headEnd);
     else if (bodyAt >= 0) html = html.slice(0, bodyAt) + themeTag + html.slice(bodyAt);
