@@ -13,7 +13,7 @@ import { makeSigninGate, authConfig } from './lib/demo-auth.mjs';
 import { makeDemoRoutes } from './lib/demo-routes.mjs';
 import { handlePublishRoute } from './lib/publish/routes.mjs';
 import { loadConfig, configPath, fastLaneGuard, GUARD_DEFAULT_SURFACE, agentCapabilities, appContract, REPLY_LANGUAGE_RULE, OVERRIDABLE_PROMPT_MAX } from './lib/config.mjs';
-import { runClaude } from './lib/runner.mjs';
+import { runClaude, APPEND_SYSTEM_PROMPT_MAX } from './lib/runner.mjs';
 import { agentAllowed, lanesFor, memberLane, NO_PLAIN_LANE_TEXT, AGENT_OFF_TEXT } from './lib/member-lanes.mjs';
 import { cancelOnClose, createTurnCancel, createTurnStops } from './lib/turn-stop.mjs';
 import { watchConfig } from './lib/config-watch.mjs';
@@ -1260,16 +1260,27 @@ async function chat(req, res, user, body) {
 
 // The facts an app turn is given about its app (lib/app-history.mjs): the edit panel gets the saved
 // versions too; an app's own chat gets the about lines and APP_CHAT_EVIDENCE_RULE. Read from THIS
-// user's workspace only. '' for a main-chat turn.
+// user's workspace only. '' for a main-chat turn. `max` bounds the whole result (the agent lane passes
+// what its runner cap leaves, so the capability text after it always arrives whole).
 // TODO(R4 seam): leaves web.mjs with the edit-turn wiring (lib/chat-turn split).
-function appTurnFacts(user, edit, app) {
+function appTurnFacts(user, edit, app, max) {
   const notes = () => { try { return JSON.parse(appNotesJson(ROOT, undefined, buildId.head())); } catch { return {}; /* notes unreadable: the block says "none" */ } };
   if (edit && edit.undo) return '';   // a typed Undo calls no model: no facts to build
-  if (edit && !edit.superelf) return editHistoryContext({ slug: edit.slug, appDir: edit.dir, versionsRoot: path.join(wsDir(user), VERSIONS_DIR), versionsRel: VERSIONS_DIR, repoRoot: ROOT, notes: notes() });
+  if (edit && !edit.superelf) return editHistoryContext({ slug: edit.slug, appDir: edit.dir, versionsRoot: path.join(wsDir(user), VERSIONS_DIR), versionsRel: VERSIONS_DIR, repoRoot: ROOT, notes: notes(), max });
   if (edit || typeof app !== 'string' || !slugOk(app)) return '';
   const dir = path.join(appsDir(user), app);
+  if (max !== undefined && max < APP_CHAT_EVIDENCE_RULE.length) return '';
   if (!noLinkOnTheWay(wsDir(user), path.join(dir, 'index.html'))) return APP_CHAT_EVIDENCE_RULE;
-  return [APP_CHAT_EVIDENCE_RULE, appAboutContext({ slug: app, appDir: dir, repoRoot: ROOT, notes: notes() })].filter(Boolean).join('\n\n');
+  const rest = max === undefined ? undefined : max - APP_CHAT_EVIDENCE_RULE.length - 2;
+  return [APP_CHAT_EVIDENCE_RULE, appAboutContext({ slug: app, appDir: dir, repoRoot: ROOT, notes: notes(), max: rest })].filter(Boolean).join('\n\n');
+}
+
+// The agent lane's prompt: overrides, then the app facts, then the capability text LAST and whole
+// (it ends with the confined note). The facts get only what the runner's cap leaves.
+function agentSystemPrompt(head, caps, facts) {
+  const fixed = [...head, caps].filter(Boolean).join('\n\n');
+  const f = facts(APPEND_SYSTEM_PROMPT_MAX - fixed.length - 2);
+  return [...head, f, caps].filter(Boolean).join('\n\n');
 }
 
 async function chatTurn(req, res, user, body, hold, cancel = null) {
@@ -1282,7 +1293,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
   try { edit = appEditOf({ user, body, headers: req.headers, appsDir: appsDir(user) }); if (edit) refuseIfEditBusy(edit, wsDir(user)); }
   catch (e) { if (!e.status) throw e; if (res.headersSent) { res.end(JSON.stringify({ type: 'error', text: e.message }) + '\n'); return; } return send(res, e.status, 'application/json', JSON.stringify({ error: e.message, code: e.code })); }
   const system = edit ? editSystemPrompt(edit) : body.system;
-  const turnFacts = appTurnFacts(user, edit, app);   // what changed on this app: facts, outside the override chain
+  const turnFacts = (max) => appTurnFacts(user, edit, app, max);   // what changed on this app: facts, outside the override chain
   // A oneShot caller that left while this turn was queued: nothing is saved, nothing spawns.
   if (cancel && cancel.signal.aborted) { audit('chat-cancelled', { who: user.id, convo: convoId || '', queued: true }); if (!res.writableEnded) res.end(); return; }
   // Decided ONCE per turn, from the shell relay's header OR the app slug (lib/agent-origin.mjs),
@@ -1406,7 +1417,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
       // lane: prompts.global is replaceable by a profile override, and being answered in your own
       // language must not be something a customised assistant can lose. It matters most here —
       // most fast lanes are Chinese-trained models.
-      const sys = [prompts.global, prompts.app, REPLY_LANGUAGE_RULE, turnFacts]   // each piece capped by resolveSystemPrompts
+      const sys = [prompts.global, prompts.app, REPLY_LANGUAGE_RULE, turnFacts()]   // each piece capped by resolveSystemPrompts
         .filter(Boolean).map((c) => ({ role: 'system', content: c }));
       const history = [...sys, ...convo.messages.slice(-20).filter((m) => !m.failed)   // a stored lane failure is not an answer to learn from
         .map((m) => ({ role: m.role === 'md' ? 'assistant' : 'user', content: String(m.text || '') }))
@@ -1484,7 +1495,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
           // override replaces the guard above, and a capability list it could delete is not one
           // any app author could rely on. A oneShot turn builds no app, so it skips the ~3.7k-char
           // app contract; the language rule and the confined note still ride.
-          systemPrompt: [agentPrompts.global, agentPrompts.app, agentCapabilities(laneRole(user, origin), oneShot ? null : APP_CONTRACT), turnFacts].filter(Boolean).join('\n\n'),   // facts LAST: the runner's cap cuts them, never the capability text
+          systemPrompt: agentSystemPrompt([agentPrompts.global, agentPrompts.app], agentCapabilities(laneRole(user, origin), oneShot ? null : APP_CONTRACT), turnFacts),
         resumeId, timeoutMs: cfg.task_timeout_minutes * 60000, onChild: cancel ? cancel.onChild : undefined,
         onDelta: (t) => line({ type: 'delta', text: t }), onTool: (n, b) => line({ type: 'status', text: `${n}${b ? ` — ${b}` : ''}` }) };
       r = await enqueue(async () => {
