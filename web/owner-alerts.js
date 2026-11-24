@@ -6,7 +6,7 @@
    in (never sent for you). The card clears when the next check passes.
    Inlined into the shell at /* PA_OWNER_ALERTS_JS *\/ (lib/shellhtml.mjs); test/owner-alerts-e2e.test.mjs drives it. */
 const PAOwnerAlerts=(()=>{
-  const URL_='/api/admin/alerts', TIP_KEY='tip:owner-alerts', POLL_MS=4000, POLL_MAX_MS=6*60_000;
+  const URL_='/api/admin/alerts', TIP_KEY='tip:owner-alerts', POLL_MS=4000, POLL_MAX_MS=6*60_000, IDLE_MS=10*60_000;
   const T={
     head:'需要处理 · Needs attention',
     tip:'新：节点出问题时会在这里提示，并给出一键解决办法 · New: node problems show here, with one-tap fixes',
@@ -19,7 +19,7 @@ const PAOwnerAlerts=(()=>{
     noHelper:'这台节点没有主机助手，按钮无法自动修复 · This node has no host helper, so this cannot be fixed automatically',
   };
   const BOX={system:['系统盘','system disk'],private:['私有数据盘','private data disk'],demo:['演示数据盘','demo data disk'],other:['磁盘','disk']};
-  let view=null, busy='', note='', pollUntil=0, armed='';
+  let view=null, busy='', since='', note='', pollUntil=0, armed='';
   const style=document.createElement('style');
   style.textContent=`#menu{position:relative}
 .oa-dot{position:absolute;top:4px;right:4px;width:9px;height:9px;border-radius:50%;background:var(--warn);box-shadow:0 0 0 2px var(--card);pointer-events:none;animation:oa-pulse 2s ease-in-out infinite}
@@ -36,14 +36,16 @@ const PAOwnerAlerts=(()=>{
   const open=()=>view?view.alerts.filter((a)=>!a.snoozed):[];
   const has=(a)=>!!view&&view.actions.includes(a);
   const recent=(a)=>{ const r=view&&view.results[a]; return r&&Date.now()-Date.parse(r.at)<24*3600_000?r:null; };
+  const cleaned=()=>{ const r=recent('cleanup-disk'); return !!(r&&r.ok); };   // only a cleanup that WORKED counts
+  // Docker prune frees the system disk only; a full data box is the owner's own data.
+  const ownData=(a)=>a.box!=='system'||cleaned();
   function words(a){
     if(a.kind==='claude') return ['Claude 在这台节点上无法启动 · Claude will not start on this node','管家暂时无法回答问题，重建节点通常能修好 · 管家 cannot answer until this is fixed; a rebuild usually fixes it'];
     if(a.kind==='job') return [`任务「${a.job}」多次重试仍失败 · The job "${a.job}" failed every retry`,'它这次的结果没有送到 · Its result did not arrive this time'];
     const [zh,en]=BOX[a.box]||BOX.other;
     if(a.kind==='disk-unreadable') return [`无法读取${zh}的用量 · Cannot read how full the ${en} is`,'数据盘可能被锁或未挂载 · The box may be locked or not mounted'];
-    const still=recent('cleanup-disk');
     return [`${zh}已用 ${a.pct}% · The ${en} is ${a.pct}% full`,
-      still?'已经清理过，剩下的是你自己的数据。可以问管家哪些占地方，或在 VM 上给它更多空间（需要你本人操作）· Already cleaned up; what is left is your own data. Ask 管家 what takes the space, or give it more room on the VM (needs you there)'
+      ownData(a)?`${a.box==='system'?'已经清理过，':''}剩下的是你自己的数据。可以问管家哪些占地方，或在 VM 上给它更多空间（需要你本人操作）· ${a.box==='system'?'Already cleaned up; ':''}what is left is your own data. Ask 管家 what takes the space, or give it more room on the VM (needs you there)`
         :'再满下去，更新和保存可能失败 · If it fills up, updates and saving can fail'];
   }
   const prompt=(a)=>a.kind==='job'?`我的任务「${a.job}」多次重试仍失败，请查明原因并修好。 · My job "${a.job}" failed every retry; please find out why and fix it.`
@@ -51,7 +53,7 @@ const PAOwnerAlerts=(()=>{
   function buttons(a){
     const b=[];
     if(a.kind==='claude'&&has('rebuild-node')) b.push(`<button class="primary" data-oa="rebuild-node">${armed==='rebuild-node'?T.rebuildSure:T.rebuild}</button>`);
-    if(a.kind==='disk'&&has('cleanup-disk')&&!recent('cleanup-disk')) b.push(`<button class="primary" data-oa="cleanup-disk">${T.free}</button>`);
+    if(a.kind==='disk'&&has('cleanup-disk')&&!ownData(a)) b.push(`<button class="primary" data-oa="cleanup-disk">${T.free}</button>`);
     b.push(`<button class="plain" data-ask="${esc(a.id)}">${T.ask}</button>`);
     return b.join('');
   }
@@ -84,7 +86,7 @@ const PAOwnerAlerts=(()=>{
       note=''; return refresh(); }
     const act=t.dataset.oa; if(!act) return;
     if(act==='rebuild-node'&&armed!==act){ armed=act; render(); return; }
-    armed='';
+    armed=''; since=(view.results[act]||{}).at||'';   // a result older than this request is not its answer
     if(act==='recheck'&&!has('recheck')){ note=''; return refresh(); }
     let r; try{ r=await api(URL_+'/action',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:act})}); }catch{ r=null; }
     if(!r||!r.ok){ let e=''; try{ e=(await r.json()).error; }catch{ /* no body: the status alone is shown */ } note=T.failed+(e||(r?'HTTP '+r.status:'offline')); render(); return; }
@@ -92,7 +94,7 @@ const PAOwnerAlerts=(()=>{
   }
   async function poll(){
     const ok=await refresh(true);
-    if(busy&&ok&&!view.pending.includes(busy)){ const r=view.results[busy]; note=r?(r.ok?T.done:T.failed+r.msg):''; busy=''; paint(); return; }
+    if(busy&&ok&&!view.pending.includes(busy)){ const r=view.results[busy]; note=r&&r.at!==since?(r.ok?T.done:T.failed+r.msg):''; busy=''; paint(); return; }
     if(busy&&Date.now()<pollUntil) setTimeout(poll,POLL_MS);
     else if(busy){ busy=''; note=T.failed+'timeout'; render(); }
   }
@@ -101,9 +103,12 @@ const PAOwnerAlerts=(()=>{
   async function refresh(quiet){
     if(ROLE!=='owner') return false;
     try{ const r=await api(URL_); if(!r.ok) return false; view=await r.json(); }catch{ return false; }
+    if(!quiet) armed='';   // a rebuild confirm never survives closing and reopening the drawer
+    if(!busy&&view.pending.length){ busy=view.pending[0]; since=(view.results[busy]||{}).at||''; note=busy==='rebuild-node'?T.restarting:T.working; pollUntil=Date.now()+POLL_MAX_MS; setTimeout(poll,POLL_MS); }   // after a reload: keep following the running fix
     if(!quiet||!busy) paint(); else render();
     return true;
   }
   document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&!busy) refresh(); });
+  setInterval(()=>{ if(document.visibilityState==='visible'&&!busy) refresh(true); },IDLE_MS);   // a tab left open still gets the dot
   return {refresh,render,state:()=>({view,busy,note})};
 })();

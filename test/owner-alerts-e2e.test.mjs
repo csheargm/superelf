@@ -14,7 +14,7 @@ import { hashPassword } from '../lib/auth.mjs';
 import { NODE_ACTIONS, NODE_HEALTH_FILE, ACTIONS_DIR, resultFile } from '../lib/node-alerts.mjs';
 
 const FULL = { ok: false, at: new Date().toISOString(), actions: [...NODE_ACTIONS], problems: [{ kind: 'disk', box: 'system', pct: 92 }] };
-let port, root, web, browser, responder;
+let port, root, web, browser, responder, hostPaused = false;
 before(async () => {
   port = await freePort();
   root = mkWebRoot({ port, extraConfig: { users: [
@@ -25,7 +25,7 @@ before(async () => {
   // The fake host: every 200 ms, take any request and answer it; cleanup and recheck leave the disk healthy.
   responder = setInterval(() => {
     const dir = path.join(root, ACTIONS_DIR, 'req');
-    if (!fs.existsSync(dir)) return;
+    if (hostPaused || !fs.existsSync(dir)) return;
     for (const a of fs.readdirSync(dir)) {
       fs.writeFileSync(path.join(root, resultFile(a)), JSON.stringify({ at: new Date().toISOString(), ok: true, msg: 'freed 3 GB' }));
       fs.writeFileSync(path.join(root, NODE_HEALTH_FILE), JSON.stringify({ ok: true, at: new Date().toISOString(), actions: FULL.actions, problems: [] }));
@@ -113,5 +113,25 @@ test('reduced motion: the dot is steady; phone width 375: the card fits, no side
   const box = await page.$eval('#oaCard', (e) => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right }; });
   assert.ok(box.l >= 0 && box.r <= 375, JSON.stringify(box));
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await ctx.close();
+});
+
+test('a full DATA box offers no prune (it frees only the system disk); a reload mid-fix keeps following it; a rebuild confirm resets on reopen', { skip, timeout: 90000 }, async () => {
+  setHealth({ ...FULL, problems: [{ kind: 'disk', box: 'private', pct: 91 }, { kind: 'claude' }] });
+  const { ctx, page } = await signIn({}, 'mom', 'owner-pass-123');
+  await page.waitForSelector('#menu .oa-dot'); await page.click('#menu'); await page.waitForSelector('#oaCard');
+  assert.equal(await page.$('#oaCard [data-oa="cleanup-disk"]'), null);
+  assert.match(await page.locator('#oaCard').innerText(), /what is left is your own data/);
+  assert.doesNotMatch(await page.locator('#oaCard').innerText(), /Already cleaned up/);
+  await page.click('#oaCard [data-oa="rebuild-node"]');
+  await page.evaluate(() => closeDrawer()); await page.click('#menu'); await page.waitForSelector('#oaCard [data-oa="rebuild-node"]');
+  await page.waitForFunction(() => !/Confirm/.test(document.querySelector('#oaCard [data-oa="rebuild-node"]').innerText));
+  hostPaused = true;
+  await page.click('#oaCard [data-oa="recheck"]');
+  await page.waitForFunction(() => /Working/.test(document.querySelector('#oaCard')?.innerText || ''));
+  await page.reload(); await page.click('#menu');
+  await page.waitForFunction(() => /Working/.test(document.querySelector('#oaCard')?.innerText || ''), null, { timeout: 10000 });
+  hostPaused = false;
+  await page.waitForFunction(() => /完成 · Done/.test(document.querySelector('#oaCard')?.innerText || ''), null, { timeout: 20000 });
   await ctx.close();
 });
