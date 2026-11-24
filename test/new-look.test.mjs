@@ -129,5 +129,8 @@ test('USER FLOW: tiles with icons, drawer 5 + More, one Aa, and the app page wea
     const at = html.indexOf('<style id="pa-theme">');
     assert.ok(at > 0 && at > html.lastIndexOf('</style>', at - 1) && html.indexOf('</head>') > at, 'injected at the end of <head>');
     assert.ok(html.includes(read('web/theme-tokens.css')), 'the very same file');
+    const src = read('web.mjs');
+    assert.match(src, /lastIndexOf\('<\/head>'\)/, 'the LAST </head>, not one quoted in a script');
+    assert.match(src, /never before the doctype/, 'no head and no body: after the doctype');
   } finally { await ctxB.close(); }
 });

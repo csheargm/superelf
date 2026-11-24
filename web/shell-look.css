@@ -139,3 +139,7 @@ dialog input, dialog textarea, dialog select{ border-radius:var(--r-ctl); }
 }
 @media (min-width:900px){ header{ padding-left:max(16px, calc((100vw - 1040px) / 2)); padding-right:max(16px, calc((100vw - 1040px) / 2)); } }
 .ecard .star{ margin-left:.25em; }
+/* A shelf tile's Get button sits inside the title: never clamp it out of reach. */
+.ecard > b:has([data-fget]){ display:block; -webkit-line-clamp:unset; overflow:visible; }
+/* A ⋯ menu taller than a short landscape screen scrolls instead of running off it. */
+.cmenu-pop{ max-height:calc(100dvh - 12px); overflow-y:auto; }
