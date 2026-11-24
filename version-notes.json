@@ -1,4 +1,12 @@
 {
+  "v5.3.3": {
+    "date": "2026-11-23",
+    "features": [],
+    "fixes": [
+      "设置页顶部固定关闭与保存 · Settings: sticky top bar with close and Save"
+    ],
+    "through": "54e5561c417a67e9278e0e5dd5f33fb1d60cee51"
+  },
   "v5.3.2": {
     "date": "2026-11-23",
     "features": [],
