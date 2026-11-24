@@ -218,15 +218,14 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
 .dhead{ display:flex; align-items:center; padding:14px 16px; border-bottom:1px solid var(--line); }
 .dhead b, .dhead #goHome{ flex:1; text-align:left; font-weight:700; font-size:inherit; color:var(--text); padding:0; }
 #goHome{ cursor:pointer; }
-#convos{ overflow-y:auto; flex:1; }
+#convos{ flex:1 0 auto; }   /* scrolls with .dscroll */
 .dsec{ flex-shrink:0; display:flex; flex-direction:column; min-height:0; }
-.dsec-head{ font-size:14px; font-weight:600; letter-spacing:.02em; color:var(--text); padding:14px 16px 6px; flex-shrink:0; cursor:pointer; user-select:none; display:flex; align-items:center; }
-.dsec-head::after{ content:'›'; margin-left:auto; font-size:20px; line-height:1; color:var(--muted); display:inline-block; transition:transform .15s ease; }
-.dsec.open > .dsec-head::after{ transform:rotate(90deg); }
+.dsec-head{ flex-shrink:0; user-select:none; }   /* the look: web/drawer-sections.js */
 .dsec-body{ display:none; }
 .dsec.open > .dsec-body{ display:block; }
-#secChats.open{ flex:1; min-height:0; }
-#secChats.open > .dsec-body{ display:flex; flex-direction:column; flex:1; min-height:0; }
+.dscroll{ flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; }
+#secChats.open{ flex:1 0 auto; }
+#secChats.open > .dsec-body{ display:flex; flex-direction:column; flex:1 0 auto; }
 #chatSearch{ position:absolute; inset:0; background:var(--card); display:none; flex-direction:column; z-index:5; }
 #chatSearch.on{ display:flex; }
 .cs-bar{ display:flex; gap:6px; padding:14px 12px; border-bottom:1px solid var(--line); }
@@ -322,15 +321,17 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
 <body>
 <div id="backdrop"></div>
 <aside id="drawer">
-  <div class="dhead"><button class="plain" id="goHome" title="主页 · Home">主页 · Home</button><button class="plain" id="drawerSearch" title="搜索对话 · Search chats" aria-label="搜索对话 · Search chats" data-icon="search"></button><button class="plain" id="newChat" title="新对话 · New chat" data-icon="plus">新建 · New</button></div>
-  <div class="dsec open" id="secApps"><div class="dsec-head">我的应用 · My Apps</div><div class="dsec-body"><div class="d-apps-list" id="dApps"></div></div></div>
-  <div class="dsec open" id="secFamily"><div class="dsec-head">家庭应用 · Family Apps</div><div class="dsec-body"><div id="dFamily" class="d-apps-list" style="padding:0 12px 8px"></div></div></div>
+  <div class="dhead"><button class="plain" id="goHome" title="主页 · Home">主页 · Home</button><button class="plain" id="drawerSearch" title="搜索对话 · Search chats" aria-label="搜索对话 · Search chats" data-icon="search"></button><button class="plain" id="newChat" title="新对话 · New chat" aria-label="新对话 · New chat" data-icon="plus"><span>新对话</span><span class="en"> · New chat</span></button></div>
+  <div class="dscroll">   <!-- the sections scroll together, so any mix of open ones stays reachable -->
+  <div class="dsec" id="secApps"><button type="button" class="dsec-head" aria-expanded="false"><span class="dsec-ic" data-icon="grid"></span><span class="dsec-l"><b>我的应用</b><span class="en">My Apps</span></span><span class="dsec-n"></span><span class="dsec-chev" data-icon="chev"></span></button><div class="dsec-body"><div class="d-apps-list" id="dApps"></div></div></div>
+  <div class="dsec" id="secFamily"><button type="button" class="dsec-head" aria-expanded="false"><span class="dsec-ic" data-icon="home"></span><span class="dsec-l"><b>家庭应用</b><span class="en">Family Apps</span></span><span class="dsec-n"></span><span class="dsec-chev" data-icon="chev"></span></button><div class="dsec-body"><div id="dFamily" class="d-apps-list" style="padding:0 12px 8px"></div></div></div>
   <!-- 简报 · Briefings — a JOB's output. System-level, like the jobs that produce it, so it
        belongs beside My Apps rather than inside any one app. It was previously readable only
        inside the longevity app: an accident of history, since briefings began as a health
        feature and the reading surface never moved when they became general. -->
-  <div class="dsec open" id="secBriefs"><div class="dsec-head">简报 · Briefings</div><div class="dsec-body"><div id="briefs"></div></div></div>
-  <div class="dsec open" id="secChats"><div class="dsec-head">对话记录 · Chats</div><div class="dsec-body"><div id="convos"></div></div></div>
+  <div class="dsec" id="secBriefs"><button type="button" class="dsec-head" aria-expanded="false"><span class="dsec-ic" data-icon="news"></span><span class="dsec-l"><b>简报</b><span class="en">Briefings</span></span><span class="dsec-n"></span><span class="dsec-chev" data-icon="chev"></span></button><div class="dsec-body"><div id="briefs"></div></div></div>
+  <div class="dsec" id="secChats"><button type="button" class="dsec-head" aria-expanded="false"><span class="dsec-ic" data-icon="chat"></span><span class="dsec-l"><b>对话记录</b><span class="en">Chats</span></span><span class="dsec-n"></span><span class="dsec-chev" data-icon="chev"></span></button><div class="dsec-body"><div id="convos"></div></div></div>
+  </div>
   <div id="chatSearch"><div class="cs-bar"><input id="csInp" placeholder="搜索对话 · Search chats" autocomplete="off"><button class="plain" id="csClose" title="关闭 · Close" aria-label="关闭 · Close" data-icon="close"></button></div><div id="csResults"></div></div>
 </aside>
 <header>
@@ -419,6 +420,7 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
 <script>
 /* PA_ICONS_JS */
 /* PA_HOME_LOOK_JS */
+/* PA_DRAWER_SECTIONS_JS */
 /* PA_HOME_V2_JS */
 const $=(s)=>document.querySelector(s);
 PAIcons.hydrate(); PAHomeLook.bindAa(); PAHome.bind();
@@ -503,7 +505,7 @@ async function loadConvos(){
 }
 // Chats by day, 5 recent + 更多 · More (web/home-look.js); the expansion lasts until the drawer is reopened.
 let convosExpanded=false;
-function renderConvos(){ $('#convos').innerHTML=PAHomeLook.convosHtml(allConvos,convoId,convosExpanded,esc); }
+function renderConvos(){ $('#convos').innerHTML=PAHomeLook.convosHtml(allConvos,convoId,convosExpanded,esc); PADrawerSections.count('secChats',allConvos.length); }
 // A job's output. Rows are SUMMARIES (id/title/job/created/preview); the body is fetched on
 // open, so the drawer stays cheap with months of history behind it.
 const BRIEFS_MAX=15;
@@ -515,6 +517,7 @@ async function loadBriefs(){
   // Three-state on purpose: a FAILURE must not look like an empty feed. A silently blank
   // section reads as "nothing happened" when the truth is "we could not look" (R5).
   try{ const r=await api('/api/briefings'); if(r.ok) list=await r.json(); }catch{ /* list stays null */ }
+  PADrawerSections.count('secBriefs',Array.isArray(list)?Math.min(list.length,BRIEFS_MAX):0);
   if(!Array.isArray(list)){ box.innerHTML='<div style="padding:16px;color:var(--danger);font-size:14px">无法加载简报 · Could not load briefings</div>'; return; }
   if(!list.length){ box.innerHTML='<div class="d-empty">暂无简报 · No briefings yet</div>'; return; }
   box.innerHTML=list.slice(0,BRIEFS_MAX).map((b)=>
@@ -596,11 +599,7 @@ function startRename(convoEl, id){
   const finish=async()=>{ const val=inp.value.trim()||cur; tEl.textContent=val; if(val!==cur) await api('/api/convos/'+encodeURIComponent(id),{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({title:val})}); };
   inp.onblur=finish; inp.onkeydown=(ev)=>{ if(ev.key==='Enter'){ ev.preventDefault(); inp.blur(); } if(ev.key==='Escape'){ tEl.textContent=cur; } };
 }
-// Collapsible drawer sections (state persisted per section)
-document.querySelectorAll('#drawer .dsec').forEach(s=>{
-  try{ if(localStorage.getItem('pa_sec_'+s.id)==='0') s.classList.remove('open'); }catch{}
-  s.querySelector('.dsec-head').onclick=()=>{ s.classList.toggle('open'); try{ localStorage.setItem('pa_sec_'+s.id, s.classList.contains('open')?'1':'0'); }catch{} };
-});
+PADrawerSections.bind();   // the ☰ sections: closed but Chats, taps remembered on the account (web/drawer-sections.js)
 // Chat search (popup within the drawer)
 function csRender(qv){ const f=(qv||'').toLowerCase().trim();
   const items=allConvos.filter(c=>!f || (c.title||'').toLowerCase().includes(f));
@@ -1186,6 +1185,7 @@ async function loadApps(){
       ${PAIcons.tileIcon(a)}<span class="dapp-name">${esc(a.title)}${a.sharedBy?` <small style="color:var(--muted)">· ${esc(a.sharedBy)}</small>`:''}</span>
       ${ownNames.has(a.name)?'<small style="color:var(--accent);font-size:11px">✓ copied</small>':`<button class="plain" style="font-size:12px;padding:3px 8px" data-fork="${esc(a.name)}">Fork</button>`}
     </div>`).join(''):'');
+  PADrawerSections.count('secApps',$('#dApps').querySelectorAll('.dapp').length);   // own + shelf rows, as shown
   // Home: greeting, ask box, Start here, then the dock with the Family shelf (web/home-v2.js PAHome).
   PAHome.render({own,shelf,uid:UID,esc});
   // Blue dot on each new app — the existing markNew system (key + _SEEN), so it clears on
@@ -1293,6 +1293,7 @@ async function loadFamilyApps(){
   catch{ offline=!denied; apps=denied?null:(recallFamily().apps||null); }   // R5: the failure is shown below (the offline mark, or the could-not-load line)
   let myNames=new Set(); try{ (await (await api('/api/apps')).json()).forEach(a=>myNames.add(a.name)); }catch{ (PASW.recall(SW_APPS_KEY)||[]).forEach(a=>myNames.add(a.name)); }
   const el=$('#dFamily');
+  PADrawerSections.count('secFamily',apps?apps.length:0);
   if(!apps){ el.innerHTML=`<span style="color:var(--muted);font-size:13px">${FAMILY_UNREADABLE}</span>`; return; }
   const mark=offline?`<div class="fc-offline" style="color:var(--muted);font-size:12px;margin-bottom:6px">${FAMILY_OFFLINE}</div>`:'';
   if(!apps.length){ el.innerHTML=mark+`<span style="color:var(--muted);font-size:13px">${FAMILY_NONE}</span>`; return; }
@@ -2674,7 +2675,7 @@ PAAppEdit.bindBar();
   await refreshChatModels();   // also sets the main chat's lane and chooser (syncShellModel)
   // Fetch the profile (ME, incl. appOrder) in parallel; gate only the app grid on it so the
   // saved My-Apps order applies on first paint, while convos/family load concurrently.
-  const profileReady=loadProfile();
+  const profileReady=loadProfile().then(()=>PADrawerSections.paint());   // the account's remembered sections
   await Promise.allSettled([profileReady.finally(loadApps), loadFamilyApps(), loadConvos(), convoId?openConvo(convoId):Promise.resolve()]);
   if(!convoId) showEmptyState();
   if(refreshing){ try{ sessionStorage.removeItem('pa_refreshing'); }catch{} $('#reload').classList.remove('spin'); }

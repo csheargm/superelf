@@ -709,3 +709,6 @@ Without it they now FAIL (R14), not pass as `# pass 0 / # fail 0`. To run them:
 - The update dot on Start/dock tiles is pointer-only; make it a real button reachable by keyboard (web/home-v2.js updDot).
 - Family-shelf dock tiles (role=button) nest the Get button, so the tile's accessible name includes "Get"; split the tile and its Get control.
 - The one-time ⋯ tip covers part of the greeting on phones until dismissed.
+
+## Drawer sections — review leftover (GPT review cap, 2026-11-24)
+- test/drawer-sections-e2e.test.mjs reads the page clock just after the drawer renders; a render and read straddling midnight could still mismatch (seconds-wide window). Fix: freeze the page clock (page.clock) and seed chats from that time.

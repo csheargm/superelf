@@ -78,10 +78,14 @@ main{ max-width:1040px; }
 .dhead{ gap:6px; padding:10px 10px 8px 14px; border-bottom:0; }
 .dhead #goHome{ border:0; background:none; font-size:17px; min-height:44px; }
 #drawerSearch{ border:0; background:none; min-width:44px; min-height:44px; display:inline-flex; align-items:center; justify-content:center; padding:0; color:var(--text); }
-#newChat{ border:0; background:var(--accent-fill); color:var(--on-accent); font-weight:600; min-height:38px; padding:0 14px; display:inline-flex; align-items:center; gap:4px; }
+/* 新对话 · New chat: secondary in the drawer, so a light outline, not a filled pill; the English drops on a
+   narrow drawer (the aria-label keeps both). "主页 · Home" never wraps. */
+#drawer{ container-type:inline-size; }
+.dhead #goHome{ white-space:nowrap; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+#newChat{ flex:none; white-space:nowrap; border:1px solid var(--line); background:none; color:var(--accent); font-weight:600; min-height:36px; padding:0 12px; display:inline-flex; align-items:center; gap:4px; border-radius:var(--r-pill); }
+#newChat:hover{ background:var(--accent-soft); }
+@container (max-width:360px){ #newChat .en{ display:none; } }
 #newChat .pi{ width:16px; height:16px; }
-.dsec-head{ font-size:13px; font-weight:600; color:var(--muted); padding:14px 16px 6px; min-height:40px; }
-.dsec-head::after{ color:var(--muted); }
 .dapp,.convo{ border-bottom:0; margin:0 8px; padding:9px 10px; min-height:44px; border-radius:var(--r-ctl); gap:10px; }
 .dapp:hover,.convo:hover{ background:var(--accent-soft); }
 .convo.active{ background:var(--accent-soft); color:var(--accent); font-weight:500; }

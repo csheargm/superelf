@@ -12,6 +12,7 @@ const PAIcons=(function(){
     refresh:'<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>',
     down:'<path d="M6 9l6 6 6-6"/>',
     back:'<path d="M15 5l-7 7 7 7"/>',
+    chev:'<path d="M9 5l7 7-7 7"/>',
     up:'<path d="M12 19V5M6 11l6-6 6 6"/>',
     stop:'<rect x="7" y="7" width="10" height="10" rx="2"/>',
     more:'<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>',

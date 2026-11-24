@@ -3,7 +3,7 @@
    - greeting(now): 早安 / 午安 / 晚上好 with the English beside it, 中文 first.
    - dateLine(now): ["11月24日 周二", "Tue, Nov 24"].
    - chatGroups(list, now, limit): chats grouped by day (今天 / 昨天 / 11月20日), newest first;
-     only the first `limit` rows unless expanded, so the drawer shows 5 recent + 更多 · More.
+     only the first `limit` rows unless expanded, so the drawer shows today's/yesterday's (max 5) + 更多 · More.
    - convosHtml(list, activeId, expanded, esc): the drawer markup; rows keep class .convo + data-id
      and the ⋯ button keeps data-menu, so the existing click handler in index.html is unchanged.
    - bindAa(root): the single "Aa" text-size control; it reveals the existing .fs-dn/.fs-up pair. */
@@ -31,8 +31,14 @@ const PAHomeLook=(function(){
       const g=groups[groups.length-1]; if(g&&g.label===label) g.items.push(c); else groups.push({label,items:[c]}); }
     return {groups,total:rows.length,hidden:rows.length-shown.length};
   }
+  // How many chats the closed-up list shows: today's and yesterday's, at most RECENT; with none that
+  // recent, the newest FALLBACK so the section never opens empty over older history.
+  const FALLBACK=3;
+  function recentCount(list,now){ const n=now||new Date(), y=new Date(n); y.setDate(n.getDate()-1); y.setHours(0,0,0,0);
+    const fresh=(Array.isArray(list)?list:[]).filter((c)=>(c.updated||0)>=y.getTime()).length;
+    return Math.min(RECENT,fresh||FALLBACK); }
   function convosHtml(list,activeId,expanded,esc,now){
-    const {groups,hidden}=chatGroups(list,now,expanded?null:RECENT);
+    const {groups,hidden}=chatGroups(list,now,expanded?null:recentCount(list,now));
     if(!groups.length) return '<div class="d-empty">还没有对话 · No chats yet.</div>';
     return groups.map((g)=>`<div class="day">${esc(g.label)}</div>`+g.items.map((c)=>
       `<div class="convo${c.id===activeId?' active':''}" data-id="${esc(c.id)}"><div class="t">${esc(c.title||'New chat')}</div><button class="cmenu" data-menu="${esc(c.id)}" title="更多 · More" aria-label="More">${PAIcons.svg('more')}</button></div>`).join('')).join('')
@@ -55,5 +61,5 @@ const PAHomeLook=(function(){
     return `<span class="it">${esc(zh)}<span class="en"> ${esc(en)}</span></span><span class="it">${esc(dz)}<span class="en"> · ${esc(de)}</span></span>`
       +(bible?`<span class="it rd">今日读经 <b>${esc(bible.face.value)}</b></span>`:'');
   }
-  return {RECENT,greeting,dateLine,dayLabel,chatGroups,convosHtml,bindAa,headerSub};
+  return {RECENT,FALLBACK,recentCount,greeting,dateLine,dayLabel,chatGroups,convosHtml,bindAa,headerSub};
 })();
