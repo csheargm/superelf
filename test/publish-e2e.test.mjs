@@ -74,7 +74,12 @@ test('owner: ⋯ → Publish (with its one-time tip) → files sheet → Publish
     await item.click();
     await page.waitForSelector('#pubFiles');
     assert.match(await page.locator('#pubFiles').innerText(), /workspace\.example\/apps\/myapp\/index\.html/);
+    // Regression: a second preview on the open sheet must not stack a second Publish handler.
+    const starts = []; page.on('request', (r) => { if (r.method() === 'POST' && /\/publish$/.test(r.url()) && !/preview/.test(r.postData() || '')) starts.push(r.url()); });
+    await page.evaluate(() => PAPublish.open('myapp')); await page.waitForSelector('#pubGo');
     await page.click('#pubGo');
+    await page.waitForTimeout(300);
+    assert.equal(starts.length, 1, 'one tap = one publish request');
     await page.waitForSelector('#pubDone', { timeout: 30000 });
     assert.match(await page.locator('#pubDone').innerText(), /^已发布 v5\.1\.0 · Published PR$/);
     assert.equal(gh.st.pulls[0].merged, true);

@@ -52,7 +52,8 @@ const PAPublish=(()=>{
       +(p.refused.length?`<p>不发布 · Not published: ${p.refused.map(x=>esc(x.file)).join(', ')}</p>`:'')
       +'<p>隐私检查通过；CI 通过后自动合并并发版 · Privacy scan clean; merges and releases when CI is green.</p>'
       +'<button data-pub="go" id="pubGo">发布 · Publish</button>');
-    s.addEventListener('click',(e)=>{ if(e.target.closest('[data-pub="go"]')) go(slug); });
+    // ONE handler, replaced on every sheet (sheet() resets onclick): a stale preview can never publish.
+    const close=s.onclick; s.onclick=(e)=>{ if(e.target.closest('[data-pub="go"]')){ s.onclick=null; go(slug); } else close(e); };
   }
   return { item, armTip, open };
 })();

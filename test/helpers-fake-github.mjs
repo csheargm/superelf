@@ -5,6 +5,7 @@
 // stale sha. It records every request (minus the auth header) for assertions.
 import http from 'node:http';
 import crypto from 'node:crypto';
+import { REQUIRED_CHECKS } from '../lib/publish/github.mjs';
 
 export const FAKE_TOKEN = 'fake-publish-token-not-real-0000';
 
@@ -26,7 +27,8 @@ export function startFakeGitHub({ token = FAKE_TOKEN, repo = 'csheargm/superelf'
     ['POST', /^\/git\/refs$/, (m, b) => { if (st.refs.has(b.ref)) return [422, { message: 'Reference already exists' }]; if (!st.commits.has(b.sha)) return [422, { message: 'Object does not exist' }]; st.refs.set(b.ref, b.sha); return [201, { ref: b.ref }]; }],
     ['POST', /^\/pulls$/, (m, b) => { if (!st.refs.has(`refs/heads/${b.head}`)) return [422, { message: 'Validation Failed' }]; const n = st.pulls.length + 1; const pr = { number: n, ...b, headSha: st.refs.get(`refs/heads/${b.head}`), html_url: `https://github.com/${repo}/pull/${n}` }; st.pulls.push(pr); return [201, pr]; }],
     ['GET', /^\/commits\/([0-9a-f]+)\/check-runs$/, () => [200, st.checks === 'none' ? { total_count: 0, check_runs: [] }
-      : { total_count: 1, check_runs: [{ status: st.checks === 'pending' ? 'in_progress' : 'completed', conclusion: st.checks === 'pending' ? null : st.checks }] }]],
+      : st.checks === 'early-only' ? { total_count: 1, check_runs: [{ name: 'early', status: 'completed', conclusion: 'success' }] }
+      : { total_count: 2, check_runs: REQUIRED_CHECKS.map((name) => ({ name, status: st.checks === 'pending' ? 'in_progress' : 'completed', conclusion: st.checks === 'pending' ? null : st.checks })) }]],
     ['PUT', /^\/pulls\/(\d+)\/merge$/, (m, b) => {
       const pr = st.pulls[Number(m[1]) - 1];
       if (!pr) return [404, { message: 'Not Found' }];

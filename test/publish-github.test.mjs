@@ -128,3 +128,34 @@ test('release retries when main moved, and refuses loudly after the cap', () => 
     assert.throws(() => cutRelease({ remoteUrl: fx.bare, token: FAKE_TOKEN }), (e) => e.code === 'RELEASE_PUSH_FAILED' && !e.message.includes(FAKE_TOKEN));
   } finally { fs.rmSync(fx.d, { recursive: true, force: true }); }
 });
+
+test('public text outside the files is scanned: refused names stay off GitHub; an escaped term in the title blocks', async () => {
+  const fx = fixture(); const gh = await startFakeGitHub({ onMerge: (pr) => fx.doMerge(pr) });
+  try {
+    fs.writeFileSync(path.join(fx.a, 'notes-Zorblax.txt'), 'x'); fs.writeFileSync(path.join(fx.a, '.env'), 'K=1');
+    const end = await (await startPublish({ appDir: fx.a, slug: 'myapp', options: opts(fx, gh) })).done;
+    assert.equal(end.state, 'published');
+    const body = gh.st.pulls[0].body;
+    assert.doesNotMatch(body, /Zorblax|\.env/); assert.match(body, /Not published: 2 non-code file\(s\)\./);
+    fs.rmSync(path.join(fx.a, 'notes-Zorblax.txt')); fs.rmSync(path.join(fx.a, '.env'));
+    fs.writeFileSync(path.join(fx.a, 'meta.json'), '{"title":"\\u005aorblax app"}');
+    const s = (await startPublish({ appDir: fx.a, slug: 'myapp', options: opts(fx, gh) })).status;
+    assert.equal(s.state, 'blocked'); assert.ok(s.hits.some((h) => h.file === '(PR title)'), JSON.stringify(s.hits));
+    assert.equal(gh.st.pulls.length, 1, 'the blocked title opened no PR');
+  } finally { await gh.close(); fs.rmSync(fx.d, { recursive: true, force: true }); }
+});
+
+test('only an unrelated early check green: the required CI jobs are missing, so pending, not merged', async () => {
+  const fx = fixture(); const gh = await startFakeGitHub();
+  try {
+    gh.st.checks = 'early-only';
+    const end = await (await startPublish({ appDir: fx.a, slug: 'myapp', options: opts(fx, gh, { maxPolls: 3 }) })).done;
+    assert.equal(end.code, 'CI_TIMEOUT'); assert.ok(!gh.st.pulls[0].merged);
+  } finally { await gh.close(); fs.rmSync(fx.d, { recursive: true, force: true }); }
+});
+
+test('publish_terms_root points the gate at the term files (the private image ships none)', async () => {
+  const { publishOptions } = await import('../lib/publish/run.mjs');
+  assert.equal(publishOptions({ publish_terms_root: '/data/.publish-terms' }, '/app').termsRoot, '/data/.publish-terms');
+  assert.equal(publishOptions({}, '/app').termsRoot, '/app');
+});
