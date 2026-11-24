@@ -7,12 +7,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
+import { fileURLToPath } from 'node:url';
 import { skip, chromium } from './helpers-note-link.mjs';
 import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, OWNER_TOKEN } from './helpers-web.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
 import { SHELL } from './helpers-app.mjs';
 
-const REPO = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');   // a file URL path, not .pathname (/D:/… on Windows)
 const read = (f) => fs.readFileSync(path.join(REPO, f), 'utf8');
 const ctx = vm.createContext({});
 vm.runInContext(read('web/icons.js') + read('web/home-look.js') + ';this.PAIcons=PAIcons;this.PAHomeLook=PAHomeLook;', ctx);
