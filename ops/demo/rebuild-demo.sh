@@ -89,6 +89,8 @@ sudo install -d -o 10001 -g 10001 -m 700 "$DATA/superelf"
 if [[ -z "$RESTORE" ]] && sudo test -e "$DATA/.restoring"; then
   die "a restore did not finish: empty $DATA/superelf (docs/demo-node.md) and run --restore again"
 fi
+# The image stamps the commit it holds (REVISION); unknown or conflicting → stop here (revision.sh).
+. ./revision.sh; superelf_revision "$(cd ../.. && pwd)" || die "cannot tell which commit is being built"
 compose build
 if [[ -n "$RESTORE" ]]; then
   emptydir() { local b; b=$(sudo ls -A "$1" | wc -c) || die "cannot list $1"; [[ "${b// /}" == 0 ]]; }   # bytes: a newline-only name still counts
