@@ -189,3 +189,23 @@ test('GPT review round 2: deleting an app drops its undo history', async () => {
     assert.equal(undoAppEdit(e, { wsDir: w }).line.undone, undefined);
   } finally { rmTemp(w); }
 });
+
+test('GPT review round 3: undo keeps the current sharing; a linked index.html fails the checks; delete during an edit keeps the rollback copy', async () => {
+  const { dropAppHistory } = await import('../lib/app-edit.mjs');
+  const w = ws();
+  try {
+    const meta = path.join(w, 'apps', 'todo', 'meta.json'), page = path.join(w, 'apps', 'todo', 'index.html');
+    fs.writeFileSync(meta, '{"title":"Todo","shared":true}');
+    const e = ed(w, { edit: 'todo', message: 'x' });
+    let c = beginAppEdit(e, { wsDir: w }); fs.writeFileSync(page, PAGE.replace('Hi', 'v')); finishAppEdit(e, c, { wsDir: w });
+    fs.writeFileSync(meta, '{"title":"Todo"}');   // unshared since
+    assert.equal(undoAppEdit(e, { wsDir: w }).line.undone, true);
+    assert.equal(JSON.parse(fs.readFileSync(meta, 'utf8')).shared, undefined, 'undo did not re-share it');
+    c = beginAppEdit(e, { wsDir: w });
+    dropAppHistory(w, 'todo');
+    fs.rmSync(page); fs.writeFileSync(path.join(w, 'real.html'), PAGE); fs.symlinkSync(path.join(w, 'real.html'), page);
+    const out = finishAppEdit(e, c, { wsDir: w });
+    assert.equal(out.line.applied, false); assert.match(out.line.problems.join(), /link/);
+    assert.equal(fs.lstatSync(page).isSymbolicLink(), false, 'rolled back to the real page');
+  } finally { rmTemp(w); }
+});
