@@ -1,4 +1,12 @@
 {
+  "v5.7.1": {
+    "date": "2026-11-24",
+    "features": [],
+    "fixes": [
+      "全新外观的 CI 修复 · CI fix for the new look"
+    ],
+    "through": "e70f511cdb1f753a9b4ff8b09bb5a9e3ecb118dd"
+  },
   "v5.7.0": {
     "date": "2026-11-24",
     "features": [
