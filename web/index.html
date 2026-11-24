@@ -565,7 +565,7 @@ $('#convos').onclick=(e)=>{
 // pointerdown ON a menu item must NOT remove the menu before that item's click fires, or
 // the action never runs (this was breaking app move/share/delete AND chat rename/delete).
 let _menuOutside=null;
-function closeMenuPop(){ document.querySelectorAll('.cmenu-pop').forEach((m)=>m.remove()); if(_menuOutside){ document.removeEventListener('click',_menuOutside,true); _menuOutside=null; } }
+function closeMenuPop(){ document.querySelectorAll('.cmenu-pop:not(#hmenu)').forEach((m)=>m.remove()); if(_menuOutside){ document.removeEventListener('click',_menuOutside,true); _menuOutside=null; } }
 function armMenuPop(){
   // Dismiss on a click OUTSIDE the popup, handled in the CAPTURE phase and stopped there so
   // it never reaches what's underneath (e.g. the drawer backdrop's close-on-click). So the

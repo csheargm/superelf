@@ -28,6 +28,7 @@ test('titles split into 中文 and English; old built-in titles still read bilin
   assert.deepEqual([...PAHome.label('Bible 圣经')], ['圣经', 'Bible']);
   assert.deepEqual([...PAHome.label('Biblical Values')], ['圣经价值观', 'Biblical Values'], 'an installed copy keeps its old meta.json');
   assert.deepEqual([...PAHome.label('My Timer')], ['My Timer', ''], 'a one-language title stays one line');
+  for (const t of ['constructor', '__proto__', 'toString']) assert.deepEqual([...PAHome.label(t)], [t, ''], `${t}: no inherited lookup`);
 });
 
 test('layout: guest starts with Bible, Journal, Make an app; no app twice; hidden slugs never shown', () => {
@@ -49,7 +50,7 @@ test('layout: guest starts with Bible, Journal, Make an app; no app twice; hidde
 test('chips: the open-task count first, from the app faces', () => {
   const c = PAHome.chips([app('sunday-study', '主日查经 Sunday Study', { face: { value: '周日' } }), ...OWN]);
   assert.equal(c[0].zh, '3 件待办'); assert.equal(c[0].en, '3 tasks');
-  assert.equal(c[1].zh, '主日查经 周日');
+  assert.equal(c[1].zh, '主日查经 周日'); assert.equal(c[1].en, 'Sunday Study', 'a 中文 value is not repeated on the English side');
 });
 
 test('distinct dock icons: Bible ≠ Biblical Values; Pollen is a flower', () => {
@@ -111,6 +112,15 @@ test('USER FLOW owner: name + task chip, ⋯ holds every moved control, alert do
     await page.evaluate(() => { const d = document.createElement('span'); d.className = 'oa-dot'; document.querySelector('#menu').appendChild(d); });
     assert.notEqual(await page.evaluate(() => getComputedStyle(document.querySelector('#hmore'), '::after').content), 'none', 'the owner-alert dot shows on ⋯');
     await page.click('#hmore'); await page.click('#menu'); await page.waitForSelector('#drawer.open');
+    // An app row's ⋯ (the shared .cmenu-pop) closing must not remove the header's More menu.
+    await page.evaluate(() => closeMenuPop());
+    assert.equal(await page.locator('#hmenu').count(), 1, '#hmenu survives closeMenuPop');
+    await page.evaluate(() => closeDrawer());
+    // Attachment chips stay visible on the home (they move with the composer row).
+    await page.evaluate(() => { attachments.push({ name: 'note.txt', text: 'x' }); renderChips(); });
+    assert.equal(await page.isVisible('#chips'), true, 'attachment chips show on the home');
+    // Dock tiles open from the keyboard.
+    await page.focus('#eApps .ecard.dk'); await page.keyboard.press('Enter'); await page.waitForSelector('#frame', { state: 'visible' });
   } finally { await c.close(); }
 });
 
