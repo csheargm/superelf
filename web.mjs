@@ -836,7 +836,11 @@ function sendAppHtml(res, file, type, extra) {
     let theme = '';
     try { theme = fs.readFileSync(path.join(ROOT, 'web', PA_THEME_FILE), 'utf8'); }
     catch (e) { return send(res, 500, 'text/plain', 'component unavailable'); }   // fail loud, like a missing component (R5)
-    html = html.replace(/<\/head>/i, (m) => '<style id="pa-theme">' + theme + '</style>' + m);   // after the app's own styles
+    // After the app's own styles; a page with no </head> (legal HTML) gets it before <body>, else first.
+    const themeTag = '<style id="pa-theme">' + theme + '</style>';
+    if (/<\/head>/i.test(html)) html = html.replace(/<\/head>/i, (m) => themeTag + m);
+    else if (/<body\b/i.test(html)) html = html.replace(/<body\b/i, (m) => themeTag + m);
+    else html = themeTag + html;
     for (const c of PA_COMPONENTS) {
       if (!html.includes(c.marker)) continue;
       let snippet = '';

@@ -38,12 +38,15 @@ const PAHomeLook=(function(){
       `<div class="convo${c.id===activeId?' active':''}" data-id="${esc(c.id)}"><div class="t">${esc(c.title||'New chat')}</div><button class="cmenu" data-menu="${esc(c.id)}" title="更多 · More" aria-label="More">${PAIcons.svg('more')}</button></div>`).join('')).join('')
       +(hidden>0?`<button type="button" class="more-chats" data-more-chats>更多 · More (${hidden})</button>`:'');
   }
+  function closeAa(){ document.querySelectorAll('.aa.open').forEach((x)=>{ x.classList.remove('open'); x.querySelector('.aa-btn')?.setAttribute('aria-expanded','false'); }); }
   function bindAa(root){
     (root||document).querySelectorAll('.aa').forEach((w)=>{
       const b=w.querySelector('.aa-btn'); if(!b||b.dataset.bound) return; b.dataset.bound='1';
-      b.onclick=(e)=>{ e.stopPropagation(); const on=!w.classList.contains('open'); document.querySelectorAll('.aa.open').forEach((x)=>x.classList.remove('open')); w.classList.toggle('open',on); b.setAttribute('aria-expanded',String(on)); };
+      b.onclick=(e)=>{ e.stopPropagation(); const on=!w.classList.contains('open'); closeAa(); w.classList.toggle('open',on); b.setAttribute('aria-expanded',String(on)); };
     });
-    if(!bindAa.doc){ bindAa.doc=1; document.addEventListener('click',(e)=>{ if(!e.target.closest('.aa')) document.querySelectorAll('.aa.open').forEach((x)=>{ x.classList.remove('open'); x.querySelector('.aa-btn')?.setAttribute('aria-expanded','false'); }); }); }
+    if(!bindAa.doc){ bindAa.doc=1;
+      document.addEventListener('click',(e)=>{ if(!e.target.closest('.aa')) closeAa(); });
+      document.addEventListener('keydown',(e)=>{ if(e.key==='Escape') closeAa(); }); }
   }
   // The header's second line: date, then today's reading when the Bible tile carries a face.
   function headerSub(apps,esc,now){

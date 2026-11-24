@@ -101,8 +101,16 @@ test('USER FLOW: tiles with icons, drawer 5 + More, one Aa, and the app page wea
     assert.equal(await page.isVisible('header .fs-up'), false);
     await page.click('header .aa-btn');
     assert.equal(await page.isVisible('header .fs-up'), true);
+    const fs = () => page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--fs')) || 1);
+    const before = await fs();
     await page.click('header .fs-up');
-    assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--fs').trim() !== ''), true, 'the step still applies');
+    await page.waitForFunction((b) => (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--fs')) || 1) > b, before);
+    assert.ok((await fs()) > before, 'A+ makes the text larger');
+    assert.equal(await page.getAttribute('header .aa-btn', 'aria-expanded'), 'true');
+    await page.keyboard.press('Escape');
+    assert.equal(await page.isVisible('header .fs-up'), false, 'Escape closes it');
+    assert.equal(await page.getAttribute('header .aa-btn', 'aria-expanded'), 'false');
+    await page.click('header .aa-btn');
     await page.mouse.click(200, 400);
     assert.equal(await page.isVisible('header .fs-up'), false, 'an outside tap closes it');
     // Drawer: 5 recent chats + More (3), then all 8
