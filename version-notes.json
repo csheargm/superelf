@@ -1,4 +1,12 @@
 {
+  "v5.5.0": {
+    "date": "2026-11-23",
+    "features": [
+      "应用内发布 · Publish an app from where you use it"
+    ],
+    "fixes": [],
+    "through": "d459c7bac12e7b0ff67d093fefe400ceeeabab2c"
+  },
   "v5.4.0": {
     "date": "2026-11-23",
     "features": [
