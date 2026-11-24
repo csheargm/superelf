@@ -114,8 +114,14 @@
    answerable from the list instead of by opening every note in turn. */
 .pac-lai{font-size:11px;line-height:1;opacity:.85}
 .pac-dhead{display:flex;align-items:center;flex-shrink:0}
-.pac-list{position:absolute;top:0;left:0;bottom:0;width:86%;max-width:330px;background:var(--card,#fff);display:flex;flex-direction:column;z-index:8;transform:translateX(-102%);transition:transform .22s ease;box-shadow:2px 0 18px rgba(0,0,0,.22)}
-.pac-list.on{transform:none}
+/* The closed list sits just off screen. Two things leaked out of it onto every PAChat page (owner
+   2026-11-24, a pale rounded square over an app's first input / the panel greeting, plus a thin edge):
+   width:100% + padding on a content-box input made the search box ~46px wider than the list, so its
+   right end stuck in; and the 18px shadow reached past the 2% gap. Every box in the drawer is
+   border-box, and the closed list is hidden (after the slide-out) so nothing of it can show. */
+.pac-drawerhost *,.pac-drawerhost *::before,.pac-drawerhost *::after{box-sizing:border-box}
+.pac-list{position:absolute;top:0;left:0;bottom:0;width:86%;max-width:330px;background:var(--card,#fff);display:flex;flex-direction:column;z-index:8;transform:translateX(-102%);visibility:hidden;transition:transform .22s ease,visibility 0s linear .22s;box-shadow:2px 0 18px rgba(0,0,0,.22)}
+.pac-list.on{transform:none;visibility:visible;transition:transform .22s ease}
 /* Multi-select · 多选. Deliberately a MODE, not an always-on checkbox column: the drawer's
    everyday job is opening ONE thing, and a permanent column of boxes beside every row makes the
    common action look like the rare one. */

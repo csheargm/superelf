@@ -210,9 +210,10 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
 #backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; z-index:20; }
 #backdrop.open{ display:block; }
 #drawer{ position:fixed; top:0; left:0; bottom:0; width:82%; max-width:320px; background:var(--card); border-right:1px solid var(--line);
-  transform:translateX(-100%); transition:transform .2s; z-index:21; display:flex; flex-direction:column;
+  transform:translateX(-100%); visibility:hidden; transition:transform .2s, visibility 0s linear .2s; z-index:21; display:flex; flex-direction:column;
   padding-top:env(safe-area-inset-top); }
-#drawer.open{ transform:none; }
+/* Hidden once slid out: its lift shadow otherwise drew a thin edge down the left of every page (owner 2026-11-24). */
+#drawer.open{ transform:none; visibility:visible; transition:transform .2s; }
 @media (prefers-reduced-motion:reduce){ #drawer{ transition:none; } }
 .dhead{ display:flex; align-items:center; padding:14px 16px; border-bottom:1px solid var(--line); }
 .dhead b, .dhead #goHome{ flex:1; text-align:left; font-weight:700; font-size:inherit; color:var(--text); padding:0; }
