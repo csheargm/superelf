@@ -693,3 +693,4 @@ Without it they now FAIL (R14), not pass as `# pass 0 / # fail 0`. To run them:
 
 - 改这个应用 panel: "历史 · History" list with Undo-to-this-version (needs a restore-any-version route + undo of the skipped versions; ADR 0040 addendum 2026-11-24).
 - app-history leftovers (GPT review 2026-11-24): (1) `appNotesJson` runs a sync `git` with no timeout on a release-notes cache miss, now also on the app-chat path (web.mjs appTurnFacts) — give lib/vernotes.mjs a timeout; (2) a same-size replacement of a binary or >300 KB file is not reported as changed (sizes only) — compare a hash within the read budget.
+- app-history (GPT review round 3, deferred): (3) the runner's 20k cut can drop the end of the facts block (and its closing marker) when a max-length override fills the prompt — budget turnFacts against APPEND_SYSTEM_PROMPT_MAX in web.mjs; (4) listHistory/treeFiles walk and stat every file of all 20 saved versions synchronously — cap the file count or cache per version name.
