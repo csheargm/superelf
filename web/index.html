@@ -592,7 +592,7 @@ $('#drawerSearch').onclick=()=>{ $('#chatSearch').classList.add('on'); $('#csInp
 $('#csClose').onclick=()=>$('#chatSearch').classList.remove('on');
 $('#csInp').addEventListener('input',()=>csRender($('#csInp').value));
 $('#csResults').onclick=e=>{ const c=e.target.closest('.convo'); if(!c) return; $('#chatSearch').classList.remove('on'); openConvo(c.dataset.id); };
-function openDrawer(){ convosExpanded=false; $('#drawer').classList.add('open'); $('#backdrop').classList.add('open'); loadConvos(); loadBriefs(); }
+function openDrawer(){ convosExpanded=false; $('#drawer').classList.add('open'); $('#backdrop').classList.add('open'); loadConvos(); loadBriefs(); PAOwnerAlerts.refresh(); }
 function closeDrawer(){ $('#drawer').classList.remove('open'); $('#backdrop').classList.remove('open'); }
 $('#menu').onclick=openDrawer; $('#backdrop').onclick=closeDrawer;
 $('#newChat').onclick=newConvo; $('#goHome').onclick=goHome;
@@ -2618,6 +2618,7 @@ $('#shellVfy').onclick=()=>{ shellVerifyOn=!shellVerifyOn; renderShellVfy(); };
 /* PA_SETTINGS_JS */
 /* PA_SETTINGS_HEAD_JS */
 /* PA_ACTIVITY_JS */
+/* PA_OWNER_ALERTS_JS */
 
 /* ── Scroll-to-bottom button ── */
 const scrollBtn=document.createElement('button'); scrollBtn.id='scrollBtn'; scrollBtn.title='Scroll to bottom'; scrollBtn.textContent='↓'; document.body.appendChild(scrollBtn);
@@ -2650,6 +2651,7 @@ PAAppEdit.bindBar();
   let refreshing=false; try{ refreshing=sessionStorage.getItem('pa_refreshing')==='1'; }catch{}
   if(refreshing) $('#reload').classList.add('spin');
   await ensureToken();
+  PAOwnerAlerts.refresh();   // owner only: the ☰ attention dot (web/owner-alerts.js)
   PAOffline.boot();   // the queued count on the state line, the warm cap from the node's config (web/offline-client.js)
   PASync.drain();     // what was queued while away goes to the node now (web/offline-sync.js); then on online/visible/poll/tap
   applyShellFontScale();   // the saved A-/A+ scale must apply to the shell on boot, not only when tapped

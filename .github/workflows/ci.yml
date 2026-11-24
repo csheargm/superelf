@@ -101,11 +101,13 @@ jobs:
         # 2026-11-24: EVERY OS +1 (ubuntu 163, windows 248): new-look (tiles, drawer 5 + More, Aa, app palette).
         # 2026-11-24: EVERY OS +7 (ubuntu 170, windows 255): bible-verse-order-e2e (中文 first at 3 sizes, the ⚙ tick
         #   + tip, ink + highlights across the flip at iPad portrait/landscape x both orders, the member template).
+        # 2026-11-24: EVERY OS +5 (ubuntu 177, windows 262): owner-alerts-e2e (dot + card + fix, Claude rebuild
+        #   confirm, Not today, member sees nothing, reduced motion + 375px), skipped on CI by PA_E2E_SKIP.
         include:
           - os: ubuntu-latest
-            max_skipped: 172
+            max_skipped: 177
           - os: windows-latest
-            max_skipped: 257
+            max_skipped: 262
     env:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED

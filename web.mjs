@@ -12,6 +12,7 @@ import { injectDemoBoot } from './lib/demo-boot.mjs';
 import { makeSigninGate, authConfig } from './lib/demo-auth.mjs';
 import { makeDemoRoutes } from './lib/demo-routes.mjs';
 import { handlePublishRoute } from './lib/publish/routes.mjs';
+import { handleAlertsRoute } from './lib/node-alerts.mjs';
 import { loadConfig, configPath, fastLaneGuard, GUARD_DEFAULT_SURFACE, agentCapabilities, appContract, REPLY_LANGUAGE_RULE, OVERRIDABLE_PROMPT_MAX } from './lib/config.mjs';
 import { runClaude, APPEND_SYSTEM_PROMPT_MAX } from './lib/runner.mjs';
 import { agentAllowed, lanesFor, memberLane, NO_PLAIN_LANE_TEXT, AGENT_OFF_TEXT } from './lib/member-lanes.mjs';
@@ -1826,6 +1827,7 @@ const server = http.createServer(async (req, res) => {
     // Each app is listed once (F4-6): your own apps are in "My apps", and an app on the family shelf is under the shelf.
     if (req.method === 'GET' && p === '/api/family-apps') { const shelf = new Set(demoOn(cfg) ? [] : listShared(SHARED).map((a) => a.name));
       return send(res, 200, 'application/json', JSON.stringify(listFamilyApps().filter((a) => a.uid !== user.id && !shelf.has(a.slug)))); }
+    if (await handleAlertsRoute(req, res, p, { user, cfg, readBody: (r) => readBody(r, BODY_LIMITS.control), send, audit, demo: demoOn(cfg) })) return;   // owner alerts + host actions (docs/adr/0041)
     if (await handlePublishRoute(req, res, p, { user, cfg, root: ROOT, slugOk, ownAppDir, readBody: (r) => readBody(r, BODY_LIMITS.control), send, audit, demo: demoOn(cfg) })) return;   // owner-only Publish (docs/adr/0039)
     // 改这个应用 · Change this app (lib/app-edit.mjs, ADR 0040): the panel page and its 撤销 · Undo. Owner only in Phase 1.
     if (req.method === 'GET' && p === '/api/app-edit/panel') {

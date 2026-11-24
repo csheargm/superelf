@@ -54,6 +54,15 @@ test('Activity log opens a dialog: 中文 · English labels, names, local date a
   assert.deepEqual(when.slice(1), ['22', '2026', '08', '12', 'PM'], 'local (Los Angeles) date and time, not UTC');
   assert.doesNotMatch(text, /job-failed|owner\b/);
   await page.click('#activityClose');
+  // Critical rows pinned on top and marked; routine runs fold into "label ×N" (docs/adr/0041).
+  const now = new Date().toISOString();
+  fs.appendFileSync(path.join(root, auditFile), [1, 2, 3].map(() => JSON.stringify({ at: now, ev: 'builtin-apps-update' })).join('\n') + '\n'
+    + JSON.stringify({ at: now, ev: 'node-health-failed', ok: false, why: '/ 91% full' }) + '\n' + JSON.stringify({ at: now, ev: 'builtin-apps-update' }) + '\n');
+  await page.click('#auditBtn'); await page.waitForSelector('#activityLog[open] .act-crit');
+  const rows = await page.locator('#activityLog .act-row').allInnerTexts();
+  assert.match(rows[0], /节点健康检查发现问题 · Node health check found a problem/, 'pinned first');
+  assert.match(rows[1], /Builtin apps update ×4/, 'routine run folded, the pinned row does not split it');
+  await page.click('#activityClose');
   assert.equal(await page.evaluate(() => document.querySelector('#activityLog').open), false);
   await ctx.close();
 });
