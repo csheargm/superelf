@@ -16,7 +16,7 @@ const PAAppEdit=(()=>{
   // The broker kinds the panel's PAChat needs; anything else from the panel is refused (it has no data of its own).
   const KINDS=new Set(['chat','chat-cancel','convo','app-convos','render-md','upload','attach-url','set-model','seen-feature','get-new-features','convo-rename','convo-delete']);
   let S=null;   // {slug,title,el,fr,rec}
-  let snapSeq=0;
+  let snapSeq=0, openSeq=0;   // openSeq: a newer open, a close or Home makes an older open's late steps no-ops
   const CSS=`#aePanel{position:fixed;z-index:12;background:var(--bg);display:flex;flex-direction:column;border-left:1px solid var(--line)}
 #aePanel .ae-h{display:flex;gap:6px;align-items:center;padding:calc(4px + env(safe-area-inset-top)) 8px 4px;border-bottom:1px solid var(--line);font-size:14px}
 #aePanel .ae-h b{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -73,15 +73,19 @@ const PAAppEdit=(()=>{
     if(!owner()) return;
     if(frameSlug()!==slug||frameUid()!==UID){ openApp(UID,slug,title); await loaded(); }
     if(!canEdit()) return;
-    close();
+    close(); const my=++openSeq;
     const shot=await upload(slug,await snap());
+    if(my!==openSeq||!canEdit()||frameSlug()!==slug) return;   // Home, another app or another open came first
     S=build(slug,title||$('#ftitle').textContent||slug); layout(); addEventListener('resize',layout);
-    try{ const r=await api('/api/app-edit/panel'); if(!r.ok) throw new Error('HTTP '+r.status); S.fr.srcdoc=await r.text(); }
-    catch(err){ S.el.querySelector('#aeTitle').textContent='面板加载失败 · The panel did not load: '+((err&&err.message)||''); return; }
-    const me=S; S.fr.addEventListener('load',()=>{ if(S===me) me.fr.contentWindow.postMessage({pa:'edit-init',slug,title:me.title,shot},'*'); },{once:true});
+    const me=S;
+    try{ const r=await api('/api/app-edit/panel'); if(!r.ok) throw new Error('HTTP '+r.status); const html=await r.text(); if(S!==me) return; me.fr.srcdoc=html; }
+    catch(err){ if(S===me) me.el.querySelector('#aeTitle').textContent='面板加载失败 · The panel did not load: '+((err&&err.message)||''); return; }
+    if(S!==me) return;
+    S.fr.addEventListener('load',()=>{ if(S===me) me.fr.contentWindow.postMessage({pa:'edit-init',slug,title:me.title,shot},'*'); },{once:true});
   }
   function loaded(){ return new Promise((res)=>{ const t=setTimeout(res,LOAD_MS); $('#fr').addEventListener('load',()=>{ clearTimeout(t); res(); },{once:true}); }); }
   function close(){
+    openSeq++;
     if(!S) return;
     S.el.remove(); S=null; removeEventListener('resize',layout);
     $('#frame').classList.remove('ae-side','ae-sheet');

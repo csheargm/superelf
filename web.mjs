@@ -85,7 +85,7 @@ import { pageImageFile, IMG_BAD_PATH, IMG_NOT_FOUND } from './lib/note-page-imag
 import { buildFollowup, followupDeps } from './lib/summary-followup.mjs';
 import { writerClaudeBase, writerLaneMs } from './lib/research-writer.mjs';
 import { snapshotApps, appBuildWarnings } from './lib/app-postcheck.mjs';
-import { appEditOf, editSystemPrompt, beginAppEdit, finishAppEdit, undoAppEdit } from './lib/app-edit.mjs';
+import { appEditOf, refuseIfEditBusy, editSystemPrompt, beginAppEdit, finishAppEdit, undoAppEdit } from './lib/app-edit.mjs';
 import { isBlankAnswer, laneFailureText, shouldFallBackToAgent, fallbackStatusText, chatTurnLogLine, turnErrorText } from './lib/chat-outcome.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -1248,7 +1248,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
   // 改这个应用 · Change this app (lib/app-edit.mjs, ADR 0040): the owner's panel turn, or a refusal before anything is saved.
   // TODO(R4 seam): edit-turn wiring leaves chat() with the lane dispatch (the split named above).
   let edit = null;
-  try { edit = appEditOf({ user, body, headers: req.headers, appsDir: appsDir(user) }); }
+  try { edit = appEditOf({ user, body, headers: req.headers, appsDir: appsDir(user) }); if (edit) refuseIfEditBusy(edit, wsDir(user)); }
   catch (e) { if (!e.status) throw e; if (res.headersSent) { res.end(JSON.stringify({ type: 'error', text: e.message }) + '\n'); return; } return send(res, e.status, 'application/json', JSON.stringify({ error: e.message, code: e.code })); }
   const system = edit ? editSystemPrompt(edit) : body.system;
   // A oneShot caller that left while this turn was queued: nothing is saved, nothing spawns.
@@ -1472,7 +1472,8 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
       // TODO(R4 seam): lane dispatch leaves chat() with the split named above.
       else if (!r.ok && isAuthFailure(r.text)) {
         claudeAuth.noteFailure(r.text);
-        r = (oneShot || agentConfined(user, origin)) ? { ok: false, text: CLAUDE_SIGNIN_EXPIRED } : await codexFallback({ chatModels: cfg.chat_models, claudeError: r.text,
+        r = (oneShot || edit || agentConfined(user, origin)) ? { ok: false, text: CLAUDE_SIGNIN_EXPIRED }   // edit: Codex has no edit scope (ADR 0040)
+          : await codexFallback({ chatModels: cfg.chat_models, claudeError: r.text,
           convo, prompt: histPrompt, images: imgs, cwd: wsDir(user), timeoutMs: cfg.task_timeout_minutes * 60000,
           runCodex, enqueue, onStatus: (t) => line({ type: 'status', text: t }) });
       }

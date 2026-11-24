@@ -989,7 +989,8 @@ window.addEventListener('message',(e)=>{
   if(!e.source||e.source!==$('#fr').contentWindow||e.origin!=='null'||!frameOpen()||!frameOwnBar()) return;
   if(m.type==='ready'){ barHide(); $('#frame').classList.add('ownbar'); return; }
   if(m.type==='home') return goHome();
-  if(m.type==='edit-app') return PAAppEdit.editAppFromBar();   // PAAppBar's long-press on ← Home (ADR 0040)
+  // PAAppBar's long-press on ← Home (ADR 0040). Only on a real press: an app cannot open the owner's panel by itself.
+  if(m.type==='edit-app'){ if(!(navigator.userActivation&&navigator.userActivation.isActive)) return; return PAAppEdit.editAppFromBar(); }
   if(m.type!=='font'||![-1,0,1].includes(m.d)) return;
   const now=Date.now(); if(now-_shellFont.t>1000) _shellFont={t:now,n:0};
   if(++_shellFont.n>SHELL_MSG_FONT_PER_S) return;

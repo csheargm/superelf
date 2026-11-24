@@ -8,8 +8,11 @@ that found it in brackets. Pick from here; do not open a side session per item.
 - Phase 3: member Publish as PR with their own token (plan "Phase 3"); needs the owner's OK for per-user token storage.
 - Nightly review run + "审核一下 · Review now" (plan "Review"): a second model reviews the day's edits; not built.
 - Inline check "loads headless" is only a script compile (lib/app-edit.mjs): runtime errors are not caught; a real headless load needs a browser on the node.
-- A change blocked by the data check rolls the app back but not data/<slug>/ the agent may have written (the system line forbids it; the owner lane can still do it).
-- Two edit turns on the same app at once (two panels, two devices) each take their own undo copy; the later finish may roll back over the earlier one.
+- A turn that writes data/<slug>/ is caught and the app rolled back, but the data itself is not restored (no data copy is taken; it can be large).
+- The one-edit-per-app lock is in-process memory: fine for one node process; it resets on restart.
+- An app can still post fake broker replies to the panel window (web/broker.inline.html does not check e.source===parent): cosmetic text only; harden for every app in one change.
+- The owner panel runs the full agent on app files that may come from a member's shelf app (a fork): prompt-injection risk the composer already has; Phase 2's no-tools lane could be offered for forked apps.
+- Own-bar long-press needs navigator.userActivation (Safari 16.4+); older engines refuse the press (fail closed).
 - PASnap: inner iframes are blank; :hover / live scroll inside sticky layers drawn at rest; real iPad Safari not yet checked (Playwright WebKit draws it).
 - Undo walks back through edits; there is no Redo button (the replaced copy is kept as <stamp>-undo in .app-versions).
 - Pre-existing, seen while testing: test/member-plain-lane-e2e "owner ticks Agent tools" fails on origin/main too (checkbox click does not change state); WebKit app-own-bar-e2e "Journal pen stroke" fails on origin/main too.

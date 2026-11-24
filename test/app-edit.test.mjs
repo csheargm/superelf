@@ -141,3 +141,39 @@ test('app-versions: links are stripped, history is capped, names sort newest fir
     assert.equal(typeof undoLastEdit(app, root, 'todo'), 'string');
   } finally { rmTemp(w); }
 });
+
+test('GPT review 2026-11-24: one edit per app at a time; undo waits; a data-only write is caught; linked apps/ and version folders are refused', () => {
+  const w = ws();
+  try {
+    const e = ed(w, { edit: 'todo', message: 'x' });
+    const ctx = beginAppEdit(e, { wsDir: w });
+    assert.equal(code(() => beginAppEdit(e, { wsDir: w })), 'edit_busy', 'a second turn on the same app waits');
+    assert.equal(undoAppEdit(e, { wsDir: w }).ok, false, 'undo cannot take the in-flight copy');
+    fs.writeFileSync(path.join(w, 'data', 'todo', 'items.json'), '[1,2,3]');
+    const out = finishAppEdit(e, ctx, { wsDir: w });
+    assert.equal(out.line.applied, false, 'a turn that wrote only data is not a clean change');
+    assert.match(out.note, /data\/todo/);
+    assert.notEqual(code(() => beginAppEdit(e, { wsDir: w })), 'edit_busy', 'released after finish');
+    const w2 = fs.mkdtempSync(path.join(os.tmpdir(), 'pa-edit-l-'));
+    fs.symlinkSync(path.join(w, 'apps'), path.join(w2, 'apps'));
+    assert.equal(code(() => appEditOf({ user: OWNER, body: { edit: 'todo', message: 'x' }, headers: {}, appsDir: path.join(w2, 'apps') })), 'no_app', 'a linked apps/ is refused');
+    rmTemp(w2);
+    const w3 = ws(); fs.symlinkSync(os.tmpdir(), path.join(w3, VERSIONS_DIR));
+    assert.throws(() => beginAppEdit(ed(w3, { edit: 'todo', message: 'x' }), { wsDir: w3 }), /linked/);
+    assert.throws(() => beginAppEdit(ed(w3, { edit: 'todo', message: 'x' }), { wsDir: w3 }), /linked/, 'a refused begin does not leave the app busy');
+    fs.unlinkSync(path.join(w3, VERSIONS_DIR)); rmTemp(w3);
+  } finally { rmTemp(w); }
+});
+
+test('GPT review 2026-11-24: VERSIONS_KEPT edits give VERSIONS_KEPT undos; an unchanged turn costs no undo point', () => {
+  const w = ws();
+  try {
+    const e = ed(w, { edit: 'todo', message: 'x' });
+    const page = path.join(w, 'apps', 'todo', 'index.html');
+    for (let i = 0; i < VERSIONS_KEPT; i++) { const c = beginAppEdit(e, { wsDir: w }); fs.writeFileSync(page, PAGE.replace('Hi', 'v' + i)); finishAppEdit(e, c, { wsDir: w }); }
+    finishAppEdit(e, beginAppEdit(e, { wsDir: w }), { wsDir: w });   // no change
+    let n = 0; while (undoAppEdit(e, { wsDir: w }).line.undone) n += 1;
+    assert.equal(n, VERSIONS_KEPT);
+    assert.equal(fs.readFileSync(page, 'utf8'), PAGE);
+  } finally { rmTemp(w); }
+});
