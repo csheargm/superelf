@@ -1,4 +1,12 @@
 {
+  "v5.9.3": {
+    "date": "2026-11-24",
+    "features": [],
+    "fixes": [
+      "构建检查 agent CLI、磁盘下限与清理、演示盘 1 GB · build checks agent CLIs, disk floor + prune, 1 GB demo disk"
+    ],
+    "through": "95554bf9bc757283cb544c2147ff09384f9f660f"
+  },
   "v5.9.2": {
     "date": "2026-11-24",
     "features": [],
