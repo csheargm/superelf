@@ -121,3 +121,17 @@ test('the route MERGES taps: two devices tapping different sections both stick',
   assert.equal(got.drawerOpen.secBriefs, true); assert.equal(got.drawerOpen.secFamily, true);
   await put(DEFAULTS);
 });
+
+test('everything open on a short screen: the sections scroll together, Chats and its More stay reachable', { skip, timeout: 60000 }, async () => {
+  const { c, page } = await openDrawerIn(390, 420);
+  for (const id of ['secApps', 'secFamily', 'secBriefs']) await page.click(`#${id} .dsec-head`);
+  await page.click('#convos .more-chats');   // all 10 chats now: taller than the screen
+  const m = await page.evaluate(() => { const d = document.querySelector('.dscroll'); return { over: d.scrollHeight > d.clientHeight, bodyH: document.querySelector('#secChats .dsec-body').getBoundingClientRect().height }; });
+  assert.equal(m.over, true, 'it overflows, so it must scroll');
+  assert.ok(m.bodyH > 300, `the chats list is not squeezed: ${m.bodyH}`);
+  await page.locator('#convos .convo').last().scrollIntoViewIfNeeded();
+  assert.equal(await page.locator('#convos .convo').last().isVisible(), true);
+  await page.click('#convos .convo >> nth=9', { trial: true });   // reachable to a tap
+  await fetch(`http://127.0.0.1:${port}/api/profile`, { method: 'PUT', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + await session() }, body: JSON.stringify({ drawerOpen: DEFAULTS }) });
+  await c.close();
+});

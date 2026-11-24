@@ -2633,11 +2633,14 @@ const server = http.createServer(async (req, res) => {
         if (typeof b.autoUpdateApps === 'boolean') prof.autoUpdateApps = b.autoUpdateApps;
         // MERGED, not replaced: the shell sends only the section tapped, so a tap on the phone never undoes one made on the Mac.
         if (b.drawerOpen !== undefined) prof.drawerOpen = drawerOpenOf({ ...drawerOpenOf(prof.drawerOpen), ...drawerOpenOf(b.drawerOpen) });
-        if (!user.demo && typeof b.password === 'string' && b.password) {   // a demo visitor has no account to set a PIN on (lib/demo.mjs)
+        const setPin = !user.demo && typeof b.password === 'string' && b.password;   // a demo visitor has no account to set a PIN on (lib/demo.mjs)
+        if (setPin) {
            if (apiKeyBlocked(req, user)) return send(res, 403, 'application/json', API_KEY_REFUSED);
            if (passwordError(b.password)) return send(res, 400, 'application/json', JSON.stringify({ error: passwordError(b.password) }));   // refused loudly, never silently dropped (R5)
-           user.passHash = hashPassword(b.password); await upsertUser(user); cfg.sessions.destroyUserExcept(user.id, bearerOf(req)); audit('set-pin', { who: user.id }); }
+        }
+        // Written BEFORE the PIN's await: the profile's load-modify-write stays free of awaits (no lost update).
         saveProfile(wsDir(user), prof);
+        if (setPin) { user.passHash = hashPassword(b.password); await upsertUser(user); cfg.sessions.destroyUserExcept(user.id, bearerOf(req)); audit('set-pin', { who: user.id }); }
         return send(res, 200, 'application/json', JSON.stringify({ ok: true }));
       }
     }

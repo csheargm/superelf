@@ -218,13 +218,14 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
 .dhead{ display:flex; align-items:center; padding:14px 16px; border-bottom:1px solid var(--line); }
 .dhead b, .dhead #goHome{ flex:1; text-align:left; font-weight:700; font-size:inherit; color:var(--text); padding:0; }
 #goHome{ cursor:pointer; }
-#convos{ overflow-y:auto; flex:1; }
+#convos{ flex:1 0 auto; }   /* scrolls with .dscroll */
 .dsec{ flex-shrink:0; display:flex; flex-direction:column; min-height:0; }
 .dsec-head{ flex-shrink:0; user-select:none; }   /* the look: web/drawer-sections.js */
 .dsec-body{ display:none; }
 .dsec.open > .dsec-body{ display:block; }
-#secChats.open{ flex:1; min-height:0; }
-#secChats.open > .dsec-body{ display:flex; flex-direction:column; flex:1; min-height:0; }
+.dscroll{ flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; }
+#secChats.open{ flex:1 0 auto; }
+#secChats.open > .dsec-body{ display:flex; flex-direction:column; flex:1 0 auto; }
 #chatSearch{ position:absolute; inset:0; background:var(--card); display:none; flex-direction:column; z-index:5; }
 #chatSearch.on{ display:flex; }
 .cs-bar{ display:flex; gap:6px; padding:14px 12px; border-bottom:1px solid var(--line); }
@@ -321,6 +322,7 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
 <div id="backdrop"></div>
 <aside id="drawer">
   <div class="dhead"><button class="plain" id="goHome" title="主页 · Home">主页 · Home</button><button class="plain" id="drawerSearch" title="搜索对话 · Search chats" aria-label="搜索对话 · Search chats" data-icon="search"></button><button class="plain" id="newChat" title="新对话 · New chat" aria-label="新对话 · New chat" data-icon="plus"><span>新对话</span><span class="en"> · New chat</span></button></div>
+  <div class="dscroll">   <!-- the sections scroll together, so any mix of open ones stays reachable -->
   <div class="dsec" id="secApps"><button type="button" class="dsec-head" aria-expanded="false"><span class="dsec-ic" data-icon="grid"></span><span class="dsec-l"><b>我的应用</b><span class="en">My Apps</span></span><span class="dsec-n"></span><span class="dsec-chev" data-icon="chev"></span></button><div class="dsec-body"><div class="d-apps-list" id="dApps"></div></div></div>
   <div class="dsec" id="secFamily"><button type="button" class="dsec-head" aria-expanded="false"><span class="dsec-ic" data-icon="home"></span><span class="dsec-l"><b>家庭应用</b><span class="en">Family Apps</span></span><span class="dsec-n"></span><span class="dsec-chev" data-icon="chev"></span></button><div class="dsec-body"><div id="dFamily" class="d-apps-list" style="padding:0 12px 8px"></div></div></div>
   <!-- 简报 · Briefings — a JOB's output. System-level, like the jobs that produce it, so it
@@ -329,6 +331,7 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
        feature and the reading surface never moved when they became general. -->
   <div class="dsec" id="secBriefs"><button type="button" class="dsec-head" aria-expanded="false"><span class="dsec-ic" data-icon="news"></span><span class="dsec-l"><b>简报</b><span class="en">Briefings</span></span><span class="dsec-n"></span><span class="dsec-chev" data-icon="chev"></span></button><div class="dsec-body"><div id="briefs"></div></div></div>
   <div class="dsec" id="secChats"><button type="button" class="dsec-head" aria-expanded="false"><span class="dsec-ic" data-icon="chat"></span><span class="dsec-l"><b>对话记录</b><span class="en">Chats</span></span><span class="dsec-n"></span><span class="dsec-chev" data-icon="chev"></span></button><div class="dsec-body"><div id="convos"></div></div></div>
+  </div>
   <div id="chatSearch"><div class="cs-bar"><input id="csInp" placeholder="搜索对话 · Search chats" autocomplete="off"><button class="plain" id="csClose" title="关闭 · Close" aria-label="关闭 · Close" data-icon="close"></button></div><div id="csResults"></div></div>
 </aside>
 <header>
