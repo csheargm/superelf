@@ -236,8 +236,8 @@ test("no committed app hand-writes the guarded first read: only Allergy compares
   const found = committedApps().filter(({ html }) => HAND_WRITTEN.test(codeOnly(html))).map(({ slug }) => slug);
   assert.deepEqual(found, ['ws-allergy', 'ex-allergy']);   // ex- is the seeded starter copy
   const users = committedApps().filter(({ html }) => /\bPAStore\.file\(/.test(html)).map(({ slug }) => slug).sort();
-  assert.deepEqual(users, ['ex-productivity-hub', 'ex-tasks', 'sh-productivity-hub', 'ws-brainstorm', 'ws-calendar', 'ws-church', 'ws-daily-digest', 'ws-family',
-    'ws-productivity-hub', 'ws-rental-hunt', 'ws-rise', 'ws-tasks'], 'the apps that save (with the shelf hub and the Tasks template) read through it');
+  assert.deepEqual(users, ['ex-productivity-hub', 'ex-sunday-study', 'ex-tasks', 'sh-productivity-hub', 'ws-brainstorm', 'ws-calendar', 'ws-church', 'ws-daily-digest', 'ws-family',
+    'ws-productivity-hub', 'ws-rental-hunt', 'ws-rise', 'ws-sunday-study', 'ws-tasks'], 'the apps that save (with the shelf hub and the Tasks template) read through it');
 });
 
 // ── Each app's own shape and words ─────────────────────────────────────────────────────────
