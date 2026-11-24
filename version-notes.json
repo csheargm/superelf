@@ -1,4 +1,12 @@
 {
+  "v5.13.1": {
+    "date": "2026-11-24",
+    "features": [],
+    "fixes": [
+      "修复 CI · app-face pin after new home"
+    ],
+    "through": "346d915f741c07a1abb44b54efbf293ef1e09d33"
+  },
   "v5.13.0": {
     "date": "2026-11-24",
     "features": [
