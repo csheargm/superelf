@@ -16,7 +16,8 @@ let s = ''; process.stdin.on('data', (d) => s += d).on('end', async () => {
   const cur = s.split('[Current message:]').pop();
   const i = process.argv.indexOf('--append-system-prompt');
   let say = 'SYSTEM:' + (i > 0 ? process.argv[i + 1] : '');
-  if (/make it red/.test(cur)) { const f = 'apps/todo/index.html'; fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace('<h1>', '<h1 style="color:red">')); say = 'Made it red.'; }
+  if (/READ-ONLY/.test(say) && /make it red/.test(cur)) say = 'I will make it red.\\n[[apply]]';   // unconfirmed: plan only (ADR 0042)
+  else if (/confirmed this change \\(do it now\\):\\s*make it red/.test(say)) { const f = 'apps/todo/index.html'; fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace('<h1>', '<h1 style="color:red">')); say = 'Made it red.'; }
   process.stdout.write(JSON.stringify({ type: 'system', subtype: 'init', session_id: 'sid-h' }) + '\\n');
   process.stdout.write(JSON.stringify({ type: 'result', subtype: 'success', result: say, session_id: 'sid-h' }) + '\\n');
 });
@@ -42,15 +43,21 @@ before(async () => {
 });
 after(async () => { if (web) await stopWeb(web); if (root) rmTemp(root); });
 
-async function chat(body, headers = {}) {
+async function chatLines(body, headers = {}) {
   const r = await fetch(`http://127.0.0.1:${port}/api/chat`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${OWNER_TOKEN}`, ...headers }, body: JSON.stringify(body) });
   assert.equal(r.status, 200, await r.clone().text());
-  const lines = (await r.text()).split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  return (await r.text()).split('\n').filter(Boolean).map((l) => JSON.parse(l));
+}
+async function chat(body, headers = {}) {
+  const lines = await chatLines(body, headers);
   return lines.filter((l) => l.type === 'done' || l.type === 'reply' || l.type === 'delta' || l.text).map((l) => l.text || '').join('\n');
 }
 
 test('Change this app: "what changed?" is answered from the saved version, its request and the diff', { timeout: 60000 }, async () => {
-  await chat({ message: 'make it red', edit: 'todo' });
+  const apply = await chatLines({ message: 'make it red', edit: 'todo' });
+  const offer = apply.find((l) => l.type === 'app-change-confirm');
+  assert.ok(offer, 'a change is planned first, with 改 · Apply');
+  await chat({ message: offer.message, edit: 'todo' });
   const out = await chat({ message: 'what has been changed on this app?', edit: 'todo' });
   assert.match(out, /SYSTEM:/, 'the fake echoed its system line');
   assert.match(out, /Saved versions of this app/);

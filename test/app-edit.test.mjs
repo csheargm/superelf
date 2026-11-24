@@ -23,7 +23,8 @@ function ws() {
   fs.writeFileSync(path.join(w, 'data', 'todo', 'items.json'), '[1,2]');
   return w;
 }
-const ed = (w, body, user = OWNER, headers = {}) => appEditOf({ user, body, headers, appsDir: path.join(w, 'apps') });
+// A CONFIRMED turn, as after 改 · Apply (the confirm gate itself: test/app-edit-confirm.test.mjs).
+const ed = (w, body, user = OWNER, headers = {}) => { const e = appEditOf({ user, body, headers, appsDir: path.join(w, 'apps') }); return e && Object.assign(e, { confirmed: true, plan: e.request }); };
 const code = (fn) => { try { fn(); return 'no-throw'; } catch (e) { return e.code; } };
 
 test('an ordinary chat is not an edit turn', () => {

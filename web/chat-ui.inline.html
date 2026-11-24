@@ -918,7 +918,8 @@
     // TODO(R4 seam): with the reply-row helpers when this file is split.
     function addChangeApp(bubble,ev){ const b=document.createElement('button'); b.type='button'; b.className='pac-change-app';
       b.textContent=String(ev.label||'改这个应用 · Change this app'); b.style.cssText='display:block;align-self:flex-start;max-width:82%;margin:6px 0 2px;padding:6px 12px;border-radius:16px;border:1px solid currentColor;background:transparent;color:inherit;font:inherit;cursor:pointer';
-      b.onclick=()=>parent.postMessage({pa:'shell',type:'change-app',request:String(ev.request||'').slice(0,2000)},'*'); bubble.after(b); }
+      // 改 · Apply (ADR 0042): the server minted the message; the tap sends it as the next turn, once.
+      b.onclick=ev.type==='app-change-confirm'?()=>{ b.disabled=true; send(String(ev.message)); }:()=>parent.postMessage({pa:'shell',type:'change-app',request:String(ev.request||'').slice(0,2000)},'*'); bubble.after(b); }
     function addActions(bubble,kind,rawText,prompt,scopeKey){   // scopeKey: the thread this bubble was rendered in (send() passes its snapshot); default = the thread shown now
       const bar=document.createElement('div'); bar.className='pac-acts '+kind;
       const copyBtn=mkab('⎘','Copy'); copyBtn.onclick=()=>copyText(rawText,copyBtn); bar.appendChild(copyBtn);
@@ -1137,7 +1138,7 @@
             pin(); updateScroll(); }
           if(ev.type==='done'&&ev.text&&!acc) acc=ev.text;
           if(ev.type==='done'&&typeof ev.by==='string') _doneBy=ev.by;   // the model that actually answered
-          if(ev.type==='app-change'&&typeof ev.request==='string') changeEv=ev;   // this chat cannot change the app: the server offers the real way (lib/app-chat-honesty.mjs)
+          if((ev.type==='app-change'&&typeof ev.request==='string')||(ev.type==='app-change-confirm'&&typeof ev.message==='string')) changeEv=ev;   // this chat cannot change the app: the server offers the real way (lib/app-chat-honesty.mjs)
           if(ev.type==='assess'&&ev.state==='started') assessEv=ev;   // Verify panel launched server-side; results arrive via the convo poll
           // A TERMINAL SERVER FAILURE, not a chunk of an answer (V4). The route answers a
           // rejected body as one {ok:false,type:'error',code,limit,text} line, so it arrives

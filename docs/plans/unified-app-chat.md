@@ -1,6 +1,13 @@
 # 一个应用一个对话 · Unified app chat — plan
 
-Status: proposed (2026-11-24), no code yet. ADR: docs/adr/0042-unified-app-chat.md.
+Status: Phases A + B built 2026-11-24 (lib/app-edit-confirm.mjs, lib/app-edit-lane.mjs). As built:
+- The confirm id travels as the Apply turn's own message (「改 · Apply (<id>)」), so no new body field; the
+  server parses, consumes (single use, user + app + plan bound, 10 min) and only then may the turn write.
+- An unconfirmed turn that writes anyway is rolled back (finishAppEdit `unconfirmed`), said in the reply.
+- Members: the no-tools lane is Claude (--tools=), or an Ollama model only when the user picked one.
+- Not built (docs/TODO.md): generic apps' in-page Ask AI → panel (the shell hook {pa:'shell',type:'app-chat'}
+  exists; apps must call it), shelf fork-first in the panel, the demo panel (demo guests keep the app maker's
+  change path with its caps), one convo tag shared with the in-page chat. ADR: docs/adr/0042-unified-app-chat.md.
 Builds on ADR 0040 (Change this app), lib/app-history.mjs (app change history) and
 lib/app-chat-honesty.mjs (honest app chat). Owner request: ONE chat per app that both answers
 questions and changes the app.

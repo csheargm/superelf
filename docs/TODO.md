@@ -21,6 +21,19 @@ that found it in brackets. Pick from here; do not open a side session per item.
 - Undo walks back through edits; there is no Redo button (the replaced copy is kept as <stamp>-undo in .app-versions).
 - Pre-existing, seen while testing: test/member-plain-lane-e2e "owner ticks Agent tools" fails on origin/main too (checkbox click does not change state); WebKit app-own-bar-e2e "Journal pen stroke" fails on origin/main too.
 
+## One chat per app · 一个应用一个对话 (ADR 0042, shipped 2026-11-24)
+Owner decisions (defaults applied, change any by saying so):
+1. Content apps (Bible explain, Journal summaries, notes) keep their in-page Ask AI — applied: yes.
+2. The owner also taps 改 · Apply before a change — applied: yes.
+3. Real iPad check of the screenshot taken when the panel opens (PA_SNAP) — needs the device.
+Follow-ups:
+- Generic apps' Ask AI button → the one chat: the shell takes {pa:'shell',type:'app-chat'} (web/app-edit.js
+  fromAppChat); apps (or PAChat.fullscreen for non-content apps) still need to post it.
+- Shelf app → fork first inside the panel (members today copy the app, then open their copy).
+- Demo guests: the panel stays off on the demo; they change their own apps through the app maker (caps charged).
+- The Apply turn shows as 「改 · Apply (<id>)」 in the user bubble; a nicer label needs a PAChat display hook.
+- Pending plans are in memory: a node restart forgets them (re-ask, tap Apply again).
+
 ## Verse ink: handwriting frame leftovers (GPT review 2026-11-22, web/ink-frame.inline.html)
 
 - Circle round words (followEnclosures, 2026-11-22): on another width a closed big stroke is re-anchored

@@ -18,15 +18,26 @@ const SHOTS = process.env.PA_SHOTS || '';
 const ENGINE = process.env.PA_E2E_ENGINE || 'chromium';
 const PAGE = '<!doctype html><html><head><meta charset="utf-8"></head><body><h1 id="t">Todo</h1><canvas id="ink" width="80" height="40"></canvas>'
   + '<script>const g=document.getElementById("ink").getContext("2d");g.fillRect(0,0,40,40);</script></body></html>';
-// The fake agent: reads the CURRENT message (after any history block) and edits apps/todo/index.html.
+// The fake model. A READ-ONLY (unconfirmed) turn plans and ends with the marker — except "write anyway",
+// which writes regardless (the server must roll it back). A confirmed owner turn edits the file named by
+// the plan in its system line. A member's confirmed turn (no tools) returns the whole page.
 const FAKE = `#!/usr/bin/env node
 let s = ''; process.stdin.on('data', (d) => s += d).on('end', async () => {
   const fs = await import('node:fs');
+  const sys = process.argv.join(' ');
   const cur = s.split('[Current message:]').pop();
   const f = 'apps/todo/index.html';
+  const red = (h) => h.replace('<h1 id="t">', '<h1 id="t" style="color:rgb(200, 0, 0)">');
   let say = 'nothing to do';
-  if (/make it red/.test(cur)) { fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace('<h1 id="t">', '<h1 id="t" style="color:rgb(200, 0, 0)">')); say = 'Made the title red.'; }
-  if (/break it/.test(cur)) { fs.writeFileSync(f, '<html><body><h1 id="t">broken</h1><script>let = ;</script></body></html>'); say = 'Rewrote it.'; }
+  if (/READ-ONLY/.test(sys)) {
+    if (/write anyway/.test(cur)) { fs.writeFileSync(f, red(fs.readFileSync(f, 'utf8'))); say = 'Done, it is red.'; }
+    else if (/make it red|break it/.test(cur)) say = 'I will change the title as asked.\\n[[apply]]';
+    else say = 'The title says Todo.';
+  } else if (/You write ONE superelf mini-app/.test(sys)) {
+    const cur2 = s.match(/Change this app:\\n\\n([\\s\\S]*?)\\n\\nThe change:/);
+    say = '\\x60\\x60\\x60json\\n{"slug":"todo","title":"Todo"}\\n\\x60\\x60\\x60\\n\\x60\\x60\\x60html\\n' + red(cur2 ? cur2[1] : '') + '\\n\\x60\\x60\\x60';
+  } else if (/confirmed this change \\(do it now\\):\\s*break it/.test(sys)) { fs.writeFileSync(f, '<html><body><h1 id="t">broken</h1><script>let = ;</script></body></html>'); say = 'Rewrote it.'; }
+  else if (/confirmed this change \\(do it now\\):\\s*make it red/.test(sys)) { fs.writeFileSync(f, red(fs.readFileSync(f, 'utf8'))); say = 'Made the title red.'; }
   process.stdout.write(JSON.stringify({ type: 'system', subtype: 'init', session_id: 'sid-e' }) + '\\n');
   process.stdout.write(JSON.stringify({ type: 'result', subtype: 'success', result: say, session_id: 'sid-e' }) + '\\n');
 });
@@ -37,7 +48,7 @@ before(async () => {
   port = await freePort();
   root = mkWebRoot({ port, extraConfig: { task_timeout_minutes: 1, users: [
     { id: 'owner', name: 'Owner', role: 'owner', token: OWNER_TOKEN, workspace: 'workspace', passHash: hashPassword('owner-pass-123') },
-    { id: 'kid', name: 'Kid', role: 'member', token: 'kid-token-abcdefghijkl', workspace: 'ws-kid' }] } });
+    { id: 'kid', name: 'Kid', role: 'member', token: 'kid-token-abcdefghijkl', workspace: 'ws-kid', passHash: hashPassword('kid-pass-12345') }] } });
   const bin = path.join(root, 'fakebin'); fs.mkdirSync(bin);
   const cfgPath = path.join(root, 'config.json');
   const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
@@ -54,12 +65,12 @@ before(async () => {
 after(async () => { if (browser) await browser.close(); if (web) await stopWeb(web); if (root) rmTemp(root); });
 
 const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `${name}-${ENGINE}.png`) }); };
-async function signIn(viewport) {
+async function signIn(viewport, who = 'owner', pass = 'owner-pass-123') {
   const ctx = await browser.newContext({ viewport }); const page = await ctx.newPage();
   if (process.env.DBG) { page.on('console', (m) => console.log('PAGE', m.type(), m.text())); page.on('pageerror', (e) => console.log('PAGEERR', e.message)); }
   await page.goto(`http://127.0.0.1:${port}/`);
   await page.waitForSelector('#login[open]');
-  await page.fill('#luser', 'owner'); await page.fill('#lpin', 'owner-pass-123'); await page.click('#loginBtn');
+  await page.fill('#luser', who); await page.fill('#lpin', pass); await page.click('#loginBtn');
   await page.waitForFunction(() => !document.querySelector('#login[open]'));
   await page.click('.ecard[data-es="todo"]');
   await page.frameLocator('#fr').locator('#t').waitFor();
@@ -71,10 +82,14 @@ async function showBar(page) {
   await page.click('#barpeek');   // the shell's bar slides away over an app; its top handle brings it back
   await page.waitForFunction(() => document.querySelector('#ftitle').getBoundingClientRect().top >= 0);
 }
+// WebKit sometimes drops the first synthetic long-press (flaky on origin/main too, 2 of 3 runs): one retry.
 async function longPressTitle(page) {
-  await showBar(page);
-  const b = await page.locator('#ftitle').boundingBox();
-  await page.mouse.move(b.x + 10, b.y + b.height / 2); await page.mouse.down(); await page.waitForTimeout(900); await page.mouse.up();
+  for (let i = 0; i < 2 && !(await page.locator('#aePanel').count()); i++) {
+    await showBar(page);
+    const b = await page.locator('#ftitle').boundingBox();
+    await page.mouse.move(b.x + 10, b.y + b.height / 2); await page.mouse.down(); await page.waitForTimeout(900); await page.mouse.up();
+    await page.locator('#aePanel').waitFor({ timeout: 12000 }).catch(() => { /* retried once; the waitFor below fails loudly */ });
+  }
   if (process.env.DBG) console.log('DBG', await page.evaluate(() => ({ role: ROLE, uid: UID, open: frameOpen(), fu: frameUid(), fs: frameSlug(), ref: frameRef(), bar: getComputedStyle(document.querySelector('#frame .bar')).display, ft: document.querySelector('#ftitle').getBoundingClientRect().toJSON() })));
   await page.locator('#aePanel').waitFor();
 }
@@ -106,8 +121,26 @@ test('long-press the title → panel docks beside the app with its picture; a ch
   await page.evaluate(() => document.querySelector('#aefr').contentWindow.postMessage({ pa: 'x', tag: 'shell' }, '*'));
   await p.locator('body').evaluate(() => new Promise((r) => setTimeout(r, 300)));
   assert.deepEqual(await p.locator('body').evaluate(() => window.__got), ['shell'], 'only the shell is heard; the sibling app is stopped');
+  // The tip shows once, under the chat (ADR 0042).
+  await p.locator('#aeTip').waitFor();
+  // A question is answered; nothing changes and no Apply is offered.
+  await sendInPanel(page, 'what does the title say?');
+  await p.locator('text=The title says Todo.').waitFor({ timeout: 20000 });
+  assert.equal(await p.locator('.pac-change-app').count(), 0, 'a question offers no Apply');
+  assert.equal(fs.readFileSync(path.join(root, 'workspace', 'apps', 'todo', 'index.html'), 'utf8'), PAGE, 'a question changes nothing');
+  // A write without the confirm step is rolled back by the server, and said.
+  await sendInPanel(page, 'write anyway');
+  await p.locator('text=未确认').first().waitFor({ timeout: 20000 });
+  assert.equal(fs.readFileSync(path.join(root, 'workspace', 'apps', 'todo', 'index.html'), 'utf8'), PAGE, 'no confirm, no write');
+  // A change request: the plan and ONE 改 · Apply button; the app is unchanged until the tap.
   await sendInPanel(page, 'make it red');
+  await p.locator('.pac-change-app', { hasText: '改 · Apply' }).waitFor({ timeout: 20000 });
+  assert.equal(fs.readFileSync(path.join(root, 'workspace', 'apps', 'todo', 'index.html'), 'utf8'), PAGE, 'the plan alone changes nothing');
+  assert.equal(await p.locator('text=[[apply]]').count(), 0, 'the marker is not shown');
+  await shot(page, 'uac-plan');
+  await p.locator('.pac-change-app', { hasText: '改 · Apply' }).click();
   await page.locator('#aeUndo').waitFor({ state: 'visible', timeout: 20000 });
+  await p.locator('text=已完成 · Done').waitFor({ timeout: 15000 });   // said only after the reload loaded
   await page.frameLocator('#fr').locator('#t').waitFor();
   for (let i = 0; i < 50 && (await titleColor(page)) !== 'rgb(200, 0, 0)'; i++) await page.waitForTimeout(200);
   assert.equal(await titleColor(page), 'rgb(200, 0, 0)', 'the app reloaded in place with the change');
@@ -119,6 +152,8 @@ test('long-press the title → panel docks beside the app with its picture; a ch
   await p.locator('text=已撤销').waitFor();
   // A change that breaks the app is not applied, and the reply says so.
   await sendInPanel(page, 'break it');
+  await p.locator('.pac-change-app:not([disabled])', { hasText: '改 · Apply' }).waitFor({ timeout: 20000 });
+  await p.locator('.pac-change-app:not([disabled])', { hasText: '改 · Apply' }).click();
   await p.locator('text=未应用').first().waitFor({ timeout: 20000 });
   assert.equal(fs.readFileSync(path.join(root, 'workspace', 'apps', 'todo', 'index.html'), 'utf8'), PAGE, 'the broken page was rolled back');
   await shot(page, 'cta-not-applied');
@@ -152,14 +187,40 @@ test('⋯ on the open app lists 改这个应用 first with a one-time tip; phone
   await ctx.close();
 });
 
-test('the server refuses an edit turn from a member, from an app, and for an app that is not theirs', { skip: false }, async () => {
+test('a member changes their OWN copy through the same chat: plan → Apply → reload → Done → Undo (no-tools lane)', { skip, timeout: 90000 }, async () => {
+  const kidPage = path.join(root, 'ws-kid', 'apps', 'todo', 'index.html');
+  const { ctx, page } = await signIn({ width: 820, height: 1180 }, 'kid', 'kid-pass-12345');   // iPad width
+  await showBar(page);
+  await page.click('#fmore');   // ⋯ → 改这个应用 opens the same one chat
+  await page.locator('#frameMenu button').first().click();
+  await page.locator('#aePanel').waitFor();
+  const p = page.frameLocator('#aefr');
+  await p.locator('.pac-inp').waitFor();
+  await sendInPanel(page, 'make it red');
+  await p.locator('.pac-change-app', { hasText: '改 · Apply' }).waitFor({ timeout: 20000 });
+  assert.doesNotMatch(fs.readFileSync(kidPage, 'utf8'), /200, 0, 0/, 'nothing changes before the tap');
+  await p.locator('.pac-change-app', { hasText: '改 · Apply' }).click();
+  await p.locator('text=已完成 · Done').waitFor({ timeout: 20000 });
+  for (let i = 0; i < 50 && (await titleColor(page)) !== 'rgb(200, 0, 0)'; i++) await page.waitForTimeout(200);
+  assert.equal(await titleColor(page), 'rgb(200, 0, 0)', "the member's own app reloaded with the change");
+  assert.equal(fs.readFileSync(path.join(root, 'workspace', 'apps', 'todo', 'index.html'), 'utf8'), PAGE, "the owner's app of the same name is untouched");
+  await shot(page, 'uac-member-ipad');
+  await page.click('#aeUndo');
+  for (let i = 0; i < 50 && (await titleColor(page)) === 'rgb(200, 0, 0)'; i++) await page.waitForTimeout(200);
+  assert.notEqual(await titleColor(page), 'rgb(200, 0, 0)', 'undo works for members too');
+  await ctx.close();
+});
+
+test('the server refuses: an edit turn from an app, another\'s app, "change superelf" from a member, a forged Apply', { skip: false }, async () => {
   const post = (token, body, extra = {}) => fetch(`http://127.0.0.1:${port}/api/chat`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, ...extra }, body: JSON.stringify(body) });
-  assert.equal((await post('kid-token-abcdefghijkl', { message: 'make it red', edit: 'todo' })).status, 403, 'members: Phase 2');
+  const KID = 'kid-token-abcdefghijkl';
+  if (process.env.DBG) console.log('KIDTURN', await (await post(KID, { message: 'make it red', edit: 'todo' })).text());
+  assert.equal((await post(KID, { message: 'change superelf: bigger buttons', edit: 'todo' })).status, 403, 'only the owner changes superelf');
+  assert.equal((await post(KID, { message: 'make it red', edit: 'nope' })).status, 404, "only the member's own apps");
   assert.equal((await post(OWNER_TOKEN, { message: 'make it red', edit: 'todo' }, { 'x-superelf-origin': 'app' })).status, 403, 'never from an app');
   assert.equal((await post(OWNER_TOKEN, { message: 'make it red', edit: 'nope' })).status, 404);
-  const u = await fetch(`http://127.0.0.1:${port}/api/apps/todo/undo`, { method: 'POST', headers: { authorization: 'Bearer kid-token-abcdefghijkl' } });
-  assert.equal(u.status, 403);
-  const pnl = await fetch(`http://127.0.0.1:${port}/api/app-edit/panel`, { headers: { authorization: 'Bearer kid-token-abcdefghijkl' } });
-  assert.equal(pnl.status, 403);
-  assert.match(fs.readFileSync(path.join(root, 'ws-kid', 'apps', 'todo', 'index.html'), 'utf8'), /<h1 id="t">/, "the member's app is untouched");
+  assert.equal((await post(KID, { message: '改 · Apply (AAAAAAAAAAAAAAAA)', edit: 'todo' })).status, 403, 'a forged confirm id never writes');
+  const pnl = await fetch(`http://127.0.0.1:${port}/api/app-edit/panel`, { headers: { authorization: `Bearer ${KID}` } });
+  assert.equal(pnl.status, 200, 'members get the panel on a private node');
+  assert.match(fs.readFileSync(path.join(root, 'ws-kid', 'apps', 'todo', 'index.html'), 'utf8'), /<h1 id="t">/, "the member's app is untouched by refused turns");
 });

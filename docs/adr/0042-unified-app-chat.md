@@ -1,6 +1,6 @@
 # 0042. 一个应用一个对话 · One chat per app: ask and change
 
-Date: 2026-11-24. Status: proposed. Plan: docs/plans/unified-app-chat.md.
+Date: 2026-11-24. Status: accepted (Phases A + B shipped 2026-11-24). Plan: docs/plans/unified-app-chat.md.
 
 ## Context
 Each app has two chats: its own Ask AI (confined, writes nothing, ADR 0040 follow-up) and the

@@ -6,12 +6,16 @@
 // posts {pa:'shell',type:'edit-app'}. One-time tip: a line under the menu item until it is tapped.
 // Flow: picture of the app (PASnap, fails closed to a manual photo) → upload to the user's uploads/
 // → the panel (web/app-edit-panel.html, PAChat) docks beside the app (a bottom sheet on a phone).
-// A turn the server applied ({type:'app-edit',applied:true}) reloads the app in place and shows
-// 撤销 · Undo in the panel's header.
+// One chat per app (ADR 0042): it answers questions and, after the server's 改 · Apply step, changes the
+// app. A turn the server applied ({type:'app-edit',applied:true}) reloads the app in place; only once the
+// reload loaded does the panel say 已完成 · Done and show 撤销 · Undo (a failed reload says so, Undo still shown).
+// Members use it on their own apps too (the server runs their no-tools lane); never on the demo.
 const PAAppEdit=(()=>{
   const ITEM='改这个应用 · Change this app';
   const TIP_KEY='tip:app-edit';
   const TIP='长按标题可修改此应用 · Long-press the title to change this app';
+  const CHAT_TIP_KEY='tip:app-chat';
+  const DONE='已完成 · Done', RELOAD_FAILED='已改但未能重新加载，可撤销 · Changed, but the app did not reload — you can undo';
   const SNAP_MS=6000, LOAD_MS=10000, PRESS_MS=600, SIDE_MIN_PX=768;
   // The broker kinds the panel's PAChat needs; anything else from the panel is refused (it has no data of its own).
   const KINDS=new Set(['chat','chat-cancel','convo','app-convos','render-md','upload','attach-url','set-model','seen-feature','get-new-features','convo-rename','convo-delete']);
@@ -26,7 +30,7 @@ const PAAppEdit=(()=>{
 #aePanel.sheet{left:0;right:0;bottom:0;height:55%;border-left:0;border-top:1px solid var(--line);border-radius:12px 12px 0 0;box-shadow:0 -4px 16px rgba(0,0,0,.15)}
 #aePanel.sheet .ae-h{padding-top:6px}
 #frame.ae-sheet{bottom:55%}`;
-  const owner=()=>ROLE==='owner';
+  const owner=()=>(ROLE==='owner'||ROLE==='member')&&!window.PADemoAuth;   // the server decides the lane by role
   const canEdit=()=>owner()&&frameOpen()&&frameUid()===UID&&!!frameSlug();
   function item(){
     const seen=_SEEN.has(TIP_KEY);
@@ -62,7 +66,7 @@ const PAAppEdit=(()=>{
     if(!$('#aeStyle')){ const st=document.createElement('style'); st.id='aeStyle'; st.textContent=CSS; document.head.appendChild(st); }
     const el=document.createElement('div'); el.id='aePanel';
     el.innerHTML='<div class="ae-h"><b id="aeTitle"></b><button class="plain" id="aeUndo" style="display:none">撤销 · Undo</button><button class="plain" id="aeClose" title="关闭 · Close" aria-label="Close">✕</button></div>';
-    el.querySelector('#aeTitle').textContent=ITEM.split(' · ')[0]+' · '+title;
+    el.querySelector('#aeTitle').textContent=title;
     const fr=document.createElement('iframe'); fr.id='aefr'; fr.setAttribute('sandbox','allow-scripts'); el.appendChild(fr);
     document.body.appendChild(el);
     el.querySelector('#aeClose').onclick=close;
@@ -81,9 +85,12 @@ const PAAppEdit=(()=>{
     try{ const r=await api('/api/app-edit/panel'); if(!r.ok) throw new Error('HTTP '+r.status); const html=await r.text(); if(S!==me) return; me.fr.srcdoc=html; }
     catch(err){ if(S===me) me.el.querySelector('#aeTitle').textContent='面板加载失败 · The panel did not load: '+((err&&err.message)||''); return; }
     if(S!==me) return;
-    S.fr.addEventListener('load',()=>{ if(S===me) me.fr.contentWindow.postMessage({pa:'edit-init',slug,title:me.title,shot,prefill:typeof prefill==='string'?prefill.slice(0,2000):''},'*'); },{once:true});
+    S.fr.addEventListener('load',()=>{ if(S!==me) return; const tip=!_SEEN.has(CHAT_TIP_KEY); if(tip){ _SEEN.add(CHAT_TIP_KEY); _saveSeen(); }   // the one-time tip, shown in the panel
+      me.fr.contentWindow.postMessage({pa:'edit-init',slug,title:me.title,shot,tip,prefill:typeof prefill==='string'?prefill.slice(0,2000):''},'*'); },{once:true});
   }
-  function loaded(){ return new Promise((res)=>{ const t=setTimeout(res,LOAD_MS); $('#fr').addEventListener('load',()=>{ clearTimeout(t); res(); },{once:true}); }); }
+  // The next load of the app frame that is not the blank placeholder (appFrameLeave loads about:blank first).
+  function loaded(){ const fr=$('#fr'); return new Promise((res)=>{ const t=setTimeout(()=>{ fr.removeEventListener('load',on); res(false); },LOAD_MS);
+    const on=()=>{ const u=fr.getAttribute('src'); if(!fr.hasAttribute('srcdoc')&&(!u||u==='about:blank')) return; clearTimeout(t); fr.removeEventListener('load',on); res(true); }; fr.addEventListener('load',on); }); }
   function close(){
     openSeq++;
     if(!S) return;
@@ -91,7 +98,10 @@ const PAAppEdit=(()=>{
     $('#frame').classList.remove('ae-side','ae-sheet');
   }
   // The app reloads in place, beside the panel: the same leave-then-load openApp uses (its last save is kept, ADR 0018).
-  function reloadApp(){ if(!S) return; appFrameLeave(); PASW.frameLoad(UID,S.slug); }
+  // Resolves true once the reloaded app loaded, false when it did not within LOAD_MS.
+  function reloadApp(){ if(!S) return Promise.resolve(false); appFrameLeave(); const wait=loaded(); PASW.frameLoad(UID,S.slug); return wait; }   // after the leave: it swaps #fr for a fresh frame
+  async function reloadThenDone(){ const me=S; const ok=await reloadApp(); if(!me||S!==me) return;
+    say(ok?DONE:RELOAD_FAILED); me.el.querySelector('#aeUndo').style.display=''; }
   function say(t){ if(S&&S.fr.contentWindow) S.fr.contentWindow.postMessage({pa:'edit-note',text:t},'*'); }
   async function undo(){
     if(!S) return;
@@ -102,7 +112,7 @@ const PAAppEdit=(()=>{
   // Every event of the panel's chat passes here (the broker's chat relay).
   function onEvent(ev){
     if(!S||!ev||ev.type!=='app-edit'||ev.slug!==S.slug) return;
-    if(ev.applied){ reloadApp(); S.el.querySelector('#aeUndo').style.display=''; }
+    if(ev.applied&&!ev.undone) reloadThenDone(); else if(ev.applied) reloadApp();
   }
   function frameRec(win){ return S&&win&&S.fr.contentWindow===win?S.rec:null; }
   const kindOk=(k)=>KINDS.has(k);
@@ -141,5 +151,8 @@ const PAAppEdit=(()=>{
     if(!(navigator.userActivation&&navigator.userActivation.isActive)) return;
     open(frameSlug(),$('#ftitle').textContent,typeof m.request==='string'?m.request:'');
   }
-  return {item,armTip,open,close,onEvent,frameRec,kindOk,bindBar,syncBar,fromApp,noteOffer,editAppFromBar:()=>{ if(canEdit()) open(frameSlug(),$('#ftitle').textContent); }};
+  // An app's own Ask AI asked for the one app chat ({pa:'shell',type:'app-chat'}): the page open in #fr, on a real tap.
+  function fromAppChat(e){ const fr=$('#fr'); if(!fr||e.source!==fr.contentWindow||e.origin!=='null'||!canEdit()) return;
+    if(!(navigator.userActivation&&navigator.userActivation.isActive)) return; open(frameSlug(),$('#ftitle').textContent); }
+  return {item,armTip,open,fromAppChat,close,onEvent,frameRec,kindOk,bindBar,syncBar,fromApp,noteOffer,editAppFromBar:()=>{ if(canEdit()) open(frameSlug(),$('#ftitle').textContent); }};
 })();
