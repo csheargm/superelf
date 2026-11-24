@@ -141,7 +141,8 @@ export const simplifiedNote = (en, zh) => `已简化：去掉了${zh} · Simplif
 // into passes NO_DEADLINE, a clock that never moves, or loads the page with loadStill, whose performance.now() never moves —
 // the studio's calls too. The work budget still applies; stationery-simplify-deadline proves the deadline (R13 round 5).
 export const NO_DEADLINE = Object.freeze({ clock: () => 0 });
-export const loadStill = (o = {}) => loadStationery({ ...o, globals: { performance: { now: () => 0 }, ...o.globals } });
+const STILL_CLOCK = { performance: { now: () => 0 } };   // a clock that never moves: no deadline is ever passed
+export const loadStill = (o = {}) => loadStationery({ ...o, globals: { ...STILL_CLOCK, ...o.globals } });
 export const TOO_COMPLEX = '太复杂，iPad 画不动 · Too complex for the iPad to draw — 请重试或要求简单些 · try again or ask for a simpler design';
 export const answerWith = (text) => async () => ({ ok: true, text: 'Here is your design:\n\n' + text + '\n\nEnjoy!', convoId: 'c1', error: '' });
 // How often re matches s; and a mutant that must match the shipped text EXACTLY once — one that matched twice or not at all
@@ -243,8 +244,8 @@ export function loadPicker(S, ST, { mutate, win } = {}) {
 // the host's mount options (e.g. its paper()). end() presses Cancel and answers every turn still out, so a live
 // run's elapsed-time ticker (a REAL setInterval) and the studio's wait timer stop even when an assertion threw
 // first: register it with t.after, or a failing test leaves node --test running with no summary.
-export function mountStudio(mutate, studioMutate, channel, win, opts) {
-  const S = loadStationery(), ST = loadStudio(S, { mutate: studioMutate });
+export function mountStudio(mutate, studioMutate, channel, win, opts, globals) {
+  const S = loadStationery({ globals }), ST = loadStudio(S, { mutate: studioMutate });
   const pending = []; const ai = channel || ((message, o) => new Promise((res) => pending.push({ message, o, res })));
   const host = new FakeEl('div'), list = new FakeEl('div'); host.append(list);
   const { picker } = loadPicker(S, ST, { mutate, win });
@@ -263,18 +264,15 @@ export function mountStudio(mutate, studioMutate, channel, win, opts) {
 
 // The Journal's studio as the person uses it (the simplify suites' user flow; R3: one copy): Design is pressed with 'pink
 // dots', reply(text) answers that AI turn and lets the page settle, `saved` holds what Keep stored. Ends with the test.
-const REPLY_MS = 2000;
 export function draftFlow(t, mutate, studioMutate) {
   const turns = [], saved = [], ai = () => new Promise((res) => turns.push(res));
   const store = { saveMine: async (tpl) => { saved.push(tpl); return { ok: true }; } };
-  const m = mountStudio(mutate, studioMutate, ai, undefined, { studio: { ai, store, upload: async () => ({ ok: false }) } });
+  // A still clock: simplify()'s 150 ms deadline is pinned with fake clocks in stationery-simplify-deadline; here a slow CI
+  // runner (windows-latest) passed it on the real clock and the user flow read the plain refusal (CI on ff5c1ce, 27a7431).
+  const m = mountStudio(mutate, studioMutate, ai, undefined, { studio: { ai, store, upload: async () => ({ ok: false }) } }, STILL_CLOCK);
   t.after(async () => { for (const res of turns) res({ ok: false, error: 'test over' }); await m.end(); });
   m.btn('✨').click(); m.btn('Design ·').click();
-  // Settles, then (a slow Windows runner) waits up to REPLY_MS for the answer to show: drawn, or an error. The
-  // test's own assertions still decide; a draft never drawn just reaches them after the wait.
-  const shown = () => m.drawn() || m.msg.classList.contains('err');
-  return { ...m, saved, reply: async (text) => { turns.shift()({ ok: true, text, convoId: 'c1', error: '' }); await settle();
-    for (const t0 = Date.now(); !shown() && Date.now() - t0 < REPLY_MS;) await new Promise((r) => setTimeout(r, 5)); } };
+  return { ...m, saved, reply: async (text) => { turns.shift()({ ok: true, text, convoId: 'c1', error: '' }); await settle(); } };
 }
 
 // The WHOLE shipped chat-ui script, run against a small recording DOM: the real window.PAChat, plus
