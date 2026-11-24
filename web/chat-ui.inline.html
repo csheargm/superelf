@@ -914,6 +914,11 @@
       }
       return out.length?out:null;
     }
+    // 改这个应用 · Change this app under a reply: the shell opens its panel prefilled (web/app-edit.js fromApp).
+    // TODO(R4 seam): with the reply-row helpers when this file is split.
+    function addChangeApp(bubble,ev){ const b=document.createElement('button'); b.type='button'; b.className='pac-change-app';
+      b.textContent=String(ev.label||'改这个应用 · Change this app'); b.style.cssText='display:block;align-self:flex-start;max-width:82%;margin:6px 0 2px;padding:6px 12px;border-radius:16px;border:1px solid currentColor;background:transparent;color:inherit;font:inherit;cursor:pointer';
+      b.onclick=()=>parent.postMessage({pa:'shell',type:'change-app',request:String(ev.request||'').slice(0,2000)},'*'); bubble.after(b); }
     function addActions(bubble,kind,rawText,prompt,scopeKey){   // scopeKey: the thread this bubble was rendered in (send() passes its snapshot); default = the thread shown now
       const bar=document.createElement('div'); bar.className='pac-acts '+kind;
       const copyBtn=mkab('⎘','Copy'); copyBtn.onclick=()=>copyText(rawText,copyBtn); bar.appendChild(copyBtn);
@@ -1103,7 +1108,7 @@
       let _waiting=true, _elTimer=null;
       const thinking=addMsg('ai','…');
       _elTimer=setInterval(()=>{ if(_waiting&&thinking.isConnected) thinking.textContent='… '+_took(Date.now()-sendTime); },200);
-      let acc='', _rt=null, _rseq=0, _rlast=0, assessEv=null, failure=null, _doneBy='';
+      let acc='', _rt=null, _rseq=0, _rlast=0, assessEv=null, failure=null, _doneBy='', changeEv=null;
       // Live markdown while streaming: re-render the accumulated text through the shared
       // renderer (render-md), throttled to ~150ms. A seq guard drops stale renders so a
       // slow one can't clobber a newer one (or the final).
@@ -1132,6 +1137,7 @@
             pin(); updateScroll(); }
           if(ev.type==='done'&&ev.text&&!acc) acc=ev.text;
           if(ev.type==='done'&&typeof ev.by==='string') _doneBy=ev.by;   // the model that actually answered
+          if(ev.type==='app-change'&&typeof ev.request==='string') changeEv=ev;   // this chat cannot change the app: the server offers the real way (lib/app-chat-honesty.mjs)
           if(ev.type==='assess'&&ev.state==='started') assessEv=ev;   // Verify panel launched server-side; results arrive via the convo poll
           // A TERMINAL SERVER FAILURE, not a chunk of an answer (V4). The route answers a
           // rejected body as one {ok:false,type:'error',code,limit,text} line, so it arrives
@@ -1162,6 +1168,7 @@
           _addTook(thinking,Date.now()-sendTime,_doneBy);
           addActions(thinking,'ai',final, q, k);
           if(assessEv&&thinking.isConnected) addAssessRow(thinking, final, {state:'pending',aid:assessEv.aid,started:Date.now(),timeoutMinutes:assessEv.timeoutMinutes,models:[]}, curConvo);
+          if(changeEv&&thinking.isConnected) addChangeApp(thinking,changeEv);
           if(failure) addMsg('status','⚠ '+failure); }
         else if(failure){ thinking.className='pac-m status'; thinking.textContent='⚠ '+failure; }
         else { thinking.textContent='No response — try rephrasing.'; thinking.classList.remove('pac-md'); }   // plain text again: pre-wrap back on

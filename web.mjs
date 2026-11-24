@@ -88,6 +88,7 @@ import { writerClaudeBase, writerLaneMs } from './lib/research-writer.mjs';
 import { snapshotApps, appBuildWarnings } from './lib/app-postcheck.mjs';
 import { appEditOf, refuseIfEditBusy, dropAppHistory, editSystemPrompt, beginAppEdit, finishAppEdit, undoAppEdit, VERSIONS_DIR } from './lib/app-edit.mjs';
 import { APP_CHAT_EVIDENCE_RULE, appAboutContext, editHistoryContext } from './lib/app-history.mjs';
+import { noChangeRule, finishHonest, editUnchangedNote } from './lib/app-chat-honesty.mjs';
 import { isBlankAnswer, laneFailureText, shouldFallBackToAgent, fallbackStatusText, chatTurnLogLine, turnErrorText } from './lib/chat-outcome.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -1295,6 +1296,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
   catch (e) { if (!e.status) throw e; if (res.headersSent) { res.end(JSON.stringify({ type: 'error', text: e.message }) + '\n'); return; } return send(res, e.status, 'application/json', JSON.stringify({ error: e.message, code: e.code })); }
   const system = edit ? editSystemPrompt(edit) : body.system;
   const turnFacts = (max) => appTurnFacts(user, edit, app, max);   // what changed on this app: facts, outside the override chain
+  const chatRole = user.role === 'owner' ? 'owner' : 'member';
   // A oneShot caller that left while this turn was queued: nothing is saved, nothing spawns.
   if (cancel && cancel.signal.aborted) { audit('chat-cancelled', { who: user.id, convo: convoId || '', queued: true }); if (!res.writableEnded) res.end(); return; }
   // Decided ONCE per turn, from the shell relay's header OR the app slug (lib/agent-origin.mjs),
@@ -1418,7 +1420,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
       // lane: prompts.global is replaceable by a profile override, and being answered in your own
       // language must not be something a customised assistant can lose. It matters most here —
       // most fast lanes are Chinese-trained models.
-      const sys = [prompts.global, prompts.app, REPLY_LANGUAGE_RULE, turnFacts()]   // each piece capped by resolveSystemPrompts
+      const sys = [prompts.global, prompts.app, REPLY_LANGUAGE_RULE, origin.fromApp ? noChangeRule(chatRole) : null, turnFacts()]   // each piece capped by resolveSystemPrompts
         .filter(Boolean).map((c) => ({ role: 'system', content: c }));
       const history = [...sys, ...convo.messages.slice(-20).filter((m) => !m.failed)   // a stored lane failure is not an answer to learn from
         .map((m) => ({ role: m.role === 'md' ? 'assistant' : 'user', content: String(m.text || '') }))
@@ -1496,7 +1498,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
           // override replaces the guard above, and a capability list it could delete is not one
           // any app author could rely on. A oneShot turn builds no app, so it skips the ~3.7k-char
           // app contract; the language rule and the confined note still ride.
-          systemPrompt: agentSystemPrompt([agentPrompts.global, agentPrompts.app], agentCapabilities(laneRole(user, origin), oneShot ? null : APP_CONTRACT), turnFacts),
+          systemPrompt: agentSystemPrompt([agentPrompts.global, agentPrompts.app, origin.fromApp ? noChangeRule(chatRole) : null], agentCapabilities(laneRole(user, origin), oneShot ? null : APP_CONTRACT), turnFacts),
         resumeId, timeoutMs: cfg.task_timeout_minutes * 60000, onChild: cancel ? cancel.onChild : undefined,
         onDelta: (t) => line({ type: 'delta', text: t }), onTool: (n, b) => line({ type: 'status', text: `${n}${b ? ` — ${b}` : ''}` }) };
       r = await enqueue(async () => {
@@ -1541,9 +1543,15 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
     // TODO(R4 seam): post-turn checks leave chat() with the lane dispatch. A warning is appended, never a rewrite.
     const appWarn = blank ? '' : appBuildWarnings(appsDir(user), appsBefore);
     if (appWarn) { r = { ...r, text: `${r.text}\n\n${appWarn}` }; line({ type: 'status', text: appWarn }); }
+    // No-write lanes (an app's chat on any lane, a fast lane anywhere): never a false "Done" (lib/app-chat-honesty.mjs).
+    // TODO(R4 seam): with the post-turn checks above.
+    if (!blank && r.ok !== false && !edit && (origin.fromApp || ml.blocked || (chosen && (chosen.provider === 'ollama' || chosen.provider === 'research')))) {
+      r = { ...r, text: finishHonest({ reply: r.text || '', message, prior: convo.messages.slice(0, -1), inApp: origin.fromApp, line,
+        canEdit: user.role === 'owner' && origin.fromApp && typeof app === 'string' && slugOk(app) }) };
+    }
     const edited = finishAppEdit(edit, editCtx, { wsDir: wsDir(user) });   // inline checks; a failing change is rolled back
     editCtx = null;
-    if (edited) { audit('app-edit', { who: user.id, app: edit.slug, changed: edited.line.changed, applied: edited.line.applied }); line(edited.line); if (edited.note) { r = { ...r, text: `${r.text || ''}\n\n${edited.note}` }; line({ type: 'delta', text: `\n\n${edited.note}` }); } }
+    if (edited) { audit('app-edit', { who: user.id, app: edit.slug, changed: edited.line.changed, applied: edited.line.applied }); line(edited.line); edited.note = [editUnchangedNote(r.text, edited.line), edited.note].filter(Boolean).join('\n\n'); if (edited.note) { r = { ...r, text: `${r.text || ''}\n\n${edited.note}` }; line({ type: 'delta', text: `\n\n${edited.note}` }); } }
     // by: the lane that ACTUALLY answered (a confined turn's GPT pick runs on Claude), shown under the answer.
     const by = ml.blocked ? '' : chosen ? chosen.label : 'Claude';
     const mdMsg = { role: 'md', text: r.text || '', ms: turnMs, by, ...(blank ? { failed: true } : {}) };

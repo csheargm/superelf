@@ -992,6 +992,7 @@ addEventListener('blur',()=>{ if(frameOpen()) barHide(); });
 // TODO(R4): this file is far over budget; this block moves with the app-frame seam (see SHELL_BEHIND_APP).
 const SHELL_MSG_FONT_PER_S=20; let _shellFont={t:0,n:0};
 function frameOwnBar(){ return frameUid()===UID&&OWNBAR_APPS.has(frameSlug()); }
+window.addEventListener('message',(e)=>{ if(e.data&&e.data.pa==='shell'&&e.data.type==='change-app') PAAppEdit.fromApp(e); });   // any app's chat, not only ownBar apps. TODO(R4): moves with the app-frame seam below
 window.addEventListener('message',(e)=>{
   const m=e.data; if(!m||m.pa!=='shell') return;
   if(!e.source||e.source!==$('#fr').contentWindow||e.origin!=='null'||!frameOpen()||!frameOwnBar()) return;
@@ -2000,7 +2001,7 @@ window.addEventListener('message',async(e)=>{
             // R5: a line that will not parse is skipped on purpose — NDJSON framing is the
             // stream's contract, and the transport failures that used to hide here (a 413 or
             // a 401 answered instead of a stream) are now caught by the res.ok check above.
-            let i; while((i=buf.indexOf('\n'))>=0){ const t=buf.slice(0,i); buf=buf.slice(i+1); if(!t.trim()) continue; let jj; try{jj=JSON.parse(t)}catch{continue} if(fr.edit) PAAppEdit.onEvent(jj); send({ev:jj}); } }
+            let i; while((i=buf.indexOf('\n'))>=0){ const t=buf.slice(0,i); buf=buf.slice(i+1); if(!t.trim()) continue; let jj; try{jj=JSON.parse(t)}catch{continue} if(fr.edit) PAAppEdit.onEvent(jj); else if(jj&&jj.type==='app-change') PAAppEdit.noteOffer(fr.el,jj.request); send({ev:jj}); } }
           send({done:true});
         }catch(err){ return fail(relayNetFail(err,'stream',ac.signal)); }
       }finally{ if(relayChats.get(m.id)===ac) relayChats.delete(m.id); }

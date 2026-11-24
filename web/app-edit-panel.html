@@ -39,6 +39,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px 
       greeting:'改「'+m.title+'」：说说你想改什么，截图已附上 · Change “'+m.title+'”: say what you want, the screenshot is attached. 输入「撤销」可撤销 · Type “undo” to undo.',
     });
     chat.open('edit');
+    if(typeof m.prefill==='string'&&m.prefill.trim()) chat.prefill(m.prefill);   // the request the app's chat could not carry out
     if(m.shot&&m.shot.path) chat.attach({name:m.shot.name||'screen.png',path:m.shot.path,thumb:m.shot.thumb});
     else setTimeout(()=>note(NO_SHOT,'noShot'),0);
   }
