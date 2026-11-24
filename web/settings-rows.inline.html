@@ -19,11 +19,18 @@
 <script id="pagr-script">
 (function(){
   if(window.PASettingsRows) return;
+  const VERSE_ORDER_KEY='englishFirst';   // 经文顺序 (the Bible reads it from here)
   const ROWS=[
     { key:'openAi', label:'打开笔记时显示 AI 对话 · Open AI notes with the note',
       hint:'关闭时笔记单独打开；✨ 打开 AI · Off: a note opens alone; ✨ opens its AI',
       when:()=>!!(window.PANote&&typeof window.PANote.prefs==='function'),
       tip:'新功能：打开笔记时一并显示 AI 对话 · New: open a note together with its AI notes' },
+    // 经文顺序 Verse order (owner 2026-11-24): 中文 first is the default; a tick puts English first. The
+    // Bible reads this key as PASettingsRows.VERSE_ORDER_KEY (one copy, R3) and says it is the host.
+    { key:VERSE_ORDER_KEY, label:'经文顺序：英文在前 · Verse order: English first',
+      hint:'不勾选时中文在前（和合本），英文在后 · Off: 中文 (CUV) first, then English (BSB)',
+      when:()=>window.PAVerseOrderHost===true,
+      tip:'新功能：经文默认中文在前，可在此改为英文在前 · New: verses show 中文 first; tick to put English first' },
   ];
   // "Show tips again": removes tipsSeen from the box, so Save brings the first-use tips back (ADR 0030).
   const RESET={ key:'tipsSeen', label:'重新显示提示 · Show tips again', done:'保存后将重新显示提示 · Tips will show again after Save', when:()=>!!window.PATips };
@@ -67,6 +74,6 @@
     jTa.addEventListener('input',sync);
     return {sync};
   }
-  window.PASettingsRows={mount,ROWS,RESET};
+  window.PASettingsRows={mount,ROWS,RESET,VERSE_ORDER_KEY};
 })();
 </script>

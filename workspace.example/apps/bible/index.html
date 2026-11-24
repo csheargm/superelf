@@ -41,8 +41,9 @@ body{display:flex;flex-direction:column}
 .verse.selected{background:color-mix(in srgb,var(--accent) 11%,transparent);border-color:color-mix(in srgb,var(--accent) 28%,transparent)}
 .vnum{font-size:11px;font-weight:700;color:var(--accent);margin-bottom:3px;display:flex;align-items:center;gap:5px}
 .ndot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex-shrink:0}
-.ven{font-size:1.125em;line-height:1.6;margin-bottom:6px}
-.vzh{font-size:1.0625em;line-height:1.7;color:var(--muted)}
+.ven{font-size:1.125em;line-height:1.6}
+.vzh{font-size:1.0625em;line-height:1.7}
+.vnum+div{margin-bottom:6px}.vnum+div+div{color:var(--muted)}   /* 经文顺序: the first line is the text, the second muted, whichever language orderLines put first */
 /* FAB */
 /* Top bar pane toggles (plan item 1): pressed = that pane is open. Narrow screens wrap the label. */
 #top-panes{margin-left:auto;display:flex;gap:6px;flex-shrink:0}
@@ -775,6 +776,25 @@ async function load(){
 function hasAnnotation(n, set){ return (set||annotatedVerses()).has(n); }
 
 // ── Render ──
+// 经文顺序 Verse order（owner 2026-11-24）: 中文 (CUV) first, then English (BSB), unless this reader's
+// account app pref englishFirst is true (the ⚙ Settings tick-box row, web/settings-rows.inline.html,
+// which owns the key: PASettingsRows.VERSE_ORDER_KEY). ONE rule, orderLines, used by the render and by a
+// flip. Ink and highlights are pinned to a LINE (verse + lang + chars, web/ink-anchor / verse-marks), never
+// to its place in the verse, so moving a line moves its marks with it and nothing stored is rewritten.
+// TODO(R4 seam): this host is far over budget; the verse order goes with the render block when it splits.
+const ORDER_KEY=window.PASettingsRows&&PASettingsRows.VERSE_ORDER_KEY;
+let englishFirst=false;
+function orderLines(d){ const en=d.querySelector('.ven'), zh=d.querySelector('.vzh'); if(!en||!zh) return;
+  const [a,b]=englishFirst?[en,zh]:[zh,en]; if(a.nextElementSibling!==b) d.insertBefore(a,b); }
+const versePair=v=>englishFirst?[v.en,v.zh]:[v.zh,v.en];   // the order copied text (Ask AI / Explain) follows too
+function setOrder(ef){ if(ef===englishFirst) return; englishFirst=ef;
+  const wrap=document.getElementById('verses'); for(const d of wrap.querySelectorAll('.verse')) orderLines(d);
+  INK.render(); }   // (runs after boot, once INK exists) the lines moved: re-anchor the ink to them
+// A refused read keeps the default order (中文 first) and is not reported: the order is display only,
+// nothing is written from it, and the Settings dialog shows its own read failure (R5 c).
+function readOrder(){ if(!(ORDER_KEY&&window.PAAppPrefs)) return Promise.resolve();
+  return PAAppPrefs.read().then(r=>{ if(r&&r.ok) setOrder(r.prefs[ORDER_KEY]===true); }); }
+readOrder();
 function renderVerses(verses){
   const wrap=document.getElementById('verses');
   if(!verses.length){
@@ -790,6 +810,7 @@ function renderVerses(verses){
     d.innerHTML=`<div class="vnum">${v.n} ${dot}</div>`+
       `<div class="ven">${esc(v.en)}</div>`+
       `<div class="vzh">${esc(v.zh)}</div>`;
+    orderLines(d);
     // A text range dragged inside an already-selected verse must not deselect it (the click that
     // follows the drag would): the range is what the Mark control is about to use.
     d.onclick=()=>{ const r=VM.selection(); if(!(r&&r.n===v.n&&selV.has(v.n))) selectVerse(v.n,d); };
@@ -1538,7 +1559,8 @@ document.getElementById('daily-btn').onclick=dailyRead;
 // app's own) and SAY which one is in force, rather than showing an empty box for a prompt that is
 // very much in effect. Read from chatData so there is exactly one copy of that text (R3).
 if(window.PASettings&&PASettings.available){
-  PASettings.attach({ host:document.getElementById('nav'), appPrompt:chatData.system, extras:[INK_READOUT] });
+  window.PAVerseOrderHost=true;   // shows the 经文顺序 row in the dialog (PASettingsRows)
+  PASettings.attach({ host:document.getElementById('nav'), onSave:readOrder, appPrompt:chatData.system, extras:[INK_READOUT] });
 }
 
 // ── Start ──

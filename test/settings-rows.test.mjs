@@ -39,9 +39,10 @@ function mkDom() {
 
 // A page the way web.mjs serves it: PANote (when the app mounts notes), then settings-ui, whose
 // PA_SETTINGS_ROWS marker inlines settings-rows right after it; then the app attaches its ⚙.
-function page({ withNotes = true, withRows = true, me } = {}) {
+function page({ withNotes = true, withRows = true, verseHost = false, me } = {}) {
   const dom = mkDom();
   if (withNotes) dom.win.PANote = { prefs: () => ({ openAi: false }) };
+  if (verseHost) dom.win.PAVerseOrderHost = true;   // the Bible says so before it attaches its ⚙
   const run = (js) => new Function('window', 'document', 'parent', js)(dom.win, dom.doc, dom.win.parent);   // eslint-disable-line no-new-func
   run(jsOf(SETTINGS)); if (withRows) run(jsOf(ROWS));
   const host = dom.doc.createElement('div');
@@ -49,6 +50,7 @@ function page({ withNotes = true, withRows = true, me } = {}) {
   const shell = loadShellAppSettings({ me });
   return { dom, h, shell,
     cb: () => dom.made.find((n) => n.tag === 'input' && n.type === 'checkbox'),
+    win: dom.win,
     json: () => dom.find('pag-mono'),
     async open() { h.el.fire('click'); await tick(); dom.reply({ ok: true, ...shell.appSettingsOf('notes', 'app own') }); await tick(); },
     async save() { dom.find('pag-go').fire('click'); await tick(); const m = dom.posted[dom.posted.length - 1];
@@ -114,4 +116,25 @@ test('the JSON box drives the tick; a tick over invalid JSON is undone, not writ
   assert.equal(p.cb().checked, false, 'undone');
   assert.equal(p.json().value, '{"openAi": tr', 'the half-typed text is kept');
   assert.ok(p.dom.find('pag-msg').classList.contains('pag-err'), 'and the parse error stays on screen (R5)');
+});
+
+// 经文顺序 Verse order (owner 2026-11-24): the Bible shows 中文 first; one tick, in this dialog, puts English first.
+const ORDER_LABEL = '经文顺序：英文在前 · Verse order: English first';
+const boxOf = (p, label) => { const lab = p.dom.made.find((n) => n.tag === 'label' && n.children.some((c) => c.textContent === label)); return lab && lab.children.find((c) => c.tag === 'input'); };
+test('Bible (PAVerseOrderHost): the verse-order row shows, unticked (中文 first); tick + Save stores englishFirst=true, untick removes it', async () => {
+  const me = ME(); const p = page({ verseHost: true, me }); await p.open();
+  assert.equal(p.win.PASettingsRows.VERSE_ORDER_KEY, 'englishFirst', 'the key the Bible reads');
+  assert.equal(ROWS.split(ORDER_LABEL).length, 2, 'the label is written once (R3)');
+  const cb = boxOf(p, ORDER_LABEL); assert.ok(cb, 'the row is there');
+  assert.equal(cb.checked, false, 'default: 中文 first');
+  cb.checked = true; cb.fire('change');
+  assert.deepEqual(JSON.parse(p.json().value), { noteSort: 'created', englishFirst: true });
+  await p.save(); assert.deepEqual(me.appPrefs.notes, { noteSort: 'created', englishFirst: true }, 'stored on the account (per user)');
+  await p.open(); assert.equal(boxOf(p, ORDER_LABEL).checked, true, 'reopened: painted from the stored value');
+  boxOf(p, ORDER_LABEL).checked = false; boxOf(p, ORDER_LABEL).fire('change'); await p.save();
+  assert.deepEqual(me.appPrefs.notes, { noteSort: 'created' }, 'off = the default, the key goes');
+});
+test('CONTROL (R14): a page that is not the Bible (no PAVerseOrderHost) has no verse-order row', async () => {
+  const p = page({ me: ME() }); await p.open();
+  assert.equal(boxOf(p, ORDER_LABEL), undefined);
 });

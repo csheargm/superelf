@@ -6,12 +6,17 @@ const BIBLE = fs.readFileSync(new URL('../workspace/apps/bible/index.html', impo
 const CHAT = fs.readFileSync(new URL('../web/chat-ui.inline.html', import.meta.url), 'utf8');
 const slice = (a, b) => BIBLE.slice(BIBLE.indexOf(a), BIBLE.indexOf(b));
 const ctx = { selV: new Set([2]), VERSES: [{ n: 2, en: 'He came at night.', zh: '这人夜里来见耶稣。' }] };
+// 经文顺序 (owner 2026-11-24): the verse text follows the reading order — the Bible's own versePair line.
+const PAIR = BIBLE.slice(BIBLE.indexOf('const versePair='), BIBLE.indexOf('\n', BIBLE.indexOf('const versePair=')));
+vm.runInNewContext('var englishFirst=false;' + PAIR.replace('const versePair', 'var versePair') + '\n;this.setEF=v=>{englishFirst=v};', ctx);
 vm.runInNewContext(slice('const EXPLAIN_PROMPT_BODY=', 'let rail=null') + ';this.explainMsg=explainMsg;this.showMe=showMe;this.setO=v=>{_explainPromptOverride=v};', ctx);
 
 test('the model gets the instructions; the bubble shows header + verse only', () => {
   const m = ctx.explainMsg('John 3:2');
   assert.match(m, /FIRST REPLY/); assert.match(m, /He came at night/);
-  assert.equal(ctx.showMe(m), '释经 Explain — John 3:2\nHe came at night.\n这人夜里来见耶稣。');
+  assert.equal(ctx.showMe(m), '释经 Explain — John 3:2\n这人夜里来见耶稣。\nHe came at night.', '中文 first, as the verses read');
+  ctx.setEF(true); const e = ctx.explainMsg('John 3:2'); ctx.setEF(false);
+  assert.equal(ctx.showMe(e), '释经 Explain — John 3:2\nHe came at night.\n这人夜里来见耶稣。', 'English first when the reader chose it');
 });
 test('a custom prompt is hidden the same way', () => {
   ctx.setO('My own instructions'); const m = ctx.explainMsg('John 3:2'); ctx.setO(null);
