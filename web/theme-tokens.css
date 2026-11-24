@@ -1,0 +1,28 @@
+/* PA theme tokens（主题变量）— the ONE palette for the shell AND every app page (R3).
+   Inlined into the shell (lib/shellhtml.mjs) and injected at the end of each served app's <head>
+   (web.mjs sendAppHtml), so an app that names --bg/--card/--text/--muted/--line/--accent/--danger
+   gets the same look without a per-app fork. Direction "B 清透 Clear glass" with "C 专注" restraint:
+   crisp white / true black, one blue accent kept for what needs the user.
+   Contrast (measured, WCAG): --text/--bg 19:1 both themes; --muted/--bg 5.3:1 light, 7.0:1 dark;
+   --accent as TEXT on --card 5.7:1 light, 6.0:1 dark; white on --accent-fill 5.7:1 light, 4.8:1 dark.
+   In dark mode --accent is the TEXT blue and --accent-fill the BUTTON blue: no single blue clears
+   4.5:1 both as text on near-black and under white text. */
+:root{
+  --bg:#f5f6f8; --card:#ffffff; --text:#0b0c0e; --muted:#63666e; --line:#e3e5ea;
+  --accent:#0062d1; --accent-fill:#0062d1; --on-accent:#ffffff; --accent-soft:rgba(0,98,209,.1);
+  --danger:#c62f2f; --ok:#1f8a4c;
+  --panel:rgba(255,255,255,.78);
+  --shadow:0 1px 1px rgba(0,0,0,.04),0 8px 24px rgba(20,30,60,.07);
+  --shadow-lift:0 2px 4px rgba(0,0,0,.05),0 14px 32px rgba(20,30,60,.12);
+  --r-card:20px; --r-ctl:12px; --r-pill:999px;
+  --font-ui:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Hiragino Sans GB","Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;
+  --ease-lift:cubic-bezier(.2,.8,.2,1);
+}
+@media (prefers-color-scheme: dark){ :root{
+  --bg:#000000; --card:#1c1c1e; --text:#f5f5f7; --muted:#a1a1a8; --line:#2c2c2e;
+  --accent:#409cff; --accent-fill:#0a6fe0; --on-accent:#ffffff; --accent-soft:rgba(64,156,255,.18);
+  --danger:#ff6b5e; --ok:#4cd07d;
+  --panel:rgba(28,28,30,.82);
+  --shadow:0 0 0 .5px rgba(255,255,255,.07),0 8px 24px rgba(0,0,0,.5);
+  --shadow-lift:0 0 0 .5px rgba(255,255,255,.1),0 14px 32px rgba(0,0,0,.6);
+} }

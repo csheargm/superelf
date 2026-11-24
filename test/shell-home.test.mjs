@@ -29,7 +29,7 @@ test('there is exactly one definition of Home, and it clears everything', () => 
 test('every control that says Home is wired to it', () => {
   // Enumerate rather than trusting a list: find each element whose label is Home, then prove
   // its handler is goHome. A third Home button added later fails here until it is wired.
-  const labelled = [...SHELL.matchAll(/id="([a-zA-Z]+)"[^>]*>(?:←\s*)?Home</g)].map((m) => m[1]);
+  const labelled = [...SHELL.matchAll(/id="([a-zA-Z]+)"[^>]*>(?:←\s*)?(?:主页 · )?Home</g)].map((m) => m[1]);
   const byTitle = [...SHELL.matchAll(/id="([a-zA-Z]+)"[^>]*title="Home[^"]*"/g)].map((m) => m[1]);
   const homes = [...new Set([...labelled, ...byTitle])];
   assert.ok(homes.includes('goHome'), 'the drawer header must carry a Home control');

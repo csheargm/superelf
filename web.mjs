@@ -666,6 +666,10 @@ const PA_LEAVE_MARKER = '<!--PA_LEAVE_UI-->';
 const PA_BROKER_MARKER = '<!--PA_BROKER_UI-->';
 const PA_BUSY_MARKER = '<!--PA_BUSY_UI-->';
 const PA_SNAP_MARKER = '<!--PA_SNAP_UI-->';
+// The shared palette (web/theme-tokens.css, also inlined into the shell): placed at the END of <head>, after the
+// app's own <style>, so every app that names --bg/--card/--text/--accent… gets the one look (no per-app fork).
+// Kept OUT of PA_COMPONENTS (that list is append-only and its order is pinned); it is in appStamp below.
+const PA_THEME_FILE = 'theme-tokens.css';
 // APPEND-ONLY, and order matters: the loop below re-tests the ALREADY-INLINED html on each pass,
 // so a component listed BEFORE another can have that other's marker inlined into it. Adding new
 // entries last keeps an existing component's content out of the substitution path.
@@ -813,7 +817,7 @@ function appStamp(file) {
   let k;
   try { const st = fs.statSync(file); k = file + ':' + st.mtimeMs + ':' + st.size; }
   catch { return null; }                                  // unreadable: fall through to the live path
-  for (const c of PA_COMPONENTS) {
+  for (const c of [...PA_COMPONENTS, { file: PA_THEME_FILE }]) {
     try { const st = fs.statSync(path.join(ROOT, 'web', c.file)); k += '|' + c.file + ':' + st.mtimeMs + ':' + st.size; }
     catch { return null; }
   }
@@ -829,6 +833,10 @@ function sendAppHtml(res, file, type, extra) {
     // Before the first script, or at the end of <head>: whichever comes first. A page with neither
     // has no script element, so it gets none of PATwoTap, PAStore, PALeave and PA (ADR 0018 known gaps).
     html = html.replace(/<\/head>|<script\b/i, (m) => PA_TWO_TAP_MARKER + PA_STORE_MARKER + PA_LEAVE_MARKER + PA_BROKER_MARKER + PA_BUSY_MARKER + PA_SNAP_MARKER + m);
+    let theme = '';
+    try { theme = fs.readFileSync(path.join(ROOT, 'web', PA_THEME_FILE), 'utf8'); }
+    catch (e) { return send(res, 500, 'text/plain', 'component unavailable'); }   // fail loud, like a missing component (R5)
+    html = html.replace(/<\/head>/i, (m) => '<style id="pa-theme">' + theme + '</style>' + m);   // after the app's own styles
     for (const c of PA_COMPONENTS) {
       if (!html.includes(c.marker)) continue;
       let snippet = '';

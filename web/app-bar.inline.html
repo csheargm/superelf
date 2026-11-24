@@ -19,9 +19,9 @@
 <style id="paab-style">
 /* PA_BAR_HANDLE_CSS */
 .paab-on{transition:transform .18s ease}
-.paab-btn{font:inherit;font-weight:700;background:none;border:none;color:var(--accent,#0f6355);cursor:pointer;
-  padding:4px 8px;min-height:36px;flex-shrink:0;white-space:nowrap}
-.paab-home{font-size:13px}.paab-dn{font-size:12px}.paab-up{font-size:15px}
+.paab-btn{font:inherit;font-weight:700;background:none;border:none;color:var(--text,#1c1e1d);cursor:pointer;
+  padding:4px 8px;min-height:40px;min-width:40px;flex-shrink:0;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:2px}
+.paab-home{font-size:14px;font-weight:600}.paab-ic{width:20px;height:20px;flex:none}.paab-dn{font-size:12px}.paab-up{font-size:15px}
 @media(max-width:600px){.paab-home .paab-lbl{display:none}.paab-btn{padding:4px 5px}}
 .paab-narrow{display:flex;justify-content:center;gap:12px}
 .paab-handle{display:none;position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:2147482000;width:var(--pa-handle-w);height:var(--pa-handle-h);
@@ -111,7 +111,7 @@
   }
   function sizeBtn(d){
     const b=document.createElement('button'); b.type='button';
-    b.className='paab-btn '+(d<0?'paab-dn':'paab-up'); b.textContent=d<0?'A-':'A+';
+    b.className='paab-btn '+(d<0?'paab-dn':'paab-up'); b.textContent=d<0?'A−':'A+';
     const t=(S.titles&&S.titles[d<0?0:1])||''; if(t){ b.title=t; b.setAttribute('aria-label',t); }
     let held=0, tm=0;
     b.addEventListener('pointerdown',()=>{ held=0; clearTimeout(tm); tm=setTimeout(()=>{ held=1; post('font',0); },RESET_PRESS_MS); });
@@ -124,7 +124,8 @@
     S.bar=bar; bar.classList.add('paab-on');
     const home=document.createElement('button'); home.type='button'; home.className='paab-btn paab-home';
     home.title='主页 · Home'; home.setAttribute('aria-label','主页 · Home');
-    home.innerHTML='← <span class="paab-lbl">Home</span>';
+    // The shell's back chevron (web/icons.js PAIcons 'back'), drawn inline: an app page cannot load the shell's script.
+    home.innerHTML='<svg class="paab-ic" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg><span class="paab-lbl">主页 · Home</span>';
     // A long press asks the shell for 改这个应用 · Change this app (ADR 0040; the shell decides who may). It is not also a Home tap.
     let pressT=0, pressed=false;
     home.addEventListener('pointerdown',()=>{ pressed=false; clearTimeout(pressT); pressT=setTimeout(()=>{ pressed=true; post('edit-app'); },RESET_PRESS_MS); });

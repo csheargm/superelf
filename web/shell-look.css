@@ -1,0 +1,141 @@
+/* PA shell look（外观）— the new look for the shell's own chrome: header, drawer, home tiles,
+   composer, frame bar, dialogs and menus. Inlined LAST in the shell's <style> (lib/shellhtml.mjs),
+   so it restyles the rules above without touching their behaviour. Colours come only from the
+   tokens in web/theme-tokens.css. Motion is small (a tile lifts on press) and switched off under
+   prefers-reduced-motion. Tap targets are >= 44px on touch. */
+body{ font-family:var(--font-ui); -webkit-font-smoothing:antialiased; }
+.pi{ width:22px; height:22px; display:block; flex:none; }
+.ibtn{ min-width:44px; min-height:44px; display:inline-flex; align-items:center; justify-content:center; color:var(--text); border-radius:var(--r-pill);
+  -webkit-tap-highlight-color:transparent; transition:background-color .15s ease, transform .15s var(--ease-lift); }
+.ibtn:hover{ background:var(--accent-soft); }
+.ibtn:active{ transform:scale(.94); }
+button.plain{ border-radius:var(--r-pill); border-color:var(--line); color:var(--text); }
+button.primary{ background:var(--accent-fill); color:var(--on-accent); border-radius:var(--r-ctl); }
+
+/* Header: a friendly greeting block — the name bold, then greeting · date · today's reading. */
+header{ border-bottom:0; align-items:center; flex-wrap:wrap; gap:0 4px; padding:10px 16px 6px; }
+header .greet{ flex:1; min-width:0; display:flex; flex-direction:column; }
+header h1{ font-size:calc(24px * var(--fs,1)); font-weight:700; letter-spacing:-.01em; line-height:1.2; }
+header .hsub{ flex:1 0 100%; order:10; padding:0 0 2px 68px; margin-top:-6px; font-size:calc(13.5px * var(--fs,1)); color:var(--muted); line-height:1.45; word-break:keep-all; line-break:strict;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+header .hsub .it{ white-space:nowrap; }
+header .hsub .it + .it::before{ content:'·'; margin:0 .45em; }
+header .hsub b{ color:var(--text); font-weight:600; }
+header .hsub:empty{ display:none; }
+.dot{ width:8px; height:8px; margin:0 6px 0 2px; }
+.dot.ok{ background:var(--ok); }
+#newSession{ display:inline-flex; align-items:center; gap:4px; min-height:40px; padding:0 12px; background:var(--card); border:0; box-shadow:var(--shadow); font-weight:500; white-space:nowrap; }
+#newSession .pi{ width:16px; height:16px; }
+@media (max-width:440px){
+  header{ gap:2px; padding:10px 8px 4px; }
+  header h1{ font-size:calc(20px * var(--fs,1)); }
+  header .hsub{ white-space:normal; }
+  header .hsub .en{ display:none; }
+  header .hsub{ padding-left:64px; }
+  #newSession .lbl{ display:none; }
+  #newSession{ padding:0 10px; }
+}
+
+/* One "Aa" control: tap shows the existing smaller / larger pair as a small floating pill. */
+.aa{ position:relative; display:inline-flex; }
+.aa-btn{ font-weight:600; font-size:17px; letter-spacing:-.02em; }
+.aa-set{ display:none; position:absolute; top:calc(100% + 6px); right:0; z-index:40; gap:2px; padding:4px; background:var(--card); border-radius:var(--r-pill); box-shadow:var(--shadow-lift); }
+.aa.open .aa-set{ display:flex; }
+.aa-set .ibtn{ font-weight:700; }
+.aa-set .fs-dn{ font-size:14px; } .aa-set .fs-up{ font-size:19px; }
+
+/* Home: rounded soft cards, coloured filled icon, bold title, the live number leading. */
+main{ max-width:1040px; }
+#log{ max-width:720px; width:100%; margin:0 auto; }
+#emptyState{ padding-top:10px; }
+#emptyState .grid{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+@media (min-width:600px){ #emptyState .grid{ grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; } }
+@media (min-width:900px){ #emptyState .grid{ grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; } }
+.ecard{ position:relative; display:flex; flex-direction:column; gap:10px; min-height:124px; min-width:0; padding:14px; border:0; border-radius:var(--r-card);
+  background:var(--card); box-shadow:var(--shadow); -webkit-tap-highlight-color:transparent;
+  transition:transform .18s var(--ease-lift), box-shadow .18s var(--ease-lift); }
+.ecard:hover{ box-shadow:var(--shadow-lift); }
+.ecard:active{ transform:translateY(-2px) scale(.985); box-shadow:var(--shadow-lift); }
+.ecard > b{ margin:0; font-size:calc(16px * var(--fs,1)); font-weight:700; line-height:1.25; overflow-wrap:anywhere; word-break:keep-all; line-break:strict;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.ecard > small{ margin-top:auto; font-size:calc(13.5px * var(--fs,1)); line-height:1.35; color:var(--muted); word-break:keep-all; line-break:strict; overflow-wrap:anywhere;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.ecard .face{ margin-top:auto; font-size:calc(13.5px * var(--fs,1)); line-height:1.35; color:var(--muted); }
+.ecard .face b{ display:block; font-size:calc(26px * var(--fs,1)); font-weight:700; line-height:1.1; letter-spacing:-.02em; color:var(--text); margin-bottom:2px; }
+.ecard .face i{ white-space:nowrap; }
+.app-ic{ --c:#5b6470; width:40px; height:40px; border-radius:12px; display:grid; place-items:center; flex:none; color:#fff;
+  background:linear-gradient(160deg,color-mix(in srgb,var(--c) 78%,#fff),var(--c)); box-shadow:inset 0 0 0 .5px rgba(0,0,0,.06); }
+.app-ic .pi{ width:22px; height:22px; }
+.update-dot{ position:absolute; top:12px; right:12px; margin:0; width:10px; height:10px; background:var(--accent-fill); box-shadow:0 0 0 3px var(--accent-soft); }
+.ecard .star{ color:var(--accent); }
+.grid-sep,.shelf-head{ text-transform:none; letter-spacing:0; font-size:13px; font-weight:600; color:var(--muted); }
+.grid-sep{ margin:12px 2px 0; }
+.ecard [data-fget]{ min-height:32px; }
+
+/* Drawer: translucent panel, rows with small icons, chats by day. */
+#drawer{ background:var(--panel); -webkit-backdrop-filter:saturate(1.6) blur(22px); backdrop-filter:saturate(1.6) blur(22px); border-right:0; box-shadow:var(--shadow-lift); }
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){ #drawer{ background:var(--card); } }
+.dhead{ gap:6px; padding:10px 10px 8px 14px; border-bottom:0; }
+.dhead #goHome{ border:0; background:none; font-size:17px; min-height:44px; }
+#drawerSearch{ border:0; background:none; min-width:44px; min-height:44px; display:inline-flex; align-items:center; justify-content:center; padding:0; color:var(--text); }
+#newChat{ border:0; background:var(--accent-fill); color:var(--on-accent); font-weight:600; min-height:38px; padding:0 14px; display:inline-flex; align-items:center; gap:4px; }
+#newChat .pi{ width:16px; height:16px; }
+.dsec-head{ font-size:13px; font-weight:600; color:var(--muted); padding:14px 16px 6px; min-height:40px; }
+.dsec-head::after{ color:var(--muted); }
+.dapp,.convo{ border-bottom:0; margin:0 8px; padding:9px 10px; min-height:44px; border-radius:var(--r-ctl); gap:10px; }
+.dapp:hover,.convo:hover{ background:var(--accent-soft); }
+.convo.active{ background:var(--accent-soft); color:var(--accent); font-weight:500; }
+.dapp .app-ic{ width:28px; height:28px; border-radius:8px; }
+.dapp .app-ic .pi{ width:16px; height:16px; }
+.dapp-name,.convo .t{ font-size:15px; }
+.convo .cmenu,.dapp .cmenu{ min-width:36px; min-height:36px; display:inline-flex; align-items:center; justify-content:center; padding:0; border-radius:var(--r-pill); }
+.convo .cmenu .pi,.dapp .cmenu .pi{ width:18px; height:18px; }
+#convos .day{ font-size:12px; color:var(--muted); padding:10px 18px 2px; font-weight:500; }
+.more-chats{ display:block; margin:4px 8px 12px; padding:10px; min-height:44px; border:0; background:none; color:var(--accent); font:inherit; font-size:15px; text-align:left; cursor:pointer; border-radius:var(--r-ctl); }
+.more-chats:hover{ background:var(--accent-soft); }
+.d-empty{ padding:12px 18px; color:var(--muted); font-size:14px; }
+#chatSearch{ background:var(--card); }
+.cs-bar{ border-bottom:0; }
+.cs-bar input{ border-radius:var(--r-pill); padding:10px 14px; }
+#csClose{ border:0; min-width:44px; display:inline-flex; align-items:center; justify-content:center; padding:0; }
+
+/* Composer: a floating rounded bar over a soft fade, the send button the one filled accent. */
+form#f{ padding-top:22px; background:linear-gradient(to bottom,transparent,var(--bg) 55%); }
+#frow{ max-width:760px; width:100%; margin:0 auto; border:0; padding:5px; box-shadow:0 2px 6px rgba(0,0,0,.06),0 12px 32px rgba(0,0,0,.12); }
+@media (prefers-color-scheme: dark){ #frow{ box-shadow:0 0 0 1px rgba(255,255,255,.08),0 12px 32px rgba(0,0,0,.6); } }
+#box{ font-size:max(16px, calc(16px * var(--fs,1))); }
+#box::placeholder{ color:var(--muted); }
+#plus{ min-width:40px; min-height:40px; }
+#send{ width:40px; height:40px; background:var(--accent-fill); color:var(--on-accent); }
+#send .pi{ width:20px; height:20px; }
+.pac-pills{ max-width:760px; width:100%; margin:0 auto; }
+.pac-model,.pac-vfy{ border:0; box-shadow:var(--shadow); padding:5px 12px; }
+.chip{ border:0; box-shadow:var(--shadow); }
+
+/* Messages, menus, sheets. */
+.msg{ border:0; border-radius:18px; box-shadow:var(--shadow); padding:11px 15px; }
+.msg.me{ background:var(--accent-fill); color:var(--on-accent); border-radius:18px 18px 6px 18px; }
+.msg.status,.msg.err{ box-shadow:none; }
+.cmenu-pop,.pac-mmenu{ border:0; border-radius:14px; box-shadow:var(--shadow-lift); padding:4px; }
+.cmenu-pop button{ border-radius:10px; min-height:44px; }
+dialog{ border:0; border-radius:var(--r-card); box-shadow:var(--shadow-lift); }
+dialog::backdrop{ background:rgba(0,0,0,.35); }
+dialog input, dialog textarea, dialog select{ border-radius:var(--r-ctl); }
+#cfg{ border-radius:0; box-shadow:none; }
+#cfgHead{ background:var(--panel); -webkit-backdrop-filter:blur(18px); backdrop-filter:blur(18px); border-bottom:1px solid var(--line); }
+#cfgClose{ display:inline-flex; align-items:center; justify-content:center; color:var(--text); }
+#scrollBtn{ border:0; box-shadow:var(--shadow-lift); width:44px; height:44px; }
+
+/* App frame bar: same icons, same Aa. */
+#frame .bar{ border-bottom:1px solid var(--line); }
+#frame .bar #back{ border:0; background:none; display:inline-flex; align-items:center; gap:2px; min-height:40px; padding:0 10px 0 4px; font-weight:500; }
+#frame .bar #back .pi{ width:20px; height:20px; }
+#frame .bar>#ftitle{ font-weight:700; }
+#frame .bar #fmore{ border:0; background:none; min-width:40px; min-height:40px; display:inline-flex; align-items:center; justify-content:center; padding:0; }
+
+@media (prefers-reduced-motion:reduce){
+  .ecard,.ibtn{ transition:none; }
+  .ecard:active,.ibtn:active{ transform:none; }
+}
+@media (min-width:900px){ header{ padding-left:max(16px, calc((100vw - 1040px) / 2)); padding-right:max(16px, calc((100vw - 1040px) / 2)); } }
+.ecard .star{ margin-left:.25em; }

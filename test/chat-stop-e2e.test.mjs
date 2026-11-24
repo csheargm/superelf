@@ -40,11 +40,11 @@ test('while a turn runs the send button is Stop; Stop ends it with 已取消 · 
   await page.waitForSelector('#login[open]');
   await page.fill('#luser', 'owner'); await page.fill('#lpin', 'owner-pass-123'); await page.click('#loginBtn');
   await page.waitForFunction(() => !document.querySelector('#login[open]'));
-  const btn = () => page.evaluate(() => { const b = document.querySelector('#send'); return { text: b.textContent, title: b.title }; });
-  assert.deepEqual(await btn(), { text: '↑', title: '发送 · Send' });
+  const btn = () => page.evaluate(() => { const b = document.querySelector('#send'); return { stop: b.classList.contains('stop'), icon: !!b.querySelector('svg'), title: b.title }; });
+  assert.deepEqual(await btn(), { stop: false, icon: true, title: '发送 · Send' });   // icons are inline SVG (web/icons.js), not ↑ / ■
   await page.fill('#box', 'a slow question'); await page.press('#box', 'Enter');
   await page.waitForFunction(() => document.querySelector('#send').title === '停止 · Stop');
-  assert.equal((await btn()).text, '■');
+  assert.deepEqual(await btn(), { stop: true, icon: true, title: '停止 · Stop' });
   await page.fill('#box', 'typing a follow-up');
   assert.equal((await btn()).title, '发送 · Send', 'with text in the composer the button sends (queues)');
   await page.fill('#box', '');

@@ -13,8 +13,8 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ctext y=%2213%22 font-size=%2213%22%3E🏠%3C/text%3E%3C/svg%3E">
 <style>
 /* PA_BAR_HANDLE_CSS */
-:root { --sab-probe: env(safe-area-inset-bottom, 0px); --bg:#f4f4f2; --card:#fff; --text:#1c1e1d; --muted:#6b7370; --line:#e2e2de; --accent:#0f6355; --danger:#983d24; }
-@media (prefers-color-scheme: dark){ :root{ --bg:#111514; --card:#1b201f; --text:#e5e8e6; --muted:#8f9894; --line:#2a302e; --accent:#57c2ac; --danger:#e08163; } }
+:root { --sab-probe: env(safe-area-inset-bottom, 0px); }
+/* PA_THEME_TOKENS_CSS */
 *{ box-sizing:border-box; margin:0; }
 html{ height:100dvh; overflow:hidden; background:var(--bg); }
 /* iOS home-screen apps: dvh can compute short, leaving a bottom band. 100% is reliable there. */
@@ -314,33 +314,32 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
     -webkit-print-color-adjust:exact;print-color-adjust:exact}
   @page{margin:10mm}
 }
+/* PA_SHELL_LOOK_CSS */
 </style>
 </head>
 <body>
 <div id="backdrop"></div>
 <aside id="drawer">
-  <div class="dhead"><button class="plain" id="goHome" title="主页 · Home">Home</button><button class="plain" id="drawerSearch" title="Search chats" style="margin-right:2px">🔍</button><button class="plain" id="newChat">+ New</button></div>
-  <div class="dsec open" id="secApps"><div class="dsec-head">My Apps</div><div class="dsec-body"><div class="d-apps-list" id="dApps"></div></div></div>
-  <div class="dsec open" id="secFamily"><div class="dsec-head">Family Apps</div><div class="dsec-body"><div id="dFamily" class="d-apps-list" style="padding:0 12px 8px"></div></div></div>
+  <div class="dhead"><button class="plain" id="goHome" title="主页 · Home">主页 · Home</button><button class="plain" id="drawerSearch" title="搜索对话 · Search chats" aria-label="搜索对话 · Search chats" data-icon="search"></button><button class="plain" id="newChat" title="新对话 · New chat" data-icon="plus">新建 · New</button></div>
+  <div class="dsec open" id="secApps"><div class="dsec-head">我的应用 · My Apps</div><div class="dsec-body"><div class="d-apps-list" id="dApps"></div></div></div>
+  <div class="dsec open" id="secFamily"><div class="dsec-head">家庭应用 · Family Apps</div><div class="dsec-body"><div id="dFamily" class="d-apps-list" style="padding:0 12px 8px"></div></div></div>
   <!-- 简报 · Briefings — a JOB's output. System-level, like the jobs that produce it, so it
        belongs beside My Apps rather than inside any one app. It was previously readable only
        inside the longevity app: an accident of history, since briefings began as a health
        feature and the reading surface never moved when they became general. -->
   <div class="dsec open" id="secBriefs"><div class="dsec-head">简报 · Briefings</div><div class="dsec-body"><div id="briefs"></div></div></div>
   <div class="dsec open" id="secChats"><div class="dsec-head">对话记录 · Chats</div><div class="dsec-body"><div id="convos"></div></div></div>
-  <div id="chatSearch"><div class="cs-bar"><input id="csInp" placeholder="搜索对话 · Search chats" autocomplete="off"><button class="plain" id="csClose">✕</button></div><div id="csResults"></div></div>
+  <div id="chatSearch"><div class="cs-bar"><input id="csInp" placeholder="搜索对话 · Search chats" autocomplete="off"><button class="plain" id="csClose" title="关闭 · Close" aria-label="关闭 · Close" data-icon="close"></button></div><div id="csResults"></div></div>
 </aside>
 <header>
-  <button class="ibtn" id="menu" title="Conversations">☰</button>
+  <button class="ibtn" id="menu" title="菜单 · Menu" aria-label="菜单 · Menu" data-icon="menu"></button>
   <span class="dot" id="dot"></span>
-  <h1>管家</h1>
-  <span class="spacer"></span>
-  <button class="ibtn fs-dn" style="font-size:12px;font-weight:700">A-</button>
-  <button class="ibtn fs-up" style="font-size:15px;font-weight:700">A+</button>
-  <button class="ibtn" id="reload" title="Refresh">↺</button>
-
-  <button class="ibtn" id="settings" title="Settings">⚙️</button>
-  <button class="plain" id="newSession">Main</button>
+  <div class="greet"><h1>管家</h1></div>
+  <span class="aa"><button class="ibtn aa-btn" type="button" title="字号 · Text size" aria-label="字号 · Text size" aria-expanded="false">Aa</button><span class="aa-set"><button class="ibtn fs-dn">A−</button><button class="ibtn fs-up">A+</button></span></span>
+  <button class="ibtn" id="reload" title="刷新 · Refresh" aria-label="刷新 · Refresh" data-icon="refresh"></button>
+  <button class="ibtn" id="settings" title="设置 · Settings" aria-label="设置 · Settings" data-icon="gear"></button>
+  <button class="plain" id="newSession" title="新对话 · New chat"><span class="lbl">Main</span></button>
+  <div class="hsub" id="hsub"></div>
 </header>
 <!-- Outside <header>: the toast also answers the app bar's A-/A+, and the header is inert while an app is open. -->
 <span id="updBar" class="fs-toast"></span>   <!-- "Update ready" line, PAUpdate (web/update.js); same place as the toast, outside the inert header -->
@@ -354,14 +353,14 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
   <div id="chips"></div>
   <div class="pac-pills"><button class="pac-model" id="shellModel" type="button" style="display:none"></button><button class="pac-vfy" id="shellVfy" type="button" style="display:none">校验 · ☐ Verify</button></div>
   <div id="frow">
-    <button class="ibtn" id="plus" type="button" title="Attach">+</button>
+    <button class="ibtn" id="plus" type="button" title="附件 · Attach" aria-label="附件 · Attach" data-icon="plus"></button>
     <input id="box" placeholder="提问，或：创建一个应用… · Ask, or: create an app that…" autocomplete="off">
-    <button class="primary" id="send" type="button" title="发送 · Send" aria-label="发送 · Send">↑</button>
+    <button class="primary" id="send" type="button" title="发送 · Send" aria-label="发送 · Send" data-icon="up"></button>
   </div>
 </form>
 <input type="file" id="filein-photo" multiple hidden accept="image/*">
 <div id="lightbox"><button id="lightbox-close">✕</button><img id="lightbox-img" src="" alt=""><div style="position:absolute;bottom:calc(env(safe-area-inset-bottom)+16px);left:0;right:0;text-align:center;color:rgba(255,255,255,.55);font-size:13px;pointer-events:none;">Tap outside image to close</div></div>
-<div id="frame"><div class="bar"><button class="plain" id="back">← Home</button><b id="ftitle" style="flex:1"></b><button class="plain" id="fmore" style="display:none;font-size:16px;padding:4px 8px" title="更多 · More" aria-label="More">⋯</button><button class="plain fs-dn" id="fs-dn" style="font-size:12px;font-weight:700;padding:4px 8px">A-</button><button class="plain fs-up" id="fs-up" style="font-size:15px;font-weight:700;padding:4px 8px">A+</button></div><button id="barpeek" class="plain" title="显示应用栏 · Show the app bar" aria-label="Show the app bar"></button><iframe id="fr" sandbox="allow-scripts" allow="clipboard-write;microphone"></iframe></div>
+<div id="frame"><div class="bar"><button class="plain" id="back" data-icon="back">主页 · Home</button><b id="ftitle" style="flex:1"></b><button class="plain" id="fmore" style="display:none" title="更多 · More" aria-label="More" data-icon="more"></button><span class="aa"><button class="ibtn aa-btn" type="button" title="字号 · Text size" aria-label="字号 · Text size" aria-expanded="false">Aa</button><span class="aa-set"><button class="ibtn fs-dn" id="fs-dn">A−</button><button class="ibtn fs-up" id="fs-up">A+</button></span></span></div><button id="barpeek" class="plain" title="显示应用栏 · Show the app bar" aria-label="Show the app bar"></button><iframe id="fr" sandbox="allow-scripts" allow="clipboard-write;microphone"></iframe></div>
 <!--PA_SETTINGS_DIALOG-->
 <dialog id="actConfirm" style="max-width:340px">
   <div id="acText" style="margin-bottom:14px;overflow-wrap:anywhere"></div>
@@ -401,7 +400,11 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
   <div style="text-align:center;margin-top:6px;font-size:12px"><a href="#" id="toTok" style="color:var(--muted)">尚无密码：用访问令牌登录 · No password yet: sign in with access token</a></div>
 </form></dialog>
 <script>
+/* PA_ICONS_JS */
+/* PA_HOME_LOOK_JS */
 const $=(s)=>document.querySelector(s);
+PAIcons.hydrate(); PAHomeLook.bindAa();
+$('#newSession').insertAdjacentHTML('beforeend',PAIcons.svg('down'));
 let T=localStorage.getItem('pa_session')||'';
 let API_BASE='';   // '' = this page's origin; the home node's name while the public one is away (web/offline-origin.js PAOrigin). TODO(R4 seam): with api() into web/api.js
 const api=(p,opt={})=>fetch(API_BASE+p,{...opt,headers:{...(opt.headers||{}),authorization:'Bearer '+T}});
@@ -478,10 +481,11 @@ let allConvos=[];
 async function loadConvos(){
   let list=[]; try{ list=await (await api('/api/convos')).json(); }catch{}
   allConvos=list;
-  $('#convos').innerHTML=list.map((c)=>
-    `<div class="convo${c.id===convoId?' active':''}" data-id="${esc(c.id)}"><div class="t">${esc(c.title||'New chat')}</div><button class="cmenu" data-menu="${esc(c.id)}" title="More" aria-label="More">⋯</button></div>`
-  ).join('')||'<div style="padding:16px;color:var(--muted)">No chats yet.</div>';
+  renderConvos();
 }
+// Chats by day, 5 recent + 更多 · More (web/home-look.js); the expansion lasts until the drawer is reopened.
+let convosExpanded=false;
+function renderConvos(){ $('#convos').innerHTML=PAHomeLook.convosHtml(allConvos,convoId,convosExpanded,esc); }
 // A job's output. Rows are SUMMARIES (id/title/job/created/preview); the body is fetched on
 // open, so the drawer stays cheap with months of history behind it.
 const BRIEFS_MAX=15;
@@ -494,7 +498,7 @@ async function loadBriefs(){
   // section reads as "nothing happened" when the truth is "we could not look" (R5).
   try{ const r=await api('/api/briefings'); if(r.ok) list=await r.json(); }catch{ /* list stays null */ }
   if(!Array.isArray(list)){ box.innerHTML='<div style="padding:16px;color:var(--danger);font-size:14px">无法加载简报 · Could not load briefings</div>'; return; }
-  if(!list.length){ box.innerHTML='<div style="padding:16px;color:var(--muted)">暂无简报 · No briefings yet</div>'; return; }
+  if(!list.length){ box.innerHTML='<div class="d-empty">暂无简报 · No briefings yet</div>'; return; }
   box.innerHTML=list.slice(0,BRIEFS_MAX).map((b)=>
     `<div class="convo${b.id===briefId?' active':''}" data-brief="${esc(b.id)}"><div class="t">
        <div style="display:flex;gap:8px;align-items:baseline"><span style="color:var(--muted);font-size:12px;flex-shrink:0">${esc(briefWhen(b.created))}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(b.title||b.job||'Briefing')}</span></div>
@@ -534,8 +538,9 @@ function goHome(){
 }
 const newConvo=goHome;   // a new chat begins at Home; kept as a name so call sites still read right
 $('#convos').onclick=(e)=>{
-  const menuId=e.target.dataset.menu;
-  if(menuId){ e.stopPropagation(); convoMenu(menuId, e.target.closest('.convo'), e.target); return; }
+  if(e.target.closest('[data-more-chats]')){ e.stopPropagation(); convosExpanded=true; renderConvos(); return; }
+  const menuId=e.target.closest('[data-menu]')?.dataset.menu;
+  if(menuId){ e.stopPropagation(); convoMenu(menuId, e.target.closest('.convo'), e.target.closest('[data-menu]')); return; }
   const id=e.target.closest('.convo')?.dataset.id; if(id) openConvo(id);
 };
 // Shared ⋯-popover close (chats + apps, R3). Closes ONLY on an OUTSIDE pointerdown — a
@@ -585,7 +590,7 @@ $('#drawerSearch').onclick=()=>{ $('#chatSearch').classList.add('on'); $('#csInp
 $('#csClose').onclick=()=>$('#chatSearch').classList.remove('on');
 $('#csInp').addEventListener('input',()=>csRender($('#csInp').value));
 $('#csResults').onclick=e=>{ const c=e.target.closest('.convo'); if(!c) return; $('#chatSearch').classList.remove('on'); openConvo(c.dataset.id); };
-function openDrawer(){ $('#drawer').classList.add('open'); $('#backdrop').classList.add('open'); loadConvos(); loadBriefs(); }
+function openDrawer(){ convosExpanded=false; $('#drawer').classList.add('open'); $('#backdrop').classList.add('open'); loadConvos(); loadBriefs(); }
 function closeDrawer(){ $('#drawer').classList.remove('open'); $('#backdrop').classList.remove('open'); }
 $('#menu').onclick=openDrawer; $('#backdrop').onclick=closeDrawer;
 $('#newChat').onclick=newConvo; $('#goHome').onclick=goHome;
@@ -1151,20 +1156,20 @@ async function loadApps(){
   const promotedInShelf=shelf.filter(a=>a.uid==='shared');
   $('#dApps').innerHTML=(own.map((a,i,arr)=>
     `<div class="dapp" data-u="${esc(UID)}" data-n="${esc(a.name)}">
-      <span class="dapp-name">${esc(a.title)}</span>
-      <button class="cmenu" data-appmenu="${esc(a.name)}" data-shared="${a.shared?'1':'0'}" data-forked="${a.forkedFrom?'1':'0'}" data-version="${esc(a.version||'')}" data-first="${i===0?'1':'0'}" data-last="${i===arr.length-1?'1':'0'}" title="More" aria-label="More">⋯</button>
-    </div>`).join('')||'<div style="padding:10px 16px;color:var(--muted);font-size:14px">No apps yet.</div>')
-    +(promotedInShelf.length?'<div class="shelf-head">⭐ Family shelf</div>'+promotedInShelf.map(a=>
+      ${PAIcons.tileIcon(a)}<span class="dapp-name">${esc(a.title)}</span>
+      <button class="cmenu" data-appmenu="${esc(a.name)}" data-shared="${a.shared?'1':'0'}" data-forked="${a.forkedFrom?'1':'0'}" data-version="${esc(a.version||'')}" data-first="${i===0?'1':'0'}" data-last="${i===arr.length-1?'1':'0'}" title="更多 · More" aria-label="More">${PAIcons.svg('more')}</button>
+    </div>`).join('')||'<div class="d-empty">还没有应用 · No apps yet.</div>')
+    +(promotedInShelf.length?'<div class="shelf-head">家庭书架 · Family shelf</div>'+promotedInShelf.map(a=>
     `<div class="dapp" data-u="shared" data-n="${esc(a.name)}">
-      <span class="dapp-name">${esc(a.title)}${a.sharedBy?` <small style="color:var(--muted)">· ${esc(a.sharedBy)}</small>`:''}</span>
+      ${PAIcons.tileIcon(a)}<span class="dapp-name">${esc(a.title)}${a.sharedBy?` <small style="color:var(--muted)">· ${esc(a.sharedBy)}</small>`:''}</span>
       ${ownNames.has(a.name)?'<small style="color:var(--accent);font-size:11px">✓ copied</small>':`<button class="plain" style="font-size:12px;padding:3px 8px" data-fork="${esc(a.name)}">Fork</button>`}
     </div>`).join(''):'');
   // Empty state grid: own then shelf (promoted + family-shared)
-  const card=(uid,a,badge)=>`<div class="ecard" data-eu="${esc(uid)}" data-es="${esc(a.name)}" data-et="${esc(a.title)}"><b>${esc(a.title)}${badge||''}${a.hasUpdate?`<span class="update-dot" data-update="${esc(a.name)}" data-title="${esc(a.title)}" title="有新版本 · Update available"></span>`:''}</b>${faceHtml(a)||`<small>${esc(a.desc||a.name)}</small>`}</div>`;
+  const card=(uid,a,badge)=>`<div class="ecard" data-eu="${esc(uid)}" data-es="${esc(a.name)}" data-et="${esc(a.title)}">${PAIcons.tileIcon(a)}<b>${esc(a.title)}${badge||''}${a.hasUpdate?`<span class="update-dot" data-update="${esc(a.name)}" data-title="${esc(a.title)}" title="有新版本 · Update available"></span>`:''}</b>${faceHtml(a)||`<small>${esc(a.desc||a.name)}</small>`}</div>`;
   const familyShelf=shelf.filter(a=>a.fromFamily);
   const shelfBadge=(a)=>a.fromFamily?`<button class="plain" style="font-size:11px;padding:2px 7px;margin-left:4px" data-fget="${esc(a.uid)}" data-fslug="${esc(a.name)}">Get</button>`:'<span class="star">★</span>';
   $('#eApps').innerHTML=own.map(a=>card(UID,a,'')).join('')
-    +(shelf.length?`<div class="grid-sep">⭐ Family shelf</div>`+shelf.map(a=>card(a.uid,a,shelfBadge(a))).join(''):'');
+    +(shelf.length?`<div class="grid-sep">家庭书架 · Family shelf</div>`+shelf.map(a=>card(a.uid,a,shelfBadge(a))).join(''):'');
   // Blue dot on each new app — the existing markNew system (key + _SEEN), so it clears on
   // first tap and stays cleared across reloads. The shelf is usually off-screen when an app
   // is created, so the ☰ that opens it is dotted too, or there is no cue to look.
@@ -1173,6 +1178,7 @@ async function loadApps(){
     $('#eApps').querySelectorAll('.ecard').forEach(el=>{ if(el.dataset.eu===UID&&fresh.has(el.dataset.es)) markNew(el,'app:'+el.dataset.es); });
     markNewSel('#menu','apps:'+[...fresh].sort().join(','));
   }
+  $('#hsub').innerHTML=PAHomeLook.headerSub(ownApps,esc);
   checkAndAutoUpdate(ownApps);
 }
 
@@ -2471,7 +2477,7 @@ const SEND_LABEL='发送 · Send', STOP_LABEL='停止 · Stop';
 let turnsRunning=0;
 function paintSendBtn(){
   const b=$('#send'), stop=turnsRunning>0&&!$('#box').value.trim()&&!attachments.length;
-  b.classList.toggle('stop',stop); b.textContent=stop?'■':'↑'; b.title=stop?STOP_LABEL:SEND_LABEL; b.setAttribute('aria-label',b.title);
+  b.classList.toggle('stop',stop); b.innerHTML=PAIcons.svg(stop?'stop':'up'); b.title=stop?STOP_LABEL:SEND_LABEL; b.setAttribute('aria-label',b.title);
 }
 async function stopTurn(){
   while(!convoId&&convoIdWait) await convoIdWait;   // a tap before the turn named its conversation waits for it, never a silent no-op
