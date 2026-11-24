@@ -5,6 +5,8 @@
 const PAPublish=(()=>{
   const POLL_MS=5000, TERMINAL=new Set(['published','failed','blocked']);
   const TIP_KEY='tip:publish';
+  // CI_MINUTES: measured from recent CI runs on main (4-9 min, 2026-11-24; PR 1 took 4.5 min).
+  const WAIT_TEXT='正在发布，CI 约需 5–10 分钟。可以关闭此窗口，完成后会提示（或下次打开 ⋯ 菜单时显示） · Publishing — CI takes about 5–10 minutes. You can close this; you\'ll be told when it\'s done (or see it next time you open the ⋯ menu).';
   const url=(slug)=>'/api/apps/'+encodeURIComponent(slug)+'/publish';
   const post=(slug,body)=>api(url(slug),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body||{})});
   // The menu item; the first time it is on screen it carries the one-time bilingual tip line.
@@ -13,11 +15,24 @@ const PAPublish=(()=>{
     return '<button data-a="publish" id="pubItem">发布到公开仓库 · Publish'
       +(seen?'':'<span class="pub-tip" style="display:block;font-size:11px;opacity:.75">新：审核后公开分享此应用 · New: share this app publicly after a privacy check</span>')+'</button>';
   }
-  function armTip(){ const b=$('#pubItem'); if(b) markNew(b,TIP_KEY); }
-  function sheet(html){
+  // armTip(slug) runs each time the owner's ⋯ menu opens: it also shows a publish result the owner
+  // has not seen yet (they closed the wait sheet, or left the app), and re-attaches the watcher to
+  // a publish still running. The node keeps the status in memory, so a node restart forgets it.
+  function armTip(slug){ const b=$('#pubItem'); if(b) markNew(b,TIP_KEY); if(b&&slug) check(slug); }
+  const SEEN_KEY=(slug)=>'pub:seen:'+slug;
+  const seenAt=(slug)=>{ try{ return localStorage.getItem(SEEN_KEY(slug)); }catch{ return null; /* no storage: show it again, harmless */ } };
+  const markSeen=(slug,st)=>{ try{ localStorage.setItem(SEEN_KEY(slug),String(st.at)); }catch{ /* no storage: the result may show once more */ } };
+  const watching=new Set();
+  async function check(slug){
+    let j; try{ const r=await api(url(slug)); j=await r.json(); }catch{ return; /* offline: the next ⋯ open looks again */ }
+    const st=j&&j.status; if(!st) return;
+    if(TERMINAL.has(st.state)){ if(seenAt(slug)!==String(st.at)){ notice(st); markSeen(slug,st); } }
+    else watch(slug);
+  }
+  function sheet(html,withGo){
     let s=$('#pubSheet'); if(!s){ s=document.createElement('div'); s.id='pubSheet'; s.className='cmenu-pop';
       s.style.cssText='left:8px;right:8px;top:64px;max-height:70vh;overflow:auto;padding:12px;font-size:14px'; document.body.appendChild(s); }
-    s.innerHTML=html+'<div style="text-align:right;margin-top:10px"><button data-pub="close" class="plain">关闭 · Close</button></div>';
+    s.innerHTML=html+'<div class="sheet-acts"><button data-pub="close" class="plain" id="pubClose">关闭 · Close</button>'+(withGo?'<button data-pub="go" id="pubGo" class="primary">发布 · Publish</button>':'')+'</div>';
     s.onclick=(e)=>{ const b=e.target.closest('[data-pub]'); if(b&&b.dataset.pub==='close') s.remove(); };
     return s;
   }
@@ -29,18 +44,20 @@ const PAPublish=(()=>{
     if(st.state==='published') return sheet(`<p id="pubDone">已发布 ${esc(st.version||'')} · Published${pr}</p>`);
     if(st.state==='blocked') return sheet(hitsHtml(st.hits||[]));
     if(st.state==='failed') return sheet(`<p id="pubFail">发布失败（${esc(st.step||'')}） · Publish failed: ${esc(st.error||'')}${pr}</p>`);
-    return sheet(`<p id="pubWait">正在发布，等待 CI · Publishing, waiting for CI${pr}</p>`);
+    return sheet(`<p id="pubWait">${WAIT_TEXT}${pr}</p>`);
   }
   async function watch(slug){
-    for(;;){ await new Promise(r=>setTimeout(r,POLL_MS));
+    if(watching.has(slug)) return; watching.add(slug);
+    try{ for(;;){ await new Promise(r=>setTimeout(r,POLL_MS));
       let j; try{ const r=await api(url(slug)); j=await r.json(); }catch{ continue; /* offline for a beat: the publish runs on the node; look again */ }
-      if(j&&j.status){ if(TERMINAL.has(j.status.state)){ notice(j.status); return; } } }
+      if(j&&j.status){ if(TERMINAL.has(j.status.state)){ notice(j.status); markSeen(slug,j.status); return; } } } }
+    finally{ watching.delete(slug); }
   }
   async function go(slug,hash){
     const r=await post(slug,{hash}); const j=await r.json().catch(()=>({error:'回复无效 · Bad answer'}));
     if(j.code==='TOKEN_MISSING') return tokenNeeded(j);
     if(!j.status) return sheet(`<p id="pubFail">发布失败 · Publish failed: ${esc(j.error||r.status)}</p>`);
-    notice(j.status); if(!TERMINAL.has(j.status.state)) watch(slug);
+    notice(j.status); if(TERMINAL.has(j.status.state)) markSeen(slug,j.status); else watch(slug);
   }
   async function open(slug){
     const r=await post(slug,{preview:true}); const j=await r.json().catch(()=>({error:'回复无效 · Bad answer'}));
@@ -51,10 +68,9 @@ const PAPublish=(()=>{
     const s=sheet(`<p><b>将公开以下文件 · These files will be public</b></p><ul id="pubFiles">${p.files.map(f=>`<li><code>${esc(f.path)}</code> (${f.bytes} B)</li>`).join('')}</ul>`
       +(p.refused.length?`<p>不发布 · Not published: ${p.refused.map(x=>esc(x.file)).join(', ')}</p>`:'')
       +`<p id="pubRepo">目标仓库 · Repository: <code>${esc(p.repo||'')}</code></p>`
-      +'<p>隐私检查通过；CI 通过后自动合并并发版 · Privacy scan clean; merges and releases when CI is green.</p>'
-      +'<button data-pub="go" id="pubGo">发布 · Publish</button>');
+      +'<p>隐私检查通过；CI 通过后自动合并并发版 · Privacy scan clean; merges and releases when CI is green.</p>',true);
     // ONE handler, replaced on every sheet (sheet() resets onclick): a stale preview can never publish.
     const close=s.onclick; s.onclick=(e)=>{ if(e.target.closest('[data-pub="go"]')){ s.onclick=null; go(slug,p.hash); } else close(e); };
   }
-  return { item, armTip, open };
+  return { item, armTip, open, WAIT_TEXT };
 })();

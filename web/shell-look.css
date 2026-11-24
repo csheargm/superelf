@@ -118,6 +118,11 @@ form#f{ padding-top:22px; background:linear-gradient(to bottom,transparent,var(-
 .msg.status,.msg.err{ box-shadow:none; }
 .cmenu-pop,.pac-mmenu{ border:0; border-radius:14px; box-shadow:var(--shadow-lift); padding:4px; }
 .cmenu-pop button{ border-radius:10px; min-height:44px; }
+/* A sheet's action row (Publish sheet): real buttons, right-aligned, primary last — not menu rows. */
+.sheet-acts{ display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
+.cmenu-pop .sheet-acts button{ width:auto; display:inline-flex; align-items:center; padding:0 18px; font-weight:600; }
+.cmenu-pop .sheet-acts button.plain{ border:1px solid var(--line); }
+.cmenu-pop .sheet-acts button.primary,.cmenu-pop .sheet-acts button.primary:hover{ background:var(--accent-fill); color:var(--on-accent); }
 dialog{ border:0; border-radius:var(--r-card); box-shadow:var(--shadow-lift); }
 dialog::backdrop{ background:rgba(0,0,0,.35); }
 dialog input, dialog textarea, dialog select{ border-radius:var(--r-ctl); }
