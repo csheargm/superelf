@@ -22,6 +22,15 @@ RUN mkdir -p builtin-apps \
  && if [ -d workspace/apps ]; then mv workspace/apps builtin-apps/workspace-apps; fi \
  && if [ -d shared-apps ]; then mv shared-apps builtin-apps/shared-apps; fi \
  && rm -rf workspace
+# REVISION: the exact commit this image holds (lib/buildid.mjs readRevision), plus its date. The
+# entrypoint's copy then replaces the node folder's file on every start, so the footer and PAUpdate
+# (docs/adr/0026) see each deploy. Required: a build without it fails here, never a stale stamp.
+# Passed by ops/demo/revision.sh (rebuild-demo.sh, rebuild-private.sh) through compose build args.
+ARG REVISION
+ARG REVISION_DATE
+RUN printf '%s' "$REVISION" | grep -Eqx '[0-9a-f]{40}' || { echo "build arg REVISION must be the full 40-hex commit sha (got '$REVISION'); run ops/demo/rebuild-demo.sh" >&2; exit 1; } \
+ && printf '%s' "$REVISION_DATE" | grep -Eqx '[0-9]{4}-[0-9]{2}-[0-9]{2}' || { echo "build arg REVISION_DATE must be YYYY-MM-DD (got '$REVISION_DATE')" >&2; exit 1; } \
+ && printf '%s\n%s\n' "$REVISION" "$REVISION_DATE" > /opt/superelf/REVISION
 RUN chmod +x /opt/superelf/ops/demo/entrypoint.sh /opt/superelf/backup.sh /opt/superelf/restore.sh \
  && useradd --uid 10001 --create-home --shell /usr/sbin/nologin superelf
 ENV NODE_ENV=production

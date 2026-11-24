@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { blobId, makeBuildId, BUILD_MARKER, HEAD_TTL_MS, GIT_SHORT, NOTE_SHORT, readRevision, REVISION_FILE } from '../lib/buildid.mjs';
+import { blobId, makeBuildId, BUILD_MARKER, HEAD_TTL_MS, GIT_SHORT, NOTE_SHORT, readRevision, readRevisionDate, shortDate, REVISION_FILE } from '../lib/buildid.mjs';
 import { ROOT } from './helpers-panote-routing.mjs';
 
 const WEB = fs.readFileSync(path.join(ROOT, 'web.mjs'), 'utf8');
@@ -58,9 +58,9 @@ test('no git, or no PANote on disk: the id names what it can and never throws', 
 });
 
 test('web.mjs shows it in the shell version line and stamps it into every app page', () => {
-  assert.match(WEB, /import \{ makeBuildId, BUILD_MARKER, readRevision \} from '\.\/lib\/buildid\.mjs';/);
-  assert.match(WEB, /const buildId = makeBuildId\(ROOT, gitHead\);/, 'one git invocation, the existing gitHead (R3)');
-  assert.match(WEB, /const appVersion = \(\) => \{ try \{ const b = buildId\(\); return 'v' \+ [^\n]*\+ \(b \? ' · ' \+ b : ''\); \}/);
+  assert.match(WEB, /import \{ makeBuildId, BUILD_MARKER, readRevision, readRevisionDate \} from '\.\/lib\/buildid\.mjs';/);
+  assert.match(WEB, /const buildId = makeBuildId\(ROOT, gitHead, undefined, /, 'one git invocation, the existing gitHead (R3)');
+  assert.match(WEB, /const appVersion = \(\) => \{ try \{ const b = buildId\(\); const d = buildId\.date\(\); return 'v' \+ [^\n]*\+ \(b \? ' · ' \+ b : ''\) \+ \(d \? ' · ' \+ d : ''\); \}/);
   const loop = WEB.indexOf('html = html.split(c.marker).join(snippet);');
   const stamp = WEB.indexOf('html = html.split(BUILD_MARKER).join(buildId());');
   assert.ok(loop > 0 && stamp > loop, 'stamped AFTER the components are inlined — the marker lives in one of them');
@@ -102,8 +102,33 @@ test('a folder with no .git takes its commit from REVISION, so the build id chan
   assert.equal(readRevision(root), null, 'only a hex sha is believed');
 });
 
-test('web.mjs falls back to REVISION when git has no answer; the image lets the file in', () => {
+test('web.mjs falls back to REVISION when git has no answer; a stale REVISION never enters the image', () => {
   const web = fs.readFileSync(new URL('../web.mjs', import.meta.url), 'utf8');
   assert.match(web, /catch \{ return readRevision\(ROOT\); \}/);
-  assert.match(fs.readFileSync(new URL('../ops/demo/Dockerfile.dockerignore', import.meta.url), 'utf8'), /^!REVISION$/m);
+  assert.match(web, /catch \{ return readRevisionDate\(ROOT\); \}/);
+  // The image writes REVISION from a build arg (test/revision-stamp.test.mjs); a copied file could be an old deploy's.
+  assert.doesNotMatch(fs.readFileSync(new URL('../ops/demo/Dockerfile.dockerignore', import.meta.url), 'utf8'), /^!REVISION$/m);
+});
+
+test('REVISION line 2 is the commit date; the footer shows it short, asked once per sha', () => {
+  const root = tmpRoot('x');
+  assert.equal(readRevisionDate(root), null, 'no file: no date');
+  fs.writeFileSync(path.join(root, REVISION_FILE), `${SHA}\n2026-11-23\n`);
+  assert.equal(readRevision(root), SHA, 'line 1 still the sha');
+  assert.equal(readRevisionDate(root), '2026-11-23');
+  fs.writeFileSync(path.join(root, REVISION_FILE), `${SHA}\n23/11/2026; rm -rf /\n`);
+  assert.equal(readRevisionDate(root), null, 'only YYYY-MM-DD is believed');
+  fs.writeFileSync(path.join(root, REVISION_FILE), `${SHA}\n`);
+  assert.equal(readRevisionDate(root), null, 'an old one-line REVISION: no date, no throw');
+  assert.equal(shortDate('2026-11-23'), '11-23');
+  assert.equal(shortDate(null), '');
+  let clock = 0, asked = 0, head = SHA;
+  const id = makeBuildId(root, () => head, () => clock, () => { asked++; return '2026-11-23'; });
+  assert.equal(id.date(), '11-23');
+  id.date(); id.date();
+  assert.equal(asked, 1, 'one git log per sha, not per page load');
+  head = 'fedcba9876543210fedcba9876543210fedcba98'; clock += HEAD_TTL_MS;
+  id.date();
+  assert.equal(asked, 2, 'a new sha asks again');
+  assert.equal(makeBuildId(root, () => null).date(), '', 'no sha: no date');
 });

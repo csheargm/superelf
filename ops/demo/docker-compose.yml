@@ -5,7 +5,14 @@
 name: superelf-demo
 services:
   superelf:
-    build: { context: ../.., dockerfile: ops/demo/Dockerfile }
+    build:
+      context: ../..
+      dockerfile: ops/demo/Dockerfile
+      # The deployed commit (ops/demo/revision.sh, exported by rebuild-demo.sh). Empty here (so
+      # logs/ps/the backup timer still work) but the Dockerfile refuses to BUILD without them.
+      args:
+        REVISION: ${SUPERELF_REVISION:-}
+        REVISION_DATE: ${SUPERELF_REVISION_DATE:-}
     image: superelf-demo:latest
     hostname: superelf-demo
     user: "10001:10001"

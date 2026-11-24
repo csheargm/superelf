@@ -55,7 +55,7 @@ import { modelReviewJobs } from './lib/model-review.mjs';
 import { hashPassword, verifyPassword, makeAudit, readAudit, ACCOUNT_REMOVED_BODY } from './lib/auth.mjs';
 import { notifyBriefingEmail } from './lib/notify.mjs';
 import { readShell } from './lib/shellhtml.mjs';
-import { makeBuildId, BUILD_MARKER, readRevision } from './lib/buildid.mjs';
+import { makeBuildId, BUILD_MARKER, readRevision, readRevisionDate } from './lib/buildid.mjs';
 import { SW_PATH, SW_PROBE_PATH, OFFLINE_CONFIG_PATH, offlineAppsFor, bibleIndex, withCspMeta, APP_CSP } from './lib/offline.mjs';
 import { corsHeaders } from './lib/local-origin.mjs';
 import { loadJobs as loadJobFiles, saveJob, deleteJob, validateJob } from './lib/jobs/store.mjs';
@@ -117,7 +117,7 @@ export const freeStamp = (k, now = new Date()) => {
 // …plus the build id (lib/buildid.mjs), because the version alone did not change across the fixes it shipped.
 // …and '+N' merges since the newest tag (lib/version-auto.mjs, the SAME N the Release Notes sheet shows).
 const plusN = () => { const n = autoSince(ROOT, buildId.head()).n; return n ? '+' + n : ''; };
-const appVersion = () => { try { const b = buildId(); return 'v' + JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version + plusN() + (b ? ' · ' + b : ''); } catch { return ''; } };
+const appVersion = () => { try { const b = buildId(); const d = buildId.date(); return 'v' + JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version + plusN() + (b ? ' · ' + b : '') + (d ? ' · ' + d : ''); } catch { return ''; } };
 const appHash = (dir) => { try { return crypto.createHash('sha1').update(fs.readFileSync(path.join(dir, 'index.html'))).digest('hex').slice(0, 12); } catch { return null; } };
 // ── Committing the shelf · 把 shelf 提交进 git ─────────────────────────────────────────────
 // shared-apps/ is tracked as of v3.5.0, so a promote/rollback/unshare leaves the repo dirty until
@@ -163,7 +163,9 @@ function commitShelf(slug, message) {
 // and the node with it. The server bound its port, logged it, and vanished seconds later.
 const GIT_QUIET = { stdio: ['ignore', 'pipe', 'ignore'] };
 const gitHead = () => { try { return execSync('git rev-parse HEAD', { cwd: ROOT, encoding: 'utf8', ...GIT_QUIET }).trim(); } catch { return readRevision(ROOT); } };   // no .git: the deploy's REVISION (lib/buildid.mjs)
-const buildId = makeBuildId(ROOT, gitHead);
+// The commit date of that sha: git when there is a .git, else REVISION's line 2 (the image build).
+const gitDate = (sha) => { try { return execSync(`git log -1 --format=%cs ${sha}`, { cwd: ROOT, encoding: 'utf8', ...GIT_QUIET }).trim(); } catch { return readRevisionDate(ROOT); } };
+const buildId = makeBuildId(ROOT, gitHead, undefined, (sha) => (GIT_REF_RE.test(sha) ? gitDate(sha) : null));
 const GIT_REF_RE = /^[0-9a-f]{7,40}$/;
 const bumpPatch = (v) => { const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(v || ''); return m ? `${m[1]}.${m[2]}.${+m[3] + 1}` : '1.0.0'; };
 // Release notes: curated version-notes.json merged with git history, cached in

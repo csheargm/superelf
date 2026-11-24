@@ -1,7 +1,6 @@
 # Whitelist: everything is excluded, then only the code the demo node runs is let back in.
 *
 !web.mjs
-!REVISION
 !package.json
 !superelf.md
 !version-notes.json
