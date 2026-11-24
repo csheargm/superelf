@@ -12,7 +12,7 @@ const PAOwnerAlerts=(()=>{
     tip:'新：节点出问题时会在这里提示，并给出一键解决办法 · New: node problems show here, with one-tap fixes',
     again:'再检查 · Check again', snooze:'今天不再提示 · Not today', working:'正在处理… · Working…',
     restarting:'节点正在重启，约 2 分钟 · The node is restarting, about 2 minutes',
-    done:'完成 · Done', failed:'没有成功 · Did not work: ', ask:'问管家 · Ask 管家',
+    done:'完成 · Done', noResult:'主机没有回报结果 · the host sent no result', failed:'没有成功 · Did not work: ', ask:'问管家 · Ask 管家',
     filled:'已填好给管家的请求，检查后点发送 · Your request to 管家 is filled in; check it and tap Send',
     free:'清理空间 · Free up space', rebuild:'重建节点 · Rebuild node',
     rebuildSure:'确认重建（约 2 分钟无法使用）· Confirm: rebuild (about 2 minutes offline)',
@@ -94,7 +94,7 @@ const PAOwnerAlerts=(()=>{
   }
   async function poll(){
     const ok=await refresh(true);
-    if(busy&&ok&&!view.pending.includes(busy)){ const r=view.results[busy]; note=r&&r.at!==since?(r.ok?T.done:T.failed+r.msg):''; busy=''; paint(); return; }
+    if(busy&&ok&&!view.pending.includes(busy)){ const r=view.results[busy]; note=r&&r.at!==since?(r.ok?T.done:T.failed+r.msg):T.failed+T.noResult; busy=''; paint(); return; }
     if(busy&&Date.now()<pollUntil) setTimeout(poll,POLL_MS);
     else if(busy){ busy=''; note=T.failed+'timeout'; render(); }
   }
@@ -102,8 +102,8 @@ const PAOwnerAlerts=(()=>{
   // hint; while a rebuild restarts the node the read is EXPECTED to fail, and poll() keeps asking).
   async function refresh(quiet){
     if(ROLE!=='owner') return false;
+    if(!quiet) armed='';   // a rebuild confirm never survives closing and reopening the drawer, even if this read fails
     try{ const r=await api(URL_); if(!r.ok) return false; view=await r.json(); }catch{ return false; }
-    if(!quiet) armed='';   // a rebuild confirm never survives closing and reopening the drawer
     if(!busy&&view.pending.length){ busy=view.pending[0]; since=(view.results[busy]||{}).at||''; note=busy==='rebuild-node'?T.restarting:T.working; pollUntil=Date.now()+POLL_MAX_MS; setTimeout(poll,POLL_MS); }   // after a reload: keep following the running fix
     if(!quiet||!busy) paint(); else render();
     return true;
