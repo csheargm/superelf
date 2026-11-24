@@ -1,4 +1,12 @@
 {
+  "v5.11.4": {
+    "date": "2026-11-24",
+    "features": [],
+    "fixes": [
+      "应用对话不再假装已修改 · App chat never claims changes it can't make"
+    ],
+    "through": "efe29989625bbe474776e8d334ddd38e667a860d"
+  },
   "v5.11.3": {
     "date": "2026-11-24",
     "features": [],
