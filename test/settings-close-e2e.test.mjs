@@ -101,3 +101,41 @@ test('the profile, family and shelf labels read 中文 first', { skip, timeout: 
     assert.ok(!/\bClose\b/.test(await page.locator('#cfg form > div:last-of-type').innerText()), 'no bottom Close');
   } finally { await ctx.close(); }
 });
+
+test('shelf Roll back / Remove are type="button": they never submit Settings\' dialog form past the discard guard', () => {
+  const js = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'web', 'settings.js'), 'utf8');
+  for (const attr of ['data-rb=', 'data-un=']) assert.match(js, new RegExp(`<button type="button"[^>]*${attr}`), `${attr} button has type="button"`);
+});
+
+test('a slow Save: one PUT only, an edit typed meanwhile keeps Settings open and dirty; a discarded password draft is gone on reopen', { skip, timeout: 60000 }, async () => {
+  const { ctx, page } = await openSettings(SIZES[0]);
+  page.on('dialog', (d) => d.accept());
+  // Slow the PUT in the page itself (a Playwright route did not see this fetch in WebKit).
+  await page.evaluate(() => {
+    const f = window.fetch; window.__puts = 0; window.__slow = true;
+    window.fetch = async (u, o) => {
+      if (o && o.method === 'PUT' && String(u).includes('/api/profile')) { window.__puts++; if (window.__slow) await new Promise((r) => setTimeout(r, 800)); }
+      return f(u, o);
+    };
+  });
+  const puts = () => page.evaluate(() => window.__puts);
+  try {
+    await page.fill('#pAbout', 'first');
+    await page.click('#pSave');
+    assert.equal(await page.locator('#pSave').isDisabled(), true, 'Save is off while the PUT runs');
+    await page.evaluate(() => document.querySelector('#pSave').click());   // a second tap does nothing
+    await page.fill('#pAbout', 'typed during save');
+    await page.waitForFunction(() => !document.querySelector('#pSave').disabled);
+    assert.equal(await puts(), 1, 'exactly one PUT');
+    assert.equal(await isOpen(page), true, 'still open: the later edit was not sent');
+    assert.equal(await page.inputValue('#pAbout'), 'typed during save');
+    await page.evaluate(() => { window.__slow = false; });
+    await page.fill('#pPin', 'draftpass123');
+    await page.click('#cfgClose');   // dialog accepted: discard
+    await page.waitForFunction(() => !document.querySelector('#cfg').open);
+    await page.click('#settings');
+    await page.waitForSelector('#addU');
+    assert.equal(await page.inputValue('#pPin'), '', 'password draft cleared on open');
+    assert.equal(await page.inputValue('#pAbout'), 'first', 'the saved value, not the discarded one');
+  } finally { await ctx.close(); }
+});

@@ -488,10 +488,13 @@ function markNewSel(sel,key){ markNew($(sel),key); }
     dlg.showModal();
   }
 })();
-$('#settings').onclick=async()=>{ await loadProfile(); if(ME.role==='owner'){ await loadFamily(); await loadShelf(); $('#auditBtn').style.display='inline-block'; } $('#cfg').showModal(); cfgMarkClean(); };
+$('#settings').onclick=async()=>{ await loadProfile(); if(ME.role==='owner'){ await loadFamily(); await loadShelf(); $('#auditBtn').style.display='inline-block'; } $('#pPin').value=''; $('#cfg').showModal(); cfgMarkClean(); };   // a discarded password draft must not ride along on a later save
 $('#auditBtn').onclick=(e)=>{ e.preventDefault(); showActivityLog(); };   // web/activity-log.js (F5-10)
+// _cfgSaving (web/settings-head.js): one PUT at a time; edits typed while it runs are kept, not closed away
 $('#pSave').onclick=async(e)=>{
   e.preventDefault();
+  if(_cfgSaving) return;
+  const sent=JSON.stringify(cfgFields());
   const body={name:$('#pName').value,about:$('#pAbout').value,prefs:$('#pPrefs').value,briefingEmail:$('#pBriefEmail').value,briefingRetainDays:parseInt($('#pRetainDays').value,10)||30, postcode:$('#pPostcode').value.trim(),
     autoUpdateApps:$('#pAutoUpdate').checked,
     systemPrompts:collectSystemPrompts()};
@@ -502,10 +505,13 @@ $('#pSave').onclick=async(e)=>{
   // it must say "内容过大 (max 64 KB) · Too large", never the same words a dropped
   // connection produces — and a null `r` used to make `r.json()` throw inside the try,
   // discarding the reason entirely.
-  const g=await relayJson(api('/api/profile',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(body)}),'data');
+  _cfgSaving=true; $('#pSave').disabled=true;
+  let g; try{ g=await relayJson(api('/api/profile',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(body)}),'data'); }
+  finally{ _cfgSaving=false; cfgSync(); }
   if(!g.ok){ alert(g.text); return; }
+  if(ME.name!==body.name){ ME.name=body.name; }
+  if(JSON.stringify(cfgFields())!==sent){ _cfgSnap=sent; cfgSync(); return; }   // edited during the save: stay open, still dirty
   $('#pPin').value='';
-  if(ME.name!==$('#pName').value){ ME.name=$('#pName').value; }
   cfgMarkClean(); $('#cfg').close();
 };
 async function loadShelf(){
@@ -517,8 +523,8 @@ async function loadShelf(){
   box.innerHTML='<b>共享应用（家庭书架）· Shared apps (family shelf)</b>'+
     (shelf.map(a=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)">
       <span style="flex:1">${esc(a.title)} <small style="color:var(--muted)">作者 ${esc(a.sharedBy||'?')} · by ${esc(a.sharedBy||'?')}${a.versions?' · '+a.versions+' 个旧版本 · '+a.versions+' old version'+(a.versions>1?'s':''):''}</small></span>
-      ${a.versions?`<button class="plain" style="font-size:12px;padding:3px 8px" data-rb="${esc(a.name)}">回退 · Roll back</button>`:''}
-      <button class="plain" style="font-size:12px;padding:3px 8px" data-un="${esc(a.name)}">移除 · Remove</button>
+      ${a.versions?`<button type="button" class="plain" style="font-size:12px;padding:3px 8px" data-rb="${esc(a.name)}">回退 · Roll back</button>`:''}
+      <button type="button" class="plain" style="font-size:12px;padding:3px 8px" data-un="${esc(a.name)}">移除 · Remove</button>
     </div>`).join('')||'<div style="color:var(--muted);font-size:13px;padding:4px 0">还没有共享的应用 · Nothing shared yet.</div>')+
     `<div style="display:flex;gap:6px;margin-top:10px"><select id="promoteSel" style="flex:1;min-width:0;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text)"><option value="">把应用放上书架… · Promote an app to the shelf…</option>${opts}</select><button class="primary" id="promoteBtn" style="padding:6px 10px">放上书架 · Promote</button></div>`;
   box.querySelectorAll('[data-rb]').forEach(b=>b.onclick=async()=>{ if(confirm('Roll back "'+b.dataset.rb+'" to the previous version?')){ await api('/api/admin/shared/'+b.dataset.rb+'/rollback',{method:'POST'}); loadShelf(); loadApps(); } });

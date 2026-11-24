@@ -6,12 +6,13 @@
 const CFG_OWN_SAVE='#family,#shelf,#jobsWrap,#nodeCfgWrap';
 const CFG_DISCARD_ASK='有未保存的更改，要放弃吗？ · Unsaved changes — discard them?';
 let _cfgSnap='';
+let _cfgSaving=false;   // set by 保存 · Save (web/settings.js) while its PUT runs
 function cfgFields(){
   return [...$('#cfg').querySelectorAll('input,textarea,select')].filter(el=>!el.closest(CFG_OWN_SAVE))
     .map(el=>el.type==='checkbox'?el.checked:el.value);
 }
 function cfgDirty(){ return JSON.stringify(cfgFields())!==_cfgSnap; }
-function cfgSync(){ $('#pSave').disabled=!cfgDirty(); }
+function cfgSync(){ $('#pSave').disabled=_cfgSaving||!cfgDirty(); }
 function cfgMarkClean(){ _cfgSnap=JSON.stringify(cfgFields()); cfgSync(); }
 function roleLabel(r){ return r==='owner'?'所有者 · owner':'成员 · member'; }
 function roleLine(r){ const [zh,en]=roleLabel(r).split(' · '); return `角色：${zh} · role: ${en}`; }
