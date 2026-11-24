@@ -383,9 +383,14 @@ const isInlineNotebook=v=>!!(v&&typeof v==='object'&&Array.isArray(v.pages));
 // awaits the broker; a Pencil stroke on the still-visible list in that window would run saveAnn()
 // and serialize the EMPTY ANN over the chapter (notes/marks wiped on disk). Gated in ONE place —
 // the ink overlay's enabled() — so every loadAnn caller (boot, chapter change, ☰ delete) is covered.
-let ANN_BLOCKED=''; let ANN_LOADING=false; let _annSeq=0;
+// ANN_PATH: the chapter file ANN belongs to, fixed when ANN is (re)loaded. Every annotation write
+// targets ANN_PATH, never the live location: a save that runs after bookIdx/chapter changed
+// (chapter step, swipe, picker, search, history, daily, verse link) must still write the chapter its
+// text was written in. SCAR: saveAnn() used annPath(), so a note typed in John 3 and saved by the
+// navigation's flush landed — with all of John 3's ANN — over John 4's file.
+let ANN_BLOCKED=''; let ANN_LOADING=false; let _annSeq=0; let ANN_PATH='';
 async function loadAnn(){ const s=++_annSeq; ANN_LOADING=true; ANN={notes:{},draws:{},chat:{},titles:{},pins:{}}; ANN_BLOCKED='';
-  const p=annPath();
+  const p=annPath(); ANN_PATH=p;
   const r=await DATA.read(p);
   if(s!==_annSeq) return false;                        // a newer read owns ANN and ANN_LOADING: a stale chapter must never land in it
   if(r.status===DATA.ST.loaded){
@@ -414,6 +419,7 @@ function migrateKeys(o){ const out={}; for(const k of Object.keys(o)) out[/^[0-9
 // Deliberate: no PNG back-compat — old bitmap draws are discarded, not migrated.
 function vectorDraws(o){ const out={}; for(const k of Object.keys(o)) if(o[k]&&typeof o[k]==='object') out[k]=o[k]; return out; }
 const CH_UNREADABLE='本章笔记无法读取 · Chapter notes unreadable';
+const NOTE_MOVED='章节已切换，未写入 · Chapter changed — not written to another chapter';
 // Bilingual message prefixes and the two non-path notice keys — one source each (R3).
 const PHOTO_FAILED=PANote.PHOTO_TXT.failed;
 const NOTES_LIST_KEY='notes-list';      // the server listing, not an app-data path
@@ -439,7 +445,7 @@ function annRetryLater(path,fn){
 // Returns the OUTCOME and is always awaited by its callers. SCAR: this was fire-and-forget, so
 // PANote's `await opts.save(NB)` resolved before the postMessage round-trip had even begun and
 // every "flushed, safe to tear down" guarantee in the Draw pad was vacuous.
-async function saveAnn(){ return saveAnnAt(annPath(), JSON.stringify(ANN)); }
+async function saveAnn(){ return saveAnnAt(ANN_PATH, JSON.stringify(ANN)); }
 // The write itself, for a path and a body fixed by the CALLER: saveAnn() (this chapter, now) and the
 // ink chain below (a body captured before the user left the chapter).
 async function saveAnnAt(p,body){                    // p captured: the retry and the notice both belong to THIS chapter
@@ -449,7 +455,7 @@ async function saveAnnAt(p,body){                    // p captured: the retry an
   // The retry re-runs only while the app is still on this chapter — a stale ANN must never be
   // written to a chapter the user has navigated away from. Leaving the chapter drops the TIMER,
   // never the report: the notice is keyed to the path and stays up until that path succeeds.
-  else annNotice(PANote.NOT_SAVED+' — '+r.error+(annRetryLater(p,()=>{ if(annPath()===p) saveAnn(); })?' — retrying 重试中':''),'',p);
+  else annNotice(PANote.NOT_SAVED+' — '+r.error+(annRetryLater(p,()=>{ if(ANN_PATH===p) saveAnn(); })?' — retrying 重试中':''),'',p);
   return r;
 }
 // One bilingual, PERSISTENT failure surface for the annotation writes that happen outside the
@@ -614,7 +620,7 @@ BOOKS.forEach(([en,zh],i)=>{
   bookSel.appendChild(o);
 });
 bookSel.value=bookIdx;
-bookSel.onchange=()=>{ bookIdx=+bookSel.value; chapter=1; load(); };
+bookSel.onchange=()=>{ const b=+bookSel.value; bookSel.value=bookIdx; goChapter(b,1); };
 
 // ── Search ──
 // Reading history（阅读记录）: PAReadingHistory (web/reading-history.inline.html) owns reading.json, the list and
@@ -624,7 +630,7 @@ bookSel.onchange=()=>{ bookIdx=+bookSel.value; chapter=1; load(); };
 const SEARCH_HINT='<div class="sl-hint">输入以搜索经文 · Type to search verses</div>';
 const RH=PAReadingHistory.attach({ store:{read:(p)=>DATA.read(p),write:(p,t)=>DATA.write(p,t,{replaces:true})}, ST:DATA.ST,
   bookName:(b)=>BOOKS[b]&&{en:BOOKS[b][0],zh:BOOKS[b][1]}, notice:(m,k)=>annNotice(m,'',k), noticeOk:paNoticeOk,
-  onPick:(b,c)=>{ document.getElementById('search-overlay').classList.remove('on'); bookIdx=b; chapter=Math.min(c,BOOKS[b][2]); bookSel.value=b; load(); } });
+  onPick:(b,c)=>{ document.getElementById('search-overlay').classList.remove('on'); goChapter(b,c); } });
 const RH_BOOT_WAIT_MS=1500;                         // a slow reading.json read opens John 3 rather than hold the first chapter
 let _hashBoot=false, _rhBoot=RH.restore(), _loadSeq=0;
 // Boot only. A hash boot never waits. A load started during the wait (a tap, a jump) wins: the restore applies
@@ -686,10 +692,9 @@ document.getElementById('search-inp').addEventListener('keydown',e=>{ if(e.key==
 document.getElementById('search-inp').addEventListener('input',()=>{ if(!document.getElementById('search-inp').value.trim()) searchIdle(); });
 document.getElementById('search-results').onclick=e=>{
   const el=e.target.closest('.sr'); if(!el) return;
-  bookIdx=(+el.dataset.b)-1; chapter=+el.dataset.c; const vn=+el.dataset.v;
-  bookSel.value=bookIdx;
+  const vn=+el.dataset.v;
   document.getElementById('search-overlay').classList.remove('on');
-  load().then(ok=>{ if(ok===false) return; setTimeout(()=>{ const vd=document.querySelector(`.verse[data-n="${vn}"]`); if(vd){ vd.scrollIntoView({block:'center'}); vd.classList.add('selected'); setTimeout(()=>vd.classList.remove('selected'),1600); } },200); });
+  goChapter((+el.dataset.b)-1,+el.dataset.c).then(ok=>{ if(ok===false) return; setTimeout(()=>{ const vd=document.querySelector(`.verse[data-n="${vn}"]`); if(vd){ vd.scrollIntoView({block:'center'}); vd.classList.add('selected'); setTimeout(()=>vd.classList.remove('selected'),1600); } },200); });
 };
 
 
@@ -701,7 +706,19 @@ let _chFor=-1;
 function fillChapters(){ if(_chFor!==bookIdx){ _chFor=bookIdx;
   chLabel.innerHTML=''; for(let i=1;i<=BOOKS[bookIdx][2];i++){ const o=document.createElement('option'); o.value=i; o.textContent=i; chLabel.appendChild(o); } }
   chLabel.value=chapter; }
-chLabel.onchange=()=>{ chapter=+chLabel.value; load(); };
+chLabel.onchange=()=>{ const c=+chLabel.value; chLabel.value=chapter; goChapter(bookIdx,c); };
+// EVERY chapter change goes through here. The open note's pending save is flushed FIRST, while
+// bookIdx/chapter/ANN still belong to the chapter it was typed in; only then does the location move.
+// Resolves like load() (false = superseded). A failed flush still navigates: the pad has already
+// reported it, keyed to the old note, and its save refuses to write into another chapter (_drawPath).
+let _navSeq=0;
+async function goChapter(b,c){
+  const g=++_navSeq;
+  if(drawPad&&drawPad.flush){ try{ await drawPad.flush(); }catch(_){ /* reported by the pad's own not-saved notice; see above */ } }
+  if(g!==_navSeq) return false;                       // a newer navigation owns the location
+  bookIdx=b; chapter=Math.min(Math.max(1,c),BOOKS[b][2]); bookSel.value=b;
+  return load();
+}
 // F2-03 (owner 2026-11-23): next / previous chapter three ways — the buttons at the chapter end, a
 // finger swipe across the text on touch, the ← → keys on desktop. One step function, across books.
 // TODO(R4 seam): chapter stepping + its gestures → bible/chapter-nav.js when this file is split.
@@ -710,7 +727,7 @@ function stepChapter(d){
   let b=bookIdx, c=chapter+d;
   if(c<1){ if(b===0) return false; b--; c=BOOKS[b][2]; }
   else if(c>BOOKS[b][2]){ if(b===BOOKS.length-1) return false; b++; c=1; }
-  bookIdx=b; chapter=c; bookSel.value=b; load().then(ok=>{ if(ok!==false) document.getElementById('verses').scrollTop=0; }); return true;
+  goChapter(b,c).then(ok=>{ if(ok!==false) document.getElementById('verses').scrollTop=0; }); return true;
 }
 function chapterEnd(){
   const nav=document.createElement('div'); nav.id='ch-end';
@@ -738,13 +755,14 @@ async function load(){
   if(_rhBoot) await restoreReading(g);             // boot only: the last chapter read, unless the hash chose one. Later loads stay synchronous up to loadAnn (its read gate)
   if(g!==_loadSeq) return false;                         // a newer load started during the boot restore: it owns the chapter
   const b0=bookIdx, c0=chapter;
-  selV.clear(); updateFab(); followSelection();   // a new chapter/book has no selection: an open pane shows the whole-Bible state
+  selV.clear(); updateFab();
   fillChapters();
   const wrap=document.getElementById('verses');
   wrap.innerHTML='<div id="loading">加载中… · Loading…</div>';
   INK.load([]);                                    // the last chapter's undo history and ink go now, not after the read
   const annOk=await loadAnn(); if(g!==_loadSeq) return false;   // superseded: the newer load draws its own chapter
-  if(annOk) INK.load(ANN.ink);                     // false = a later read (☰ delete) owns ANN and loads the ink itself              // this chapter's ink, before the text: a failed text load must never keep the last chapter's groups
+  if(annOk){ followSelection(); INK.load(ANN.ink); }   // AFTER the read: an open pane re-opens on THIS chapter's notes (a new chapter has no selection: the whole-Bible state), never the last one's
+  // annOk false = a later read (☰ delete) owns ANN and loads the ink itself. The ink goes in before the text: a failed text load must never keep the last chapter's groups
   const timeout=new Promise(res=>setTimeout(()=>res(null),10000));
   const r=await Promise.race([paBible(bookIdx+1, chapter), timeout]);
   if(g!==_loadSeq) return false;                         // superseded while the text loaded: never paint an old chapter or its timeout over the new one
@@ -813,9 +831,9 @@ PAVerseMarks.armControl(document.getElementById('top-mark')).onclick=()=>VM.open
 // ladder) is one unit to lift out of this file.
 const inkSaves=new Map();                            // path -> {next: body|null, run: Promise|null}
 function saveInk(){
-  const p=annPath(), s=inkSaves.get(p)||{next:null,run:null}; inkSaves.set(p,s);
+  const p=ANN_PATH, s=inkSaves.get(p)||{next:null,run:null}; inkSaves.set(p,s);
   s.next=JSON.stringify(ANN);
-  if(!s.run) s.run=(async()=>{ let r; while(s.next!==null){ const body=annPath()===p&&!ANN_LOADING?JSON.stringify(ANN):s.next; s.next=null; r=await saveAnnAt(p,body); } s.run=null; return r; })();
+  if(!s.run) s.run=(async()=>{ let r; while(s.next!==null){ const body=ANN_PATH===p&&!ANN_LOADING?JSON.stringify(ANN):s.next; s.next=null; r=await saveAnnAt(p,body); } s.run=null; return r; })();
   return s.run;
 }
 const INK=PAInkAnchor.attach({container:document.getElementById('verses'),ink:PANote.ink,enabled:()=>!ANN_BLOCKED&&!ANN_LOADING,
@@ -913,6 +931,10 @@ function renderDots(){
 // mode, shown as a full-screen overlay. Vector strokes are stored in ANN.draws[scopeKey]
 // as a PANote notebook (vector JSON, not PNG). drawPad is defined below, with aiChat.
 let _drawScope='general';
+// _drawPath: the chapter file the open note was opened in. The pad's save writes only while ANN is
+// that chapter's and fully read — a late save or retry after the location moved is refused, never
+// re-aimed at the chapter now showing.
+let _drawPath='';
 // SCAR: this assigned the NEW _drawScope before drawPad.open(), and open() → reload() then fired
 // an un-awaited flush. The outgoing page's save closure reads _drawScope when it RUNS, so
 // switching verses within the debounce window wrote the old notebook into the NEW verse's key and
@@ -927,7 +949,7 @@ async function openDrawFull(forceKey,forceTitle,rowId,at){
   if(rail){ rail.open(); rail.expand('note'); }
   // _drawScope is repointed INSIDE the callback, which the pad runs after flushing the OUTGOING
   // verse under its OLD key and before pulling the new one.
-  const r=await drawPad.open(()=>{ _drawScope=forceKey||scopeKey();
+  const r=await drawPad.open(()=>{ _drawScope=forceKey||scopeKey(); _drawPath=annPath();
     // Title from the note's own content where it has some, so reopening shows what the drawer says.
     paintNoteTitle(forceKey?(forceTitle||freeNoteTitle(forceKey)):noteTitleFor(scopeKey(),ANN.draws[scopeKey()]));
   });
@@ -963,7 +985,7 @@ async function openNewDrawNote(key){               // key: a note the caller alr
   // freeStamp), so several notes on one chapter are distinguishable. Storing a fixed
   // placeholder here is what made six notes all read "New Note". Format mirrors freeStamp
   // and is pinned by test/bible-note-title.test.mjs.
-  const r=await drawPad.open(()=>{ _drawScope=freeKey; drawPad.setTitle(freeNoteTitle(freeKey)); });
+  const r=await drawPad.open(()=>{ _drawScope=freeKey; _drawPath=annPath(); drawPad.setTitle(freeNoteTitle(freeKey)); });
   if(r&&!r.ok) annNotice('上一幅未保存 · Previous drawing not saved — reopen it to retry 请重新打开重试','',from);
   // Use the explicit note ID so the drawer highlights this new entry, not the general slot.
   chatUI().setActiveNote(`file:${bookIdx}:${chapter}:${freeKey}`);
@@ -1006,8 +1028,7 @@ function jumpToRef(bi,ch,verses){
   backConvo=(aiChat.getConvo&&aiChat.getConvo())||null;
   backLabel=document.querySelector('.pac-fs .pac-title')?.textContent||'';
   aiChat.hide();   // step away from the full-screen chat to reveal the passage
-  bookIdx=bi; chapter=Math.min(Math.max(1,ch),BOOKS[bi][2]); bookSel.value=bi;
-  load().then(ok=>{ if(ok===false) return;   // superseded: another chapter is showing
+  goChapter(bi,ch).then(ok=>{ if(ok===false) return;   // superseded: another chapter is showing
     (verses||[]).slice(0,1).forEach(n=>{ const el=[...document.querySelectorAll('.verse')].find(e=>+e.dataset.n===n);
       if(el){ selV.add(n); el.classList.add('selected'); } });
     updateFab(); followSelection();   // the side chat (railChat) follows the jumped-to verse; aiChat.hide() only closed the full-screen one
@@ -1081,20 +1102,27 @@ const chatUI=()=>railChat||aiChat;
 // TODO(R4 seam): BIBLE_SUMMARY + chatData are the Ask AI host hooks — move them to their own inlined part.
 // A run's follow-up after the reader changed chapter (review 2026-11-12): read THAT chapter's file, replace only the
 // run note's page 0 text, write the whole object back (every other key kept as read). Not loaded = not written (R5).
-async function summaryOffChapter(b,ch,key,html){
+// key null (review 2026-11-23): a run's FIRST save after the reader moved on — a NEW note in the chapter the run was asked in.
+async function summaryOffChapter(b,ch,key,html,period){
   const p=`notes/${b+1}-${ch}.json`, r=await DATA.read(p);
-  if(r.status!==DATA.ST.loaded||!r.data) return {ok:false,error:'无法读取该章 · that chapter could not be read'};
-  const o=r.data, d=o.draws&&o.draws[key]; if(!d||!Array.isArray(d.pages)||!d.pages.length) return {ok:false,gone:true};
-  const now=Date.now(); o.draws[key]=Object.assign({},d,{updated:now,pages:[Object.assign({},d.pages[0],{updated:now,pageHtml:html})].concat(d.pages.slice(1))});
+  if(!(r.status===DATA.ST.loaded&&r.data)&&!(key==null&&r.status===DATA.ST.absent)) return {ok:false,error:'无法读取该章 · that chapter could not be read'};
+  const o=r.data||{notes:{},draws:{},chat:{},titles:{},pins:{}}, now=Date.now(); if(!o.draws) o.draws={};
+  if(key==null){ let t=now; while(o.draws['free-'+t]) t++; key='free-'+t;
+    o.draws[key]={v:2,id:key,created:now,updated:now,template:'plain',summary:period||undefined,pages:[{id:'p0',created:now,updated:now,strokes:[],pageHtml:html,images:[]}]}; }
+  else { const d=o.draws[key]; if(!d||!Array.isArray(d.pages)||!d.pages.length) return {ok:false,gone:true};
+    o.draws[key]=Object.assign({},d,{updated:now,pages:[Object.assign({},d.pages[0],{updated:now,pageHtml:html})].concat(d.pages.slice(1))}); }
   const w=await saveAnnAt(p,JSON.stringify(o)); return w&&w.ok?{ok:true,key,id:`file:${b}:${ch}:${key}`}:(w||{ok:false,error:'not saved'}); }
+const SUMMARY_AT={};   // summary scope → {b,ch}: the chapter a run was asked in, so its first save lands there (review 2026-11-23)
 const BIBLE_SUMMARY={
   run:async({scope,message,images,model})=>{   // images + model: the summary's page images and lane (note-features.md I)
+    SUMMARY_AT[scope]={b:bookIdx,ch:chapter};
     if(!splitOn()){ if(await aiChat.open(scope)===false) return false; return aiChat.send(message,{attachments:images||[],model}); }
     rail.open(); rail.expand('chat'); if(await railChat.open(scope)===false) return false; return railChat.send(message,{attachments:images||[],model}); },
-  saveNote:async({id:runId,html,period,quiet})=>{   // quiet: written, not opened (the follow-up's second save, web/summary-followup.inline.html)
+  saveNote:async({id:runId,html,period,quiet,scope})=>{   // quiet: written, not opened (the follow-up's second save, web/summary-followup.inline.html)
     if(ANN_BLOCKED) return {ok:false,error:ANN_BLOCKED};
     const rid=runId!=null?String(runId).split(':'):null;   // file:<bookIdx>:<chapter>:<key>, the row id the first save answered
     if(rid&&rid.length===4&&(Number(rid[1])!==bookIdx||Number(rid[2])!==chapter)) return summaryOffChapter(Number(rid[1]),Number(rid[2]),rid[3],html);   // the reader moved on: write THAT chapter's file
+    const at=!rid&&SUMMARY_AT[scope]; if(at&&(at.b!==bookIdx||at.ch!==chapter)) return summaryOffChapter(at.b,at.ch,null,html,period);   // first save, reader moved on: a new note in the run's chapter
     const old=rid?rid[rid.length-1]:null; if(old&&!ANN.draws[old]) return {ok:false,gone:true};   // its run's note, by the row id it answered
     const now=Date.now(); let t=now; while(!old&&ANN.draws['free-'+t]) t++;   // two runs in one ms stay two notes
     const k=old||'free-'+t, prev=old?ANN.draws[k]:null;
@@ -1183,7 +1211,7 @@ const chatData={
         setTimeout(()=>openPanel(free?'draw':(n.hasDraws?'draw':'note'),free,free?n.title:undefined,rowId,at),120); };
       items.push({id:rowId,title:n.title,preview:n.preview||'',chip:rowChip(n),updated:n.updated||0,created:n.created||0,doc:{path:chapterFile(n.bookIdx,n.chapter),scope:n.verseKey||''},onClick:(_id,at)=>{   // which file + draws key this row is, for the drawer's note search; `at` is the hit (phase 3)
         aiChat.hide();
-        if(n.bookIdx!==bookIdx||n.chapter!==chapter){ bookIdx=n.bookIdx; chapter=n.chapter; bookSel.value=bookIdx; load().then(ok=>{ if(ok!==false) doOpen(at); }); }
+        if(n.bookIdx!==bookIdx||n.chapter!==chapter){ goChapter(n.bookIdx,n.chapter).then(ok=>{ if(ok!==false) doOpen(at); }); }
         else doOpen(at);
       },onRename:(newTitle)=>renameChapterNote(n,newTitle),
         onPin:(flag)=>pinChapterNote(n,flag), pin:!!n.pin,
@@ -1358,6 +1386,7 @@ const NOTE_OPTS={
   save:async(nb)=>{
     const k=_drawScope;
     if(ANN_BLOCKED) return {ok:false,error:ANN_BLOCKED};
+    if(ANN_LOADING||_drawPath!==ANN_PATH) return {ok:false,error:NOTE_MOVED};
     const has=p=>p&&((p.strokes&&p.strokes.length)||(p.texts&&p.texts.length)||(p.pageHtml&&p.pageHtml.length)||(p.images&&p.images.length));
     const empty=!(nb&&Array.isArray(nb.pages)&&nb.pages.some(has));
     // An emptied scope drops out of the chapter file entirely — that is what makes the verse dot
@@ -1512,13 +1541,12 @@ if(window.PASplit&&PASplit.onGate) PASplit.onGate(function(on){
 // Cycles through all 1189 Bible chapters, one per day, by day index since Unix epoch.
 function dailyRead(){
   const totalChapters=BOOKS.reduce((s,b)=>s+b[2],0);
-  let idx=Math.floor(Date.now()/86400000)%totalChapters;
+  let idx=Math.floor(Date.now()/86400000)%totalChapters, b=bookIdx, c=chapter;
   for(let i=0;i<BOOKS.length;i++){
-    if(idx<BOOKS[i][2]){ bookIdx=i; chapter=idx+1; break; }
+    if(idx<BOOKS[i][2]){ b=i; c=idx+1; break; }
     idx-=BOOKS[i][2];
   }
-  bookSel.value=bookIdx;
-  load().then(ok=>{ if(ok===false) return;   // superseded: another chapter is showing
+  goChapter(b,c).then(ok=>{ if(ok===false) return;   // superseded: another chapter is showing
     const [en,zh]=BOOKS[bookIdx];
     const b=document.getElementById('daily-banner');
     // No arbitration with the failure surface any more — they are different elements now, so a

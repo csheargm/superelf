@@ -313,7 +313,7 @@ test("(d) a Bible chapter with an INLINE draws{} notebook round-trips, and its n
         pages: [{ id: 'p0', created: 1, updated: 2, strokes: [{ c: '#111', w: 0.004, p: [[0.1, 0.2]] }], pageHtml: '', images: [] }] } } };
     h.put('notes/43-3.json', chapter);
     const A = runApp('bible (live)', h.relay, ['DATA', 'loadAnn', 'annPath', 'get ANN(){return ANN}',
-      'setCh:(b,c)=>{bookIdx=b;chapter=c;}', 'setScope:(k)=>{_drawScope=k;}'], { clampTimers: true });
+      'setCh:(b,c)=>{bookIdx=b;chapter=c;}', 'setScope:(k)=>{_drawScope=k;_drawPath=annPath();}'], { clampTimers: true });
     A.setCh(42, 3);
     await A.loadAnn();
     A.setScope('v16');

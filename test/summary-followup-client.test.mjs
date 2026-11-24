@@ -112,7 +112,7 @@ test('pins: both hosts honour {quiet:true} — the note is written, the open is 
   const NOTES = ["saveNote:async({id:runId,title,html,period,convoId,quiet})=>{\n    if(runId!=null){ const old=entryById(String(runId)); return old?updateSummaryNote(old,{title,html,convoId,quiet}):{ok:false,gone:true}; }",
     "if(!quiet) await openEntry(id,null,{keepRail:true}); return {ok:true,id}; },", "if(!quiet||curId===e.id) await openEntry(e.id,null,{keepRail:true}); return {ok:true,id:e.id};"];   // the note ON the pad reloads (test/summary-research-flow.test.mjs)
   for (const f of ['workspace/apps/notes/index.html', 'workspace.example/apps/notes/index.html']) for (const h of NOTES) assert.ok(read(f).includes(h), f + ': ' + h);
-  const BIBLE = ["saveNote:async({id:runId,html,period,quiet})=>{", "renderDots(); if(!quiet) await openNewDrawNote(k); return {ok:true,key:k,id:`file:${bookIdx}:${chapter}:${k}`}; },"];
+  const BIBLE = ["saveNote:async({id:runId,html,period,quiet,scope})=>{", "renderDots(); if(!quiet) await openNewDrawNote(k); return {ok:true,key:k,id:`file:${bookIdx}:${chapter}:${k}`}; },"];
   for (const f of ['workspace/apps/bible/index.html', 'workspace.example/apps/bible/index.html']) for (const h of BIBLE) assert.ok(read(f).includes(h), f + ': ' + h);
 });
 

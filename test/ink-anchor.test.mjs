@@ -337,7 +337,7 @@ test('web.mjs registers PAInkAnchor then its pen sheet, then PAAppPrefs (only la
     assert.ok(APP_SRC[app].includes('<!--PA_INK_ANCHOR_UI-->'), `${app} carries the marker`);
     assert.match(APP_SRC[app], /VM\.render\(\); INK\.render\(\);/, `${app}: renderVerses re-anchors`);
     assert.match(APP_SRC[app], /ANN\.ink=migrateKeys\(o\.ink\|\|\{\}\);/, `${app}: read back on load, or the next note save deletes the ink`);
-    assert.match(APP_SRC[app], /const annOk=await loadAnn\(\); if\(g!==_loadSeq\) return false;[^\n]*\n  if\(annOk\) INK\.load\(ANN\.ink\);/, `${app}: the chapter's ink is loaded before its text`);
+    assert.match(APP_SRC[app], /const annOk=await loadAnn\(\); if\(g!==_loadSeq\) return false;[^\n]*\n  if\(annOk\)\{ followSelection\(\); INK\.load\(ANN\.ink\); \}/, `${app}: the chapter's ink is loaded before its text`);
     assert.match(APP_SRC[app], /enabled:\(\)=>!ANN_BLOCKED&&!ANN_LOADING,\n  onChange:async packed=>\{ ANN\.ink=packed; renderDots\(\); return saveInk\(\); \}/, `${app}: the store is ANN.ink through saveInk (one coalescing save chain per chapter, over saveAnnAt); an unreadable chapter takes no ink`);
     assert.doesNotMatch(APP_SRC[app], /Ink whose text changed|经文已改动/, `${app}: the bucket label lives in the component once (R3)`);
   }
