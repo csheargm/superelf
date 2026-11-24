@@ -264,7 +264,7 @@
       if(busy) return;
       var pr=readPrefs();
       if(!pr.ok){ jTa.classList.add('pag-bad'); say(pr.error,true); return; }
-      setBusy(true); say(TXT.saving);
+      setBusy(true); say(TXT.saving); if(window.PAAppPrefs) await window.PAAppPrefs.whenIdle();   // a prefs write in flight (a tip dismissed) lands first, never after: it would undo this Save
       var r=await req({kind:'set-app-settings',prefs:pr.value,systemPrompt:pTa.value,appPrompt:o.appPrompt||''});
       setBusy(false);
       // The write is the only thing that makes this durable, so a failure closes nothing and

@@ -46,7 +46,9 @@ async function open(viewport) {
   assert.ok(frame, 'bible frame loaded');
   await frame.waitForFunction(ready, null, { timeout: 90000 });
   await frame.evaluate(() => PAAppPrefs.whenIdle());
-  await frame.waitForTimeout(300);                 // the boot readOrder() reply
+  // The boot readOrder() reply: wait until the page shows the order the account holds (not a fixed sleep).
+  const ef = await frame.evaluate(async () => { const r = await PAAppPrefs.read(); return !!(r && r.ok && r.prefs.englishFirst === true); });
+  await frame.waitForFunction((e) => !!document.querySelector(e ? '#verses .verse .vnum + .ven' : '#verses .verse .vnum + .vzh'), ef);
   await frame.evaluate(() => { if (window.PATips) PATips.dismiss(); return PAAppPrefs.whenIdle(); });   // its tipsSeen write settles first: a pending prefs write racing a ⚙ Save is docs/TODO.md
   return { ctx, page, frame };
 }
@@ -87,7 +89,7 @@ test('⚙ Settings: the 经文顺序 tick (with its first-use tip) puts English 
       await frame.waitForFunction(() => { const t = document.querySelector('.pat-tip.on'); return t && getComputedStyle(t).opacity === '1'; });
       assert.ok(await frame.evaluate(() => { const t = document.querySelector('.pat-tip').getBoundingClientRect(), e = document.elementFromPoint(t.left + t.width / 2, t.top + t.height / 2); return !!(e && e.closest('.pat-tip')); }), 'the tip is on top, visible');
       await shot(page, 'settings-row-tip.png');
-      await frame.evaluate(() => { PATips.dismiss(); return PAAppPrefs.whenIdle(); });
+      await frame.evaluate(() => { PATips.dismiss(); });   // NOT drained: its tipsSeen write is in flight when Save is pressed (the dialog waits for it)
     }
     await frame.waitForFunction(() => !document.querySelector('.pag-go').disabled);
     if ((await box.isChecked()) !== on) await box.click();
@@ -163,11 +165,13 @@ for (const [vp, name] of [[PORTRAIT, 'ipad-portrait'], [LANDSCAPE, 'ipad-landsca
         before.ink.forEach((x, i) => assert.ok(x.quote.startsWith(TARGETS[i][2]), `stroke ${i} pinned to "${TARGETS[i][2]}": ${x.quote}`));
         assert.deepEqual(before.marks, ['1/en:Pharisees', '1/zh:法利赛人', '2/zh:耶稣']);
         await shot(page, `ink-${name}-written-${writtenEnFirst ? 'en' : 'zh'}-first.png`);
+        // LIVE flip on the open page, the path a ⚙ Save takes (the write, then the shell's {pa:'prefs'} push
+        // and onSave, each → readOrder): the ink is redrawn at once (INK.render runs) and sits on the same
+        // words with no reflow forced by the test.
+        await frame.evaluate(() => { window.__renders = 0; const r = INK.render; INK.render = function (...a) { window.__renders++; return r.apply(this, a); }; });
         await setOrder(frame, !writtenEnFirst);
-        // LIVE flip, the path a ⚙ Save takes (onSave → readOrder), on the open page: the ink is redrawn at
-        // once (INK.render runs) and sits on the same words with no reflow forced by the test.
-        const renders = await frame.evaluate(async () => { let n = 0; const r = INK.render; INK.render = function (...a) { n++; return r.apply(this, a); }; await readOrder(); INK.render = r; return n; });
-        assert.ok(renders >= 1, 'the flip redraws the ink');
+        await frame.evaluate(() => readOrder());
+        assert.ok(await frame.evaluate(() => window.__renders) >= 1, 'the flip redraws the ink');
         assert.equal((await orders(frame))[0], writtenEnFirst ? 'zh' : 'en', 'flipped live');
         const live = await measure(frame, { reflow: false });
         live.ink.forEach((x, i) => assert.ok(Math.abs(x.dx - before.ink[i].dx) <= TOL && Math.abs(x.dy - before.ink[i].dy) <= TOL, `live: ink on "${TARGETS[i][2]}" kept its place: ${JSON.stringify(before.ink[i])} -> ${JSON.stringify(x)}`));

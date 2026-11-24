@@ -795,6 +795,9 @@ function setOrder(ef){ if(ef===englishFirst) return; englishFirst=ef;
 function readOrder(){ if(!(ORDER_KEY&&window.PAAppPrefs)) return Promise.resolve();
   return PAAppPrefs.read().then(r=>{ if(r&&r.ok) setOrder(r.prefs[ORDER_KEY]===true); }); }
 readOrder();
+// The shell pushes {pa:'prefs'} on every frame load (once its profile has settled) and after a ⚙ Save: re-read then,
+// so a boot read answered before the profile was current never leaves the page in the wrong order.
+window.addEventListener('message',e=>{ if(e.source===parent&&e.data&&e.data.pa==='prefs') readOrder(); });
 function renderVerses(verses){
   const wrap=document.getElementById('verses');
   if(!verses.length){
