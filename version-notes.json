@@ -1,4 +1,13 @@
 {
+  "v5.3.1": {
+    "date": "2026-11-23",
+    "features": [],
+    "fixes": [
+      "the bump tool's git calls are listed in the process census",
+      "census lists the version-bump tool"
+    ],
+    "through": "cab9fe662e10d6b1309a94d1a4cb083ee846e84f"
+  },
   "v5.3.0": {
     "date": "2026-11-23",
     "features": [
