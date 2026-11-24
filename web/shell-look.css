@@ -143,3 +143,5 @@ dialog input, dialog textarea, dialog select{ border-radius:var(--r-ctl); }
 .ecard > b:has([data-fget]){ display:block; -webkit-line-clamp:unset; overflow:visible; }
 /* A ⋯ menu taller than a short landscape screen scrolls instead of running off it. */
 .cmenu-pop{ max-height:calc(100dvh - 12px); overflow-y:auto; }
+/* The app bar slides away on its idle timer: its Aa pill must not stay behind over the app. */
+#frame.peek:not(.barin) .aa-set{ display:none; }
