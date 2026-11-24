@@ -1,4 +1,12 @@
 {
+  "v5.4.0": {
+    "date": "2026-11-23",
+    "features": [
+      "发布主日查经应用 · Publish the Sunday Study app"
+    ],
+    "fixes": [],
+    "through": "0533ecc0eecb7ddaedfb9b17d7c1bf4ef2ee7699"
+  },
   "v5.3.3": {
     "date": "2026-11-23",
     "features": [],
