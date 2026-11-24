@@ -5,13 +5,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { rmTemp } from './helpers-tmp.mjs';
 import { APP_CHAT_EVIDENCE_RULE, recordRequest, listHistory, diffText, diffTrees, diffVersion, notesForApp, gitLinesForApp,
   appAboutContext, editHistoryContext, DIFF_MAX_CHARS, CONTEXT_MAX_CHARS, NOTE_LINES_MAX, REQUEST_MAX, FACTS_END } from '../lib/app-history.mjs';
 import { snapshotApp, EDIT_WHY } from '../lib/app-versions.mjs';
 import { appEditOf, beginAppEdit, finishAppEdit, VERSIONS_DIR } from '../lib/app-edit.mjs';
 
-const REPO = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');   // not URL.pathname: '/D:/…' on Windows
 const NOTES = { 'v2.0.0': { date: '2026-11-24', features: ['发布 Sunday Study 主日查经 · Publish Sunday Study'], fixes: ['tasks: fix sort'] },
   'v1.0.0': { date: '2026-11-01', features: ['sunday-study: bigger font'], fixes: [] } };
 const noGit = () => { throw new Error('no git'); };

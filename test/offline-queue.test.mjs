@@ -208,7 +208,7 @@ test('wiring in the shell as served: the part last, both broker hooks, the refus
   assert.match(SHELL, /<span id="offLine" class="fs-toast"><\/span>/, 'the one state line, outside the inert header like #updBar');
   assert.match(SHELL, /#updBar\.on \+ #offLine\.on\{ transform:translate\(-50%,calc\(100% \+ \.4em\)\); \}/, 'both lit: no overlap');
   assert.ok(SHELL.indexOf('/* ══ PA_SW_CLIENT_END ══ */') < SHELL.indexOf('/* ══ PA_OFFLINE_BEGIN ══ */'), 'after PASW: PAOffline borrows its remember/recall');
-  assert.match(SHELL, /await ensureToken\(\);\n\s*PAOffline\.boot\(\);/, 'boot after the sign-in');
+  assert.match(SHELL, /await ensureToken\(\);\n(?:[^\n]*\n)?\s*PAOffline\.boot\(\);/, 'boot right after the sign-in (the owner-alerts refresh may sit between)');
   assert.match(SHELL, /catch\{ if\(T===t0&&!signal\) PAOffline\.noteNet\(false\); return 'offline'; \} if\(T!==t0\) return false;[^\n]*\n  if\(signal\)\{ let j0; try\{ j0=await r\.clone\(\)\.json\(\); \}catch\{ return false; \}[^\n]*\n  PAOffline\.noteNet\(true\);/, 'ping tells the line both ways');
   assert.match(SHELL, /remember:PASW\.remember, recall:PASW\.recall,/, 'one per-device memory (R3)');
   assert.equal(SHELL.split("'需要家中节点 · Needs the home node'").length, 2, 'the sentence is written once');
