@@ -1,4 +1,12 @@
 {
+  "v5.11.1": {
+    "date": "2026-11-24",
+    "features": [],
+    "fixes": [
+      "修复 CI · CI fixes after v5.11.0"
+    ],
+    "through": "46bd1c2be30e76a34be3eca3c5abb466dd72f6ba"
+  },
   "v5.11.0": {
     "date": "2026-11-24",
     "features": [
