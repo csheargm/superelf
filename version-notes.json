@@ -1,4 +1,12 @@
 {
+  "v5.13.0": {
+    "date": "2026-11-24",
+    "features": [
+      "新首页 · New home screen"
+    ],
+    "fixes": [],
+    "through": "8076f4df3fe5467ac3d8ce726b66d73800a5a5cd"
+  },
   "v5.12.2": {
     "date": "2026-11-24",
     "features": [],
