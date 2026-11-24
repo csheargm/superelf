@@ -60,6 +60,9 @@ test('with a token: preview lists files, publish opens the PR; the token is in n
   assert.equal(gh.st.pulls[0].title, '发布 My App · Publish My App');
   const st = await waitFor(async () => { const j = await (await api(port, '/api/apps/myapp/publish')).json(); return j.status.state === 'failed' && j; }, 'CI timeout notice');
   assert.equal(st.status.code, 'CI_TIMEOUT'); assert.equal(st.tokenSet, true);
+  // The later failure reaches Settings → Activity log, not only the first 'checking' line.
+  const act = await waitFor(async () => { const rows = await (await api(port, '/api/admin/activity')).json(); return rows.find((x) => x.ev === 'app-publish' && x.state === 'failed'); }, 'publish failure in the activity view');
+  assert.equal(act.kind, 'failure'); assert.ok(!JSON.stringify(act).includes(FAKE_TOKEN));
   const all = [text, JSON.stringify(st), JSON.stringify(pv), await (await api(port, '/api/admin/config')).text(), web.log()].join('\n');
   assert.ok(!all.includes(FAKE_TOKEN), 'token never returned or logged');
   const m = await api(port, '/api/apps/myapp/publish', { method: 'POST', body: '{}', headers: { authorization: `Bearer ${MEMBER_TOKEN}` } });

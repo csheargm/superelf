@@ -13,6 +13,7 @@ import { makeSigninGate, authConfig } from './lib/demo-auth.mjs';
 import { makeDemoRoutes } from './lib/demo-routes.mjs';
 import { handlePublishRoute } from './lib/publish/routes.mjs';
 import { handleAlertsRoute } from './lib/node-alerts.mjs';
+import { handleActivityRoute, refuseStaleUndo } from './lib/activity-view.mjs';
 import { loadConfig, configPath, fastLaneGuard, GUARD_DEFAULT_SURFACE, agentCapabilities, appContract, REPLY_LANGUAGE_RULE, OVERRIDABLE_PROMPT_MAX } from './lib/config.mjs';
 import { runClaude, APPEND_SYSTEM_PROMPT_MAX } from './lib/runner.mjs';
 import { agentAllowed, lanesFor, memberLane, NO_PLAIN_LANE_TEXT, AGENT_OFF_TEXT } from './lib/member-lanes.mjs';
@@ -1408,7 +1409,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
     // TODO(R4 seam): the retry loop and the lane dispatch inside it leave chat() together (see the seam named below).
     for (;;) {
     if (ml.blocked) r = { ok: false, text: NO_PLAIN_LANE_TEXT };   // no plain lane for this member: said, never the agent
-    else if (edit && edit.undo) { r = undoAppEdit(edit, { wsDir: wsDir(user) }); line(r.line); }   // a typed "undo": no model
+    else if (edit && edit.undo) { r = undoAppEdit(edit, { wsDir: wsDir(user) }); line(r.line); audit('app-edit-undo', { who: user.id, app: edit.slug, undone: !!r.line.undone }); }   // a typed "undo": no model
     else if (chosen && chosen.provider === 'ollama') {
       // Fast lane: text-only Ollama model. Stateless, so send recent history for context.
       // Global honesty guard + the app's own directive (e.g. the Bible app's "reply in Chinese
@@ -1551,7 +1552,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
     }
     const edited = finishAppEdit(edit, editCtx, { wsDir: wsDir(user) });   // inline checks; a failing change is rolled back
     editCtx = null;
-    if (edited) { audit('app-edit', { who: user.id, app: edit.slug, changed: edited.line.changed, applied: edited.line.applied }); line(edited.line); edited.note = [editUnchangedNote(r.text, edited.line), edited.note].filter(Boolean).join('\n\n'); if (edited.note) { r = { ...r, text: `${r.text || ''}\n\n${edited.note}` }; line({ type: 'delta', text: `\n\n${edited.note}` }); } }
+    if (edited) { audit('app-edit', { who: user.id, app: edit.slug, changed: edited.line.changed, applied: edited.line.applied, version: edited.line.version || null }); line(edited.line); edited.note = [editUnchangedNote(r.text, edited.line), edited.note].filter(Boolean).join('\n\n'); if (edited.note) { r = { ...r, text: `${r.text || ''}\n\n${edited.note}` }; line({ type: 'delta', text: `\n\n${edited.note}` }); } }
     // by: the lane that ACTUALLY answered (a confined turn's GPT pick runs on Claude), shown under the answer.
     const by = ml.blocked ? '' : chosen ? chosen.label : 'Claude';
     const mdMsg = { role: 'md', text: r.text || '', ms: turnMs, by, ...(blank ? { failed: true } : {}) };
@@ -1835,6 +1836,7 @@ const server = http.createServer(async (req, res) => {
     // Each app is listed once (F4-6): your own apps are in "My apps", and an app on the family shelf is under the shelf.
     if (req.method === 'GET' && p === '/api/family-apps') { const shelf = new Set(demoOn(cfg) ? [] : listShared(SHARED).map((a) => a.name));
       return send(res, 200, 'application/json', JSON.stringify(listFamilyApps().filter((a) => a.uid !== user.id && !shelf.has(a.slug)))); }
+    if (handleActivityRoute(req, res, p, url, { user, cfg, send, demo: demoOn(cfg), wsDir })) return;   // Settings → Activity log (lib/activity-view.mjs)
     if (await handleAlertsRoute(req, res, p, { user, cfg, readBody: (r) => readBody(r, BODY_LIMITS.control), send, audit, demo: demoOn(cfg) })) return;   // owner alerts + host actions (docs/adr/0041)
     if (await handlePublishRoute(req, res, p, { user, cfg, root: ROOT, slugOk, ownAppDir, readBody: (r) => readBody(r, BODY_LIMITS.control), send, audit, demo: demoOn(cfg) })) return;   // owner-only Publish (docs/adr/0039)
     // 改这个应用 · Change this app (lib/app-edit.mjs, ADR 0040): the panel page and its 撤销 · Undo. Owner only in Phase 1.
@@ -1845,6 +1847,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && /^\/api\/apps\/[^/]+\/undo$/.test(p)) {
       try {
         const edit = appEditOf({ user, body: { edit: decodeURIComponent(p.split('/')[3]), message: 'undo' }, headers: req.headers, appsDir: appsDir(user) });
+        refuseStaleUndo(wsDir(user), edit.slug, url.searchParams.get('v'));   // Activity log: undo THAT change only, never a newer one
         const u = undoAppEdit(edit, { wsDir: wsDir(user) });
         audit('app-edit-undo', { who: user.id, app: edit.slug, undone: !!u.line.undone });
         return send(res, 200, 'application/json', JSON.stringify({ ok: true, text: u.text, undone: !!u.line.undone }));
