@@ -1,4 +1,12 @@
 {
+  "v5.9.1": {
+    "date": "2026-11-24",
+    "features": [],
+    "fixes": [
+      "发布页按钮更清楚，等待时可关闭 · Publish sheet: real buttons, close while waiting"
+    ],
+    "through": "32815c1eb0484826060016bd818a70d603bf66fa"
+  },
   "v5.9.0": {
     "date": "2026-11-24",
     "features": [
