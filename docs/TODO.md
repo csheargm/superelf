@@ -670,3 +670,5 @@ Without it they now FAIL (R14), not pass as `# pass 0 / # fail 0`. To run them:
 - Family Apps (F4-6): a shelf app hides every member app with the same slug, even from another author. Match by source account + slug; add a same-slug, different-author control.
 - Direct links (F2-11): `/app/shared/...` (the shelf) opened in a tab still serves a bare page; add the shelf case to the redirect, with a browser test.
 - Test honesty: bible-reader-e2e direct-link test injects a token (skips the real sign-in handoff); chat-stop asserts the stream ended, not that the process died; setup-modal Escape test uses a synthetic event.
+
+- deploy-vm.sh untars each deploy over the VM source folder, so files deleted in a newer commit stay in the Docker build context and ship in the image (GPT review of fix/vm-revision, 2026-11-23). Fix: extract into a fresh folder per deploy and swap, keeping runtime config outside it.

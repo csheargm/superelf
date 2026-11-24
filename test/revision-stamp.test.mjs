@@ -21,7 +21,7 @@ const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'pa-rev-'));
 
 // The Dockerfile's REVISION RUN line, run in bash with the given build args.
 const stampRun = () => {
-  const m = /^RUN (printf '%s' "\$REVISION"[\s\S]*?> \/opt\/superelf\/REVISION)$/m.exec(DOCKERFILE);
+  const m = /^RUN (case "\$REVISION"[\s\S]*?> \/opt\/superelf\/REVISION)$/m.exec(DOCKERFILE);
   assert.ok(m, 'the Dockerfile has the REVISION RUN line');
   return m[1].replace(/\\\n/g, ' ');
 };
@@ -47,7 +47,7 @@ test('the build stamp: right args write sha + date; a missing or bad arg FAILS t
   assert.equal(ok.status, 0, ok.stderr);
   assert.equal(fs.readFileSync(out, 'utf8'), `${SHA_A}\n2026-11-23\n`);
   assert.equal(readRevision(d), SHA_A); assert.equal(readRevisionDate(d), '2026-11-23');
-  for (const [args, why] of [[{}, 'no args'], [{ REVISION: SHA_A }, 'no date'], [{ REVISION: 'ca28633', REVISION_DATE: '2026-11-23' }, 'a short sha'], [{ REVISION: 'x; rm -rf /', REVISION_DATE: '2026-11-23' }, 'junk']]) {
+  for (const [args, why] of [[{}, 'no args'], [{ REVISION: SHA_A }, 'no date'], [{ REVISION: 'ca28633', REVISION_DATE: '2026-11-23' }, 'a short sha'], [{ REVISION: 'x; rm -rf /', REVISION_DATE: '2026-11-23' }, 'junk'], [{ REVISION: `${SHA_A}\nextra`, REVISION_DATE: '2026-11-23' }, 'a multi-line sha'], [{ REVISION: SHA_A, REVISION_DATE: '2026-11-23\nextra' }, 'a multi-line date']]) {
     fs.rmSync(out, { force: true });
     const r = runStamp(args, out);
     assert.notEqual(r.status, 0, `${why}: the build fails`);
@@ -75,6 +75,11 @@ test('revision.sh: a deploy-vm REVISION, or the git checkout; neither, or the tw
   r = revision(repo); assert.equal(r.status, 0, r.stderr); assert.equal(r.stdout.trim(), `${head} 2026-11-23`, 'a checkout: git HEAD and its date');
   fs.writeFileSync(path.join(repo, 'REVISION'), `${head}\n2026-11-23\n`);
   assert.equal(revision(repo).status, 0, 'REVISION matching HEAD is fine');
+  fs.writeFileSync(path.join(repo, 'f'), '2');
+  r = revision(repo);
+  assert.notEqual(r.status, 0, 'uncommitted edits to tracked files: refused, the image would ship code the sha does not name');
+  assert.match(r.stderr, /uncommitted changes/);
+  git(repo, 'checkout', '-q', '--', 'f');
   fs.writeFileSync(path.join(repo, 'REVISION'), `${SHA_A}\n2026-11-22\n`);
   r = revision(repo);
   assert.notEqual(r.status, 0, 'a REVISION left by an older deploy next to a newer HEAD: refused, never guessed');

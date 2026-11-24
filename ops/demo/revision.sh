@@ -18,6 +18,10 @@ superelf_revision() {
     if [[ -n "$sha" && -n "$gsha" && "$sha" != "$gsha" ]]; then
       echo "revision: $root/REVISION says ${sha:0:7} but git HEAD is ${gsha:0:7}; deploy with ops/private/deploy-vm.sh, or delete REVISION after a git pull" >&2; return 1
     fi
+    # Uncommitted edits: the build copies the working tree, so the image would ship code the sha does not name.
+    if [[ -n "$gsha" && -n "$(git -c safe.directory="$root" -C "$root" status --porcelain --untracked-files=no 2>/dev/null)" ]]; then
+      echo "revision: $root has uncommitted changes to tracked files; commit or discard them so the stamp names the code" >&2; return 1
+    fi
     [[ -n "$sha" ]] || { sha=$gsha; date=$gdate; }
   fi
   [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "revision: no commit sha for $root (no REVISION from deploy-vm.sh, no git checkout)" >&2; return 1; }
