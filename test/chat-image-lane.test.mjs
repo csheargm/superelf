@@ -430,12 +430,14 @@ test('the guard the SHELL gets keeps the honesty and drops the selector it does 
   assert.ok(!/model selector/.test(sys[0]), 'the shell has no model selector — never send the user looking for one');
 });
 
-test('the guard an APP gets keeps the honesty AND names the selector that is really there', async () => {
+test('the guard an APP gets keeps the honesty and never sends the user to the model selector', async () => {
   const r = await chat({ message: 'change my code', model: 'deepseek', app: 'bible' });
   const sys = systemOf(r.newOllama[0]);
   assert.equal(sys[0], fastLaneGuard('app'), 'R3: one source, app variant');
   assert.ok(/you have no tools/.test(sys[0]), 'the honest half is identical on both surfaces');
-  assert.ok(/model selector/.test(sys[0]), 'a mini-app chat does have a chooser pill');
+  // Changed 2026-11-24 (lib/app-chat-honesty.mjs): an app's Claude is confined and writes nothing too, so naming the
+  // chooser sent people to a lane that also cannot change the app.
+  assert.ok(!/model selector/.test(sys[0]), 'no model in an app chat can change the app');
   assert.equal(sys[1], 'BIBLE-DIRECTIVE 中文', 'the app directive still rides alongside, unchanged');
 });
 

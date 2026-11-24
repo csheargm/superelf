@@ -69,7 +69,7 @@ const PAAppEdit=(()=>{
     el.querySelector('#aeUndo').onclick=undo;
     return {slug,title,el,fr,rec:{el:fr,slug,edit:true,spoke:true,busy:0,held:false,left:false}};
   }
-  async function open(slug,title){
+  async function open(slug,title,prefill){
     if(!owner()) return;
     if(frameSlug()!==slug||frameUid()!==UID){ openApp(UID,slug,title); await loaded(); }
     if(!canEdit()) return;
@@ -81,7 +81,7 @@ const PAAppEdit=(()=>{
     try{ const r=await api('/api/app-edit/panel'); if(!r.ok) throw new Error('HTTP '+r.status); const html=await r.text(); if(S!==me) return; me.fr.srcdoc=html; }
     catch(err){ if(S===me) me.el.querySelector('#aeTitle').textContent='面板加载失败 · The panel did not load: '+((err&&err.message)||''); return; }
     if(S!==me) return;
-    S.fr.addEventListener('load',()=>{ if(S===me) me.fr.contentWindow.postMessage({pa:'edit-init',slug,title:me.title,shot},'*'); },{once:true});
+    S.fr.addEventListener('load',()=>{ if(S===me) me.fr.contentWindow.postMessage({pa:'edit-init',slug,title:me.title,shot,prefill:typeof prefill==='string'?prefill.slice(0,2000):''},'*'); },{once:true});
   }
   function loaded(){ return new Promise((res)=>{ const t=setTimeout(res,LOAD_MS); $('#fr').addEventListener('load',()=>{ clearTimeout(t); res(); },{once:true}); }); }
   function close(){
@@ -128,5 +128,13 @@ const PAAppEdit=(()=>{
   }
   // Shown only where it can work: the owner, on their own app (openApp passes the uid it opens).
   function syncBar(uid){ const more=$('#fmore'); if(more) more.style.display=owner()&&uid===UID?'':'none'; }
-  return {item,armTip,open,close,onEvent,frameRec,kindOk,bindBar,syncBar,editAppFromBar:()=>{ if(canEdit()) open(frameSlug(),$('#ftitle').textContent); }};
+  // The app's chat said it cannot change the app and offered this button (lib/app-chat-honesty.mjs). Only the page
+  // open in #fr, only on a real tap (an app cannot open the owner's panel by itself), only where the panel works.
+  function fromApp(e){
+    const m=e.data, fr=$('#fr');
+    if(!fr||e.source!==fr.contentWindow||e.origin!=='null'||!canEdit()) return;
+    if(!(navigator.userActivation&&navigator.userActivation.isActive)) return;
+    open(frameSlug(),$('#ftitle').textContent,typeof m.request==='string'?m.request:'');
+  }
+  return {item,armTip,open,close,onEvent,frameRec,kindOk,bindBar,syncBar,fromApp,editAppFromBar:()=>{ if(canEdit()) open(frameSlug(),$('#ftitle').textContent); }};
 })();

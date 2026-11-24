@@ -70,3 +70,17 @@ Skipped: a "历史 · History" list with Undo-to-this in the panel header. Undo 
 edit and keeps what it replaced; restoring an arbitrary version needs its own route and an undo
 story for the versions it skips, which is not cheap. The agent can already read and compare any
 saved copy. Noted in docs/TODO.md.
+
+## Follow-up (2026-11-24): an app's chat never claims a change
+
+Owner report: a demo guest asked Calendar Planner's own chat for day/week/month/year views, said
+"yes", and was told "Done — … now has a … view switcher". No app chat can write (an app's agent is
+confined and writes nothing; fast lanes and the demo have no tools). `lib/app-chat-honesty.mjs` holds
+the fix in one place: `APP_CHAT_NO_CHANGE_RULE` + the real way per person (owner: 改这个应用 under the
+reply; member: owner-only for now; demo: ask the main chat, which can build apps), sent outside the
+override chain; a `{type:'app-change'}` offer that PAChat shows as a button opening this panel
+prefilled (owner only, on a real tap); and a known-limits regex backstop that appends
+（此对话不能修改应用 · This chat can't change the app） to a reply that still claims a change. In this
+panel, a reply claiming a change on a turn the server saw change nothing gets "The app was not changed".
+The fast-lane guard no longer tells app chats to "switch the model selector to Claude": that lane is
+confined too.

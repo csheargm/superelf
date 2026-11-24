@@ -992,6 +992,7 @@ addEventListener('blur',()=>{ if(frameOpen()) barHide(); });
 // TODO(R4): this file is far over budget; this block moves with the app-frame seam (see SHELL_BEHIND_APP).
 const SHELL_MSG_FONT_PER_S=20; let _shellFont={t:0,n:0};
 function frameOwnBar(){ return frameUid()===UID&&OWNBAR_APPS.has(frameSlug()); }
+window.addEventListener('message',(e)=>{ if(e.data&&e.data.pa==='shell'&&e.data.type==='change-app') PAAppEdit.fromApp(e); });   // any app's chat, not only ownBar apps. TODO(R4): moves with the app-frame seam below
 window.addEventListener('message',(e)=>{
   const m=e.data; if(!m||m.pa!=='shell') return;
   if(!e.source||e.source!==$('#fr').contentWindow||e.origin!=='null'||!frameOpen()||!frameOwnBar()) return;
