@@ -200,7 +200,7 @@ const PROCESS_STARTS = {
     refs: ['execFileSync(process.execPath'] },
   'tools/gen-builtin-app-versions.mjs': { why: 'git log, show (builds lib/builtin-app-versions.json)', refs: ["execFileSync('git'"] },
   'tools/privacy-scan.mjs': { why: 'git ls-files, rev-list, show (the public privacy scan)', refs: ["execFileSync('git'", "execFileSync('git'"] },
-  'web.mjs': { why: 'git', refs: ["execFileSync('git'", "execFileSync('git'", "execSync('git rev-parse HEAD'"] },
+  'web.mjs': { why: 'git', refs: ["execFileSync('git'", "execFileSync('git'", "execSync('git rev-parse HEAD'", "execFileSync('git'"] },
 };
 const CHILD_PROCESS = /['"`](?:node:)?child_process['"`]/g;
 const NAMED_IMPORT = /import\s*\{([^}]*)\}\s*from\s*['"](?:node:)?child_process['"]/g;
