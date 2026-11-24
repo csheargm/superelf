@@ -185,6 +185,17 @@ dialog{ border:1px solid var(--line); border-radius:12px; background:var(--card)
   padding:max(20px, env(safe-area-inset-top,0px)) max(16px, calc((100vw - 760px) / 2))
           max(24px, calc(20px + env(safe-area-inset-bottom,0px))); }
 #cfg::backdrop{ background:var(--bg); }
+/* The top bar sticks while the page scrolls: title, 保存 · Save and the one ✕ (web/settings-head.js).
+   Negative side margins + matching padding paint it edge to edge over the scrolled content. */
+#cfgHead{ position:sticky; top:calc(-1 * max(20px, env(safe-area-inset-top,0px))); z-index:6; display:flex; align-items:center; gap:8px;
+  margin:calc(-1 * max(20px, env(safe-area-inset-top,0px))) calc(-1 * max(16px, calc((100vw - 760px) / 2))) 12px;
+  padding:max(8px, env(safe-area-inset-top,0px)) max(16px, calc((100vw - 760px) / 2)) 8px;
+  background:var(--card); border-bottom:1px solid var(--line); }
+#cfgTitle{ flex:1; font-size:17px; }
+#cfgHead .primary{ padding:8px 14px; }
+#cfgHead .primary:disabled{ opacity:.45; cursor:default; }
+#cfgClose{ min-width:44px; min-height:44px; font-size:22px; line-height:1; background:none; border:0; color:var(--muted); cursor:pointer; }
+label.pa-new{ padding-right:14px; }   /* the blue dot sits in this gutter, not on the label's last word */
 
 /* Form controls do NOT inherit a font — the login inputs were rendering at the UA default (~13px),
    unreadable on a phone and immune to A-/A+. The 16px floor is the threshold below which iOS
@@ -2581,6 +2592,7 @@ function renderShellVfy(){ const btn=$('#shellVfy'); btn.textContent=(shellVerif
 $('#shellVfy').onclick=()=>{ shellVerifyOn=!shellVerifyOn; renderShellVfy(); };
 
 /* PA_SETTINGS_JS */
+/* PA_SETTINGS_HEAD_JS */
 /* PA_ACTIVITY_JS */
 
 /* ── Scroll-to-bottom button ── */

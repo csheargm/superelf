@@ -1,16 +1,17 @@
 <dialog id="cfg">
   <form method="dialog">
-    <h3 style="margin-bottom:12px">Your profile</h3>
-    <label>Name<br><input id="pName" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></label>
-    <label>About you (the assistant reads this)<br><textarea id="pAbout" rows="2" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></textarea></label>
-    <label>Reply style — how should the assistant talk to you?<br><input id="pPrefs" placeholder="Short and plain, no preamble · bullet points · be direct" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></label>
+    <div id="cfgHead"><b id="cfgTitle">设置 · Settings</b><button class="primary" id="pSave" disabled>保存 · Save</button><button class="plain" id="cfgClose" value="cancel" formnovalidate aria-label="关闭 · Close" title="关闭 · Close">✕</button></div>
+    <h3 style="margin-bottom:12px">你的资料 · Your profile</h3>
+    <label>名字 · Name<br><input id="pName" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></label>
+    <label>关于你（助手会读）· About you (the assistant reads this)<br><textarea id="pAbout" rows="2" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></textarea></label>
+    <label>回复风格 · Reply style — how should the assistant talk to you?<br><input id="pPrefs" placeholder="Short and plain, no preamble · bullet points · be direct" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></label>
     <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:14px"><input type="checkbox" id="pAutoUpdate"> 自动更新共享应用 · Auto-update shared apps</label>
     <div id="pAge" style="color:var(--muted);font-size:13px;margin-bottom:10px"></div>
     <label id="pBriefWrap">简报邮箱 · Briefing email<br><input id="pBriefEmail" type="email" autocomplete="email" placeholder="留空则不发送 · blank = off" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></label>
     <label>简报保留天数（天，默认 30） · Briefing history (days, default 30)<br><input id="pRetainDays" type="number" min="1" max="3650" placeholder="30" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></label>
-    <label id="pZipWrap">邮编 · Postcode (for local data like pollen 用于花粉等本地数据)<br><input id="pPostcode" placeholder="留空则每次询问 · blank = ask each time" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></label>
+    <label id="pZipWrap">邮编 · Postcode（用于花粉等本地数据 · for local data like pollen）<br><input id="pPostcode" placeholder="留空则每次询问 · blank = ask each time" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></label>
     <details id="advWrap" style="border:1px solid var(--line);border-radius:8px;padding:0 10px;margin:2px 0 10px">
-      <summary style="cursor:pointer;padding:9px 0;color:var(--muted);font-size:13px">Advanced · AI system prompts</summary>
+      <summary style="cursor:pointer;padding:9px 0;color:var(--muted);font-size:13px">高级：AI 系统提示 · Advanced: AI system prompts</summary>
       <div style="padding:2px 0 10px">
         <label style="font-size:13px">Fast-lane system message (all apps)<br><textarea id="spGlobal" rows="4" style="width:100%;padding:8px;margin:4px 0 2px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px"></textarea></label>
         <button type="button" class="plain" data-spreset="__global" style="font-size:12px;padding:2px 8px;margin-bottom:8px" formnovalidate>Reset to default</button>
@@ -45,8 +46,8 @@
     </details>
     <div id="family" style="display:none;border-top:1px solid var(--line);padding-top:12px;margin-top:6px"></div>
     <div id="shelf" style="display:none;border-top:1px solid var(--line);padding-top:12px;margin-top:6px"></div>
-    <label style="display:block;margin-top:6px">修改密码 · Change password (optional)<br><input id="pPin" type="password" placeholder="新密码 · new password" style="width:100%;padding:8px;margin:4px 0 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></label>
-    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap"><button class="primary" style="padding:8px 14px" id="pSave">Save</button><button class="plain" id="auditBtn" style="display:none" formnovalidate>Activity log</button><button class="plain" id="logoutBtn" formnovalidate>Sign out</button><button class="plain" value="cancel" formnovalidate>Close</button></div>
+    <label style="display:block;margin-top:6px">修改密码（可选）· Change password (optional)<br><input id="pPin" type="password" placeholder="新密码 · new password" style="width:100%;padding:8px;margin:4px 0 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></label>
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap"><button class="plain" id="auditBtn" style="display:none" formnovalidate>活动记录 · Activity log</button><button class="plain" id="logoutBtn" formnovalidate>退出登录 · Sign out</button></div>
     <div id="ver-lbl" style="text-align:center;margin-top:16px;font-size:11px;color:var(--muted);cursor:pointer;user-select:none">管家 · <!--APP_VERSION--></div>
   </form>
 </dialog>
