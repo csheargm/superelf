@@ -1,4 +1,56 @@
 {
+  "v5.2.0": {
+    "date": "2026-11-23",
+    "features": [
+      "overnight triage — 25 fixes and 12 approved product changes"
+    ],
+    "fixes": [
+      "revision-date lookup listed in the process census",
+      "VM nodes report their real revision, so auto-update works again",
+      "notes stay in the chapter they were written in; members get app updates",
+      "page text stays still when the app bar hides, in every app",
+      "Bible chapter buttons and swipe reach the iPad",
+      "leftovers — 中文 placeholder, Safari checks, quieter Bible, ⋯ clear of the handle",
+      "test flakes, webkit settings, expired-session prune",
+      "中文-first sweep",
+      "demo limit screen, quiet demo sign-out, removed-member notice, bilingual add-member"
+    ],
+    "through": "0d68cd1ef5401e10f0ad2891e4dc137a0f362e35"
+  },
+  "v5.1.0": {
+    "date": "2026-11-22",
+    "features": [
+      "demo waiting list",
+      "Church and Rise as public showcase apps",
+      "optional agent CLIs in the node image; model check sends the Ollama key",
+      "Cloudflare Web Analytics on the landing page"
+    ],
+    "fixes": [
+      "overnight test fixes",
+      "a drawn circle stays on its words when the iPad rotates",
+      "visible undo/redo; a resting finger no longer selects words or asks AI while writing",
+      "handwriting keeps words together on rotation; original layout unchanged",
+      "unshared app pages load only for their author and the owner",
+      "one handwritten word stays on one frame when the screen turns",
+      "Bible handwriting stays whole on every screen width",
+      "weekly model review works on direct ollama.com nodes",
+      "the Bible opens ink and picture notes on Draw, like the Journal",
+      "VM build id from REVISION, so open pages update themselves",
+      "the floating pane you press comes to the front",
+      "sign-in says password or PIN",
+      "CI skip ceilings for the synced e2e files",
+      "sync from private, privacy guard, one public source"
+    ],
+    "through": "3ad3cb61da03c01a2e95eaeb6df49cd193076da0"
+  },
+  "v5.0.1": {
+    "date": "2026-11-21",
+    "features": [],
+    "fixes": [
+      "CI green on the public snapshot"
+    ],
+    "through": "b16e17d6e70f9330f0730b6f1f18d38ccf27e9d7"
+  },
   "v5.0.0": {
     "date": "2026-10-12",
     "features": [
