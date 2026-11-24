@@ -1,4 +1,12 @@
 {
+  "v5.8.0": {
+    "date": "2026-11-24",
+    "features": [
+      "圣经中文在前 · Bible shows Chinese first"
+    ],
+    "fixes": [],
+    "through": "595a7a3e87830d59a3a20bbefe72ac24c5807654"
+  },
   "v5.7.1": {
     "date": "2026-11-24",
     "features": [],
