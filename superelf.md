@@ -293,6 +293,12 @@ already register theirs (a pending save, a streaming turn). An app with its OWN 
 registers one predicate: `PABusy.watch(() => dirty)`. A watcher that throws, or no answer within
 0.5 s, counts as busy: the shell then lights ↺ and shows one line instead of reloading.
 
+### PASnap — the app's own picture for 改这个应用 · Change this app
+On every app page, after PABusy (ADR 0040): nothing to mount. The owner's ⋯ → 改这个应用 asks the
+page for a picture of itself and attaches it to the edit panel. Keep images and fonts as data: URLs
+(they are anyway: connect-src 'none') and the picture shows them; a page with no script gets none
+and the panel asks for a photo instead.
+
 ### Font size — every app gets it free
 The shell's A-/A+ scale reaches EVERY app: `web.mjs` injects a listener into every served app
 page (`PA_PREFS_SNIPPET` in `sendAppHtml`). You write no code for it. Two mechanisms, chosen

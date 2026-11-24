@@ -39,7 +39,7 @@ function appFrameOf(win){
   const live=$('#fr');
   if(live.contentWindow===win){ const r=appFrameRec(live); r.slug=frameSlug(); r.spoke=true; return r; }
   for(const r of appFramesHeld) if(r.el.contentWindow===win) return r;
-  return null;
+  return typeof PAAppEdit!=='undefined'?PAAppEdit.frameRec(win):null;   // the edit panel (web/app-edit.js): a shell page filed under the app it edits, r.edit set
 }
 // The broker calls this with +1 when a request arrives and -1 when its handler is done. That is when
 // it has been answered, except speech-start: its results come later and do not hold the page.

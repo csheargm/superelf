@@ -60,7 +60,7 @@ test('served: settings-ui carries the rows marker and web.mjs registers settings
   assert.ok(SETTINGS.trimEnd().endsWith('<!--PA_SETTINGS_ROWS-->'), 'settings-ui carries the marker, after its script');
   const list = WEB.slice(WEB.indexOf('const PA_COMPONENTS = ['), WEB.indexOf('\n];', WEB.indexOf('const PA_COMPONENTS = [')));
   const files = [...list.matchAll(/file: '([^']+)'/g)].map((m) => m[1]);
-  assert.deepEqual(files.slice(-7), ['settings-rows.inline.html', 'tips.inline.html', 'pane-chrome.inline.html', 'app-bar.inline.html', 'bar-handle.css', 'reading-history.inline.html', 'ink-frame.inline.html']);
+  assert.deepEqual(files.slice(-8), ['settings-rows.inline.html', 'tips.inline.html', 'pane-chrome.inline.html', 'app-bar.inline.html', 'bar-handle.css', 'reading-history.inline.html', 'ink-frame.inline.html', 'snap.inline.html']);
   assert.ok(files.indexOf('settings-ui.inline.html') < files.length - 1);
   assert.equal(ROWS.split(LABEL).length, 2, 'the label is written once (R3)');
 });

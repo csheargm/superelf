@@ -198,9 +198,10 @@ test('the relay marks EVERY agent-reaching broker kind through the one helper', 
   for (const r of ['/api/chat', '/api/ask', '/api/jobs/resolve']) assert.ok(routes.has(r), `derived agent routes include ${r}: ${[...routes]}`);
   let used = 0;
   for (const r of routes) {
-    const re = new RegExp(`'${r.replace(/\//g, '\\/')}'(.{0,40})`, 'g');
+    const re = new RegExp(`'${r.replace(/\//g, '\\/')}'(.{0,80})`, 'g');
     for (const m of BROKER.matchAll(re)) {
-      assert.match(m[1], /^,appAgentInit\(/, `broker call to ${r} must go through appAgentInit: ${m[0]}`);
+      // The one exception (ADR 0040): the edit panel's chat, chosen by fr.edit — the panel's window only — is the owner's own turn.
+      assert.match(m[1], r === '/api/chat' ? /^,(?:fr\.edit===true\?editTurnInit\(body,ac\.signal\):)?appAgentInit\(/ : /^,appAgentInit\(/, `broker call to ${r} must go through appAgentInit: ${m[0]}`);
       used++;
     }
   }

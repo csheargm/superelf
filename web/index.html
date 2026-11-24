@@ -361,7 +361,7 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
 </form>
 <input type="file" id="filein-photo" multiple hidden accept="image/*">
 <div id="lightbox"><button id="lightbox-close">✕</button><img id="lightbox-img" src="" alt=""><div style="position:absolute;bottom:calc(env(safe-area-inset-bottom)+16px);left:0;right:0;text-align:center;color:rgba(255,255,255,.55);font-size:13px;pointer-events:none;">Tap outside image to close</div></div>
-<div id="frame"><div class="bar"><button class="plain" id="back">← Home</button><b id="ftitle" style="flex:1"></b><button class="plain fs-dn" id="fs-dn" style="font-size:12px;font-weight:700;padding:4px 8px">A-</button><button class="plain fs-up" id="fs-up" style="font-size:15px;font-weight:700;padding:4px 8px">A+</button></div><button id="barpeek" class="plain" title="显示应用栏 · Show the app bar" aria-label="Show the app bar"></button><iframe id="fr" sandbox="allow-scripts" allow="clipboard-write;microphone"></iframe></div>
+<div id="frame"><div class="bar"><button class="plain" id="back">← Home</button><b id="ftitle" style="flex:1"></b><button class="plain" id="fmore" style="display:none;font-size:16px;padding:4px 8px" title="更多 · More" aria-label="More">⋯</button><button class="plain fs-dn" id="fs-dn" style="font-size:12px;font-weight:700;padding:4px 8px">A-</button><button class="plain fs-up" id="fs-up" style="font-size:15px;font-weight:700;padding:4px 8px">A+</button></div><button id="barpeek" class="plain" title="显示应用栏 · Show the app bar" aria-label="Show the app bar"></button><iframe id="fr" sandbox="allow-scripts" allow="clipboard-write;microphone"></iframe></div>
 <!--PA_SETTINGS_DIALOG-->
 <dialog id="actConfirm" style="max-width:340px">
   <div id="acText" style="margin-bottom:14px;overflow-wrap:anywhere"></div>
@@ -526,6 +526,7 @@ async function openConvo(id){
 // disagree: the drawer's Home was a plain <b> that did nothing at all, and ← Home closed the
 // app and opened the DRAWER instead of going home.
 function goHome(){
+  if(typeof PAAppEdit!=='undefined') PAAppEdit.close();   // the edit panel belongs to the app it was opened on (web/app-edit.js); absent in the extracted-block tests
   $('#frame').style.display='none'; $('#frame').classList.remove('peek','barin','ownbar'); barHide(); shellBehindApp(false);
   appFrameLeave();   // the app is held while it makes its last save, then removed (web/app-frame.js)
   setConvo(null); $('#log').innerHTML='';
@@ -988,6 +989,7 @@ window.addEventListener('message',(e)=>{
   if(!e.source||e.source!==$('#fr').contentWindow||e.origin!=='null'||!frameOpen()||!frameOwnBar()) return;
   if(m.type==='ready'){ barHide(); $('#frame').classList.add('ownbar'); return; }
   if(m.type==='home') return goHome();
+  if(m.type==='edit-app') return PAAppEdit.editAppFromBar();   // PAAppBar's long-press on ← Home (ADR 0040)
   if(m.type!=='font'||![-1,0,1].includes(m.d)) return;
   const now=Date.now(); if(now-_shellFont.t>1000) _shellFont={t:now,n:0};
   if(++_shellFont.n>SHELL_MSG_FONT_PER_S) return;
@@ -995,7 +997,7 @@ window.addEventListener('message',(e)=>{
 });
 
 /* PA_APP_FRAME_JS */
-function openApp(uid,slug,title){ if(uid===UID) promoteApp(slug); appFrameLeave(); $('#ftitle').textContent=title||slug; refreshChatModels(); PASW.frameLoad(uid,slug); $('#frame').classList.remove('ownbar'); $('#frame').classList.add('peek'); $('#frame').style.display='flex'; closeDrawer(); shellBehindApp(true); }
+function openApp(uid,slug,title){ if(uid===UID) promoteApp(slug); if(typeof PAAppEdit!=='undefined'){ PAAppEdit.close(); PAAppEdit.syncBar(uid); } appFrameLeave(); $('#ftitle').textContent=title||slug; refreshChatModels(); PASW.frameLoad(uid,slug); $('#frame').classList.remove('ownbar'); $('#frame').classList.add('peek'); $('#frame').style.display='flex'; closeDrawer(); shellBehindApp(true); }
 /* ══ SHELL_BEHIND_APP_BEGIN — cut out and run by runShell() in test/helpers-shell-dom.mjs, for every suite that calls it ══ */
 // TODO(R4): this file is far over the 300-line budget. Split seam: the app-frame section (bar peek,
 // openApp, this block) moves into web/app-frame.js, the inlined shell part that already holds
@@ -1182,7 +1184,8 @@ function appMenu(name, anchor){
   const forked=anchor.dataset.forked==='1', ver=anchor.dataset.version||'';
   const nextVer=ver?ver.replace(/(\d+)$/,n=>+n+1):'1.0.0';
   const m=document.createElement('div'); m.id='appMenu'; m.className='cmenu-pop';
-  m.innerHTML=(first?'':'<button data-a="up">Move up</button>')
+  m.innerHTML=(ROLE==='owner'?PAAppEdit.item():'')   // ADR 0040 order
+    +(first?'':'<button data-a="up">Move up</button>')
     +(last?'':'<button data-a="dn">Move down</button>')
     +`<button data-a="share">${shared?'Unshare from family':'Share to family'}</button>`
     +(ROLE==='owner'&&!forked?PAPublish.item():'')
@@ -1191,7 +1194,8 @@ function appMenu(name, anchor){
   document.body.appendChild(m);
   const r=anchor.getBoundingClientRect(); m.style.top=(r.bottom+4)+'px'; m.style.right=Math.max(6,innerWidth-r.right)+'px';
   m.onclick=async(ev)=>{ const b=ev.target.closest('button'); if(!b) return; const a=b.dataset.a; closeAppMenu();
-    if(a==='up') moveApp(name,-1);
+    if(a==='edit-app') PAAppEdit.open(name,anchor.closest('.dapp')?.querySelector('.dapp-name')?.textContent);
+    else if(a==='up') moveApp(name,-1);
     else if(a==='dn') moveApp(name,1);
     else if(a==='share'){ await api('/api/apps/'+encodeURIComponent(name)+'/share',{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({shared:!shared})}); loadApps(); loadFamilyApps(); }
     else if(a==='publish') PAPublish.open(name);
@@ -1201,7 +1205,7 @@ function appMenu(name, anchor){
     }
     else if(a==='delete'){ if(confirm(`Delete "${name}"?`)){ await api('/api/apps/'+encodeURIComponent(name),{method:'DELETE'}); loadApps(); } }
   };
-  if(ROLE==='owner') PAPublish.armTip();
+  if(ROLE==='owner'){ PAAppEdit.armTip(); PAPublish.armTip(); }
   armMenuPop();
 }
 $('#dApps').onclick=async(e)=>{
@@ -1485,6 +1489,10 @@ const APP_ORIGIN_HEADER='x-superelf-origin', APP_ORIGIN_VALUE='app';
 function appAgentInit(body,signal){
   return {method:'POST',headers:{'content-type':'application/json',[APP_ORIGIN_HEADER]:APP_ORIGIN_VALUE},body,signal};
 }
+// The edit panel's chat (web/app-edit.js, ADR 0040) is the owner's own turn: no app-origin header. Used by the
+// broker's chat kind ONLY when the asking window is the panel (fr.edit, set by PAAppEdit.frameRec alone); the
+// server honours `edit` for the owner only, and refuses it outright when the header is there (lib/app-edit.mjs).
+function editTurnInit(body,signal){ return {method:'POST',headers:{'content-type':'application/json'},body,signal}; }
 // Bytes on the wire for a JSON body — what the caps in lib/webutil.mjs actually count, so
 // a "too large" message can state the real size instead of a character count.
 // The fallback is for an engine with no TextEncoder: a character count under-reports CJK
@@ -1874,6 +1882,8 @@ window.addEventListener('message',async(e)=>{
   // to the workspace root or read another app's data. Shared data uses dedicated kinds.
   // The slug of the page that asked: #fr's, or the one a held page had when it was held.
   const appSlug=fr.slug;
+  // The edit panel (web/app-edit.js) is a shell page: only the chat kinds, its chat the owner's edit turn (ADR 0040).
+  if(fr.edit&&!PAAppEdit.kindOk(m.kind)) return reply({ok:false,code:'bad-request',error:'修改面板不支持 · not available in the edit panel'});
   // FAILS CLOSED with no slug, for EVERY kind (R13, 2026-10-13; ADR 0018). A page with no app slug
   // has no data folder, no chat tag and no settings of its own: a bare path landed at the workspace
   // root, and a chat or an ask ran an agent for no app. None of this is reachable from a page the
@@ -1954,7 +1964,7 @@ window.addEventListener('message',async(e)=>{
       // oneShot: ONE answer for a component (PAChat.complete), not a conversation turn — the server
       // then answers without extended thinking and kills the job when this request closes. Only the
       // literal true is forwarded, so no other value an app sends can switch either behaviour on.
-      const body=JSON.stringify({message:String(m.message||''),convoId:m.convoId||null,attachments:m.attachments,app:appSlug,label:m.label,model:m.model||undefined,system:m.system||undefined,assess:m.assess||undefined,oneShot:m.oneShot===true||undefined});
+      const body=JSON.stringify({message:String(m.message||''),convoId:m.convoId||null,attachments:m.attachments,app:fr.edit?undefined:appSlug,edit:fr.edit?appSlug:undefined,label:m.label,model:m.model||undefined,system:m.system||undefined,assess:m.assess||undefined,oneShot:m.oneShot===true||undefined});
       // A failed chat must SAY so inside the app's chat UI. PAChat renders only
       // convo/status/delta/done/assess events (web/chat-ui.inline.html:575-588), and a
       // delta APPENDS to what has streamed so far — so the failure is delivered as a delta
@@ -1970,7 +1980,8 @@ window.addEventListener('message',async(e)=>{
       const ac=new AbortController(); relayChats.set(m.id,ac);
       try{
         let res;
-        try{ res=await api('/api/chat',appAgentInit(body,ac.signal)); }
+        // The edit panel's turn is the owner's own (no app-origin header); the server refuses it for anyone else (lib/app-edit.mjs).
+        try{ res=await api('/api/chat',fr.edit===true?editTurnInit(body,ac.signal):appAgentInit(body,ac.signal)); }
         catch(err){ return fail(relayNetFail(err,'request',ac.signal)); }
         if(!res.ok) return fail(await relayHttpFail(res));
         try{
@@ -1979,7 +1990,7 @@ window.addEventListener('message',async(e)=>{
             // R5: a line that will not parse is skipped on purpose — NDJSON framing is the
             // stream's contract, and the transport failures that used to hide here (a 413 or
             // a 401 answered instead of a stream) are now caught by the res.ok check above.
-            let i; while((i=buf.indexOf('\n'))>=0){ const t=buf.slice(0,i); buf=buf.slice(i+1); if(!t.trim()) continue; let jj; try{jj=JSON.parse(t)}catch{continue} send({ev:jj}); } }
+            let i; while((i=buf.indexOf('\n'))>=0){ const t=buf.slice(0,i); buf=buf.slice(i+1); if(!t.trim()) continue; let jj; try{jj=JSON.parse(t)}catch{continue} if(fr.edit) PAAppEdit.onEvent(jj); send({ev:jj}); } }
           send({done:true});
         }catch(err){ return fail(relayNetFail(err,'stream',ac.signal)); }
       }finally{ if(relayChats.get(m.id)===ac) relayChats.delete(m.id); }
@@ -1997,7 +2008,7 @@ window.addEventListener('message',async(e)=>{
     } else if(m.kind==='convo'){
       reply(await relayCall('/api/convos/'+encodeURIComponent(m.convoId||''),undefined,'json','data'));
     } else if(m.kind==='app-convos'){
-      reply(await relayCall('/api/app-convos?app='+encodeURIComponent(appSlug),undefined,'raw'));
+      reply(await relayCall('/api/app-convos?app='+encodeURIComponent(fr.edit?'app-edit:'+appSlug:appSlug),undefined,'raw'));   // == EDIT_TAG_PREFIX in lib/agent-origin.mjs
     } else if(m.kind==='health'){
       reply(await relayCall('/api/health?days='+encodeURIComponent(m.days||7),undefined,'json','days'));
     } else if(m.kind==='briefings'){
@@ -2617,6 +2628,8 @@ scrollBtn.onclick=()=>{ logEl.scrollTo({top:logEl.scrollHeight,behavior:'smooth'
 // (full reload → new page boot → data loaded). Cleared once the boot loaders settle.
 $('#reload').onclick=()=>{ try{ sessionStorage.setItem('pa_refreshing','1'); }catch{} $('#reload').classList.add('spin'); location.reload(); };
 /* PA_PUBLISH_JS */
+/* PA_APP_EDIT_JS */
+PAAppEdit.bindBar();
 /* PA_UPDATE_JS */   /* TODO(R4 seam): the boot block below (reload, loaders, new-feature dots) belongs in web/boot.js like app-frame.js */
 /* PA_SW_CLIENT_JS */
 /* PA_OFFLINE_JS */

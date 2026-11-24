@@ -321,7 +321,7 @@ test('web.mjs registers PAInkAnchor then its pen sheet, then PAAppPrefs (only la
   assert.ok(at > 0, 'ink-anchor is registered');
   assert.equal(files[at + 1], 'ink-pen.inline.html', 'the pen sheet, appended right after it (the registry rule)');
   assert.equal(files[at + 2], 'app-prefs.inline.html', 'the page\'s one prefs chain, appended after it');
-  assert.deepEqual(files.slice(-7), ['settings-rows.inline.html', 'tips.inline.html', 'pane-chrome.inline.html', 'app-bar.inline.html', 'bar-handle.css', 'reading-history.inline.html', 'ink-frame.inline.html'], 'the ⚙ tick-box rows, PATips, PAPaneChrome, PAAppBar, PAReadingHistory, then PAInkFrame, appended last since');
+  assert.deepEqual(files.slice(-8), ['settings-rows.inline.html', 'tips.inline.html', 'pane-chrome.inline.html', 'app-bar.inline.html', 'bar-handle.css', 'reading-history.inline.html', 'ink-frame.inline.html', 'snap.inline.html'], 'the ⚙ tick-box rows, PATips, PAPaneChrome, PAAppBar, PAReadingHistory, PAInkFrame, then PASnap (ADR 0040), appended last since');
   assert.ok(files.indexOf('ink-frame.inline.html') > at, 'PAInkFrame after PAInkAnchor: its marker is inside ink-anchor, so the in-order loop finds it only then');
   assert.ok(files.indexOf('note-ui.inline.html') < files.indexOf('ink-anchor.inline.html'));
   assert.match(ENGINE, /ink:Object\.freeze\(\{drawStroke,drawFlat,segTo,segWidth,guardInk,MAX_CANVAS_PX,HILITE_ALPHA\}\)/, 'PANote.ink');

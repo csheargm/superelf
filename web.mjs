@@ -85,6 +85,7 @@ import { pageImageFile, IMG_BAD_PATH, IMG_NOT_FOUND } from './lib/note-page-imag
 import { buildFollowup, followupDeps } from './lib/summary-followup.mjs';
 import { writerClaudeBase, writerLaneMs } from './lib/research-writer.mjs';
 import { snapshotApps, appBuildWarnings } from './lib/app-postcheck.mjs';
+import { appEditOf, editSystemPrompt, beginAppEdit, finishAppEdit, undoAppEdit } from './lib/app-edit.mjs';
 import { isBlankAnswer, laneFailureText, shouldFallBackToAgent, fallbackStatusText, chatTurnLogLine, turnErrorText } from './lib/chat-outcome.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -664,6 +665,7 @@ const PA_STORE_MARKER = '<!--PA_STORE_UI-->';
 const PA_LEAVE_MARKER = '<!--PA_LEAVE_UI-->';
 const PA_BROKER_MARKER = '<!--PA_BROKER_UI-->';
 const PA_BUSY_MARKER = '<!--PA_BUSY_UI-->';
+const PA_SNAP_MARKER = '<!--PA_SNAP_UI-->';
 // APPEND-ONLY, and order matters: the loop below re-tests the ALREADY-INLINED html on each pass,
 // so a component listed BEFORE another can have that other's marker inlined into it. Adding new
 // entries last keeps an existing component's content out of the substitution path.
@@ -774,6 +776,8 @@ const PA_COMPONENTS = [
   // PAInkFrame, the verse ink's handwriting frame and stroke geometry: its marker is at the top of ink-anchor.inline.html,
   // so it is inlined just above PAInkAnchor's script (appended last: the loop runs in order, so it finds the marker once ink-anchor is in the page).
   { marker: '<!--PA_INK_FRAME_UI-->', file: 'ink-frame.inline.html' },
+  // PASnap, the app's picture for 改这个应用 · Change this app (ADR 0040): on EVERY app page, after PABusy. Appended last.
+  { marker: PA_SNAP_MARKER, file: 'snap.inline.html' },
 ];
 // Injected into EVERY served app page, unconditionally. The shell broadcasts the user's A-/A+
 // scale to each app (sendAppPrefs -> pa:'prefs'), but only chat-ui.inline.html ever applied it,
@@ -824,7 +828,7 @@ function sendAppHtml(res, file, type, extra) {
       const hasNote = html.includes(PA_NOTE_MARKER);   // decided BEFORE inlining replaces the marker
     // Before the first script, or at the end of <head>: whichever comes first. A page with neither
     // has no script element, so it gets none of PATwoTap, PAStore, PALeave and PA (ADR 0018 known gaps).
-    html = html.replace(/<\/head>|<script\b/i, (m) => PA_TWO_TAP_MARKER + PA_STORE_MARKER + PA_LEAVE_MARKER + PA_BROKER_MARKER + PA_BUSY_MARKER + m);
+    html = html.replace(/<\/head>|<script\b/i, (m) => PA_TWO_TAP_MARKER + PA_STORE_MARKER + PA_LEAVE_MARKER + PA_BROKER_MARKER + PA_BUSY_MARKER + PA_SNAP_MARKER + m);
     for (const c of PA_COMPONENTS) {
       if (!html.includes(c.marker)) continue;
       let snippet = '';
@@ -1238,14 +1242,20 @@ async function chat(req, res, user, body) {
 }
 
 async function chatTurn(req, res, user, body, hold, cancel = null) {
-  const { message, convoId, attachments, app, label, model, system, assess } = body;
+  const { message, convoId, attachments, app, label, model, assess } = body;
   const oneShot = body.oneShot === true;   // the literal true only (docs/adr/0008)
   if (typeof message !== 'string' || !message.trim()) return send(res, 400, 'application/json', '{"error":"empty message"}');
+  // 改这个应用 · Change this app (lib/app-edit.mjs, ADR 0040): the owner's panel turn, or a refusal before anything is saved.
+  // TODO(R4 seam): edit-turn wiring leaves chat() with the lane dispatch (the split named above).
+  let edit = null;
+  try { edit = appEditOf({ user, body, headers: req.headers, appsDir: appsDir(user) }); }
+  catch (e) { if (!e.status) throw e; if (res.headersSent) { res.end(JSON.stringify({ type: 'error', text: e.message }) + '\n'); return; } return send(res, e.status, 'application/json', JSON.stringify({ error: e.message, code: e.code })); }
+  const system = edit ? editSystemPrompt(edit) : body.system;
   // A oneShot caller that left while this turn was queued: nothing is saved, nothing spawns.
   if (cancel && cancel.signal.aborted) { audit('chat-cancelled', { who: user.id, convo: convoId || '', queued: true }); if (!res.writableEnded) res.end(); return; }
   // Decided ONCE per turn, from the shell relay's header OR the app slug (lib/agent-origin.mjs),
   // and handed to every lane below — the job resolver, Claude, Codex and the Verify panel.
-  const origin = { fromApp: appOriginated(req.headers, { app }), app: typeof app === 'string' ? app : '' };
+  const origin = edit ? { fromApp: false, edit: edit.slug } : { fromApp: appOriginated(req.headers, { app }), app: typeof app === 'string' ? app : '' };
   const tag = convoTag(origin);
   // Read-before-write, three-state (empty-overwrite class, 2026-09-02 round 2):
   // "the chat file is damaged" used to look exactly like "there is no such
@@ -1302,7 +1312,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
   // same paused-by-default rule the editor and the resolver already follow.
   // `origin.fromApp`, not `app`: an app request whose slug is forged empty still carries the
   // relay's header, and must not reach this resolver in the owner's unrestricted lane.
-  if (!origin.fromApp && agentAllowed(user) && looksLikeJob(message).job) {   // the resolver runs the agent CLI (F4-2)
+  if (!origin.fromApp && !edit && agentAllowed(user) && looksLikeJob(message).job) {   // the resolver runs the agent CLI (F4-2)
     try {
       const prof = loadProfile(wsDir(user)) || {};
       const out = await resolvePrompt(message, {
@@ -1340,15 +1350,19 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
   // F4-2: a member the owner has not opted in never reaches an agent lane (lib/member-lanes.mjs).
   const ml = memberLane(user, chosen, cfg.chat_models, (m) => laneServed(m, modelHealth.gone()));
   if (ml.status) laneStatus = ml.status;
-  chosen = ml.lane;
+  chosen = edit ? null : ml.lane;   // an edit turn needs tools: the Claude agent lane (null), whatever the chooser says
+  if (edit) laneStatus = '';
   if (laneStatus) line({ type: 'status', text: laneStatus });
   let fellBack = false;   // lib/chat-outcome.mjs: ONE retry on the agent lane for an app turn a fast lane left blank
+  let editCtx = null;   // the undo copy of an edit turn; checked in the catch too, so a crashed turn never leaves a broken app
   try {
     let r;
     const appsBefore = snapshotApps(appsDir(user));   // lib/app-postcheck.mjs: scan only what this turn writes
+    editCtx = edit ? beginAppEdit(edit, { wsDir: wsDir(user) }) : null;   // before the agent runs
     // TODO(R4 seam): the retry loop and the lane dispatch inside it leave chat() together (see the seam named below).
     for (;;) {
     if (ml.blocked) r = { ok: false, text: NO_PLAIN_LANE_TEXT };   // no plain lane for this member: said, never the agent
+    else if (edit && edit.undo) { r = undoAppEdit(edit, { wsDir: wsDir(user) }); line(r.line); }   // a typed "undo": no model
     else if (chosen && chosen.provider === 'ollama') {
       // Fast lane: text-only Ollama model. Stateless, so send recent history for context.
       // Global honesty guard + the app's own directive (e.g. the Bible app's "reply in Chinese
@@ -1482,6 +1496,9 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
     // TODO(R4 seam): post-turn checks leave chat() with the lane dispatch. A warning is appended, never a rewrite.
     const appWarn = blank ? '' : appBuildWarnings(appsDir(user), appsBefore);
     if (appWarn) { r = { ...r, text: `${r.text}\n\n${appWarn}` }; line({ type: 'status', text: appWarn }); }
+    const edited = finishAppEdit(edit, editCtx, { wsDir: wsDir(user) });   // inline checks; a failing change is rolled back
+    editCtx = null;
+    if (edited) { audit('app-edit', { who: user.id, app: edit.slug, changed: edited.line.changed, applied: edited.line.applied }); line(edited.line); if (edited.note) { r = { ...r, text: `${r.text || ''}\n\n${edited.note}` }; line({ type: 'delta', text: `\n\n${edited.note}` }); } }
     // by: the lane that ACTUALLY answered (a confined turn's GPT pick runs on Claude), shown under the answer.
     const by = ml.blocked ? '' : chosen ? chosen.label : 'Claude';
     const mdMsg = { role: 'md', text: r.text || '', ms: turnMs, by, ...(blank ? { failed: true } : {}) };
@@ -1506,6 +1523,8 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
   } catch (e) {
     console.log(chatTurnLogLine({ app: tag, lane: chosen, ok: false, textLen: 0, ms: Date.now() - startedAt, code: e.code || e.status || e.name, fellBack }));
     line({ type: 'error', text: turnErrorText(chosen, e) });
+    if (editCtx) { try { const ed = finishAppEdit(edit, editCtx, { wsDir: wsDir(user) }); if (ed) line(ed.line); }
+      catch (e2) { line({ type: 'error', text: `修改检查失败 · The change could not be checked: ${e2.message}` }); } }
   } finally {
     clearInterval(beat);
     if (alive()) res.end();
@@ -1764,6 +1783,19 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && p === '/api/family-apps') { const shelf = new Set(demoOn(cfg) ? [] : listShared(SHARED).map((a) => a.name));
       return send(res, 200, 'application/json', JSON.stringify(listFamilyApps().filter((a) => a.uid !== user.id && !shelf.has(a.slug)))); }
     if (await handlePublishRoute(req, res, p, { user, cfg, root: ROOT, slugOk, ownAppDir, readBody: (r) => readBody(r, BODY_LIMITS.control), send, audit, demo: demoOn(cfg) })) return;   // owner-only Publish (docs/adr/0039)
+    // 改这个应用 · Change this app (lib/app-edit.mjs, ADR 0040): the panel page and its 撤销 · Undo. Owner only in Phase 1.
+    if (req.method === 'GET' && p === '/api/app-edit/panel') {
+      if (user.role !== 'owner' || demoOn(cfg)) return send(res, 403, 'application/json', '{"error":"owner only","code":"edit_owner_only"}');
+      return sendAppHtml(res, path.join(ROOT, 'web', 'app-edit-panel.html'), 'text/html; charset=utf-8', { 'content-security-policy': APP_CSP, 'cache-control': 'no-cache' });
+    }
+    if (req.method === 'POST' && /^\/api\/apps\/[^/]+\/undo$/.test(p)) {
+      try {
+        const edit = appEditOf({ user, body: { edit: decodeURIComponent(p.split('/')[3]), message: 'undo' }, headers: req.headers, appsDir: appsDir(user) });
+        const u = undoAppEdit(edit, { wsDir: wsDir(user) });
+        audit('app-edit-undo', { who: user.id, app: edit.slug, undone: !!u.line.undone });
+        return send(res, 200, 'application/json', JSON.stringify({ ok: true, text: u.text, undone: !!u.line.undone }));
+      } catch (e) { if (!e.status) throw e; return send(res, e.status, 'application/json', JSON.stringify({ error: e.message, code: e.code })); }
+    }
     if (req.method === 'PATCH' && p.endsWith('/share') && p.startsWith('/api/apps/')) {
       const slug = p.slice('/api/apps/'.length, -'/share'.length);
       if (!slugOk(slug)) return send(res, 400, 'application/json', '{"error":"bad name"}');
