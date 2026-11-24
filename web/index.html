@@ -677,9 +677,10 @@ let UID=null;
 // undo a newer success; its abort is the re-check deadline.
 const ACCOUNT_REMOVED_CODE='account_removed', ACCOUNT_REMOVED_TEXT='你的账号已被移除 · Your account was removed';   // R3: = lib/auth.mjs ACCOUNT_REMOVED_CODE, pinned by test/removed-member-e2e.test.mjs
 let accountRemoved=false;
+let ROLE='';   // 'owner' | 'member' from /api/ping: gates owner-only menu items (the server checks again)
 async function ping(signal){ if(!T) return false; const t0=T; let r; try{ r=await api('/api/ping',signal?{signal}:{}); }catch{ if(T===t0&&!signal) PAOffline.noteNet(false); return 'offline'; } if(T!==t0) return false;   // the session changed while this ping ran: its answer is not ours to apply
   if(signal){ let j0; try{ j0=await r.clone().json(); }catch{ return false; } if(T!==t0||!j0||!((r.ok&&typeof j0.ok==='boolean')||r.status===401)) return false; }   // a re-check needs the NODE: its ping reply or its 401 bad-token; a gateway error or HTML page does not count
-  PAOffline.noteNet(true); try{ const j=await r.json(); if(T!==t0) return false; accountRemoved=r.status===401&&j.code===ACCOUNT_REMOVED_CODE; if(accountRemoved){ T=null; try{ localStorage.removeItem('pa_session'); localStorage.removeItem(SW_UID_KEY); localStorage.removeItem(SW_FAMILY_KEY); }catch{ /* blocked storage: nothing was kept to reopen offline */ } } if(j.ok){ UID=j.uid; PASW.remember(SW_UID_KEY,j.uid); setHeaderName(j.name); rememberFamily({name:j.name}); } return j.ok; }catch{ return false; } }
+  PAOffline.noteNet(true); try{ const j=await r.json(); if(T!==t0) return false; accountRemoved=r.status===401&&j.code===ACCOUNT_REMOVED_CODE; if(accountRemoved){ T=null; try{ localStorage.removeItem('pa_session'); localStorage.removeItem(SW_UID_KEY); localStorage.removeItem(SW_FAMILY_KEY); }catch{ /* blocked storage: nothing was kept to reopen offline */ } } if(j.ok){ UID=j.uid; ROLE=j.role||''; PASW.remember(SW_UID_KEY,j.uid); setHeaderName(j.name); rememberFamily({name:j.name}); } return j.ok; }catch{ return false; } }
 // Offline is set by one failed request, and only a later success clears it. On a screen that makes no
 // requests (the home grid) that never came, so the line stayed on with the network back (owner 2026-11-21).
 // While offline and visible, ask the node again on a short beat, on return to the app and on 'online'.
@@ -1184,6 +1185,7 @@ function appMenu(name, anchor){
   m.innerHTML=(first?'':'<button data-a="up">Move up</button>')
     +(last?'':'<button data-a="dn">Move down</button>')
     +`<button data-a="share">${shared?'Unshare from family':'Share to family'}</button>`
+    +(ROLE==='owner'&&!forked?PAPublish.item():'')
     +(shared&&!forked?`<button data-a="bump">发布更新 ${nextVer} · Publish update ${nextVer}</button>`:'')
     +'<button data-a="delete" class="del">Delete</button>';
   document.body.appendChild(m);
@@ -1192,12 +1194,14 @@ function appMenu(name, anchor){
     if(a==='up') moveApp(name,-1);
     else if(a==='dn') moveApp(name,1);
     else if(a==='share'){ await api('/api/apps/'+encodeURIComponent(name)+'/share',{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({shared:!shared})}); loadApps(); loadFamilyApps(); }
+    else if(a==='publish') PAPublish.open(name);
     else if(a==='bump'){
       const g=await relayJson(api('/api/apps/'+encodeURIComponent(name)+'/bump',{method:'POST'}),'request');
       if(g.ok) loadApps(); else alert(g.text);
     }
     else if(a==='delete'){ if(confirm(`Delete "${name}"?`)){ await api('/api/apps/'+encodeURIComponent(name),{method:'DELETE'}); loadApps(); } }
   };
+  if(ROLE==='owner') PAPublish.armTip();
   armMenuPop();
 }
 $('#dApps').onclick=async(e)=>{
@@ -2612,6 +2616,7 @@ scrollBtn.onclick=()=>{ logEl.scrollTo({top:logEl.scrollHeight,behavior:'smooth'
 // Refresh: spin the icon and carry it across the reload so there's feedback the whole time
 // (full reload → new page boot → data loaded). Cleared once the boot loaders settle.
 $('#reload').onclick=()=>{ try{ sessionStorage.setItem('pa_refreshing','1'); }catch{} $('#reload').classList.add('spin'); location.reload(); };
+/* PA_PUBLISH_JS */
 /* PA_UPDATE_JS */   /* TODO(R4 seam): the boot block below (reload, loaders, new-feature dots) belongs in web/boot.js like app-frame.js */
 /* PA_SW_CLIENT_JS */
 /* PA_OFFLINE_JS */
