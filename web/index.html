@@ -995,8 +995,14 @@ function barHide(){ clearTimeout(_barIdle); _barIdle=null; $('#frame').classList
 // pointerleave, and a bar that needed a second tap to dismiss would cost more than it saves.
 // The app's OWN bar (PAAppBar) dropped this timer (ADR 0034); this one keeps it: the shell sees no tap inside the
 // app frame, so the timer is what takes an overlaying bar back off the app's own header.
-function barShowTemporarily(){ barShow(); _barIdle=setTimeout(barHide,BAR_IDLE_MS); }
+// TODO(R4): moves with the app-frame seam (see SHELL_BEHIND_APP).
+// TOUCH ONLY (owner F2-06, as in PAAppBar): shown by a mouse / trackpad, it stays until the pointer goes into
+// the app (the frame's focus, below) — a mouse user must be able to reach ⋯. A pen or a finger keeps the clock.
+let _barByMouse=false;
+function barShowTemporarily(){ barShow(); if(!_barByMouse) _barIdle=setTimeout(barHide,BAR_IDLE_MS); }
 function frameOpen(){ return $('#frame').classList.contains('peek'); }
+$('#barpeek').addEventListener('pointerdown',(e)=>{ _barByMouse=e.pointerType==='mouse'; });
+$('#frame').querySelector('.bar').addEventListener('pointerover',(e)=>{ if(e.pointerType==='mouse'&&_barIdle){ _barByMouse=true; barShow(); } });   // a mouse on the bar holds it
 $('#barpeek').onclick=barShowTemporarily;
 // A- / A+ are used in runs. Any press inside the bar restarts the clock instead of letting it
 // vanish mid-adjustment; #back needs no such care, since it leaves the app entirely.

@@ -20,7 +20,7 @@ import { agentAllowed, lanesFor, memberLane, NO_PLAIN_LANE_TEXT, AGENT_OFF_TEXT 
 import { cancelOnClose, createTurnCancel, createTurnStops, CANCELLED_TEXT } from './lib/turn-stop.mjs';
 import { watchConfig } from './lib/config-watch.mjs';
 import { oneShotBaseArgs, oneShotModel, yieldSettings, NO_TOOLS_ARGS } from './lib/one-shot.mjs';
-import { mintConfirm, planOffer, applyMessage, APPLY_LABEL, PLAN_MAX, PLAN_TOO_LONG } from './lib/app-edit-confirm.mjs';
+import { mintConfirm, planOffer, applyMessage, applyNowPrompt, APPLY_LABEL, PLAN_MAX, PLAN_TOO_LONG } from './lib/app-edit-confirm.mjs';
 import { runScopedEdit, scopedLane, flattenForClaude } from './lib/app-edit-lane.mjs';
 import { safeJoin, slugOk, drawerOpenOf, tokenOk, dataContentType, readBody, writeFileAtomic, renameWithRetry, decodeBase64Strict, bodyErrorResponse, BODY_LIMITS } from './lib/webutil.mjs';
 import { createConvoLocks, withConvoTurn, QUEUED_TURN_TEXT } from './lib/convo-lock.mjs';
@@ -48,8 +48,9 @@ import { jobsView, readAuditTail, humanSchedule } from './lib/jobstatus.mjs';
 import { adminConfigView, applyConfigWrite } from './lib/adminconfig.mjs';
 import { runCodex } from './lib/codex.mjs';
 import { laneRunner } from './lib/model-review-agent.mjs';
-import { appOriginated, agentConfined, convoTag, convoReachable, laneArgs, appJailArgs } from './lib/agent-origin.mjs';
+import { appOriginated, agentConfined, convoTag, convoReachable, laneArgs, appJailArgs, appReadArgs } from './lib/agent-origin.mjs';
 import { makeJailWatch } from './lib/app-edit-jail.mjs';
+import { cleanReply, scrubPaths, REPLY_EMPTY_TEXT } from './lib/reply-clean.mjs';
 import { consumeMemberAiCall, MEMBER_QUOTA_FILE } from './lib/member-quota.mjs';
 import { runAssessment, pickPanel } from './lib/assess.mjs';
 import { runResearch } from './lib/research.mjs';
@@ -790,6 +791,8 @@ const PA_COMPONENTS = [
   { marker: '<!--PA_INK_FRAME_UI-->', file: 'ink-frame.inline.html' },
   // PASnap, the app's picture for 改这个应用 · Change this app (ADR 0040): on EVERY app page, after PABusy. Appended last.
   { marker: PA_SNAP_MARKER, file: 'snap.inline.html' },
+  // web/reply-clean.js, what a bubble may show of a reply (lib/reply-clean.mjs runs the same file): chat-ui carries its marker. Appended last.
+  { marker: '/* PA_REPLY_CLEAN_JS */', file: 'reply-clean.js' },
 ];
 // Injected into EVERY served app page, unconditionally. The shell broadcasts the user's A-/A+
 // scale to each app (sendAppPrefs -> pa:'prefs'), but only chat-ui.inline.html ever applied it,
@@ -1166,12 +1169,24 @@ function attachmentFiles(user, attachments) {
 // Without this, "attach a screenshot with no model chosen" reaches the agent with the image
 // never mentioned and it answers about a picture it cannot see (R14: that is a failure, not a pass).
 const ATTACHMENT_LOST = (n) => `\n\n${n} attached file${n > 1 ? 's were' : ' was'} not found and ${n > 1 ? 'are' : 'is'} NOT part of this turn — do not describe ${n > 1 ? 'them' : 'it'}; say ${n > 1 ? 'they' : 'it'} could not be read.`;
-function attachmentPrompt(files) {
+// abs: an app-chat edit turn runs in the app's folder, so it is given the files' real paths (each one a Read rule).
+function attachmentPrompt(files, abs = false) {
   const lost = files.lost > 0 ? ATTACHMENT_LOST(files.lost) : '';
   if (!files.length) return lost;
   const many = files.length > 1;
-  return `\n\nAttached file${many ? 's' : ''} in this workspace — read ${many ? 'them' : 'it'} first, then answer:\n`
-    + files.map((f) => `- ${f.rel}`).join('\n') + lost;
+  return `\n\nAttached file${many ? 's' : ''}${abs ? '' : ' in this workspace'} — read ${many ? 'them' : 'it'} first, then answer:\n`
+    + files.map((f) => `- ${abs ? realOrSelf(f.abs) : f.rel}`).join('\n') + lost;
+}
+// An edit turn's status line names what it reads in the user's words, never the node's paths (lib/reply-clean.mjs).
+const EDIT_BRIEF_MAX = 60;
+const editToolBrief = (input, ws) => { const v = input && (input.file_path || input.pattern || input.path); return typeof v === 'string' ? scrubPaths(v, ws).replace(/\s+/g, ' ').slice(0, EDIT_BRIEF_MAX) : ''; };
+const realOrSelf = (p) => { try { return fs.realpathSync(p); } catch { return p; /* gone since it was found: the CLI says so */ } };
+// TODO(R4 seam): editReadable/editToolBrief leave web.mjs with the edit-turn wiring (the seam named in chatTurn).
+// What an edit turn may read besides its own folder: the app's saved data, its saved versions, the attachments.
+function editReadable(user, edit, files) {
+  const dirs = [path.join(wsDir(user), 'data', edit.slug), path.join(wsDir(user), VERSIONS_DIR, edit.slug)]
+    .filter((d) => fs.existsSync(d)).map((d) => realOrSelf(d) + '/');
+  return [...dirs, ...files.map((f) => realOrSelf(f.abs))];
 }
 
 /* ══ PA_CHAT_LANE_BEGIN ── which lane answers this turn ═══════════════════════════════════════
@@ -1505,10 +1520,13 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
       const baseArgs = oneShot ? oneShotBaseArgs(tierArgs, cfg.one_shot_args, memberArgsOf(user, origin)) : tierArgs;
       // An unconfirmed edit turn plans with NO tools: nothing can write before 改 · Apply (GPT review 2026-11-24).
       // A confirmed one is jailed to apps/<slug>/ (lib/agent-origin.mjs appJailArgs) and watched (lib/app-edit-jail.mjs).
+      // An unconfirmed one reads only (Read/Glob/Grep, cwd = the app folder: lib/agent-origin.mjs appReadArgs).
       const jailed = !!(edit && edit.confirmed && !edit.superelf && editCtx);
-      const extraArgs = jailed ? appJailArgs(baseArgs, fs.realpathSync(edit.dir))
-        : agentArgs(user, edit && !edit.confirmed && !edit.superelf ? [...baseArgs, ...NO_TOOLS_ARGS] : baseArgs, origin);
-      if (jailed && !editCtx.jail) editCtx.jail = makeJailWatch(edit.dir, wsDir(user));   // owner's own chat: unrestricted. an app's turn or a member's: no skip-permissions.
+      const appCwd = edit && !edit.superelf ? fs.realpathSync(edit.dir) : null;   // both edit lanes run IN the app folder
+      const readable = appCwd ? editReadable(user, edit, files) : [];
+      const extraArgs = jailed ? appJailArgs(baseArgs, appCwd, readable)
+        : appCwd ? appReadArgs(baseArgs, readable) : agentArgs(user, baseArgs, origin);
+      if (jailed && !editCtx.jail) editCtx.jail = makeJailWatch(edit.dir, appCwd, wsDir(user));   // owner's own chat: unrestricted. an app's turn or a member's: no skip-permissions.
       const cancelled = () => !!cancel && cancel.signal.aborted;   // a oneShot caller that left, or the composer's explicit Stop (lib/turn-stop.mjs)
         // The SAME resolved skill the fast lanes get (profile override → config → built-in).
         // It was resolved only inside the ollama branch, so an app's directive applied on one
@@ -1522,11 +1540,12 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
       // Claude cannot resume. The prior messages already include the contextPrefix from the first
       // turn (which names the passage), so Claude recovers the full conversation context.
       const priorMsgs = convo.messages.slice(0, -1); // all messages BEFORE the current one
+      const turnMsg = jailed ? applyNowPrompt(edit.plan) : message;
       const buildHistoryPrompt = (msgs) => {
         const block = msgs.filter((m) => !m.failed).slice(-10).map((m) =>
           (m.role === 'md' ? 'Assistant' : 'User') + ': ' + (m.text || '')).join('\n\n---\n\n');
         return '[Resuming conversation — prior context:]\n\n' + block +
-          '\n\n[Current message:]\nUser: ' + message + attachmentPrompt(files);
+          '\n\n[Current message:]\nUser: ' + turnMsg + attachmentPrompt(files, !!appCwd);
       };
       // A conversation turn always includes recent history — same as the Ollama lane's
       // convo.messages.slice(-20). When resumeId is alive the block is redundant (and costly when
@@ -1535,16 +1554,19 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
       // exactly its message. MEASURED 2026-10-13: the studio's tweaks share one convo, so each
       // resumed a session holding every earlier SVG AND replayed them here, 25k → 313k tokens in six
       // turns, past the 200k the CLI serves without the 1M mode a subscription bills as credits.
-      const resumeId = oneShot ? null : convo.sessionId;
-      const histPrompt = (priorMsgs.length && !oneShot) ? buildHistoryPrompt(priorMsgs) : message + attachmentPrompt(files);
-      const opts = { claudeCmd: cfg.claude_cmd, extraArgs, cwd: wsDir(user), prompt: message + attachmentPrompt(files),
+      // 改 · Apply never resumes the planning session: resumed, the model kept its read-only turns' word
+      // ("This turn is read-only, I can't edit") and changed nothing (reproduced 2026-11-24, CLI 2.1.327, the
+      // real lane). It starts fresh with the history block, and its turn is the plan itself, not the button's id.
+      const resumeId = oneShot || jailed ? null : convo.sessionId;
+      const histPrompt = (priorMsgs.length && !oneShot) ? buildHistoryPrompt(priorMsgs) : turnMsg + attachmentPrompt(files, !!appCwd);
+      const opts = { claudeCmd: cfg.claude_cmd, extraArgs, cwd: appCwd || wsDir(user), prompt: turnMsg + attachmentPrompt(files, !!appCwd),
           // agentCapabilities LAST and outside the override chain: a profile systemPrompts.global
           // override replaces the guard above, and a capability list it could delete is not one
           // any app author could rely on. A oneShot turn builds no app, so it skips the ~3.7k-char
           // app contract; the language rule and the confined note still ride.
           systemPrompt: agentSystemPrompt([agentPrompts.global, agentPrompts.app, origin.fromApp ? noChangeRule(chatRole) : null], agentCapabilities(laneRole(user, origin), oneShot ? null : APP_CONTRACT), turnFacts),
         resumeId, timeoutMs: cfg.task_timeout_minutes * 60000, onChild: cancel ? cancel.onChild : undefined,
-        onDelta: (t) => line({ type: 'delta', text: t }), onTool: (n, b, input) => { if (jailed) editCtx.jail.onTool(n, b, input); line({ type: 'status', text: `${n}${b ? ` — ${b}` : ''}` }); } };
+        onDelta: (t) => line({ type: 'delta', text: t }), onTool: (n, b, input) => { if (jailed) editCtx.jail.onTool(n, b, input); const shown = appCwd ? editToolBrief(input, wsDir(user)) : b; line({ type: 'status', text: `${n}${shown ? ` — ${shown}` : ''}` }); } };
       r = await enqueue(async () => {
         if (cancelled()) return CHAT_CANCELLED;   // still queued when its caller left: never spawn
         let x = await runClaude({ ...opts, prompt: histPrompt });
@@ -1594,13 +1616,21 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
         canEdit: user.role === 'owner' && origin.fromApp && typeof app === 'string' && slugOk(app) }) };
     }
     if (edit && !blank && r.ok !== false) r = offerApply(user, edit, message, r, line);   // a plan → the 改 · Apply button (lib/app-edit-confirm.mjs)
+    // Never shown: tool-call markup printed as text, the plan marker, the node's own paths (lib/reply-clean.mjs).
+    let unreadable = false;
+    if (!blank) {
+      const c = cleanReply(r.text);
+      unreadable = c.emptied;
+      if (unreadable) { r = { ...r, ok: false, text: REPLY_EMPTY_TEXT }; line({ type: 'error', text: REPLY_EMPTY_TEXT }); }
+      else r = { ...r, text: (edit || origin.fromApp) ? scrubPaths(c.text, wsDir(user)) : c.text };
+    }
     if (edit && cancel && cancel.signal.aborted) edit.stopped = true;   // a Stop never leaves a half-done change applied (GPT review r3)
     const edited = finishAppEdit(edit, editCtx, { wsDir: wsDir(user) });   // inline checks; a failing or unconfirmed change is rolled back
     editCtx = null;
     if (edited) { audit('app-edit', { who: user.id, app: edit.slug, changed: edited.line.changed, applied: edited.line.applied, version: edited.line.version || null }); line(edited.line); edited.note = [editUnchangedNote(r.text, edited.line), edited.note].filter(Boolean).join('\n\n'); if (edited.note) { r = { ...r, text: `${r.text || ''}\n\n${edited.note}` }; line({ type: 'delta', text: `\n\n${edited.note}` }); } }
     // by: the lane that ACTUALLY answered (a confined turn's GPT pick runs on Claude), shown under the answer.
     const by = ml.blocked ? '' : chosen ? chosen.label : 'Claude';
-    const mdMsg = { role: 'md', text: r.text || '', ms: turnMs, by, ...(blank ? { failed: true } : {}) };
+    const mdMsg = { role: 'md', text: r.text || '', ms: turnMs, by, ...(blank || unreadable ? { failed: true } : {}) };
     convo.messages.push(mdMsg);
     // Over the cap the oldest turns are ARCHIVED beside the conversation, never
     // erased (lib/convo-archive.mjs). What this replaces — `convo.messages =

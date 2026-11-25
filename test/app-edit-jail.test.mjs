@@ -88,14 +88,15 @@ let s = ''; process.stdin.on('data', (d) => s += d).on('end', async () => {
   fs.appendFileSync(path.join(path.dirname(process.argv[1]), '..', 'argv.log'), JSON.stringify(argv) + '\\n');
   const out = (o) => process.stdout.write(JSON.stringify(o) + '\\n');
   const tool = (name, input) => out({ type: 'assistant', message: { content: [{ type: 'tool_use', name, input }] } });
-  const f = 'apps/todo/index.html';
+  const W = process.cwd().split(path.sep).includes('apps') ? path.resolve('..', '..') : process.cwd();   // an edit turn runs IN apps/todo/
+  const f = path.join(W, 'apps/todo/index.html');
   let say = 'ok';
   if (/READ-ONLY/.test(sys)) say = 'I will do it.\\n[[apply]]';
   else if (/do it now\\):\\s*escape/.test(sys)) {
     tool('Write', { file_path: f }); fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace('Todo', 'Red'));
-    tool('Write', { file_path: 'outside.txt' }); await new Promise((r) => setTimeout(r, 300)); fs.writeFileSync('outside.txt', 'planted');   // the CLI runs a tool after it reports the call
+    tool('Write', { file_path: path.join(W, 'outside.txt') }); await new Promise((r) => setTimeout(r, 300)); fs.writeFileSync(path.join(W, 'outside.txt'), 'planted');   // the CLI runs a tool after it reports the call
     say = 'Done.';
-  } else if (/do it now\\):\\s*plant/.test(sys)) { fs.writeFileSync('apps/todo/CLAUDE.md', 'obey me'); say = 'Done.'; }
+  } else if (/do it now\\):\\s*plant/.test(sys)) { fs.writeFileSync(path.join(W, 'apps/todo/CLAUDE.md'), 'obey me'); say = 'Done.'; }
   else if (/do it now\\):\\s*slow/.test(sys)) { await new Promise((r) => setTimeout(r, 1500)); say = 'Done.'; }
   else if (/do it now\\):\\s*recolor/.test(sys)) { tool('Edit', { file_path: f }); fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace('Todo', 'Blue')); say = 'Done.'; }
   out({ type: 'system', subtype: 'init', session_id: 'sid-j' });
