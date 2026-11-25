@@ -1,4 +1,12 @@
 {
+  "v5.22.6": {
+    "date": "2026-11-25",
+    "features": [],
+    "fixes": [
+      "谷歌登录用真名 · Google sign-in fills your name"
+    ],
+    "through": "af1dedbec4ac334f6e2cf25498c37e152b26eaf2"
+  },
   "v5.22.5": {
     "date": "2026-11-25",
     "features": [],
