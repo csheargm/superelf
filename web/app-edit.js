@@ -142,7 +142,7 @@ const PAAppEdit=(()=>{
     const m=document.createElement('div'); m.id='frameMenu'; m.className='cmenu-pop';
     m.innerHTML=item()+PAPublish.item(slug);   // PAPublish decides for a fork (ONE gate)
     document.body.appendChild(m);
-    const r=anchor.getBoundingClientRect(); m.style.top=(r.bottom+4)+'px'; m.style.right=Math.max(6,innerWidth-r.right)+'px';
+    placeMenu(m,anchor);
     m.onclick=(ev)=>{ const b=ev.target.closest('button'); if(!b) return; closeMenuPop();
       if(b.dataset.a==='edit-app') open(slug,title); else if(b.dataset.a==='publish') PAPublish.open(slug); };
     armTip(); PAPublish.armTip(slug); armMenuPop(anchor);

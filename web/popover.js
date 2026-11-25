@@ -66,8 +66,19 @@ function armMenuPop(anchor){
   addEventListener('keydown',menuKey,true); addEventListener('blur',menuBlur);
   if(_menuAnchor) _menuWatch=setInterval(()=>{ if(_menuAnchor&&anchorGone(_menuAnchor)) closeMenuPop(); },MENU_WATCH_MS);
 }
-// A menu that would run off the bottom opens ABOVE its ⋯ instead (its rows are 44px tall now).
-function flipMenuUp(m,r){ const h=m.getBoundingClientRect().height; if(r.bottom+4+h>innerHeight-6) m.style.top=Math.max(6,r.top-4-h)+'px'; }
+// placeMenu: the ONE anchoring for every ⋯ menu (owner 2026-11-25: "the menu is too far away from the 3 dots").
+// It opens MENU_GAP below its ⋯ with its right edge on the ⋯'s right edge, clamped MENU_EDGE inside the
+// window; one that would run off the bottom opens ABOVE its ⋯ instead. A position:absolute menu (#hmenu,
+// inside the home header) gets the same window spot, measured from its offset parent.
+const MENU_GAP=6, MENU_EDGE=8;
+function placeMenu(m,a){
+  const r=a.getBoundingClientRect(), q=m.getBoundingClientRect();
+  const right=Math.min(innerWidth-MENU_EDGE,Math.max(r.right,q.width+MENU_EDGE));
+  let top=r.bottom+MENU_GAP; if(top+q.height>innerHeight-MENU_EDGE) top=Math.max(MENU_EDGE,r.top-MENU_GAP-q.height);
+  const op=getComputedStyle(m).position==='fixed'?null:m.offsetParent;
+  const o=op?op.getBoundingClientRect():{top:0,right:innerWidth};
+  m.style.left='auto'; m.style.top=(top-o.top)+'px'; m.style.right=(o.right-right)+'px';
+}
 // Leaving or changing the app (goHome, openApp) closes every popover AND the Publish sheet: neither belongs to the next page.
 // _popGen: a reply that arrives after the user moved on (a slow Publish preview) must not open a sheet then.
 let _popGen=0; function popGen(){ return _popGen; }
