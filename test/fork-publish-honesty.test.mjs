@@ -60,7 +60,7 @@ test('the offer is stored with the reply and a reopened chat shows the button ag
   const w = read('web.mjs');
   assert.match(w, /\.\.\.\(r\.offer \? \{ offer: \{ type: 'app-change', label: r\.offer\.label \} \} : \{\}\)/);
   assert.match(w, /const canEditHere = user\.role === 'owner' && typeof app === 'string' && slugOk\(app\) && appEditable\(appsDir\(user\), app\)/);
-  assert.match(w, /canEdit: origin\.fromApp && canEditHere/);
+  assert.match(w, /canEdit: origin\.fromApp && canEditHere && appEditable\(appsDir\(user\), app\)/, 're-checked after the model');
   assert.match(w, /chatRole = user\.role !== 'owner' \? 'member' : canEditHere \? 'owner' : 'ownerShared'/, 'the prompt names the button only when it is sent');
   const c = read('web/chat-ui.inline.html');
   assert.equal((c.match(/if\(mm\.offer&&mm\.offer\.type==='app-change'\) addChangeApp\(ae,\{type:'app-change',label:mm\.offer\.label,request:''\}\)/g) || []).length, 2, 'both history loaders');

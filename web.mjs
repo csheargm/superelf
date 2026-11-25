@@ -1649,7 +1649,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
     // TODO(R4 seam): with the post-turn checks above.
     if (!blank && r.ok !== false && !edit && (origin.fromApp || ml.blocked || (chosen && (chosen.provider === 'ollama' || chosen.provider === 'research')))) {
       const h = finishHonest({ reply: r.text || '', message, prior: convo.messages.slice(0, -1), inApp: origin.fromApp, line,
-        canEdit: origin.fromApp && canEditHere });
+        canEdit: origin.fromApp && canEditHere && appEditable(appsDir(user), app) });   // re-checked after the model: a delete mid-turn (GPT review r2)
       r = { ...r, text: h.text, offer: h.offer };
     }
     if (edit && !blank && r.ok !== false) r = offerApply(user, edit, message, r, line, convo.id);   // a plan → the 改 · Apply button (lib/app-edit-confirm.mjs)
