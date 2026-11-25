@@ -11,9 +11,9 @@ const SHELL = readShell(ROOT);
 const WEB = fs.readFileSync(path.join(ROOT, 'web.mjs'), 'utf8');
 
 test('the menu order the owner approved: 改这个应用 first, then 发布 · Publish', () => {
-  const m = SHELL.match(/m\.innerHTML=\(ROLE==='owner'\?PAAppEdit\.item\(\):''\)[\s\S]{0,400}?PAPublish\.item\(\)/);
+  const m = SHELL.match(/m\.innerHTML=\(ROLE==='owner'\?PAAppEdit\.item\(\):''\)[\s\S]{0,400}?PAPublish\.item\(name\)/);
   assert.ok(m, 'drawer ⋯: Change this app before Publish');
-  assert.match(SHELL, /m\.innerHTML=item\(\)\+PAPublish\.item\(\);/, "the open app's ⋯: the same order");
+  assert.match(SHELL, /m\.innerHTML=item\(\)\+PAPublish\.item\(slug\);/, "the open app's ⋯: the same order");
 });
 
 test('the panel is the only window whose chat skips the app-origin header, and it has the chat kinds only', () => {

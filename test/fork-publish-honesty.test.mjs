@@ -49,7 +49,9 @@ test('the app chat names only the control it renders, calmly', () => {
 });
 
 test('no prompt or shipped string promises a control "under my/your reply" (R11 grep, pinned)', () => {
-  const hits = execFileSync('git', ['grep', '-n', '-i', '-E', 'under (your|my) reply', '--', 'lib', 'web', 'web.mjs', 'superelf.md', 'workspace.example', 'shared-apps'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  let hits = '';
+  try { hits = execFileSync('git', ['grep', '-n', '-i', '-E', 'under (your|my) reply', '--', 'lib', 'web', 'web.mjs', 'superelf.md', 'workspace.example', 'shared-apps'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); }
+  catch (e) { if (e.status !== 1) throw e; /* git grep exits 1 on zero matches: the clean result (GPT review) */ }
   const code = hits.split('\n').filter((l) => l && !/^[^:]+:\d+:\s*\/\//.test(l));   // a comment that quotes the scar is fine
   assert.deepEqual(code, []);
 });
@@ -57,8 +59,23 @@ test('no prompt or shipped string promises a control "under my/your reply" (R11 
 test('the offer is stored with the reply and a reopened chat shows the button again', () => {
   const w = read('web.mjs');
   assert.match(w, /\.\.\.\(r\.offer \? \{ offer: \{ type: 'app-change', label: r\.offer\.label \} \} : \{\}\)/);
-  assert.match(w, /canEdit: user\.role === 'owner' && origin\.fromApp && typeof app === 'string' && slugOk\(app\) && !!ownAppDir\(user, app\)/);
+  assert.match(w, /const canEditHere = user\.role === 'owner' && typeof app === 'string' && slugOk\(app\) && appEditable\(appsDir\(user\), app\)/);
+  assert.match(w, /canEdit: origin\.fromApp && canEditHere/);
+  assert.match(w, /chatRole = user\.role !== 'owner' \? 'member' : canEditHere \? 'owner' : 'ownerShared'/, 'the prompt names the button only when it is sent');
   const c = read('web/chat-ui.inline.html');
   assert.equal((c.match(/if\(mm\.offer&&mm\.offer\.type==='app-change'\) addChangeApp\(ae,\{type:'app-change',label:mm\.offer\.label,request:''\}\)/g) || []).length, 2, 'both history loaders');
   assert.match(read('web/app-edit.js'), /m\.request!==''&&!\(offers\.get\(fr\)/, 'a stored button opens the panel empty; only a live offer may prefill');
+});
+
+test('appEditable: the one editable test refuses a linked index.html (GPT review)', async () => {
+  const fs = await import('node:fs'); const os = await import('node:os'); const path = await import('node:path');
+  const { appEditable } = await import('../lib/app-edit.mjs');
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-')); const apps = path.join(ws, 'apps');
+  fs.mkdirSync(path.join(apps, 'real'), { recursive: true }); fs.writeFileSync(path.join(apps, 'real', 'index.html'), 'x');
+  fs.mkdirSync(path.join(apps, 'linked')); fs.writeFileSync(path.join(ws, 'elsewhere.html'), 'x');
+  fs.symlinkSync(path.join(ws, 'elsewhere.html'), path.join(apps, 'linked', 'index.html'));
+  assert.equal(appEditable(apps, 'real'), true);
+  assert.equal(appEditable(apps, 'linked'), false);
+  assert.equal(appEditable(apps, 'absent'), false);
+  fs.rmSync(ws, { recursive: true, force: true });
 });

@@ -784,3 +784,5 @@ still refuses (lib/publish/collect.mjs refuseFork, web.mjs bump). "Send my chang
 `forkedFrom` as a string (shelf copy, lib/sharedapps.mjs) or an object (peer copy, web.mjs fork routes) mapped to the
 repo folder; the `<slug>-mine` rename; copies of another user's app (not in the repo, another owner); snapshot hashing
 and LOCAL_META stripping re-checked. Only the owner's copy of a repo shelf app is safe to start with.
+
+- App chat offer, shared app with the same slug as one of the owner's own apps (GPT review, fork-publish-honesty): the broker sends only the slug, so the server offers 改这个应用 and the shell then refuses the click (the frame belongs to another account). Fix: the relay should name the app's account, and the gate should require it to be the owner's own.
