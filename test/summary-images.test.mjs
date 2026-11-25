@@ -148,7 +148,7 @@ test('chat-ui wiring: send(text,{attachments,model}) posts the host\'s files and
 
 test('pins: the hosts\' run hooks hand images + model to send (live = template), the markers sit before drawer-summary\'s script, /api/models publishes provider + vision, note-text carries inkImportant', () => {
   const notes = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
-  const NOTES_RUN = "run:async({scope,message,images,model})=>{ if(!await openAsk(scope)) return false; const r=await railChat.send(message,{attachments:images||[],model}); syncDrawer(); return r; },";
+  const NOTES_RUN = "run:async({scope,message,images,model})=>{ const chat=await openAsk(scope); if(!chat) return false; const r=await chat.send(message,{attachments:images||[],model}); syncDrawer(); return r; },";
   for (const f of ['workspace/apps/notes/index.html', 'workspace.example/apps/notes/index.html']) assert.ok(notes(f).includes(NOTES_RUN), f);
   const BIBLE_RUN = "if(!splitOn()){ if(await aiChat.open(scope)===false) return false; return aiChat.send(message,{attachments:images||[],model}); }\n    rail.open(); rail.expand('chat'); if(await railChat.open(scope)===false) return false; return railChat.send(message,{attachments:images||[],model}); },";
   for (const f of ['workspace/apps/bible/index.html', 'workspace.example/apps/bible/index.html']) assert.ok(notes(f).includes(BIBLE_RUN), f);

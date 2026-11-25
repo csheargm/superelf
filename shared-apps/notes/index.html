@@ -532,7 +532,7 @@ const drawer=PAChat.listDrawer({
     // failure is shown and the binding is kept, rather than silently half-applied).
     if(!r||!r.ok){ paNotice('Could not delete the AI chat · 无法删除 AI 对话'+((r&&r.error)?' — '+r.error:''),'',IDX_PATH); return; }
     askData.unbindConvo(cid);            // drops e.chat — the same release path a ☰ delete uses
-    if(railChat) railChat.newChat();     // the surface must not keep showing a thread that is gone
+    if(railChat) railChat.newChat(); if(fsChat&&fsChat.isOpen()) fsChat.newChat();   // the surface must not keep showing a thread that is gone; a hidden full-screen chat stays hidden
     if(curId===id) syncAsk();            // ...and the rail closes: this note no longer has a chat
     syncDrawer();
   },
@@ -599,7 +599,7 @@ const askData={
 // A chat BESIDE the page, not over it: the whole point is to read the note and the answer at
 // once — which is why this is a PASplit rail. The rail's own gate keeps it off phones, where there is
 // no room for two panes: there ensureAsk() opens the same chat with PAChat.fullscreen instead.
-let rail=null, railChat=null, askOpen=false;   // askOpen: is the chat slot expanded right now
+let rail=null, railChat=null, fsChat=null, askChat=null, askOpen=false;   // askOpen: is the chat slot expanded right now
 const splitOn=()=>!!(window.PASplit&&PASplit.available&&PASplit.gateOpen());
 // The thread is bound to the NOTE, so follow-up questions continue the same conversation and a
 // note you come back to still has what you asked about it.
@@ -629,17 +629,21 @@ function ensureRail(){
 // never a refusal. PAChat.fullscreen sits over the pad (z-index 50, later in the page), so the note's own
 // header is out of the way while the chat is up.
 function ensureAsk(){
-  if(ensureRail()&&railChat) return railChat;
-  if(!railChat&&window.PAChat) railChat=PAChat.fullscreen(Object.assign({}, askData, { onClose:()=>{ askOpen=false; } }));
-  return railChat;
+  // splitOn() FIRST: a rail made on a wide screen stays cached after the window narrows, and PASplit then
+  // keeps it closed — so a narrow screen always takes the full-screen chat (GPT review).
+  if(splitOn()&&ensureRail()&&railChat) return (askChat=railChat);
+  if(!fsChat&&window.PAChat) fsChat=PAChat.fullscreen(Object.assign({}, askData, { onClose:()=>{ askOpen=false; } }));
+  return (askChat=fsChat);
 }
 
 async function openAsk(){
-  if(!ensureAsk()){ paNotice('问一问暂不可用 · Ask AI is not available','','ask'); return false; }
-  if(rail){ rail.open(); rail.expand('chat'); } askOpen=true;
+  const chat=ensureAsk();   // THIS call's surface: a later Ask AI may switch askChat while this one loads (GPT review)
+  if(!chat){ paNotice('问一问暂不可用 · Ask AI is not available','','ask'); return false; }
+  if(chat===railChat&&rail){ rail.open(); rail.expand('chat'); } askOpen=true;
   const s=chatScope();
-  if(await railChat.open(s)===false||chatScope()!==s) return false;   // AWAITED: a send before this lands in the wrong thread; false = superseded or the note changed meanwhile
-  return true;
+  if(await chat.open(s)===false||chatScope()!==s) return false;   // AWAITED: a send before this lands in the wrong thread; false = superseded or the note changed meanwhile
+  if(askChat!==chat) return false;   // another Ask AI switched the surface while this one loaded
+  return chat;   // the surface that opened, for the caller's send
 }
 
 // THE CHAT FOLLOWS THE NOTE, BOTH WAYS. Called on every note switch:
@@ -650,20 +654,20 @@ async function openAsk(){
 // No notice when there is no rail: on a phone the user opened a NOTE, they did not ask for a
 // chat, and a warning about screen width would be an answer to a question nobody asked.
 function syncAsk(){
-  if(!ensureRail()||!railChat){ if(railChat&&railChat.isOpen()){ railChat.hide(); askOpen=false; } return; }   // a phone's full-screen chat belongs to the note it was opened on
+  if(!splitOn()||!ensureRail()||!railChat){ if(fsChat&&fsChat.isOpen()){ fsChat.hide(); askOpen=false; } return; }   // a phone's full-screen chat belongs to the note it was opened on
   const e=curId?entryById(curId):null;
-  if(e&&e.chat){ rail.open(); rail.expand('chat'); askOpen=true; railChat.open(chatScope()); }
+  if(e&&e.chat){ rail.open(); rail.expand('chat'); askOpen=true; askChat=railChat; railChat.open(chatScope()); }
   else { rail.collapse('chat'); askOpen=false; }
 }
 
 async function askAboutImage(im){
-  if(!await openAsk()) return;
+  const chat=await openAsk(); if(!chat) return;
   // Attached BY PATH — the photo is already on the server, so asking about it costs no upload and
   // no second copy of the bytes. The model is told where the file is; PAChat writes that line.
-  if(!railChat.attach({name:'page.jpg',path:im.path})){
+  if(!chat.attach({name:'page.jpg',path:im.path})){
     paNotice('Could not attach the photo · 无法附加图片','','ask'); return;
   }
-  if(await railChat.send(OCR_PROMPT)===false) paNotice('Still answering · 正在回答中…','','ask');
+  if(await chat.send(OCR_PROMPT)===false) paNotice('Still answering · 正在回答中…','','ask');
   syncDrawer();   // the note now has a conversation — the list should say so without a reload
 }
 

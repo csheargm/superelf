@@ -524,7 +524,7 @@ async function updateSummaryNote(e,{title,html,convoId,quiet}){   // quiet: writ
   if(!quiet||curId===e.id) await openEntry(e.id,null,{keepRail:true}); return {ok:true,id:e.id};
 }
 const SUMMARY_HOOKS={
-  run:async({scope,message,images,model})=>{ const c=await openAsk(scope); if(!c) return false; const r=await c.send(message,{attachments:images||[],model}); syncDrawer(); return r; },   // images + model: the summary's page images and lane (note-features.md I)
+  run:async({scope,message,images,model})=>{ const chat=await openAsk(scope); if(!chat) return false; const r=await chat.send(message,{attachments:images||[],model}); syncDrawer(); return r; },   // images + model: the summary's page images and lane (note-features.md I)
   monthSummary:async(period,title)=>{           // the period's own summary entry (e.summary), else one titled as the component names it
     const e=newestSummary(period)||S.entries.find(x=>x.title===title); if(!e) return null;   // the NEWEST run of that month
     const r=await loadNote(e.id); if(r.status!==DATA.ST.loaded||!r.data||r.data.deleted===true||!Array.isArray(r.data.pages)) return null;
@@ -671,12 +671,13 @@ function ensureAsk(){
 }
 
 async function openAsk(scope){                     // scope: a thread other than this note's (a period summary)
-  const c=ensureAsk();   // THIS call's surface: a later Ask AI may switch askChat while this one loads (GPT review)
-  if(!c){ paNotice('问一问暂不可用 · Ask AI is not available','','ask'); return false; }
-  if(c===railChat&&rail){ rail.open(); rail.expand('chat'); } askOpen=true;
+  const chat=ensureAsk();   // THIS call's surface: a later Ask AI may switch askChat while this one loads (GPT review)
+  if(!chat){ paNotice('问一问暂不可用 · Ask AI is not available','','ask'); return false; }
+  if(chat===railChat&&rail){ rail.open(); rail.expand('chat'); } askOpen=true;
   const s=scope||chatScope();
-  if(await c.open(s)===false||(!scope&&chatScope()!==s)||askChat!==c) return false;   // AWAITED: a send before this lands in the wrong thread; false = superseded or the note changed meanwhile
-  return c;   // the surface that opened, for the caller's send
+  if(await chat.open(s)===false||(!scope&&chatScope()!==s)) return false;   // AWAITED: false = superseded or the note changed meanwhile
+  if(askChat!==chat) return false;   // another Ask AI switched the surface while this one loaded   // AWAITED: a send before this lands in the wrong thread; false = superseded or the note changed meanwhile
+  return chat;   // the surface that opened, for the caller's send
 }
 
 // THE CHAT FOLLOWS THE NOTE, BOTH WAYS. Called on every note switch:
@@ -696,13 +697,13 @@ function syncAsk(){
 }
 
 async function askAboutImage(im){
-  const c=await openAsk(); if(!c) return;
+  const chat=await openAsk(); if(!chat) return;
   // Attached BY PATH — the photo is already on the server, so asking about it costs no upload and
   // no second copy of the bytes. The model is told where the file is; PAChat writes that line.
-  if(!c.attach({name:'page.jpg',path:im.path})){
+  if(!chat.attach({name:'page.jpg',path:im.path})){
     paNotice('无法附加图片 · Could not attach the photo','','ask'); return;
   }
-  if(await c.send(OCR_PROMPT)===false) paNotice('正在回答中… · Still answering','','ask');
+  if(await chat.send(OCR_PROMPT)===false) paNotice('正在回答中… · Still answering','','ask');
   syncDrawer();   // the note now has a conversation — the list should say so without a reload
 }
 
