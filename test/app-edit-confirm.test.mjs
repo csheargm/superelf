@@ -235,6 +235,7 @@ test('a typed yes applies the newest plan of THIS conversation only, once', () =
 test('tool/session talk in a plan turn is replaced: the pending plan + its button, or a plain ask', () => {
   const key = { who: 'owner', slug: 'notes', convo: 'c7' };
   assert.equal(toolTalkReplacement('The title is blue.', key), null);
+  assert.equal(toolTalkReplacement('Answer in plain words: never write tool-call syntax.', key), null, 'our own prompt words are not tool talk');
   assert.deepEqual(toolTalkReplacement("I still can't edit index.html. The Edit tool is still disabled in this session.", key), { text: ASK_AGAIN_LINE, id: null });
   const id = mintConfirm({ ...key, plan: 'Base text 18px.' });
   for (const t of ['Write tool is off', "the block is in the session's tool setup", 'the session’s tool list', 'Editing needs to be re-enabled'])
