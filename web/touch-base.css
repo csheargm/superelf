@@ -17,6 +17,11 @@
      the same classes in the shell (web/index.html) and in PAChat (web/chat-ui.inline.html), and this file is the
      one stylesheet both carry, so the rule lives here once (R3).
      These use :where() (no specificity), so any rule an app writes still wins.
+   - phone chat reading size (touch AND <=600px wide; owner 2026-11-25 "still very small fonts"): every chat
+     surface (shell .msg, PAChat .pac-m in the app chat panel, Notes Ask AI and every app's in-page chat) reads at
+     17px / 1.45 (iOS body size, never under 16px even with a small A- scale), code 15px, the reply meta line 13px,
+     the header title 17px, chips 15px, and the copy / speak / retry / edit icons 20px at full opacity. iPad and
+     mouse desktops keep their sizes. Pinned by test/phone-chat-notes-e2e.test.mjs (chatText in helpers-phone-check).
    Safe areas: the --safe-* tokens below; the shared bars use env(safe-area-inset-*) themselves.
    Pinned by test/touch-base.test.mjs and, in a real browser, test/phone-friendly-e2e.test.mjs. */
 :root{ --safe-top:env(safe-area-inset-top,0px); --safe-bottom:env(safe-area-inset-bottom,0px);
@@ -34,3 +39,15 @@
   small{ font-size:max(13px,1em); }
   .pac-model,.pac-vfy,.pac-vchip{ font-size:14px !important; }
 }
+@media (pointer:coarse) and (max-width:600px){
+  .pac{ --pac-fs:max(16px, calc(17px * var(--fs,1))) !important; }
+  .pac-m,.msg:not(.status){ line-height:1.45 !important; }
+  .msg:not(.status){ font-size:max(16px, calc(17px * var(--fs,1))) !important; }
+  :where(.pac-m,.msg) :where(code,pre code){ font-size:15px !important; }
+  :where(.pac-m,.msg) :where(table){ font-size:15px !important; }
+  .pa-took{ font-size:13px !important; }
+  .pac-title{ font-size:17px !important; }
+  .pac-model,.pac-vfy,.pac-vchip{ font-size:15px !important; }
+  .pac-ab,.mab{ font-size:20px !important; opacity:1 !important; display:inline-flex; align-items:center; justify-content:center; }
+}
+

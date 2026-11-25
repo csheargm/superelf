@@ -17,7 +17,7 @@ import { missingReason, resolveSkip } from './helpers-e2e-gate.mjs';
 import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, OWNER_TOKEN } from './helpers-web.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
 import { ROOT } from './helpers-app.mjs';
-import { checkSurface } from './helpers-phone-check.mjs';
+import { checkSurface, checkChatText, chatTextFailures } from './helpers-phone-check.mjs';
 
 const pw = await (async () => { try { return process.env.PA_PLAYWRIGHT ? await import(pathToFileURL(process.env.PA_PLAYWRIGHT).href) : await import('playwright'); } catch { return null; } })();
 const skip = resolveSkip(await missingReason(pw && pw.webkit));
@@ -27,6 +27,17 @@ const TITLE_MIN_PX = 60;     // the note title keeps room for a few characters, 
 const CHIP_TEXT_PX = 14, META_PX = 13, PREVIEW_PX = 14;
 const LONG = '<p>' + 'Long answer text '.repeat(40) + '</p><pre><code>const reallyLongVariableName = someFunction(argumentNumberOne, argumentNumberTwo, argumentNumberThree);</code></pre><table><tr>'
   + '<th>Column header</th>'.repeat(6) + '</tr><tr>' + '<td>cell value 123</td>'.repeat(6) + '</tr></table>';
+// What a real reply carries under it: the meta line and the action icons (same classes as mkab / the shell's .mab).
+const PAC_ACTS = '<small class="pa-took">DeepSeek · 中文 · took 1.2s</small><div><button type="button" class="pac-ab">⧉</button><button type="button" class="pac-ab">🔊</button><button type="button" class="pac-ab">↻</button></div>';
+const MSG_ACTS = '<small class="pa-took">DeepSeek · took 1.2s</small><div class="msg-actions"><button type="button" class="mab">⧉</button><button type="button" class="mab">🔊</button></div>';
+// On a phone the chat reads at phone size; on an iPad / desktop the sizes stay as they were (CONTROL: under 16px).
+// mode: 'phone' = phone sizes; 'control' = a wide touch page keeps its old sizes (bubbles under 16px).
+async function judgeText(t, where, logSel, cls, acts, mode, bad) {
+  await t.evaluate(([l, c, h]) => { const log = document.querySelector(l), d = document.createElement('div'); d.className = c; d.innerHTML = h; log.appendChild(d); log.scrollTop = log.scrollHeight; }, [logSel, cls, '<p>Reply</p>' + acts]);
+  const m = await checkChatText(t);
+  if (mode === 'phone') bad.push(...chatTextFailures(where, m));
+  else if (!m.bubble.length || m.bubble.some((x) => x >= 16)) bad.push(`${where}: wide-page bubble text changed ${m.bubble.join('/')}px (CONTROL)`);
+}
 
 let port, root, web, wk;
 before(async () => {
@@ -142,6 +153,7 @@ for (const [dev, viewport] of Object.entries(DEVICES)) {
       const w = await wideInBox(fr, `${scope} .pac-m.ai`);
       if (!w.bubble || !w.table || !w.pre) bad.push(`${dev} ask-ai: wide content leaves its bubble ${JSON.stringify(w)} — audit #24`);
       if ((await chipPx(fr)).some((x) => x < CHIP_TEXT_PX)) bad.push(`${dev} ask-ai: chip text under ${CHIP_TEXT_PX}px — audit #11`);
+      await judgeText(fr, `${dev} ask-ai chat`, `${scope} .pac-log`, 'pac-m ai', PAC_ACTS, phone ? 'phone' : 'control', bad);
       // A spent 改 · Apply: a later typed turn disables it, really and visibly.
       await fr.evaluate((s) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'pac-change-app pac-confirm'; b.textContent = '改 · Apply'; b.style.cssText = 'cursor:pointer'; document.querySelector(s + ' .pac-log').appendChild(b); }, scope);
       // GPT review: a send refused by the size pre-flight is not a turn, so the chip stays live.
@@ -182,11 +194,13 @@ for (const [dev, viewport] of Object.entries(DEVICES)) {
       const w = await wideInBox(page, '#log .msg.bot');
       if (!w.bubble || !w.table || !w.pre) bad.push(`${dev} main chat: wide content leaves its bubble ${JSON.stringify(w)} — audit #24`);
       if ((await chipPx(page)).some((x) => x < CHIP_TEXT_PX)) bad.push(`${dev} main chat: chip text under ${CHIP_TEXT_PX}px — audit #11`);
+      if (phone) await judgeText(page, `${dev} main chat`, '#log', 'msg bot', MSG_ACTS, 'phone', bad);   // the shell body is 17px at every width
       // The app chat panel (改这个应用) over an open app.
       await page.evaluate(() => { goHome(); openApp('owner', 'tasks', 'tasks'); }); await page.waitForTimeout(2500);
       await page.evaluate(() => PAAppEdit.open('tasks', 'tasks')); await page.waitForTimeout(2000);
       const af = await (await page.$('#aefr')).contentFrame(); await noTips(af); await noTips(page);
       judge(`${dev} app chat panel`, await checkSurface(af), bad);
+      await judgeText(af, `${dev} app chat panel`, '.pac-log', 'pac-m ai', PAC_ACTS, 'phone', bad);   // a narrow panel on iPad too
       const ph = await af.evaluate(() => { const i = document.querySelector('.pac-inp'); return { fits: i.scrollHeight <= i.clientHeight + 1, ph: i.placeholder }; });
       if (!ph.fits) bad.push(`${dev} app chat panel: the placeholder "${ph.ph}" is cut (F10)`);
     } finally { await ctx.close(); }
