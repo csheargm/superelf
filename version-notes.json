@@ -1,4 +1,12 @@
 {
+  "v5.25.0": {
+    "date": "2026-11-25",
+    "features": [
+      "主人可从副本发布到原应用 · Owner can publish a copy back to its app"
+    ],
+    "fixes": [],
+    "through": "529027d2a317970f46a789ff1c0281eaa2f55710"
+  },
   "v5.24.0": {
     "date": "2026-11-25",
     "features": [
