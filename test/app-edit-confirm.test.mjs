@@ -188,7 +188,8 @@ test('GPT review r4: words on the Apply line itself are not a tap; an over-long 
   const id = mintConfirm({ who: 'owner', slug: 'todo', plan: 'p' });
   assert.equal(applyIdOf(`${applyMessage(id)} — do not apply`), null);
   const WEB = fs.readFileSync(new URL('../web.mjs', import.meta.url), 'utf8');
-  assert.match(WEB, /o\.text\.length > PLAN_MAX\) return/, 'offerApply refuses a plan it would have to cut');
+  const OFFER = fs.readFileSync(new URL('../lib/app-edit-offer.mjs', import.meta.url), 'utf8');
+  assert.match(OFFER, /o\.text\.length > PLAN_MAX\) return/, 'offerApply refuses a plan it would have to cut');
   assert.match(WEB, /cancel\.signal\.aborted \? \{ ok: false, text: CANCELLED_TEXT \} : runClaude/, 'a member turn stopped while queued never spawns');
   assert.equal((WEB.match(/if \(edit && cancel && cancel\.signal\.aborted\) edit\.stopped = true;/g) || []).length, 2, 'both the done and the crash path mark a Stop');
 });

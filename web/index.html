@@ -104,7 +104,7 @@ form#f > *{ pointer-events:auto; }
 @keyframes pa-spin{ to{ transform:rotate(-360deg); } }
 #reload.spin{ animation:pa-spin .8s linear infinite; color:var(--accent); pointer-events:none; }
 #reload.upd{ color:var(--accent); }   /* a new build is ready (web/update.js) */
-#updBar{ pointer-events:auto; cursor:pointer; }
+#updBar.on{ pointer-events:auto; cursor:pointer; }   /* only while shown: the hidden, empty line sat over every app's top centre and took its taps (owner report 2026-11-25, an app chat's "Chat" row) */
 #offLine.mini{ left:calc(env(safe-area-inset-left,0px) + 8px); top:auto; bottom:calc(env(safe-area-inset-bottom,0px) + 8px); transform:none;
   font-size:0; padding:2px 8px; opacity:0; box-shadow:none; cursor:pointer; }   /* shrunk: a small corner pill */
 #offLine.mini.on, #updBar.on + #offLine.mini.on{ opacity:.7; pointer-events:auto; transform:none; }
@@ -1015,7 +1015,7 @@ addEventListener('blur',()=>{ if(frameOpen()) barHide(); });
 // TODO(R4): this file is far over budget; this block moves with the app-frame seam (see SHELL_BEHIND_APP).
 const SHELL_MSG_FONT_PER_S=20; let _shellFont={t:0,n:0};
 function frameOwnBar(){ return frameUid()===UID&&OWNBAR_APPS.has(frameSlug()); }
-window.addEventListener('message',(e)=>{ if(e.data&&e.data.pa==='shell'&&e.data.type==='change-app') PAAppEdit.fromApp(e); else if(e.data&&e.data.pa==='shell'&&e.data.type==='app-chat') PAAppEdit.fromAppChat(e); });   // any app's chat, not only ownBar apps. TODO(R4): moves with the app-frame seam below
+window.addEventListener('message',(e)=>{ if(e.data&&e.data.pa==='shell'&&e.data.type==='change-app') PAAppEdit.fromApp(e); else if(e.data&&e.data.pa==='shell'&&e.data.type==='app-chat') PAAppEdit.fromAppChat(e); else if(e.data&&e.data.pa==='shell'&&e.data.type==='chat-open'&&e.source===$('#fr').contentWindow&&frameOpen()) barHide(); });   // an app's full-screen chat: the overlaying bar would cover its top row (owner report 2026-11-25)   // any app's chat, not only ownBar apps. TODO(R4): moves with the app-frame seam below
 window.addEventListener('message',(e)=>{
   const m=e.data; if(!m||m.pa!=='shell') return;
   if(!e.source||e.source!==$('#fr').contentWindow||e.origin!=='null'||!frameOpen()||!frameOwnBar()) return;
@@ -2019,13 +2019,14 @@ window.addEventListener('message',async(e)=>{
         catch(err){ return fail(relayNetFail(err,'request',ac.signal)); }
         if(!res.ok) return fail(await relayHttpFail(res));
         try{
-          const rd=res.body.getReader(); const dec=new TextDecoder(); let buf='';
+          const rd=res.body.getReader(); const dec=new TextDecoder(); let buf='', applied=false;
           for(;;){ const {done,value}=await rd.read(); if(done) break; buf+=dec.decode(value,{stream:true});
             // R5: a line that will not parse is skipped on purpose — NDJSON framing is the
             // stream's contract, and the transport failures that used to hide here (a 413 or
             // a 401 answered instead of a stream) are now caught by the res.ok check above.
-            let i; while((i=buf.indexOf('\n'))>=0){ const t=buf.slice(0,i); buf=buf.slice(i+1); if(!t.trim()) continue; let jj; try{jj=JSON.parse(t)}catch{continue} if(fr.edit) PAAppEdit.onEvent(jj); else if(jj&&jj.type==='app-change') PAAppEdit.noteOffer(fr.el,jj.request); send({ev:jj}); } }
+            let i; while((i=buf.indexOf('\n'))>=0){ const t=buf.slice(0,i); buf=buf.slice(i+1); if(!t.trim()) continue; let jj; try{jj=JSON.parse(t)}catch{continue} if(fr.edit) PAAppEdit.onEvent(jj); else if(jj&&jj.type==='app-change') PAAppEdit.noteOffer(fr.el,jj.request); else if(jj&&jj.type==='app-edit'&&jj.applied&&appSlug===jj.slug) applied=true; send({ev:jj}); } }
           send({done:true});
+          if(applied) setTimeout(()=>{ if(!fr.left&&frameSlug()===appSlug){ appFrameLeave(); PASW.frameLoad(UID,appSlug); } },APPLIED_RELOAD_MS);   // the app's own chat changed it (demo guest, lib/demo-app-edit.mjs): show the new page once the reply is read
         }catch(err){ return fail(relayNetFail(err,'stream',ac.signal)); }
       }finally{ if(relayChats.get(m.id)===ac) relayChats.delete(m.id); }
       loadConvos();

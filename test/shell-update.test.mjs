@@ -181,7 +181,8 @@ test('the wiring in the composed shell: polls while visible, lights ↺, one bar
   const header = between(raw, '<header>', '</header>');
   assert.ok(!header.includes('id="updBar"') && raw.includes('<span id="updBar" class="fs-toast"></span>'), 'the line sits outside the inert header, like the toast');
   assert.match(raw, /#reload\.upd\{ color:var\(--accent\); \}/);
-  assert.match(raw, /#updBar\{ pointer-events:auto; cursor:pointer; \}/, 'tappable, unlike the toast');
+  assert.match(raw, /#updBar\.on\{ pointer-events:auto; cursor:pointer; \}/, 'tappable while shown, unlike the toast');
+  assert.doesNotMatch(raw, /#updBar\{[^}]*pointer-events:auto/, 'hidden, it takes no taps: it sat over every app\'s top centre (owner report 2026-11-25)');
   const boot = raw.slice(raw.indexOf("$('#reload').onclick="));
   assert.ok(boot.indexOf('/* PA_UPDATE_JS */') < boot.indexOf('reopenAfterUpdate();'), 'defined before boot calls it');
   assert.ok(boot.indexOf("sessionStorage.removeItem('pa_refreshing')") < boot.indexOf('reopenAfterUpdate();'), 'reopened once the boot loaders settled (apps and profile loaded)');

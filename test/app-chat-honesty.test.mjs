@@ -17,7 +17,8 @@ test('the rule forbids claiming a change and names the real way per person', () 
   assert.match(APP_CHAT_NO_CHANGE_RULE, /"Done"/); assert.match(APP_CHAT_NO_CHANGE_RULE, /已添加/);
   assert.ok(noChangeRule('owner').includes(CHANGE_APP_LABEL), 'owner: the button and the ⋯ menu');
   assert.match(noChangeRule('member'), /only open to the owner/);
-  assert.match(noChangeRule('demo'), /main chat/);
+  assert.match(noChangeRule('demo'), /cannot be changed from this chat/);
+  assert.doesNotMatch(noChangeRule('demo'), /main chat/, 'never sent to a chat that cannot change it either (owner report 2026-11-25)');
   assert.equal(noChangeRule('nobody'), `${APP_CHAT_NO_CHANGE_RULE} ${CHANGE_PATHS.member}`, 'unknown → the path that promises least');
 });
 

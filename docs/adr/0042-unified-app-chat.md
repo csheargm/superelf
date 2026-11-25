@@ -41,3 +41,15 @@ Owner decisions on the two review leftovers.
    beside config.json; cap `member_limits.ai_calls_per_user_per_day`, default 30, read at use time).
    Past the cap the turn makes no model call and answers with a bilingual limit line. Ollama turns and
    typed "undo" are not charged.
+3. **Demo guests change their own copy from the app's own chat (2026-11-25).** Owner report: a guest's
+   Calendar Planner chat said "Done — … now has …" with nothing changed, then sent them to "the main
+   chat". On the demo the app's Ask AI chat IS the edit surface (no panel): when the app is a plain folder
+   in the guest's own `apps/`, every turn of its chat runs the member's no-tools lane
+   (lib/demo-app-edit.mjs → lib/app-edit-lane.mjs) on the guest's Ollama lane: plan → 改 · Apply (or a typed
+   yes) → the server writes index.html (kept under the demo's own CSP meta and Ask AI mount) → snapshot
+   checks → the server's diff line → typed "undo". Caps: the chat's consumeAiCall per turn, plus one
+   app build (consumeAppBuild) and a disk check per Apply, app_max_kb per page, the demo's app_model.
+   The page itself can post a turn to its own chat; it can only reach that same page of that same guest,
+   and an Apply still needs an id minted for a plan the chat showed. Any other app keeps the no-write lane,
+   whose rule now says plainly the app cannot be changed here (never "ask the main chat"). Every plan
+   turn's completion claim gets EDIT_UNCHANGED_NOTE (planClaimNote).
