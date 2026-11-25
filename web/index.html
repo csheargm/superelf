@@ -260,7 +260,7 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
 .convo .t input{ width:100%; font:inherit; background:none; border:none; border-bottom:1px solid var(--accent); outline:none; color:var(--text); padding:0; }
 .convo .cmenu,.dapp .cmenu{ background:none; border:none; color:var(--muted); font-size:18px; cursor:pointer; flex-shrink:0; padding:0 4px; line-height:1; }
 .cmenu-pop{ position:fixed; background:var(--card); border:1px solid var(--line); border-radius:10px; box-shadow:0 4px 16px rgba(0,0,0,.25); z-index:30; overflow:hidden; min-width:130px; }
-.cmenu-pop button{ display:block; width:100%; text-align:left; background:none; border:none; padding:10px 14px; font:inherit; font-size:14px; color:var(--text); cursor:pointer; }
+.cmenu-pop button{ display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:none; border:none; padding:10px 14px; font:inherit; font-size:14px; color:var(--text); cursor:pointer; }
 .cmenu-pop button:hover,.cmenu-pop button:active{ background:var(--bg); }
 .cmenu-pop button.del:hover,.cmenu-pop button.del:active{ background:color-mix(in srgb,var(--danger) 12%,transparent); }
 .cmenu-pop button.del{ color:var(--danger); }
@@ -345,7 +345,6 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
     <span class="aa"><button class="ibtn aa-btn" type="button" title="字号 · Text size" aria-label="字号 · Text size" aria-expanded="false">Aa<span class="hm-l">字号 · Text size</span></button><span class="aa-set"><button class="ibtn fs-dn">A−</button><button class="ibtn fs-up">A+</button></span></span>
     <button class="ibtn" id="reload" title="刷新 · Refresh" aria-label="刷新 · Refresh" data-icon="refresh"><span class="hm-l">刷新 · Refresh</span></button>
     <button class="ibtn" id="settings" title="设置 · Settings" aria-label="设置 · Settings" data-icon="gear"><span class="hm-l">设置 · Settings</span></button>
-    <button class="plain" id="newSession" title="新对话 · New chat"><span class="lbl">Main</span></button>
   </div>
   <div class="hsub" id="hsub"></div>
 </header>
@@ -425,7 +424,6 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
 /* PA_HOME_V2_JS */
 const $=(s)=>document.querySelector(s);
 PAIcons.hydrate(); PAHomeLook.bindAa(); PAHome.bind();
-$('#newSession').insertAdjacentHTML('beforeend',PAIcons.svg('down'));
 let T=localStorage.getItem('pa_session')||'';
 let API_BASE='';   // '' = this page's origin; the home node's name while the public one is away (web/offline-origin.js PAOrigin). TODO(R4 seam): with api() into web/api.js
 const api=(p,opt={})=>fetch(API_BASE+p,{...opt,headers:{...(opt.headers||{}),authorization:'Bearer '+T}});
@@ -1315,7 +1313,6 @@ $('#dFamily').onclick=async(e)=>{
     if(g.ok&&g.data&&g.data.ok){loadApps();loadFamilyApps();} else alert(g.ok?(g.data.error||'复制被拒绝。 · Fork refused'):g.text); }
 };
 $('#back').onclick=goHome;   // the button says Home, so it goes Home (it used to open the drawer)
-$('#newSession').onclick=newConvo;
 
 /* ── Trusted-chrome confirmation（外壳确认）for app-initiated decisions ──
    An app iframe can ASK for a decision; only a HUMAN tap in this SHELL-owned

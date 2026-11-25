@@ -97,7 +97,6 @@ const PAHome=(function(){
   function syncHeader(){
     const av=$('#hAvatar'); if(!av) return;
     const g=guest(), sbIn=!!(window.PADemoAuth&&!g); av.hidden=g||(!NAME&&!sbIn); av.textContent=NAME?[...NAME][0].toUpperCase():(sbIn?'我':'');   // a signed-in demo visitor with no name still sees the account, not a blank header
-    const ns=$('#newSession'); if(ns) ns.hidden=g;
   }
   // The ONE composer: while the home shows, the chat's own input row (#frow: attach, #box, send) sits in the
   // ask ring, so every send path, attachment and test stays the shell's own. Its chat placeholder comes back on leave.

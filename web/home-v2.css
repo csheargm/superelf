@@ -26,12 +26,11 @@ header{ position:relative; }
   color:#fff; background:linear-gradient(90deg,#0d7357,#2563c9); }
 #hmenu{ position:absolute; top:calc(100% - 2px); right:12px; z-index:45; min-width:220px; display:flex; flex-direction:column; overflow:visible; background:var(--card); }
 #hmenu[hidden]{ display:none; }
-#hmenu > .ibtn,#hmenu .aa-btn,#hmenu #newSession{ width:100%; justify-content:flex-start; gap:12px; padding:0 12px; border-radius:10px; box-shadow:none; background:none; font-size:15px; }
+#hmenu > .ibtn,#hmenu .aa-btn{ width:100%; justify-content:flex-start; gap:12px; padding:0 12px; border-radius:10px; box-shadow:none; background:none; font-size:15px; }
 #hmenu .aa{ display:flex; }
 #hmenu .aa-btn{ font-weight:600; }
 #hmenu .aa-set{ right:auto; left:12px; top:100%; }
 .hm-l{ font-weight:400; font-size:15px; letter-spacing:0; }
-#hmenu #newSession[hidden]{ display:none; }
 body.home-on header .hsub{ display:none; }
 body.home-on form#f{ display:none; }
 

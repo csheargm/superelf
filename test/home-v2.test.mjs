@@ -109,7 +109,7 @@ test('USER FLOW owner: name + task chip, ⋯ holds every moved control, alert do
     assert.equal(await page.isVisible('#settings'), false);
     await page.click('#hmore');
     assert.equal(await page.isVisible('.pat-tip[data-tip="tip:home-more"]'), false, 'opening ⋯ retires the tip');
-    for (const s of ['#menu', 'header .aa-btn', '#reload', '#settings', '#newSession']) assert.equal(await page.isVisible(s), true, `${s} in ⋯`);
+    for (const s of ['#menu', 'header .aa-btn', '#reload', '#settings']) assert.equal(await page.isVisible(s), true, `${s} in ⋯`);
     await page.keyboard.press('Escape'); assert.equal(await page.isVisible('#hmenu'), false);
     await page.evaluate(() => { const d = document.createElement('span'); d.className = 'oa-dot'; document.querySelector('#menu').appendChild(d); });
     assert.notEqual(await page.evaluate(() => getComputedStyle(document.querySelector('#hmore'), '::after').content), 'none', 'the owner-alert dot shows on ⋯');
@@ -145,7 +145,7 @@ test('USER FLOW demo guest: welcome, Sign in in the header, Diabetes hidden, Mak
     await page.waitForSelector('#hStart .st');
     assert.equal(await page.isVisible('#hWelcome'), true); assert.equal(await page.isVisible('#hKeep'), true);
     assert.equal(await page.isVisible('header #demoSignin'), true);
-    assert.equal(await page.isVisible('#hAvatar'), false); assert.equal(await page.isVisible('#newSession'), false);
+    assert.equal(await page.isVisible('#hAvatar'), false);
     assert.deepEqual((await homeApps(page)).slice(0, 2), ['bible', 'notes']);
     assert.ok(!(await homeApps(page)).includes('diabetes'), 'demo.home_hide');
     await page.click('[data-make]');
