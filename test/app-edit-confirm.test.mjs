@@ -204,6 +204,6 @@ test('GPT review r5: share and delete refuse while an edit runs, so its rollback
     finishAppEdit(e, ctx, { wsDir: w });
     assert.equal(editBusyBody(w, 'todo'), null, 'free again after the turn');
     const WEB = fs.readFileSync(new URL('../web.mjs', import.meta.url), 'utf8');
-    assert.equal((WEB.match(/editBusyBody\(wsDir\(user\), slug\)/g) || []).length, 2, 'the share and the delete route');
+    assert.equal((WEB.match(/editBusyBody\(wsDir\(user\), slug\)/g) || []).length, 3, 'the share, the update and the delete route');
   } finally { rmTemp(w); }
 });

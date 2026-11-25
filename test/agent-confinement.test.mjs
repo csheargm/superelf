@@ -185,7 +185,8 @@ test('EVERY agent lane is resolved through agentArgs — none left raw', () => {
       `a runClaude call whose args are not resolved through agentArgs: ${c}`);
   }
   for (const v of [...inline, ...assigned]) {
-    assert.ok(/agentArgs\(/.test(v), `an extraArgs value bypasses the resolver: ${v}`);
+    // appJailArgs (lib/agent-origin.mjs): the owner's confirmed app-chat change, stricter than any confined lane (ADR 0042 addendum).
+    assert.ok(/agentArgs\(|appJailArgs\(/.test(v), `an extraArgs value bypasses the resolver: ${v}`);
   }
   // `(?<!function )` excludes the DECLARATION, whose second parameter is literally named
   // extraArgs — matching it made the test fail on its own definition.

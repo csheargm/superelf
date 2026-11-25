@@ -10,7 +10,7 @@ import path from 'node:path';
 import { rmTemp } from './helpers-tmp.mjs';
 import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, OWNER_TOKEN } from './helpers-web.mjs';
 import { writeFakeCli } from './helpers-platform.mjs';
-import { appJailArgs, SKIP_PERMISSIONS } from '../lib/agent-origin.mjs';
+import { appJailArgs, rulePath, SKIP_PERMISSIONS } from '../lib/agent-origin.mjs';
 import { makeJailWatch, jailProblems, undoOutside, badJailName } from '../lib/app-edit-jail.mjs';
 import { consumeMemberAiCall, memberAiLimit, MEMBER_AI_LIMIT_TEXT, MEMBER_AI_DEFAULT } from '../lib/member-quota.mjs';
 import { makeQuotaStore } from '../lib/demo-quota.mjs';
@@ -24,6 +24,7 @@ test('the jail argv: no bypass, default mode, Bash and instruction files denied,
   assert.ok(a.includes('Bash') && a.includes('Edit(//**/CLAUDE.md)') && a.includes('Edit(//**/AGENTS.md)') && a.includes('Edit(//**/.*)'));
   assert.equal(a[a.indexOf('--allowedTools') + 1], 'Edit(//w/apps/todo/**)');
   assert.ok(a.includes('--strict-mcp-config') && a.includes('opus'), 'the operator model survives');
+  assert.equal(rulePath('C:\\Users\\o\\ws\\apps\\todo'), '/c/Users/o/ws/apps/todo', 'a Windows path in rule form');
 });
 
 test('the watch flags writes outside the app and protected names inside it', () => {
