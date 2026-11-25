@@ -211,7 +211,7 @@ test('EVERY menu row carries its label in that element — both menus', () => {
   // Enumerate, do not patch the row that was reported: the photo menu has the same shape and the
   // same failure, and a half-converted menu is two layouts in one popover.
   const rows = [...E.matchAll(/data-(?:img|photo)="[a-z]+"[^>]*>'\+ico\('[a-z]+'\)\+'([^']*)/g)];
-  assert.equal(rows.length, 9, `both menus are covered (found ${rows.length} rows)`);
+  assert.equal(rows.length, 10, `both menus are covered (found ${rows.length} rows)`);
   for (const r of rows) {
     assert.match(r[1], /^<span class="pan-optlbl">/, `a bare text label survives: ${r[1].slice(0, 30)}`);
   }
@@ -276,6 +276,6 @@ test('the diagnostic menu order was restored once it had answered', () => {
   // The reorder proved the defect followed the ROWS, not their position, which is what pointed at
   // per-row inline styles. Leaving it in place would have left a diagnostic shipped as a design.
   const rows = [...E.matchAll(/data-img="([a-z]+)">'\+ico\('([a-z]+)'\)/g)].map((m) => m[1]);
-  assert.deepEqual(rows, ['ask', 'crop', 'copy', 'cut', 'delete'], 'reading order, destructive last');
+  assert.deepEqual(rows, ['ask', 'tpl', 'crop', 'copy', 'cut', 'delete'], 'reading order, destructive last');
   assert.doesNotMatch(E, /ORDER IS A DIAGNOSTIC/, 'and the note explaining the experiment is gone');
 });

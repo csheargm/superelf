@@ -156,8 +156,9 @@ const FEATURES = [
   ['web/settings-rows.inline.html', "settings-'+r.key", 'tip'],
   ['web/note-ui.inline.html', 'note-open-mode', 'TIP_OPEN_MODE'],
   ['web/drawer-groups.inline.html', 'drawer-bookmark', 'TIP'],
+  ['web/note-ui.inline.html', 'note-photo-stationery', 'tip'],
 ];
-test('each of the 8 recent features registers its tip in its own file, 中文 then English', () => {
+test('each of the 9 recent features registers its tip in its own file, 中文 then English', () => {
   for (const [file, id, name] of FEATURES) {
     const src = read(file);
     assert.ok(src.includes(`PATips.register({id:'${id}`), `${file} registers ${id}`);
