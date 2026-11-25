@@ -12,6 +12,7 @@
      through PAAppPrefs (localStorage throws at the app frame's opaque origin). Phones never get here: PASplit's gate
      keeps them on the full-screen sheet. The pure geometry (PAWin.geo) is driven by test/panel-window.test.mjs. -->
 <style id="paw-style">
+/* TODO(R4): over 300 lines — split the CSS into its own inlined file (seam: this <style> vs the PAWin script). */
 /* z-index LITERAL (test/app-load.test.mjs ladder): windows 46/47 above the page, snap 48, maximised 48, pills 49 (no window — docked or maximised — ever covers a pill), all below .pac-fs/.pan-fs (50). */
 .paw-win{position:fixed;z-index:46;display:none;flex-direction:column;box-sizing:border-box;background:var(--card,#fff);
   border:1px solid var(--line,#e2e2de);box-shadow:0 4px 18px rgba(0,0,0,.12)}
@@ -35,9 +36,30 @@
 .paw-h[data-d=n],.paw-h[data-d=s]{left:10px;right:10px;height:10px;cursor:ns-resize}
 .paw-h[data-d=e],.paw-h[data-d=w]{top:10px;bottom:10px;width:10px;cursor:ew-resize}
 .paw-h[data-d=n]{top:-5px}.paw-h[data-d=s]{bottom:-5px}.paw-h[data-d=e]{right:-5px}.paw-h[data-d=w]{left:-5px}
-.paw-h[data-d=ne],.paw-h[data-d=nw],.paw-h[data-d=se],.paw-h[data-d=sw]{width:18px;height:18px}
+.paw-h[data-d=ne],.paw-h[data-d=nw],.paw-h[data-d=sw]{width:18px;height:18px}
 .paw-h[data-d=ne]{top:-6px;right:-6px;cursor:nesw-resize}.paw-h[data-d=sw]{bottom:-6px;left:-6px;cursor:nesw-resize}
-.paw-h[data-d=nw]{top:-6px;left:-6px;cursor:nwse-resize}.paw-h[data-d=se]{bottom:-6px;right:-6px;cursor:nwse-resize}
+.paw-h[data-d=nw]{top:-6px;left:-6px;cursor:nwse-resize}
+/* The resize grip（缩放角, owner 2026-11-25）: a visible // glyph in a bottom gutter the body never covers (so it never sits on
+   the composer's send button); the grab area is 24px (mouse) / 44px (touch), half outside the window. */
+.paw-float{--paw-g:14px;padding-bottom:var(--paw-g)}
+.paw-h[data-d=se]{--paw-gs:24px;--paw-go:10px;width:var(--paw-gs);height:var(--paw-gs);right:calc(-1*var(--paw-go));bottom:calc(-1*var(--paw-go));cursor:nwse-resize}
+.paw-float>.paw-h[data-d=se]::after{content:'';position:absolute;right:calc(var(--paw-go) + 3px);bottom:calc(var(--paw-go) + 3px);width:11px;height:11px;opacity:.75;
+  background:linear-gradient(135deg,transparent 40%,var(--muted,#6b7370) 40% 52%,transparent 52% 66%,var(--muted,#6b7370) 66% 78%,transparent 78%)}
+@media (pointer:coarse){.paw-float{--paw-g:22px}.paw-h[data-d=se]{--paw-gs:44px;--paw-go:20px}.paw-float>.paw-h[data-d=se]::after{width:15px;height:15px}}
+/* Docked: the inner edge is the resize handle（停靠边缘, owner 2026-11-25）: a visible bar, a 12px (mouse) / 44px (touch)
+   strip along the edge, full length, col/row-resize. Only --paw-in of it lies inside the window (the title bar and the
+   content stay grabbable); the rest is over the page's edge. */
+.paw-win:not(.paw-float)>.paw-h{--paw-e:12px;--paw-in:6px}
+.paw-win:not(.paw-float)>.paw-h:is([data-d=e],[data-d=w]){top:0;bottom:0;width:var(--paw-e);cursor:col-resize}
+.paw-win:not(.paw-float)>.paw-h:is([data-d=n],[data-d=s]){left:0;right:0;height:var(--paw-e);cursor:row-resize}
+.paw-win:not(.paw-float)>.paw-h[data-d=w]{left:calc(var(--paw-in) - var(--paw-e))}.paw-win:not(.paw-float)>.paw-h[data-d=e]{right:calc(var(--paw-in) - var(--paw-e))}
+.paw-win:not(.paw-float)>.paw-h[data-d=n]{top:calc(var(--paw-in) - var(--paw-e))}.paw-win:not(.paw-float)>.paw-h[data-d=s]{bottom:calc(var(--paw-in) - var(--paw-e))}
+@media (pointer:coarse){.paw-win:not(.paw-float)>.paw-h{--paw-e:44px;--paw-in:10px}}
+.paw-win:not(.paw-float)>.paw-h::after{content:'';position:absolute;top:50%;left:calc(100% - var(--paw-in));width:4px;height:40px;margin:-20px 0 0 -2px;border-radius:2px;background:var(--muted,#6b7370);opacity:.55}
+.paw-win:not(.paw-float)>.paw-h[data-d=e]::after{left:var(--paw-in)}
+.paw-win:not(.paw-float)>.paw-h:is([data-d=n],[data-d=s])::after{left:50%;top:calc(100% - var(--paw-in));width:40px;height:4px;margin:-2px 0 0 -20px}
+.paw-win:not(.paw-float)>.paw-h[data-d=s]::after{top:var(--paw-in)}
+.paw-win:not(.paw-float)>.paw-h:hover::after,html.paw-moving .paw-win:not(.paw-float)>.paw-h::after{opacity:1;background:var(--accent,#0f6355)}
 .paw-float>.paw-h,.paw-d-right>.paw-h[data-d=w],.paw-d-tr>.paw-h[data-d=w],.paw-d-br>.paw-h[data-d=w],
 .paw-d-left>.paw-h[data-d=e],.paw-d-top>.paw-h[data-d=s],.paw-d-bottom>.paw-h[data-d=n]{display:block}
 .paw-max>.paw-h{display:none!important}
@@ -70,7 +92,7 @@ html.paw-pb>body>:is(.pan-fs,.pac-fs){margin-bottom:var(--paw-b)}
   const WHERE=['right','left','top','bottom','tr','br'];
   const L={min:'最小化 · Minimize',max:'最大化 · Maximize',restore:'还原 · Restore',close:'关闭 · Close',
     show:'恢复 · Restore ',save:'布局未保存 · Layout not saved',read:'布局未读取 · Layout not loaded',
-    tip:'拖动标题栏可移动或停靠 · Drag the title bar to move or dock'};
+    tip:'拖动标题栏可移动或停靠 · Drag the title bar to move or dock',grip:'拖动调整大小 · Drag to resize',edge:'拖动边缘调整大小 · Drag the edge to resize'};
 
   // ── pure geometry (PAWin.geo; unit-tested) ──
   const num=(v,d)=>{ v=Number(v); return isFinite(v)?v:d; };
@@ -261,6 +283,7 @@ html.paw-pb>body>:is(.pan-fs,.pac-fs){margin-bottom:var(--paw-b)}
     bar.appendChild(btn('paw-close','✕',L.close,()=>w.api.userClose()));
     w.body=mk('div','paw-body',el);
     ['n','s','e','w','ne','nw','se','sw'].forEach(d=>{ const h=mk('div','paw-h',el); h.dataset.d=d;
+      { const t=d==='se'?L.grip:L.edge; h.title=t; h.setAttribute('aria-label',t); }
       h.addEventListener('pointerdown',e=>onHandleDown(w,e,d)); h.addEventListener('touchstart',e=>e.stopPropagation(),{passive:true}); });
     bar.addEventListener('pointerdown',e=>onBarDown(w,e));
     // Stopped here so a page-level swipe (page flip) or the pad's ink guard never sees a title-bar touch.
