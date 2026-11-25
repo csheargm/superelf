@@ -1,0 +1,271 @@
+<!-- PAWin — side panels as real windows（面板窗口）: dock, float, resize, minimise, maximise. ADR docs/adr/0043-panel-windows.md.
+     Inlined by web.mjs at the PA_PANEL_WINDOW_UI marker, which split-ui carries after its script, so every page
+     with PASplit has it. ONE generic component for every app's Ask AI / Note panels (owner 2026-11-25).
+       PAWin.create({key, title, dock?, size?, closeSel?, onResize?, onVisible?}) → a window handle:
+         open() close() minimize() maximize() restore() dock(where) float(rect?) setTitle(t) isVisible() state() destroy()
+       where: right | left | top | bottom (push the page aside) | tr | br (corners, over the page). float: over the page.
+       Each window is independent: opening one never shows another.
+     DRAG the title bar (6px threshold) to tear a docked window off; drop on a target (edges 32px, corners 48px) to
+     dock — the targets and a preview show while dragging; Esc cancels. Mouse, finger and Pencil alike: the bar and
+     handles are touch-action:none and stop their events, so a drag never page-flips or inks.
+     LAYOUT is kept per DEVICE CLASS (phone | tablet | desktop) as ratios of the viewport, in appPrefs.paneLayout2
+     through PAAppPrefs (localStorage throws at the app frame's opaque origin). Phones never get here: PASplit's gate
+     keeps them on the full-screen sheet. The pure geometry (PAWin.geo) is driven by test/panel-window.test.mjs. -->
+<style id="paw-style">
+/* z-index LITERAL (test/app-load.test.mjs ladder): windows 46/47 above the page, maximised 49, all below .pac-fs/.pan-fs (50). */
+.paw-win{position:fixed;z-index:46;display:none;flex-direction:column;box-sizing:border-box;background:var(--card,#fff);
+  border:1px solid var(--line,#e2e2de);box-shadow:0 4px 18px rgba(0,0,0,.12)}
+.paw-win.on{display:flex}
+.paw-win.paw-float{border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.22)}
+.paw-win.paw-front{z-index:47}
+.paw-win.paw-max{z-index:49}
+.paw-bar{display:flex;align-items:center;gap:2px;height:40px;padding:0 4px 0 12px;flex-shrink:0;cursor:grab;touch-action:none;
+  border-bottom:1px solid var(--line,#e2e2de);font:600 13px/1 -apple-system,system-ui,"PingFang SC",sans-serif;color:var(--muted,#6b7370);
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.paw-bar:focus-visible{outline:2px solid var(--accent,#0f6355);outline-offset:-2px}
+.paw-t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.paw-err{font-size:11px;font-weight:400;color:#b3261e;flex-shrink:0}
+.paw-btn{flex:none;width:36px;height:36px;border:0;border-radius:6px;background:none;color:inherit;font-family:inherit;font-size:18px;line-height:1;cursor:pointer;padding:0}
+.paw-btn:hover{background:var(--line,#e2e2de)}
+.paw-btn:focus-visible{outline:2px solid var(--accent,#0f6355)}
+.paw-body{flex:1 1 auto;min-height:0;position:relative;overflow:hidden}
+/* The window owns ✕ now: the mounted chat's / pad's own ✕ is hidden, and the window ✕ runs it (closeSel). */
+.paw-win .pac-top .pac-close,.paw-win .pan-hx{display:none!important}
+.paw-h{position:absolute;z-index:2;touch-action:none;display:none}
+.paw-h[data-d=n],.paw-h[data-d=s]{left:10px;right:10px;height:10px;cursor:ns-resize}
+.paw-h[data-d=e],.paw-h[data-d=w]{top:10px;bottom:10px;width:10px;cursor:ew-resize}
+.paw-h[data-d=n]{top:-5px}.paw-h[data-d=s]{bottom:-5px}.paw-h[data-d=e]{right:-5px}.paw-h[data-d=w]{left:-5px}
+.paw-h[data-d=ne],.paw-h[data-d=nw],.paw-h[data-d=se],.paw-h[data-d=sw]{width:18px;height:18px}
+.paw-h[data-d=ne]{top:-6px;right:-6px;cursor:nesw-resize}.paw-h[data-d=sw]{bottom:-6px;left:-6px;cursor:nesw-resize}
+.paw-h[data-d=nw]{top:-6px;left:-6px;cursor:nwse-resize}.paw-h[data-d=se]{bottom:-6px;right:-6px;cursor:nwse-resize}
+.paw-float>.paw-h,.paw-d-right>.paw-h[data-d=w],.paw-d-tr>.paw-h[data-d=w],.paw-d-br>.paw-h[data-d=w],
+.paw-d-left>.paw-h[data-d=e],.paw-d-top>.paw-h[data-d=s],.paw-d-bottom>.paw-h[data-d=n]{display:block}
+.paw-max>.paw-h{display:none!important}
+.paw-snap{position:fixed;z-index:48;display:none;box-sizing:border-box;border:2px solid var(--accent,#0f6355);border-radius:8px;
+  background:color-mix(in srgb,var(--accent,#0f6355) 14%,transparent);pointer-events:none}
+.paw-tgt{position:fixed;z-index:48;display:none;width:40px;height:40px;margin:-20px 0 0 -20px;border-radius:50%;pointer-events:none;
+  background:var(--card,#fff);border:2px solid var(--accent,#0f6355);opacity:.7;box-sizing:border-box}
+.paw-tgt.hit{opacity:1;background:var(--accent,#0f6355)}
+html.paw-moving .paw-snap.on,html.paw-moving .paw-tgt{display:block}
+html.paw-moving{-webkit-user-select:none;user-select:none}
+html.paw-moving .paw-body{pointer-events:none}
+.paw-pills{position:fixed;right:12px;bottom:12px;z-index:46;display:flex;gap:6px}
+.paw-pill{border:1px solid var(--line,#e2e2de);border-radius:18px;background:var(--card,#fff);color:var(--text,#1d2321);
+  font:13px/1 -apple-system,system-ui,sans-serif;padding:0 14px;min-height:36px;box-shadow:0 2px 10px rgba(0,0,0,.15);cursor:pointer}
+/* THE PUSH. Sideways: margin on every body child (a flow column and a fixed surface both narrow — PASplit's
+   proven rule). Up/down: body padding narrows the flow column; the shared full-screen surfaces take margin. */
+html.paw-pr>body>*:not(.paw-x):not(.pac-drawerhost):not(.pac-lb){margin-right:var(--paw-r)}
+html.paw-pl>body>*:not(.paw-x):not(.pac-drawerhost):not(.pac-lb){margin-left:var(--paw-l)}
+html.paw-pt>body{padding-top:var(--paw-t);box-sizing:border-box}
+html.paw-pb>body{padding-bottom:var(--paw-b);box-sizing:border-box}
+html.paw-pt>body>:is(.pan-fs,.pac-fs){margin-top:var(--paw-t)}
+html.paw-pb>body>:is(.pan-fs,.pac-fs){margin-bottom:var(--paw-b)}
+</style>
+<script id="paw-script">
+(function(){
+  if(window.PAWin) return;
+  const KEY='paneLayout2', OLD='paneLayout';
+  const DRAG_PX=6, EDGE=32, CORNER=48, MIN_W=280, MIN_H=200, DEF_W=420, DEF_H=480, STEP=16;
+  const SIDE=[0.24,0.60], TB=[0.25,0.75], DEF_SIZE={right:0.34,left:0.34,top:0.5,bottom:0.5};
+  const WHERE=['right','left','top','bottom','tr','br'];
+  const L={min:'最小化 · Minimize',max:'最大化 · Maximize',restore:'还原 · Restore',close:'关闭 · Close',
+    show:'恢复 · Restore ',save:'布局未保存 · Layout not saved',read:'布局未读取 · Layout not loaded',
+    tip:'拖动标题栏可移动或停靠 · Drag the title bar to move or dock'};
+
+  // ── pure geometry (PAWin.geo; unit-tested) ──
+  const num=(v,d)=>{ v=Number(v); return isFinite(v)?v:d; };
+  function clampSize(where,r){ const b=(where==='top'||where==='bottom')?TB:SIDE; return Math.min(b[1],Math.max(b[0],num(r,DEF_SIZE[where]||DEF_SIZE.right))); }
+  function clampRect(r,vw,vh){
+    const w=Math.min(Math.max(num(r&&r.w,DEF_W),Math.min(MIN_W,vw)),vw), h=Math.min(Math.max(num(r&&r.h,DEF_H),Math.min(MIN_H,vh)),vh);
+    const x=Math.min(Math.max(num(r&&r.x,vw-w-24),0),vw-w), y=Math.min(Math.max(num(r&&r.y,56),0),vh-h);
+    return {x:Math.round(x),y:Math.round(y),w:Math.round(w),h:Math.round(h)};
+  }
+  function snapAt(x,y,vw,vh){
+    if(x>=vw-CORNER&&y<=CORNER) return 'tr';
+    if(x>=vw-CORNER&&y>=vh-CORNER) return 'br';
+    if(x>=vw-EDGE) return 'right'; if(x<=EDGE) return 'left';
+    if(y<=EDGE) return 'top'; if(y>=vh-EDGE) return 'bottom';
+    return null;
+  }
+  // Every visible window's pixel box, and how far the page is pushed from each edge. Sides take the full
+  // height; top/bottom span between them. Windows docked on one edge share it. Corners and floats push nothing.
+  function layout(list,vw,vh){
+    const vis=list.filter(s=>s.open&&!s.min), rects={}, push={right:0,left:0,top:0,bottom:0};
+    const on=w=>vis.filter(s=>!s.max&&s.mode==='dock'&&s.where===w);
+    ['right','left'].forEach(side=>{ const g=on(side); if(!g.length) return;
+      const px=Math.round(Math.max(...g.map(s=>clampSize(side,s.size[side])))*vw); push[side]=px;
+      g.forEach((s,i)=>{ const h=vh/g.length; rects[s.key]={x:side==='right'?vw-px:0,y:Math.round(i*h),w:px,h:Math.round(h)}; }); });
+    const x0=push.left, span=vw-push.left-push.right;
+    ['top','bottom'].forEach(tb=>{ const g=on(tb); if(!g.length) return;
+      const px=Math.round(Math.max(...g.map(s=>clampSize(tb,s.size[tb])))*vh); push[tb]=px;
+      g.forEach((s,i)=>{ const w=span/g.length; rects[s.key]={x:Math.round(x0+i*w),y:tb==='top'?0:vh-px,w:Math.round(w),h:px}; }); });
+    vis.forEach(s=>{
+      if(s.max) rects[s.key]={x:0,y:0,w:vw,h:vh};
+      else if(s.mode==='dock'&&(s.where==='tr'||s.where==='br')){ const w=Math.round(clampSize('right',s.size.right)*vw), h=Math.round(vh/2);
+        rects[s.key]={x:vw-w,y:s.where==='tr'?0:vh-h,w,h}; }
+      else if(s.mode==='float') rects[s.key]=clampRect(s.rect?{x:s.rect.x*vw,y:s.rect.y*vh,w:s.rect.w*vw,h:s.rect.h*vh}:null,vw,vh);
+    });
+    return {rects,push};
+  }
+  const deviceClass=(vw,vh,coarse)=>Math.min(vw,vh)<600?'phone':(coarse?'tablet':'desktop');
+  // The old account-wide paneLayout ({key:{mode:'docked'|'floating'|'max', rect px}}) → this device class, once.
+  function migrate(old,cls,vw,vh){
+    const out={}; if(!old||typeof old!=='object') return out;
+    Object.keys(old).forEach(k=>{ const o=old[k]||{}, e={mode:o.mode==='floating'?'float':'dock'};
+      if(o.mode==='max') e.max=true;
+      if(o.rect&&typeof o.rect==='object'){ const r=clampRect(o.rect,vw,vh); e.rect={x:r.x/vw,y:r.y/vh,w:r.w/vw,h:r.h/vh}; }
+      out[k]=e; });
+    return {[cls]:out};
+  }
+
+  // ── the window manager ──
+  const root=document.documentElement, wins=[];
+  const vp=()=>({w:window.innerWidth,h:window.innerHeight});
+  const cls=()=>{ let c=false; try{ c=window.matchMedia('(any-pointer:coarse)').matches; }catch(_){ /* no matchMedia: a desktop */ } return deviceClass(vp().w,vp().h,c); };
+  let stored=null, saveT=0, pills=null, snapEl=null, tgts=null;
+  function mk(tag,c,parent){ const e=document.createElement(tag); e.className=c; if(parent) parent.appendChild(e); return e; }
+  function btn(w,c,text,label,fn){ const b=mk('button','paw-btn '+c,null); b.type='button'; b.textContent=text; b.title=label; b.setAttribute('aria-label',label);
+    b.onclick=e=>{ e.stopPropagation(); fn(); }; return b; }
+  function chrome(){
+    if(pills) return; pills=mk('div','paw-pills paw-x',document.body); snapEl=mk('div','paw-snap paw-x',document.body);
+    tgts=WHERE.map(where=>{ const t=mk('div','paw-tgt paw-x',document.body); t.dataset.w=where; return t; });
+  }
+  function placeTargets(hit){ const v=vp(), at={right:[v.w-24,v.h/2],left:[24,v.h/2],top:[v.w/2,24],bottom:[v.w/2,v.h-24],tr:[v.w-30,30],br:[v.w-30,v.h-30]};
+    tgts.forEach(t=>{ const p=at[t.dataset.w]; t.style.left=p[0]+'px'; t.style.top=p[1]+'px'; t.classList.toggle('hit',t.dataset.w===hit); }); }
+  function render(){
+    const v=vp(), {rects,push}=layout(wins.map(w=>w.s),v.w,v.h);
+    ['right','left','top','bottom'].forEach(e=>{ const c='paw-p'+e[0]; root.classList.toggle(c,push[e]>0);
+      if(push[e]) root.style.setProperty('--paw-'+e[0],push[e]+'px'); else root.style.removeProperty('--paw-'+e[0]); });
+    wins.forEach(w=>{ const r=rects[w.s.key], el=w.el; el.classList.toggle('on',!!r);
+      el.className=el.className.replace(/\bpaw-d-\w+/g,'').trim(); el.classList.toggle('paw-float',w.s.mode==='float'&&!w.s.max);
+      el.classList.toggle('paw-max',!!w.s.max); if(w.s.mode==='dock'&&!w.s.max) el.classList.add('paw-d-'+w.s.where);
+      w.maxB.textContent=w.s.max?'❐':'□'; w.maxB.title=w.s.max?L.restore:L.max; w.maxB.setAttribute('aria-label',w.maxB.title);
+      if(!r) return; const k=r.w+'x'+r.h; w.cur=r; Object.assign(el.style,{left:r.x+'px',top:r.y+'px',width:r.w+'px',height:r.h+'px'});
+      if(k!==w.lastSize){ w.lastSize=k; if(w.o.onResize) w.o.onResize(); } });
+    if(pills){ pills.textContent=''; wins.filter(w=>w.s.open&&w.s.min).forEach(w=>{ const p=mk('button','paw-pill',pills); p.type='button';
+      p.textContent='▴ '+w.title(); p.title=L.show+w.title(); p.setAttribute('aria-label',p.title); p.onclick=()=>w.api.restore(); }); }
+  }
+  function showErr(text){ wins.forEach(w=>{ w.err.textContent=text||''; }); }
+  function entry(s){ const e={mode:s.mode,where:s.where,size:Object.assign({},s.size)}; if(s.rect) e.rect=Object.assign({},s.rect); if(s.max) e.max=true; return e; }
+  function save(){
+    clearTimeout(saveT); saveT=setTimeout(()=>{ const P=window.PAAppPrefs; if(!P) return;   // no prefs on this page: the layout is simply not kept
+      const all=Object.assign({},P.get()[KEY]), c=cls(); all[c]=Object.assign({},all[c]); wins.forEach(w=>{ all[c][w.s.key]=entry(w.s); });
+      P.patch({[KEY]:all}).then(r=>showErr(r&&r.ok?'':L.save+((r&&r.error)?' — '+r.error:''))); },300);
+  }
+  function apply(w){ const e=stored&&stored[cls()]&&stored[cls()][w.s.key]; if(!e||w.touched) return;
+    if(e.mode==='float'||e.mode==='dock') w.s.mode=e.mode; if(WHERE.includes(e.where)) w.s.where=e.where;
+    if(e.size&&typeof e.size==='object') Object.keys(DEF_SIZE).forEach(k=>{ if(e.size[k]!=null) w.s.size[k]=clampSize(k,e.size[k]); });
+    if(e.rect&&typeof e.rect==='object') w.s.rect=e.rect; w.s.max=!!e.max; }
+  function load(){
+    if(load.p) return load.p; const P=window.PAAppPrefs; if(!P){ load.p=Promise.resolve(); return load.p; }
+    load.p=P.read().then(r=>{ if(!(r&&r.ok)){ showErr(L.read+' — '+((r&&r.error)||'?')); return; }
+      stored=r.prefs[KEY]||null;
+      if(!stored&&r.prefs[OLD]){ const v=vp(); stored=migrate(r.prefs[OLD],cls(),v.w,v.h); P.patch({[KEY]:stored,[OLD]:null}); }
+      wins.forEach(apply); render(); });
+    return load.p;
+  }
+  function raise(w){ wins.forEach(x=>x.el.classList.toggle('paw-front',x===w)); }
+  function setRect(w,px){ const v=vp(), r=clampRect(px,v.w,v.h); w.s.rect={x:r.x/v.w,y:r.y/v.h,w:r.w/v.w,h:r.h/v.h}; }
+  // Off the dock (or out of max) under the pointer: the float keeps its last size; the grab point stays at the same fraction of the bar.
+  function tearOff(w,sx,sy){
+    const c=w.cur||{x:0,y:0,w:DEF_W,h:DEF_H};
+    if(w.s.mode==='float'&&!w.s.max) return {x:sx-c.x,y:sy-c.y,w:c.w,h:c.h};
+    const v=vp(), f=w.s.rect?{w:w.s.rect.w*v.w,h:w.s.rect.h*v.h}:{w:DEF_W,h:DEF_H}, r=clampRect(f,v.w,v.h);
+    w.s.mode='float'; w.s.max=false; return {x:Math.min(r.w-40,Math.max(40,(sx-c.x)/c.w*r.w)),y:Math.min(sy-c.y,20),w:r.w,h:r.h};
+  }
+  function preview(where){
+    if(!snapEl) return; snapEl.classList.toggle('on',!!where); placeTargets(where); if(!where) return;
+    const v=vp(), s={key:'_',open:true,mode:'dock',where,size:Object.assign({},DEF_SIZE)}, r=layout([s],v.w,v.h).rects._;
+    Object.assign(snapEl.style,{left:r.x+'px',top:r.y+'px',width:r.w+'px',height:r.h+'px'});
+  }
+  // One pointer gesture on the bar or a handle. onMove(x,y) runs only past DRAG_PX; onEnd(cancelled).
+  function gesture(e,el,onStart,onMove,onEnd){
+    if(e.button>0) return; e.stopPropagation(); if(e.preventDefault) e.preventDefault();
+    const sx=e.clientX, sy=e.clientY; let live=false;
+    try{ el.setPointerCapture(e.pointerId); }catch(_){ /* no capture (a released pointer): moves still arrive over the element */ }
+    const move=ev=>{ if(!live){ if(Math.hypot(ev.clientX-sx,ev.clientY-sy)<DRAG_PX) return; live=true; root.classList.add('paw-moving'); onStart(sx,sy); }
+      onMove(ev.clientX,ev.clientY); };
+    const off=()=>{ root.classList.remove('paw-moving'); el.removeEventListener('pointermove',move); el.removeEventListener('pointerup',up);
+      el.removeEventListener('pointercancel',cancel); document.removeEventListener('keydown',esc,true); };
+    const up=()=>{ off(); if(live) onEnd(false); }, cancel=()=>{ off(); if(live) onEnd(true); };
+    const esc=ev=>{ if(ev.key==='Escape'){ ev.stopPropagation(); cancel(); } };
+    el.addEventListener('pointermove',move); el.addEventListener('pointerup',up); el.addEventListener('pointercancel',cancel);
+    document.addEventListener('keydown',esc,true);
+  }
+  function onBarDown(w,e){
+    if(e.target.closest&&e.target.closest('.paw-btn')) return;
+    raise(w); let off=null, tgt=null; const before=JSON.stringify(w.s);
+    gesture(e,w.bar,(sx,sy)=>{ off=tearOff(w,sx,sy); },(x,y)=>{ const v=vp();
+      setRect(w,{x:x-off.x,y:y-off.y,w:off.w,h:off.h}); tgt=snapAt(x,y,v.w,v.h); preview(tgt); render(); },
+    cancelled=>{ preview(null); w.touched=true;
+      if(cancelled) Object.assign(w.s,JSON.parse(before)); else if(tgt){ w.s.mode='dock'; w.s.where=tgt; }
+      render(); save(); });
+  }
+  function onHandleDown(w,e,d){
+    const r0=Object.assign({},w.cur), sx=e.clientX, sy=e.clientY;
+    gesture(e,e.currentTarget,()=>{},(x,y)=>{ const v=vp(), s=w.s, dx=x-sx, dy=y-sy;
+      if(s.mode==='dock'){ const k=(s.where==='tr'||s.where==='br')?'right':s.where;
+        s.size[k]=clampSize(k,{right:(v.w-x)/v.w,left:x/v.w,top:y/v.h,bottom:(v.h-y)/v.h}[k]); }
+      else { const r=Object.assign({},r0);
+        if(d.includes('e')) r.w=Math.max(MIN_W,Math.min(r0.w+dx,v.w-r0.x));
+        if(d.includes('s')) r.h=Math.max(MIN_H,Math.min(r0.h+dy,v.h-r0.y));
+        if(d.includes('w')){ r.w=Math.max(MIN_W,Math.min(r0.w-dx,r0.x+r0.w)); r.x=r0.x+r0.w-r.w; }
+        if(d.includes('n')){ r.h=Math.max(MIN_H,Math.min(r0.h-dy,r0.y+r0.h)); r.y=r0.y+r0.h-r.h; }
+        setRect(w,r); }
+      render(); },()=>{ w.touched=true; save(); });
+  }
+  function onKey(w,e){
+    if(e.key==='Escape'&&w.s.max){ w.api.restore(); e.preventDefault(); return; }
+    const d={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[e.key]; if(!d||!e.altKey) return;
+    e.preventDefault(); const c=Object.assign({},w.cur); w.s.mode='float'; w.s.max=false;
+    if(e.shiftKey){ c.w+=d[0]*STEP; c.h+=d[1]*STEP; } else { c.x+=d[0]*STEP; c.y+=d[1]*STEP; }
+    setRect(w,c); w.touched=true; render(); save();
+  }
+  function build(w){
+    const el=w.el=mk('div','paw-win paw-x',document.body); el.setAttribute('role','dialog'); el.setAttribute('aria-label',w.o.title||w.s.key);
+    const bar=w.bar=mk('div','paw-bar',el); bar.tabIndex=0; bar.title=L.tip;
+    w.titleEl=mk('span','paw-t',bar); w.titleEl.textContent=w.o.title||w.s.key; w.err=mk('span','paw-err',bar);
+    bar.appendChild(btn(w,'paw-min','—',L.min,()=>w.api.minimize()));
+    bar.appendChild(w.maxB=btn(w,'paw-maxb','□',L.max,()=>{ if(w.s.max) w.api.restore(); else w.api.maximize(); }));
+    bar.appendChild(btn(w,'paw-close','✕',L.close,()=>w.api.userClose()));
+    w.body=mk('div','paw-body',el);
+    ['n','s','e','w','ne','nw','se','sw'].forEach(d=>{ const h=mk('div','paw-h',el); h.dataset.d=d;
+      h.addEventListener('pointerdown',e=>onHandleDown(w,e,d)); h.addEventListener('touchstart',e=>e.stopPropagation(),{passive:true}); });
+    bar.addEventListener('pointerdown',e=>onBarDown(w,e));
+    // Stopped here so a page-level swipe (page flip) or the pad's ink guard never sees a title-bar touch.
+    bar.addEventListener('touchstart',e=>e.stopPropagation(),{passive:true});
+    bar.addEventListener('dblclick',e=>{ if(!(e.target.closest&&e.target.closest('.paw-btn'))) w.maxB.onclick(e); });
+    bar.addEventListener('keydown',e=>onKey(w,e));
+    el.addEventListener('pointerdown',()=>raise(w),true);
+  }
+  function create(o){
+    if(!o||!o.key) throw new Error('PAWin.create: no key — the layout could not be remembered');
+    chrome();
+    const s={key:o.key,open:false,min:false,max:false,mode:'dock',where:WHERE.includes(o.dock)?o.dock:'right',
+      size:Object.assign({},DEF_SIZE,o.size?{right:clampSize('right',o.size)}:{}),rect:null};
+    const w={o,s,title:()=>w.titleEl.textContent}; build(w);
+    const vis=v=>{ render(); if(w.o.onVisible) w.o.onVisible(v); };
+    w.api={ el:w.el, body:w.body,
+      open:()=>{ const was=s.open&&!s.min; s.open=true; s.min=false; raise(w); if(!was) vis(true); else render(); showTip(w); },
+      close:()=>{ if(!s.open) return; s.open=false; s.min=false; vis(false); },
+      // The ✕: the mounted surface's own close path when it has one (it flushes a note first), else a plain close.
+      userClose:()=>{ const inner=o.closeSel&&w.body.querySelector(o.closeSel); if(inner&&inner.onclick) inner.onclick(); else if(inner) inner.click(); else w.api.close(); },
+      minimize:()=>{ if(!s.open||s.min) return; s.min=true; vis(false); },
+      maximize:()=>{ s.max=true; s.min=false; w.touched=true; render(); save(); },
+      restore:()=>{ const was=s.min; s.min=false; s.max=false; w.touched=true; raise(w); if(was) vis(true); else render(); save(); },
+      dock:(where)=>{ if(!WHERE.includes(where)) return; s.mode='dock'; s.where=where; s.max=false; w.touched=true; render(); save(); },
+      float:(r)=>{ s.mode='float'; s.max=false; if(r) setRect(w,r); w.touched=true; render(); save(); },
+      setTitle:(t)=>{ w.titleEl.textContent=String(t||''); w.el.setAttribute('aria-label',w.titleEl.textContent); render(); },
+      isVisible:()=>s.open&&!s.min, state:()=>JSON.parse(JSON.stringify(s)), rect:()=>w.cur&&Object.assign({},w.cur),
+      destroy:()=>{ const i=wins.indexOf(w); if(i>=0) wins.splice(i,1); if(w.el.parentNode) w.el.parentNode.removeChild(w.el); render(); } };
+    wins.push(w); apply(w); load(); render();
+    return w.api;
+  }
+  let tipOn=false;
+  function showTip(w){ const T=window.PATips; if(!T||tipOn) return; tipOn=true;
+    T.register({id:'panel-window-drag',anchor:()=>{ const x=wins.find(v=>v.api.isVisible()); return x&&x.titleEl; },text:L.tip,when:()=>wins.some(v=>v.api.isVisible())});
+    T.check(); }
+  window.addEventListener('resize',()=>render());
+  window.PAWin={create,KEY,LABELS:L,geo:{clampRect,clampSize,snapAt,layout,deviceClass,migrate,MIN_W,MIN_H,EDGE,CORNER,DRAG_PX}};
+})();
+</script>

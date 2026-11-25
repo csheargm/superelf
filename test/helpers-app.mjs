@@ -30,7 +30,7 @@ const ENGINE = read('web', 'note-ui.inline.html');
 // .html with the settings dialog and settings JS inlined. Reading the raw index.html instead would
 // silently stop guarding everything that has been extracted out of it.
 const CHAT = read('web', 'chat-ui.inline.html');
-const SPLIT = read('web', 'split-ui.inline.html');
+const SPLIT = read('web', 'panel-window.inline.html');   // the panel windows' CSS (PASplit itself has none since ADR 0043)
 const PRINT = read('web', 'print-ui.inline.html');
 
 // The four app files this harness owns. Template + live for both apps: the live Bible is a

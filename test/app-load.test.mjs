@@ -581,7 +581,7 @@ test('bible: the save-failure notice paints ABOVE the chat overlay, the draw pad
       boxOf(chatRules, '.pac-lb', {}),            // the image lightbox
       boxOf(engineRules, '.pan-fs', {}),          // PANote fullscreen
       boxOf(engineRules, '.pan-lock', {}),        // the locked-note curtain
-      boxOf(splitRules, '.pas-rail', {}),          // PASplit's right-hand rail
+      boxOf(splitRules, '.paw-win', {}),           // PAWin's panel windows
       ...['#panel', '#search-overlay', '#back-chat', '#fab'].map((s) => boxOf(rules, s, vars)).filter((b) => b.decls),
     ];
     // Each overlay must RESOLVE, or paintsAbove compares against a phantom. A misspelled

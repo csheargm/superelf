@@ -480,14 +480,14 @@
   // covered the Bible's text instead of making room for it.
   // Below 640px the offset is media-gated OFF and the drawer keeps the overlay+backdrop.
   //   Excluded (never pushed): .pac-drawerhost (holds the panel), .pac-lb (full-screen zoom),
-  //   .pas-rail (PASplit's right-hand rail — it is anchored to the RIGHT edge, so pushing its
-  //   `left` would drag it inward and leave a gap at the right).
+  //   .paw-x (PAWin's panel windows, snap preview and pills — they place themselves, so pushing their
+  //   margin would drag them off their own edge).
   //   CORRECTION: an earlier version of this comment also listed `.pan-fs` as "never pushed".
   //   It never was — the constant below does not exclude it, and in the unified Journal .pan-fs
   //   IS the content surface and must narrow. The claim was simply wrong; the trailing note on
   //   the constant already said so, which made the two halves contradict each other.
   //   NOTE: .pac-fs is NOT excluded — it IS the Bible's content surface and must narrow.
-  const PAC_DOCK_EXCL=':not(.pac-drawerhost):not(.pac-lb):not(.pas-rail)';   // .pan-fs (PANote fullscreen) IS the surface in the unified Journal, so it must narrow too; in the Bible it is hidden before the drawer opens, so narrowing it there is a no-op
+  const PAC_DOCK_EXCL=':not(.pac-drawerhost):not(.pac-lb):not(.paw-x)';   // .pan-fs (PANote fullscreen) IS the surface in the unified Journal, so it must narrow too; in the Bible it is hidden before the drawer opens, so narrowing it there is a no-op
   function ensureDockStyle(){
     if(document.getElementById('pac-dock-style')) return;   // idempotent: inject exactly once
     const st=document.createElement('style'); st.id='pac-dock-style';

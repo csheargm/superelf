@@ -1,6 +1,6 @@
 # ADR 0031 — Panes float, maximise and close through shared pane chrome (PAPaneChrome)
 
-Date: 2026-11-13 · Status: accepted (branch feat/bible-panes; plan bible-panes items 3, 4, 7)
+Date: 2026-11-13 · Status: SUPERSEDED 2026-11-25 by ADR 0043 (panel windows, web/panel-window.inline.html); PAPaneChrome is deleted
 
 ## Context
 
