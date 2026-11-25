@@ -128,11 +128,12 @@ jobs:
         # 2026-11-25: EVERY OS +2 (ubuntu 232, windows 318): chat-phone-actions-e2e (440x956 and 390x844), skipped on CI by PA_E2E_SKIP.
         # 2026-11-25: EVERY OS +4 (ubuntu 236, windows 322): fork-publish-honesty-e2e, skipped on CI by PA_E2E_SKIP.
         # 2026-11-25: EVERY OS +1 (ubuntu 237, windows 323): journal-print-e2e, skipped on CI by PA_E2E_SKIP.
+        # 2026-11-25: EVERY OS +2 (ubuntu 239, windows 325): menu-anchor-e2e (1680 and 390 widths), skipped on CI by PA_E2E_SKIP.
         include:
           - os: ubuntu-latest
-            max_skipped: 237
+            max_skipped: 239
           - os: windows-latest
-            max_skipped: 323
+            max_skipped: 325
     env:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED
