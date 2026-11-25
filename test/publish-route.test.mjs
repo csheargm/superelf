@@ -88,9 +88,12 @@ test('a forked app is refused on the server for preview and publish (not only hi
   const { port, root } = await node({ github_publish_token: FAKE_TOKEN, github_api_url: 'http://127.0.0.1:9' });
   fs.writeFileSync(path.join(root, 'workspace', 'apps', 'myapp', 'meta.json'), JSON.stringify({ title: 'My App', forkedFrom: { uid: 'kid', slug: 'theirs' } }));
   const pv = await api(port, '/api/apps/myapp/publish', { method: 'POST', body: '{"preview":true}' });
-  assert.equal(pv.status, 422); assert.equal((await pv.json()).code, 'FORKED_APP');
+  const pj = await pv.json();
+  assert.equal(pv.status, 422); assert.equal(pj.code, 'FORK_OTHER'); assert.match(pj.error, /copy of kid's app/);
   const r = await api(port, '/api/apps/myapp/publish', { method: 'POST', body: '{"hash":"x"}' });
-  assert.equal(r.status, 422); assert.equal((await r.json()).status.code, 'FORKED_APP');
+  assert.equal(r.status, 422); assert.equal((await r.json()).status.code, 'FORK_OTHER');
+  const g = await (await api(port, '/api/apps/myapp/publish')).json();
+  assert.equal(g.refused.code, 'FORK_OTHER'); assert.equal(g.copyOf, null);
 });
 
 test('the confirmed hash binds the destination: a repo change after the preview refuses', async () => {

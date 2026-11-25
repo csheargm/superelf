@@ -19,17 +19,23 @@ test('every menu asks PAPublish.item(slug): the fork gate lives in ONE place', (
   assert.doesNotMatch(read('web/index.html'), /!forked\?PAPublish/, 'no second fork rule beside the gate');
 });
 
-function loadPublish(forks) {
-  const ctx = { FORK_APPS: new Set(forks), $: () => null, api: () => null, esc: (s) => s, _SEEN: new Set(), localStorage: null };
+function loadPublish(forks, role = 'member') {
+  const ctx = { FORK_APPS: new Set(forks), ROLE: role, $: () => null, api: () => null, esc: (s) => s, _SEEN: new Set(), localStorage: null };
   vm.createContext(ctx); vm.runInContext(`${read('web/publish.js')}\nthis.P=PAPublish;`, ctx);
   return ctx.P;
 }
-test('a fork gets no Publish item, only a line saying why and what to do', () => {
+test('a member\'s copy gets no Publish item, only a true line (no "ask the original author")', () => {
   const P = loadPublish(['school-mine']);
-  assert.match(P.item('mine'), /id="pubItem"/);
   const f = P.item('school-mine');
   assert.doesNotMatch(f, /pubItem|<button/, 'no button that can only refuse');
-  assert.match(f, /^<div id="pubFork".*复制来的应用.*·.*original author/, '中文 first, then English, with the next step');
+  assert.match(f, /^<div id="pubFork">?.*发布只对节点主人开放 · Only the node's owner can publish/, '中文 first, then English');
+  assert.doesNotMatch(f, /original author/);
+});
+
+test('the owner\'s copy gets Publish held off until the server names where it goes (copy-target.mjs)', () => {
+  const P = loadPublish(['school-mine'], 'owner');
+  assert.match(P.item('mine'), /id="pubItem">/, 'an own app: on at once');
+  assert.match(P.item('school-mine'), /id="pubItem" disabled style="opacity:\.5;pointer-events:none"/);
 });
 
 test('the publish sheet sits at the bottom, never over the app header', () => {

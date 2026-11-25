@@ -1,5 +1,5 @@
-// Owner report 2026-11-25 (School Helper, iPhone), in a real browser (R6). A copied app's ⋯ menus offer no Publish,
-// only a line saying why; a real app's publish sheet sits below the app header; the app's own chat's
+// Owner report 2026-11-25 (School Helper, iPhone), in a real browser (R6). A copy that cannot go back to a repo app
+// offers no Publish, only a line saying why; a real app's publish sheet sits below the app header; the app's own chat's
 // 改这个应用 · Change this app button is there after the reply AND after the chat is reopened, and opens the panel.
 // Phone (390x844) and iPad (820x1180). PA_E2E_ENGINE=webkit runs it in Safari's engine.
 import { test, before, after } from 'node:test';
@@ -57,8 +57,11 @@ for (const [name, vp] of [['phone', { width: 390, height: 844 }], ['iPad', { wid
     const { ctx, page } = await signIn(vp);
     await openApp(page, 'school'); await openMore(page);
     await page.locator('#frameMenu').waitFor();
-    assert.equal(await page.locator('#frameMenu #pubItem').count(), 0, 'no Publish on a copy');
-    assert.match(await page.locator('#frameMenu #pubFork').textContent(), /^复制来的应用不能发布.*original author/);
+    // school-src is not in the repo: the server's line replaces the item (no Publish that can only refuse).
+    await page.locator('#frameMenu #pubFork').waitFor({ timeout: 10000 });
+    assert.equal(await page.locator('#frameMenu #pubItem').count(), 0, 'no Publish on a copy that cannot go back');
+    assert.match(await page.locator('#frameMenu #pubFork').textContent(), /^这个副本的原应用不在公开仓库里.*not in the public repo/);
+    assert.doesNotMatch(await page.locator('#frameMenu #pubFork').textContent(), /original author/);
     await page.keyboard.press('Escape'); await page.mouse.click(5, vp.height - 5);
     await page.evaluate(() => document.querySelector('#back').click());   // Home (the bar may have slid away)
     await openApp(page, 'mine'); await openMore(page);
