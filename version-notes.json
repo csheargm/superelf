@@ -1,4 +1,12 @@
 {
+  "v5.22.8": {
+    "date": "2026-11-25",
+    "features": [],
+    "fixes": [
+      "返回键回到主页 · Back returns to home, never a blank page"
+    ],
+    "through": "b92e18473c8a87a27be701962deb8767e9f1aa3e"
+  },
   "v5.22.7": {
     "date": "2026-11-25",
     "features": [],
