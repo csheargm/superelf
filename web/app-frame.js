@@ -88,19 +88,23 @@ window.addEventListener('message',(e)=>{
 const APP_HIST_KEY='paApp';
 let appHistReplaceNext=false;   // set by a direct-link open (web/update.js openFromLink, the demo #app= link)
 let appHistPopsToIgnore=0;      // Back steps the shell took itself (appHistoryLeft): not the user's
+let appHistPushed=false;        // the app entry was pushed by the shell (else it replaced a link's entry: Home must not step back off the site)
 function appHistoryOpened(uid,slug,title){
   const st={[APP_HIST_KEY]:{uid,slug,title}};
-  const replace=appHistReplaceNext||!!(history.state&&history.state[APP_HIST_KEY]);
+  const onApp=!!(history.state&&history.state[APP_HIST_KEY]);
+  const replace=appHistReplaceNext||onApp;
+  if(!onApp) appHistPushed=!replace;
   appHistReplaceNext=false;
   try{ if(replace) history.replaceState(st,''); else history.pushState(st,''); }catch(_){ /* no history API (sandboxed test page): Back then leaves the shell, as before */ }
 }
 function appHistoryLeft(){
   if(!(history.state&&history.state[APP_HIST_KEY])) return;
+  if(!appHistPushed){ try{ history.replaceState(null,''); }catch(_){ /* no history API: nothing to step off */ } return; }   // a link's app: stay on the site
   appHistPopsToIgnore++; history.back();
 }
 window.addEventListener('popstate',(e)=>{
   if(appHistPopsToIgnore>0){ appHistPopsToIgnore--; return; }
   const a=e.state&&e.state[APP_HIST_KEY];
-  if(a) openApp(a.uid,a.slug,a.title);          // Forward: the app again (the entry is already its own: replaced, not pushed)
+  if(a){ appHistPushed=true; openApp(a.uid,a.slug,a.title); }          // Forward: the app again (the entry is already its own: replaced, not pushed)
   else if(frameOpen()) goHome();                // Back: Home, fully drawn, with every menu and panel closed
 });

@@ -106,4 +106,15 @@ for (const [label, engine, opts] of ENGINES) {
       await page.waitForURL(/\/blank-before$/, { timeout: 10000 });   // a link's Back leaves the shell, as any link's does
     } finally { await browser.close(); }
   });
+  test(`${label}: an app opened by deep link — in-app Home stays on the shell`, { skip, timeout: 90000 }, async () => {
+    const { browser, page } = await boot(engine, opts, '/#open=owner/todo');
+    try {
+      await frameApp(page, 'todo');
+      await page.evaluate(() => goHome());
+      await homeShown(page);
+      await new Promise((r) => setTimeout(r, 500));
+      assert.ok(!/\/blank-before$/.test(page.url()), 'Home from a link\'s app never leaves the site');
+      assert.equal(await page.evaluate(() => history.state && history.state.paApp), null);
+    } finally { await browser.close(); }
+  });
 }
