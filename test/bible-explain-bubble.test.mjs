@@ -28,7 +28,7 @@ test('old stored explain turns show their header line; ordinary turns are untouc
 });
 test('PAChat renders every user turn through opts.showMe (live + both history paths)', () => {
   assert.equal((CHAT.match(/shownMe\(cleanMe\(mm\.text\)\)/g) || []).length, 2);
-  assert.match(CHAT, /const shown=shownMe\(q\); const um=addMsg\('me',shown,mine\)/);
+  assert.match(CHAT, /const shown=shownMe\(shownUserText\(q\)\); const um=addMsg\('me',shown,mine\)/);
   assert.match(BIBLE, /\n  showMe,/);
 });
 test('a taller composer re-pins a log that was at the bottom', () => {

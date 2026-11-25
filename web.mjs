@@ -50,7 +50,7 @@ import { runCodex } from './lib/codex.mjs';
 import { laneRunner } from './lib/model-review-agent.mjs';
 import { appOriginated, agentConfined, convoTag, convoReachable, laneArgs, appJailArgs, appReadArgs } from './lib/agent-origin.mjs';
 import { makeJailWatch } from './lib/app-edit-jail.mjs';
-import { cleanReply, scrubPaths, REPLY_EMPTY_TEXT } from './lib/reply-clean.mjs';
+import { cleanReply, scrubPaths, pathScrubStream, REPLY_EMPTY_TEXT } from './lib/reply-clean.mjs';
 import { consumeMemberAiCall, MEMBER_QUOTA_FILE } from './lib/member-quota.mjs';
 import { runAssessment, pickPanel } from './lib/assess.mjs';
 import { runResearch } from './lib/research.mjs';
@@ -1183,10 +1183,18 @@ const editToolBrief = (input, ws) => { const v = input && (input.file_path || in
 const realOrSelf = (p) => { try { return fs.realpathSync(p); } catch { return p; /* gone since it was found: the CLI says so */ } };
 // TODO(R4 seam): editReadable/editToolBrief leave web.mjs with the edit-turn wiring (the seam named in chatTurn).
 // What an edit turn may read besides its own folder: the app's saved data, its saved versions, the attachments.
+// No link anywhere on the way (GPT review r1): a data/<slug> symlink into another workspace must not become a Read rule.
+// The versions folder is read as its version copies only, never its .outside-* quarantine; attachments only from uploads/.
 function editReadable(user, edit, files) {
-  const dirs = [path.join(wsDir(user), 'data', edit.slug), path.join(wsDir(user), VERSIONS_DIR, edit.slug)]
-    .filter((d) => fs.existsSync(d)).map((d) => realOrSelf(d) + '/');
-  return [...dirs, ...files.map((f) => realOrSelf(f.abs))];
+  const ws = wsDir(user);
+  const safe = (p) => { const rel = path.relative(ws, p); if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) return false;
+    let at = ws; for (const seg of rel.split(path.sep)) { at = path.join(at, seg); let st; try { st = fs.lstatSync(at); } catch { return false; /* absent: nothing to read */ } if (st.isSymbolicLink()) return false; }
+    return true; };
+  const data = path.join(ws, 'data', edit.slug), versions = path.join(ws, VERSIONS_DIR, edit.slug);
+  const copies = safe(versions) ? fs.readdirSync(versions, { withFileTypes: true }).filter((d) => d.isDirectory() && !d.name.startsWith('.'))
+    .map((d) => path.join(versions, d.name)).filter(safe).map((d) => realOrSelf(d) + '/') : [];
+  const shots = files.filter((f) => path.relative(path.join(ws, UPLOADS_DIR), f.abs).split(path.sep)[0] !== '..' && safe(f.abs)).map((f) => realOrSelf(f.abs));
+  return [...(safe(data) ? [realOrSelf(data) + '/'] : []), ...copies, ...shots];
 }
 
 /* ══ PA_CHAT_LANE_BEGIN ── which lane answers this turn ═══════════════════════════════════════
@@ -1309,8 +1317,9 @@ function agentSystemPrompt(head, caps, facts) {
 // An unconfirmed edit turn that planned a change: strip the marker, mint the single-use id, offer the button.
 function offerApply(user, edit, message, r, line) {
   if (edit.confirmed || edit.superelf || edit.undo) return r;
-  const o = planOffer(r.text);
-  if (!o.offered) return r;
+  const o0 = planOffer(r.text);
+  if (!o0.offered) return r;
+  const o = { ...o0, text: scrubPaths(cleanReply(o0.text).text, wsDir(user)) };   // the plan Apply runs is the plan the user saw (GPT review r1)
   if (o.text.length > PLAN_MAX) return { ...r, text: `${o.text}\n\n${PLAN_TOO_LONG}` };   // never an Apply that would run a cut-down plan
   const id = mintConfirm({ who: user.id, slug: edit.slug, plan: o.text, request: message });
   line({ type: 'app-change-confirm', slug: edit.slug, label: APPLY_LABEL, message: applyMessage(id) });
@@ -1539,6 +1548,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
       // Fix: build a history block from convo.messages and inject it into the prompt whenever
       // Claude cannot resume. The prior messages already include the contextPrefix from the first
       // turn (which names the passage), so Claude recovers the full conversation context.
+      const live = appCwd ? pathScrubStream(wsDir(user), (t) => line({ type: 'delta', text: t })) : null;   // an edit turn's stream never shows the node's paths
       const priorMsgs = convo.messages.slice(0, -1); // all messages BEFORE the current one
       const turnMsg = jailed ? applyNowPrompt(edit.plan) : message;
       const buildHistoryPrompt = (msgs) => {
@@ -1566,14 +1576,14 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
           // app contract; the language rule and the confined note still ride.
           systemPrompt: agentSystemPrompt([agentPrompts.global, agentPrompts.app, origin.fromApp ? noChangeRule(chatRole) : null], agentCapabilities(laneRole(user, origin), oneShot ? null : APP_CONTRACT), turnFacts),
         resumeId, timeoutMs: cfg.task_timeout_minutes * 60000, onChild: cancel ? cancel.onChild : undefined,
-        onDelta: (t) => line({ type: 'delta', text: t }), onTool: (n, b, input) => { if (jailed) editCtx.jail.onTool(n, b, input); const shown = appCwd ? editToolBrief(input, wsDir(user)) : b; line({ type: 'status', text: `${n}${shown ? ` — ${shown}` : ''}` }); } };
-      r = await enqueue(async () => {
+        onDelta: (t) => (live ? live.push(t) : line({ type: 'delta', text: t })), onTool: (n, b, input) => { if (jailed) editCtx.jail.onTool(n, b, input); const shown = appCwd ? editToolBrief(input, wsDir(user)) : b; line({ type: 'status', text: `${n}${shown ? ` — ${shown}` : ''}` }); } };
+      try { r = await enqueue(async () => {
         if (cancelled()) return CHAT_CANCELLED;   // still queued when its caller left: never spawn
         let x = await runClaude({ ...opts, prompt: histPrompt });
         // No retry after a Stop: the killed child's error is not a dead session.
         if (!x.ok && !cancelled() && opts.resumeId && /No conversation found/i.test(x.text || '')) x = await runClaude({ ...opts, resumeId: null, prompt: histPrompt });
         return x;
-      });
+      }); } finally { if (live) live.flush(); }
       // A killed child "answers" with its raw stream-json so far — never store that as a reply.
       if (cancelled()) { r = CHAT_CANCELLED; audit('chat-cancelled', { who: user.id, convo: convo.id, from: tag || 'composer' }); }
       // The node's Claude sign-in has expired (lib/claude-auth.mjs, docs/adr/0024): record it for the

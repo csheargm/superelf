@@ -181,3 +181,23 @@ test('a member not opted in to Claude: each app-chat turn is charged; past the c
   const q = JSON.parse(fs.readFileSync(path.join(root, 'member-quota.json'), 'utf8'));
   assert.equal(q.counts['member:kid'], 2);
 });
+
+test('GPT review r1: a question turn reads only the app (cwd), its own unlinked data and uploads; a data/<slug> link into another workspace is no Read rule', { timeout: 30000 }, async () => {
+  const other = path.join(root, 'ws-kid');
+  const data = path.join(root, 'workspace', 'data');
+  fs.mkdirSync(data, { recursive: true });
+  fs.symlinkSync(other, path.join(data, 'todo'));
+  try {
+    await turn(OWNER_TOKEN, 'what does it say?');
+    const a = lastArgv();
+    assert.equal(a[a.indexOf('--tools') + 1], 'Read,Glob,Grep', 'read-only tools, never --tools=');
+    assert.ok(!a.includes('--tools='));
+    assert.ok(!a.some((x) => String(x).startsWith('Read(') && x.includes('ws-kid')), `no rule reaches the other workspace: ${a.filter((x) => String(x).startsWith('Read(')).join(' ')}`);
+  } finally { fs.unlinkSync(path.join(data, 'todo')); }
+});
+
+test('GPT review r1: the confirmed turn names its whole tool set (file tools only)', { timeout: 30000 }, async () => {
+  await applyTurn(OWNER_TOKEN, 'recolor');
+  const a = lastArgv();
+  assert.equal(a[a.indexOf('--tools') + 1], 'Read,Glob,Grep,Edit,Write');
+});

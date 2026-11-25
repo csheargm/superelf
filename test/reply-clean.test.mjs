@@ -77,3 +77,14 @@ test('the question turn is told the app\'s data files as a fact, not a guess', (
     assert.match(editSystemPrompt(edit), /events\.json[\s\S]*current directory is the app's folder/);
   } finally { fs.rmSync(ws, { recursive: true, force: true }); }
 });
+
+test('GPT review r1: a marker quoted mid-answer offers nothing; the live stream is scrubbed across chunk breaks', async () => {
+  const { planOffer } = await import('../lib/app-edit-confirm.mjs');
+  const { pathScrubStream } = await import('../lib/reply-clean.mjs');
+  assert.equal(planOffer('The server shows a button when a reply ends with [[apply]] — like this one did not.').offered, false);
+  assert.equal(planOffer('I will make it red.\n[[apply]]\n').offered, true);
+  const out = []; const s = pathScrubStream('/data/superelf/workspace', (t) => out.push(t));
+  for (const c of ['Read /data/super', 'elf/workspace/apps/c', 'al/index.html now', '.']) s.push(c);
+  s.flush();
+  assert.equal(out.join(''), 'Read apps/cal/index.html now.');
+});

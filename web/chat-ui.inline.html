@@ -923,7 +923,7 @@
     function addChangeApp(bubble,ev){ const b=document.createElement('button'); b.type='button'; b.className='pac-change-app';
       b.textContent=String(ev.label||'改这个应用 · Change this app'); b.style.cssText='display:block;align-self:flex-start;max-width:82%;margin:6px 0 2px;padding:6px 12px;border-radius:16px;border:1px solid currentColor;background:transparent;color:inherit;font:inherit;cursor:pointer';
       // 改 · Apply (ADR 0042): the server minted the message; the tap sends it as the next turn, once.
-      b.onclick=ev.type==='app-change-confirm'?()=>{ b.disabled=true; send(String(ev.message)); }:()=>parent.postMessage({pa:'shell',type:'change-app',request:String(ev.request||'').slice(0,2000)},'*'); bubble.after(b); }
+      b.onclick=ev.type==='app-change-confirm'?()=>{ b.disabled=true; send(String(ev.message)).then((ok)=>{ if(!ok) b.disabled=false; }); }:()=>parent.postMessage({pa:'shell',type:'change-app',request:String(ev.request||'').slice(0,2000)},'*'); bubble.after(b); }
     function addActions(bubble,kind,rawText,prompt,scopeKey){   // scopeKey: the thread this bubble was rendered in (send() passes its snapshot); default = the thread shown now
       if(kind==='ai') rawText=shownAi(rawText);
       const bar=document.createElement('div'); bar.className='pac-acts '+kind;

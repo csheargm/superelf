@@ -486,7 +486,7 @@ test('every lane resolves attachments through the ONE safeJoin-gated resolver (i
   assert.equal((code.match(/path\.join\(wsDir\(user\), a\.path\)/g) || []).length, 0,
     'no lane may re-derive an attachment path from the client-supplied value');
   assert.match(code, /const imgs = files\.map\(\(f\) => f\.abs\)/, 'the Codex -i list comes from the shared resolver');
-  assert.match(code, /prompt: message \+ attachmentPrompt\(files\)/, 'the Claude lane names the shared resolver\'s files');
+  assert.match(code, /prompt: turnMsg \+ attachmentPrompt\(files, !!appCwd\)/, 'the Claude lane names the shared resolver\'s files');
   const resolver = WEB_SRC.slice(WEB_SRC.indexOf('function attachmentFiles'), WEB_SRC.indexOf('function attachmentPrompt'));
   assert.match(resolver, /safeJoin\(base, a\.path\)/, 'the one resolver goes through the repo\'s own traversal gate');
 });
