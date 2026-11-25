@@ -1,4 +1,12 @@
 {
+  "v5.19.2": {
+    "date": "2026-11-24",
+    "features": [],
+    "fixes": [
+      "说「好」也能改 CI 修复 · Typing-yes CI fix"
+    ],
+    "through": "d5b2791441cedc3eac24405daf49cb54686f1f77"
+  },
   "v5.19.1": {
     "date": "2026-11-24",
     "features": [],
