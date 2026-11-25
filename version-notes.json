@@ -1,4 +1,12 @@
 {
+  "v5.25.2": {
+    "date": "2026-11-25",
+    "features": [],
+    "fixes": [
+      "去掉调试框、邮编天气带国家 · Remove debug overlay; postcode weather uses your country"
+    ],
+    "through": "0daab7c61f69d1ffebc4728562eb0a9bc680a06c"
+  },
   "v5.25.1": {
     "date": "2026-11-25",
     "features": [],
