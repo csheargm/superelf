@@ -2,9 +2,9 @@
   <form method="dialog">
     <div id="cfgHead"><b id="cfgTitle">设置 · Settings</b><button class="primary" id="pSave" disabled>保存 · Save</button><button class="plain" id="cfgClose" value="cancel" formnovalidate aria-label="关闭 · Close" title="关闭 · Close">✕</button></div>
     <h3 style="margin-bottom:12px">你的资料 · Your profile</h3>
-    <label>名字 · Name<br><input id="pName" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></label>
+    <label>名字 · Name<br><input id="pName" placeholder="输入你的名字 · Type your name" autocomplete="name" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></label>
     <label>关于你（助手会读）· About you (the assistant reads this)<br><textarea id="pAbout" rows="2" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></textarea></label>
-    <label>回复风格 · Reply style — how should the assistant talk to you?<br><input id="pPrefs" placeholder="Short and plain, no preamble · bullet points · be direct" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></label>
+    <label>回复风格 · Reply style — how should the assistant talk to you?<br><input id="pPrefs" placeholder="例如：简短回答，用中文 · e.g. short answers, in English" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></label>
     <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:14px"><input type="checkbox" id="pAutoUpdate"> 自动更新共享应用 · Auto-update shared apps</label>
     <div id="pAge" style="color:var(--muted);font-size:13px;margin-bottom:10px"></div>
     <label id="pBriefWrap">简报邮箱 · Briefing email<br><input id="pBriefEmail" type="email" autocomplete="email" placeholder="留空则不发送 · blank = off" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></label>

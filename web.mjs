@@ -2616,7 +2616,7 @@ const server = http.createServer(async (req, res) => {
       // same old profile and erase each other's change (GPT review 2026-11-24).
       const b = req.method === 'PUT' ? await readBody(req, BODY_LIMITS.profile) : null;
       const prof = req.method === 'PUT' ? loadProfileForUpdate(wsDir(user), defaults) : (loadProfile(wsDir(user)) || defaults);
-      if (req.method === 'GET') return send(res, 200, 'application/json', JSON.stringify({ ...prof, id: user.id, role: user.role, age: ageFromYear(prof.birthYear, thisYear()), appOrder: Array.isArray(prof.appOrder) ? prof.appOrder : [],
+      if (req.method === 'GET') return send(res, 200, 'application/json', JSON.stringify({ ...prof, name: user.demo && String(prof.name || '').trim() === user.name ? '' : prof.name, id: user.id, role: user.role, age: ageFromYear(prof.birthYear, thisYear()), appOrder: Array.isArray(prof.appOrder) ? prof.appOrder : [],
         // The user's own prompt overrides (may be empty), plus the config defaults so the
         // Advanced-settings UI can prefill the effective value and offer reset-to-default.
         systemPrompts: (prof.systemPrompts && typeof prof.systemPrompts === 'object') ? prof.systemPrompts : {},
