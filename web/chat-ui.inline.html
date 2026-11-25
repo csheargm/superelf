@@ -1145,7 +1145,8 @@
           // exchange each. Adopting on DIFFERENCE makes a stale binding heal itself on first use.
           if(ev.type==='convo'&&ev.id&&ev.id!==cid){ setCid(k,ev.id); if(myLoad===_loadSeq||key===k){ curConvo=ev.id; _sel=ev.id; }   // adopted only while this scope is shown (still, or reopened); another thread open meanwhile keeps its own
             opts.onConvo&&opts.onConvo(ev.id,k); if(!cid&&(myLoad===_loadSeq||key===k)) setTitle(lbl||q.slice(0,40)||'Chat'); }
-          if(ev.type==='status'){ thinking.className='pac-m status'; thinking.textContent='🔧 '+ev.text; pin(); updateScroll(); }
+          if(ev.type==='status'&&ev.keep){ const d=addMsg('status',ev.text); thinking.parentNode.insertBefore(d,thinking); pin(); updateScroll(); }
+          else if(ev.type==='status'){ thinking.className='pac-m status'; thinking.textContent='🔧 '+ev.text; pin(); updateScroll(); }
           // classList, NOT className=. Assigning className wiped pac-md on EVERY delta — many
           // times a second — while the throttled render only put it back every 150ms. The bubble
           // therefore flipped between white-space:normal and pre-wrap continuously, and since
