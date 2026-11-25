@@ -64,3 +64,44 @@ test('collect: a copy goes only as its source, with no data/ and no per-user met
     assert.throws(() => collectApp(peer, 'tasks', { owner: 'owner' }), (e) => e.code === 'FORKED_APP', 'another user\'s copy');
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
+
+test('GPT review: a shelf entry another account shared is theirs; a bad meta refuses; other repo refuses', () => {
+  const { root, mk } = tree();
+  try {
+    const shelf = path.join(root, 'shared-apps', 'tasks'); fs.mkdirSync(shelf, { recursive: true });
+    fs.writeFileSync(path.join(shelf, 'meta.json'), JSON.stringify({ sharedBy: 'kid' }));
+    const d = mk('tasks-mine', { forkedFrom: 'tasks' });
+    assert.throws(() => publishTarget({ appDir: d, slug: 'tasks-mine', owner: 'owner', root }), (e) => e.code === 'FORK_OTHER');
+    fs.writeFileSync(path.join(shelf, 'meta.json'), JSON.stringify({ sharedBy: 'owner' }));
+    assert.equal(publishTarget({ appDir: d, slug: 'tasks-mine', owner: 'owner', root }).slug, 'tasks');
+    assert.throws(() => publishTarget({ appDir: d, slug: 'tasks-mine', owner: 'owner', root, defaultRepo: false }), (e) => e.code === 'FORK_OTHER_REPO');
+    fs.writeFileSync(path.join(d, 'meta.json'), `{"forkedFrom":"tasks"}${' '.repeat((1 << 20) + 1)}`);
+    assert.throws(() => publishTarget({ appDir: d, slug: 'tasks-mine', owner: 'owner', root }), (e) => e.code === 'BAD_META', 'oversize meta is not read');
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('GPT review: shelf fields (promotedFrom, files, sharedBy) never reach the published meta', () => {
+  const { root, mk } = tree();
+  try {
+    const d = mk('tasks-mine', { title: 'T', forkedFrom: 'tasks', sharedBy: 'owner', promotedAt: 'x', promotedFrom: { uid: 'owner', slug: 'tasks' }, files: { 'data/a.json': 'abc' } });
+    const meta = collectApp(d, 'tasks', { owner: 'owner' }).files.find((f) => f.path.endsWith('meta.json'));
+    assert.deepEqual(JSON.parse(meta.content.toString()), { title: 'T' });
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('GPT review: one local app never runs two publishes (the status key is locked too)', async () => {
+  const { startPublish, previewPublish } = await import('../lib/publish/run.mjs');
+  const { root, mk } = tree();
+  try {
+    const d = mk('tasks-mine', { forkedFrom: 'tasks' });
+    fs.writeFileSync(path.join(root, 'privacy-terms.txt'), 'Zorblax\n');
+    fs.mkdirSync(path.join(root, 'workspace'), { recursive: true }); fs.writeFileSync(path.join(root, 'workspace', 'identity-denylist.txt'), 'Quux Town\n');
+    const o = { token: 't', repo: 'csheargm/superelf', api: 'http://127.0.0.1:9', termsRoot: root };
+    const { hash } = previewPublish({ appDir: d, slug: 'tasks', owner: 'owner', options: o });
+    let release; const gate = new Promise((r) => { release = r; });
+    const fetchFn = async () => { await gate; throw new Error('offline'); };   // the first publish waits on GitHub
+    const first = startPublish({ appDir: d, slug: 'tasks', owner: 'owner', key: 'tasks-mine', options: o, fetchFn, expectHash: hash });
+    await assert.rejects(startPublish({ appDir: d, slug: 'other', owner: 'owner', key: 'tasks-mine', options: o, expectHash: 'x' }), (e) => e.code === 'IN_FLIGHT');
+    release(); assert.equal((await first).status.code, 'GITHUB_UNREACHABLE');
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});

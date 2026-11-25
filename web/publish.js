@@ -22,7 +22,8 @@ const PAPublish=(()=>{
   const copyText=(c)=>`更新共享应用 ${c.title} · Updates the shared app ${c.title}`;
   function item(slug){
     if(isFork(slug)&&!isOwner()) return forkLine(MEMBER_FORK_LINE);
-    return '<button data-a="publish" id="pubItem">发布到公开仓库 · Publish to the public repo'
+    // The owner's copy waits, off, until the server says where it goes (showState): no tap that can only refuse.
+    return '<button data-a="publish" id="pubItem"'+(isFork(slug)?' disabled style="opacity:.5;pointer-events:none"':'')+'>发布到公开仓库 · Publish to the public repo'
       +'<span id="pubState" style="display:block;font-size:11px;opacity:.65"></span>'
       +'</button>';
   }
@@ -38,7 +39,8 @@ const PAPublish=(()=>{
     if(j&&j.refused&&b&&b.isConnected){ b.outerHTML=forkLine(j.refused.error); return; }   // a copy that cannot go back: say why, no button
     const l=b&&b.isConnected&&b.querySelector('#pubState'); if(!l) return;
     l.textContent=[j&&j.copyOf?copyText(j.copyOf):'',stateText(repo)].filter(Boolean).join(' — ');
-    const off=!!(repo&&repo.upToDate); b.disabled=off; b.style.opacity=off?'.5':''; b.style.pointerEvents=off?'none':'';   // a tap on the line text must not reach the menu's handler
+    const off=!!(repo&&repo.upToDate); b.disabled=off;   // also turns on the owner's copy item held off in item()
+    b.style.opacity=off?'.5':''; b.style.pointerEvents=off?'none':'';   // a tap on the line text must not reach the menu's handler
     // The line arrives after the menu was placed: keep the menu's bottom on screen.
     const m=b.closest('#appMenu'); if(m&&m.style.top){ const over=m.getBoundingClientRect().bottom-(innerHeight-6); if(over>0) m.style.top=Math.max(6,parseFloat(m.style.top)-over)+'px'; }
   }

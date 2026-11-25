@@ -781,6 +781,9 @@ Without it they now FAIL (R14), not pass as `# pass 0 / # fail 0`. To run them:
 ## Publish a copy's change back to its source (owner's repo-app copies built 2026-11-25)
 The owner's copy of a repo app now publishes back to it (docs/adr/0039 addendum). Still open: a copy of another
 user's app (not in the repo) has no "send my change to its author" path; the line points to Make an app.
+- Shelf copy of a 36–40 character slug that collides locally: fork() names it `<slug>-mine`, over the 40-char slug
+  limit, so the app list hides it and Publish rejects the slug (GPT review, copy-back). Fix in lib/sharedapps.mjs fork:
+  shorten before the suffix.
 
 - App chat offer, shared app with the same slug as one of the owner's own apps (GPT review, fork-publish-honesty): the broker sends only the slug, so the server offers 改这个应用 and the shell then refuses the click (the frame belongs to another account). Fix: the relay should name the app's account, and the gate should require it to be the owner's own.
 
