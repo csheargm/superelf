@@ -2055,7 +2055,7 @@
       pages:(NB.pages||[]).map(p=>({
         // A page on stationery is a WHOLE sheet of content: the design reaches the bottom edge,
         // so print fits the full page rather than cropping the design under short writing.
-        extent:Math.max(pageExtent(p),STN&&STN.has(NB.stationery)?PAGE_H/W:0),
+        extent:Math.max(pageExtent(p),STN&&STN.has(NB.stationery)?PAGE_H/W:0), inkExtent:pageExtent(p),   // print pads INK only; the stationery floor is exactly one sheet
         // Typed text lives in an HTML overlay, not on the canvas, so this render cannot carry
         // it. Reported so the caller can SAY so rather than quietly printing a page that is
         // missing the words on it.

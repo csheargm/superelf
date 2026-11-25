@@ -62,6 +62,8 @@ test('one scale for the whole note, from content alone', () => {
   // GPT review: a stroke centred just above the sheet foot still has a thick edge below it.
   const edge = API.noteFit(info([1.29])).k;
   assert.ok(edge < 1 && (1.29 + 0.04) * 816 * edge <= 1056 + 1e-9, 'padding counts even when the centreline fits');
+  const stn = { width: 816, sheetH: 1056, pages: [{ extent: 1056 / 816, inkExtent: 0 }] };
+  assert.equal(API.noteFit(stn).k, 1, 'an empty stationery page is not shrunk by ink padding');
 });
 
 test('stationery stays registered with the ink when the note is scaled', () => {
@@ -275,7 +277,7 @@ test('nothing event-driven may reclaim the print surface', () => {
   assert.ok(!/addEventListener\('beforeprint'/.test(br[0]), 'nor any other print event');
   assert.match(br[0], /root\._paHold=setTimeout\(teardown,HOLD_MS\)/, 'a timer reclaims it');
   // Print #1's timer must not fire into print #2.
-  assert.match(br[0], /if\(root\._paHold\) clearTimeout\(root\._paHold\);/,
+  assert.match(br[0], /if\(root\._paHold\)\{ clearTimeout\(root\._paHold\); root\._paHold=0; \}[\s\S]*root\.innerHTML=pages/,
     'a new print clears the previous hold first');
   // Long enough that choosing a printer, paper and margins never outlasts it.
   const hold = /const HOLD_MS=(\d+);/.exec(br[0]);

@@ -2256,6 +2256,9 @@ window.addEventListener('message',async(e)=>{
       if(!pages.length) return reply({ok:false,code:'no-content',error:'没有可打印的内容 · nothing to print'});
       let root=$('#printRoot');
       if(!root){ root=document.createElement('div'); root.id='printRoot'; document.body.appendChild(root); }
+      // A previous print's hold timer must not fire into THIS one — cleared before anything is
+      // built, because the image decode below awaits and the timer could tear the new job down.
+      if(root._paHold){ clearTimeout(root._paHold); root._paHold=0; }
       root.innerHTML=pages.map(()=>'<div class="pr-sheet"><img alt=""></div>').join('');
       // Paper for the CSS page box. A hint: the dialog's own paper choice still wins, and the
       // sheet is centred in whatever it picks.
@@ -2288,7 +2291,6 @@ window.addEventListener('message',async(e)=>{
       // the next print clears that timer first — otherwise print #1's timer fires in the middle of
       // print #2. The surface is display:none on screen, so holding it costs nothing visible.
       const HOLD_MS=600000;
-      if(root._paHold) clearTimeout(root._paHold);          // a previous print's timer must not fire into this one
       const teardown=()=>{ root._paHold=0;
         document.documentElement.classList.remove('pa-printing');
         const pps=document.getElementById('prPageSize'); if(pps) pps.remove();   // a later Ctrl+P must not inherit this note's paper and zero margin
