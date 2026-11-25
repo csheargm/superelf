@@ -100,6 +100,8 @@ test('USER FLOW owner: name + task chip, ⋯ holds every moved control, alert do
   const { c, page } = await signedIn(OWNER_TOKEN);
   try {
     assert.match(await page.textContent('#hHello'), /Avery/);
+    { const y = await page.evaluate(() => new Date().getFullYear());   // the date line carries the year, 中文 first (owner 2026-11-24)
+      assert.match(await page.textContent('#hHello'), new RegExp(`${y}年\\d+月\\d+日 周. · \\w{3}, \\w{3} \\d+, ${y}`)); }
     assert.match(await page.textContent('#hChips'), /3 件待办 · 3 tasks/);
     assert.equal(await page.isVisible('#hAvatar'), true); assert.equal(await page.isVisible('#homeForm #box'), true, 'the ask ring holds the one composer');
     const apps = await homeApps(page); assert.equal(new Set(apps).size, apps.length, `no app twice: ${apps}`);

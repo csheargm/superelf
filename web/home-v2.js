@@ -78,10 +78,10 @@ const PAHome=(function(){
   const $=(s)=>document.querySelector(s);
   function render({own,shelf,uid,esc}){
     const g=guest(), lay=layout(own,shelf,{guest:g,hide:hideList(),mru:(typeof ME!=='undefined'&&ME&&ME.appOrder)||[]});
-    const [gz,ge]=PAHomeLook.greeting(), [dz]=PAHomeLook.dateLine();
+    const [gz,ge]=PAHomeLook.greeting(), [dz,de]=PAHomeLook.dateLine();
     $('#hHello').innerHTML=g
       ?`${T.guestHi[0]}<span class="grad">${T.guestHi[1]}</span><span class="en">${T.guestHi[2]}</span>`
-      :`${esc(gz)}，<span class="grad">${esc(NAME||'')}</span><span class="en">${esc(ge)} · ${esc(dz)}</span>`;
+      :`${esc(gz)}，<span class="grad">${esc(NAME||'')}</span><span class="en">${esc(ge)} · ${esc(dz)} · ${esc(de)}</span>`;
     $('#hChips').innerHTML=g?'':chips(own).map((c)=>`<button type="button" class="chip-t" data-eu="${esc(uid)}" data-es="${esc(c.app.name)}" data-et="${esc(c.app.title)}">${esc(c.zh)}${c.en?` · ${esc(c.en)}`:''}</button>`).join('');
     $('#hWelcome').hidden=!g; $('#hKeep').hidden=!g;
     const ph=g?T.phGuest:T.phMember, sh=g?T.phGuestShort:ph;   // phone: the short line, so the ring never cuts it

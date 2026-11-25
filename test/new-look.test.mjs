@@ -25,7 +25,7 @@ const DAY = 864e5;
 test('greeting and date are 中文 first, English beside', () => {
   assert.deepEqual([...PAHomeLook.greeting(NOW)], ['早安', 'Good morning']);
   assert.deepEqual([...PAHomeLook.greeting(new Date(2026, 10, 24, 14))], ['午安', 'Good afternoon']);
-  assert.deepEqual([...PAHomeLook.dateLine(NOW)], ['11月24日 周二', 'Tue, Nov 24']);
+  assert.deepEqual([...PAHomeLook.dateLine(NOW)], ['2026年11月24日 周二', 'Tue, Nov 24, 2026'], 'with the year, 中文 first');
   const sub = PAHomeLook.headerSub([{ name: 'bible', face: { value: '创 12' } }], esc, NOW);
   assert.match(sub, /今日读经 <b>创 12<\/b>/, "today's reading comes from the Bible tile's face");
   assert.doesNotMatch(PAHomeLook.headerSub([{ name: 'tasks', face: { value: '3' } }], esc, NOW), /今日读经/, 'CONTROL: no Bible face, no reading line');
