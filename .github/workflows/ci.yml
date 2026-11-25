@@ -138,11 +138,13 @@ jobs:
         # 2026-11-25: EVERY OS +3 (ubuntu 270, windows 356): panel-window-dock-edge-e2e (desktop mouse, iPad finger + Pencil), skipped on CI by PA_E2E_SKIP.
         # 2026-11-25: EVERY OS +3 (ubuntu 273, windows 359): selfpub-chat-e2e (iPhone + desktop) and selfpub-render (real Chromium), skipped on CI by PA_E2E_SKIP.
         # 2026-11-25: EVERY OS +1 (ubuntu 274, windows 360): no-debug-overlay-e2e (WebKit triple-tap), skipped on CI by PA_E2E_SKIP.
+        # 2026-11-25: windows +17 (377): selfpub tests that are POSIX-only skip on Windows — 12 new (jail rule paths, fake CLI
+        #   permissions, checkout) and 5 already skipped there since v5.27.0 without a raise (symlinks, hooks, round 2/3, backstop symlink).
         include:
           - os: ubuntu-latest
             max_skipped: 274
           - os: windows-latest
-            max_skipped: 360
+            max_skipped: 377
     env:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED
