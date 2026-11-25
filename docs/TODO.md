@@ -773,3 +773,7 @@ Without it they now FAIL (R14), not pass as `# pass 0 / # fail 0`. To run them:
 - Use as background (pre-existing picture panel): a slow upload that finishes after the user switched notes applies the background to the note now open. Needs a notebook identity the picker can check before o.choose().
 - templates/pictures.json across two open tabs: each tab writes from its own cached list, so the last writer wins (same as templates/index.json). Writes in ONE tab are now serialized.
 - Saved-picture ids (like a notebook's stationery id) may name any upload path in the workspace, not only uploads/. The broker rejects `..` and checks containment; narrowing both rules to the uploads prefix is a separate change.
+
+## Phone-first rule (2026-11-25)
+- Phone-first rule: a real browser check for NEW apps from the app maker (render at 390px in headless WebKit, read scrollWidth, smallest font, tap sizes) is not built: Playwright is a dev dependency only, so the node has no browser to run it. lib/app-phone-check.mjs stays a static scan (its known limits are listed there). Seam: an optional check in lib/demo-app.mjs parseApp when PA_PLAYWRIGHT is set.
+- Phone hover check edge cases (GPT review r2, 3-round cap): a hide on a qualified selector (`.menu[data-collapsed]{display:none}`) is not seen, and an exact-target reveal later overridden by a hide still counts as a way in. Both make the check pass a fault (never block a good app). Seam: hoverOnly in lib/app-phone-check.mjs; the real browser check above would replace it.

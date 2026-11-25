@@ -16,7 +16,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { agentCapabilities, appContract, REPLY_LANGUAGE_RULE } from '../lib/config.mjs';
+import { agentCapabilities, appContract, REPLY_LANGUAGE_RULE, PHONE_RULE_MARK } from '../lib/config.mjs';
+import { PHONE_FIRST_RULE } from '../lib/app-phone-check.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -82,7 +83,8 @@ test('the app contract reaches the agent by being READ from superelf.md, not res
   // PAChat at <!--PA_CHAT_UI-->, and test/app-contract.test.mjs enforces it. It was restated here
   // in prose instead, which meant a future edit to superelf.md would have had to be made twice,
   // and the copy nobody remembered becomes a lie the agent is told with full confidence.
-  const md = fs.readFileSync(path.join(ROOT, 'superelf.md'), 'utf8');
+  // Build rule 4 is the ONE phone-first constant filled in at its mark (lib/app-phone-check.mjs, R3).
+  const md = fs.readFileSync(path.join(ROOT, 'superelf.md'), 'utf8').replace(PHONE_RULE_MARK, PHONE_FIRST_RULE);
   const contract = appContract(ROOT);
   // Every line of it must come from the file — that is what "not a copy" means operationally.
   for (const line of contract.split('\n').map((l) => l.trim()).filter((l) => l.length > 40)) {
