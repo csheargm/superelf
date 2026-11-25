@@ -1,4 +1,12 @@
 {
+  "v5.24.0": {
+    "date": "2026-11-25",
+    "features": [
+      "问一问与笔记成为可拖动停靠的窗口 · Ask AI and Note become movable, dockable windows"
+    ],
+    "fixes": [],
+    "through": "796627cfe28fa31c83bb3104f8a9c41eb175a69e"
+  },
   "v5.23.0": {
     "date": "2026-11-25",
     "features": [
