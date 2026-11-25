@@ -92,7 +92,7 @@ const PAAppEdit=(()=>{
       me.fr.contentWindow.postMessage({pa:'edit-init',slug,title:me.title,shot,tip,camTip,snap:true,gen,prefill:typeof prefill==='string'?prefill.slice(0,2000):''},'*'); },{once:true});
   }
   // Any new document in #fr (the app reloading or navigating itself, not only Apply/Undo) makes earlier shots stale.
-  document.addEventListener('load',(e)=>{ if(S&&e.target&&e.target.id==='fr') bumpGen(); },true);
+  document.addEventListener('load',(e)=>{ if(e.target&&e.target.id==='fr') bumpGen(); },true);
   function bumpGen(){ gen++; if(S&&S.fr.contentWindow) S.fr.contentWindow.postMessage({pa:'edit-gen',gen},'*'); }
   function onceTip(k){ if(_SEEN.has(k)) return false; _SEEN.add(k); _saveSeen(); return true; }
   // The panel's camera (web/app-edit-panel.html): a picture of the app NOW, uploaded, or null (the panel says it cannot).

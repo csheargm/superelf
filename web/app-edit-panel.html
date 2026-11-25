@@ -69,7 +69,8 @@ var PAShotFresh={
   }
   function drop(paths){ for(const p of paths){ chat.detach(p); } shots=shots.filter((s)=>!paths.includes(s.path)); }
   const camera=()=>serial(async()=>{
-    const sh=await snapNow();
+    const c=chat.getConvo(), sh=await snapNow();
+    if(c!==chat.getConvo()) return;   // another chat opened meanwhile: never into its draft
     if(!(sh&&sh.path)){ note(CAM_FAIL); return; }
     shots=live(); drop(PAShotFresh.makeRoom(shots,gen));
     addShot(sh);
@@ -79,7 +80,8 @@ var PAShotFresh={
     shots=live();
     const old=PAShotFresh.stale(shots,gen); if(!old.length) return;
     drop(old);
-    const sh=await snapNow();
+    const c=chat.getConvo(), sh=await snapNow();
+    if(c!==chat.getConvo()) return;   // the send is dropped too (PAChat sees the switch)
     if(sh&&sh.path&&sh.gen===gen){ drop(PAShotFresh.makeRoom(live(),gen)); addShot(sh); note(RETAKEN); } else note(DROPPED);   // reloaded again mid-retake: dropped, said
   });
   function mount(m){

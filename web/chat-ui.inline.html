@@ -1096,7 +1096,7 @@
       if(sending) return false;                 // a turn is already streaming
       // A host's last word on the chips before they are read (the app chat retakes a stale screenshot,
       // web/app-edit-panel.html). Held as a send, so a second tap cannot slip in while it runs.
-      if(!(o&&Array.isArray(o.attachments))&&typeof opts.beforeSend==='function'){ sending=true; const was=_loadSeq;
+      if(!(o&&Array.isArray(o.attachments))&&typeof opts.beforeSend==='function'){ sending=true; const was=_loadSeq; if(typeof text!=='string') text=el.inp.value;   // the words as tapped, not as edited while it waits
         try{ await opts.beforeSend(); }
         catch(err){ addMsg('status','⚠ '+((err&&err.message)||err)); }   // R5: said in the log; the send goes on with the chips as they are
         finally{ sending=false; }

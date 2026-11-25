@@ -33,7 +33,7 @@ var PASnap = PASnap || (function(){
   }
   function stripComments(root){
     const dead=[], walk=(r)=>{ const it=document.createNodeIterator(r,NodeFilter.SHOW_COMMENT); for(let n=it.nextNode();n;n=it.nextNode()) dead.push(n);
-      r.querySelectorAll&&r.querySelectorAll('template').forEach((t)=>walk(t.content)); };   // a <template>'s content is its own fragment, still serialized (GPT review)
+      r.querySelectorAll&&r.querySelectorAll('template').forEach((t)=>{ if(t.content) walk(t.content); }); };   // a <template>'s content is its own fragment, still serialized (GPT review)
     walk(root); dead.forEach((n)=>n.remove());
   }
   function svgOf(w,h){
