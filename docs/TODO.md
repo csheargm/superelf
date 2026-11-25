@@ -33,6 +33,7 @@ Owner decisions (defaults applied, change any by saying so):
 1. Content apps (Bible explain, Journal summaries, notes) keep their in-page Ask AI — applied: yes.
 2. The owner also taps 改 · Apply before a change — applied: yes.
 3. Real iPad check of the screenshot taken when the panel opens (PA_SNAP) — needs the device.
+3a. App-chat screenshot freshness (web/app-edit-panel.html PA_SHOT_FRESH): staleness is counted on the app frame's `load` event, so in the moment a self-navigating app shows its new page before `load` fires (slow resource), a send still carries the previous picture (labelled with its time). GPT review round 3; capped. Also needs a real iPad/iPhone: camera tap, the time label legibility on a 50px chip, and PASnap under iOS WebKit (desktop WebKit draws it).
 Follow-ups:
 - Generic apps' Ask AI button → the one chat: the shell takes {pa:'shell',type:'app-chat'} (web/app-edit.js
   fromAppChat); apps (or PAChat.fullscreen for non-content apps) still need to post it.
