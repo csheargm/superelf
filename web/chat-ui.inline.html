@@ -42,7 +42,7 @@
    in a --fs app — the Bible — A-/A+ resized the scripture and left the chat beside it unchanged.
    Only READING text scales. Icons and round buttons keep their px so the composer row and the
    scroll pill do not deform at 1.5x; a bigger tap target is not what A+ is asking for. */
-.pac{position:relative;display:flex;flex-direction:column;height:100%;min-height:0;--pac-pill:calc(106px + env(safe-area-inset-bottom,0px));--pac-fs:calc(14px * var(--fs,1))}
+.pac{-webkit-text-size-adjust:100%;text-size-adjust:100%;position:relative;display:flex;flex-direction:column;height:100%;min-height:0;--pac-pill:calc(106px + env(safe-area-inset-bottom,0px));--pac-fs:calc(14px * var(--fs,1))}
 /* Full-screen host for PAChat.fullscreen(): fixed, full-height, own bottom safe-area.
    Owning this here keeps every app's "Ask AI" identical. */
 .pac-fs{position:fixed;inset:0;z-index:50;background:var(--card,#fff);display:none}
