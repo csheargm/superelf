@@ -1,4 +1,12 @@
 {
+  "v5.17.0": {
+    "date": "2026-11-24",
+    "features": [
+      "一个应用一个对话，可问可改 · One chat per app: ask or change"
+    ],
+    "fixes": [],
+    "through": "fc2c770584450c187b9e320418ebf771d3f1d5ef"
+  },
   "v5.16.0": {
     "date": "2026-11-24",
     "features": [
