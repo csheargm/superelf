@@ -284,7 +284,8 @@ const APP_PREFS_HTML = fs.readFileSync(path.join(ROOT, 'web', 'app-prefs.inline.
 export const APP_PREFS_SRC = APP_PREFS_HTML.slice(APP_PREFS_HTML.indexOf('>', APP_PREFS_HTML.indexOf('<script id="pap-script">')) + 1, APP_PREFS_HTML.lastIndexOf('</script>'));
 export function loadChatUi({ mutate, win = {}, parent = { postMessage() {} } } = {}) {
   const at = CHAT_HTML.indexOf('<script id="pac-script">');
-  let src = CHAT_HTML.slice(CHAT_HTML.indexOf('>', at) + 1, CHAT_HTML.indexOf('</script>', at));
+  // The served page has web/reply-clean.js inlined at its marker (web.mjs PA_COMPONENTS): so does this harness.
+  let src = CHAT_HTML.slice(CHAT_HTML.indexOf('>', at) + 1, CHAT_HTML.indexOf('</script>', at)).split('/* PA_REPLY_CLEAN_JS */').join(read('web', 'reply-clean.js'));
   if (mutate) { const before = src; src = mutate(src); assert.notEqual(src, before, 'the mutation matched nothing — it would prove nothing'); }
   const el = (tag) => { const c = new Set(), kids = [], on = {}, qs = {};
     return { tagName: String(tag).toUpperCase(), children: kids, style: {}, dataset: {}, on, className: '', value: '',

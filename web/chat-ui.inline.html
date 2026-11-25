@@ -301,7 +301,11 @@
 
   const esc=s=>String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
   // Strip our own first-message scaffolding when replaying a saved user turn.
-  const cleanMe=t=>String(t||'').replace(/^Context:[\s\S]*?Question:\s*/,'').replace(/\n*\[Attached file:[^\]]*\]/g,'').trim();
+  /* PA_REPLY_CLEAN_JS */
+  // TODO(R4): this file is far over budget; the render helpers split out with the message-render seam.
+  // A reply as shown (bubble, Copy, Read aloud): web/reply-clean.js, the same file the server stores through.
+  const shownAi=t=>{ const c=cleanReply(t); return c.emptied?REPLY_EMPTY_TEXT:c.text; };
+  const cleanMe=t=>shownUserText(String(t||'').replace(/^Context:[\s\S]*?Question:\s*/,'').replace(/\n*\[Attached file:[^\]]*\]/g,'')).trim();
 
   // Tap-to-zoom lightbox (mirrors the main chat's full-screen image view): ONE element for every mount and PAChat.lightbox; tap or Esc closes.
   let _lb=null;
@@ -919,8 +923,9 @@
     function addChangeApp(bubble,ev){ const b=document.createElement('button'); b.type='button'; b.className='pac-change-app';
       b.textContent=String(ev.label||'改这个应用 · Change this app'); b.style.cssText='display:block;align-self:flex-start;max-width:82%;margin:6px 0 2px;padding:6px 12px;border-radius:16px;border:1px solid currentColor;background:transparent;color:inherit;font:inherit;cursor:pointer';
       // 改 · Apply (ADR 0042): the server minted the message; the tap sends it as the next turn, once.
-      b.onclick=ev.type==='app-change-confirm'?()=>{ b.disabled=true; send(String(ev.message)); }:()=>parent.postMessage({pa:'shell',type:'change-app',request:String(ev.request||'').slice(0,2000)},'*'); bubble.after(b); }
+      b.onclick=ev.type==='app-change-confirm'?()=>{ b.disabled=true; send(String(ev.message)).then((ok)=>{ if(!ok) b.disabled=false; }); }:()=>parent.postMessage({pa:'shell',type:'change-app',request:String(ev.request||'').slice(0,2000)},'*'); bubble.after(b); }
     function addActions(bubble,kind,rawText,prompt,scopeKey){   // scopeKey: the thread this bubble was rendered in (send() passes its snapshot); default = the thread shown now
+      if(kind==='ai') rawText=shownAi(rawText);
       const bar=document.createElement('div'); bar.className='pac-acts '+kind;
       const copyBtn=mkab('⎘','Copy'); copyBtn.onclick=()=>copyText(rawText,copyBtn); bar.appendChild(copyBtn);
       if(kind==='ai'){
@@ -983,6 +988,7 @@
       d.classList.toggle('pac-md',ok);
     }
     async function paint(d,md){
+      md=shownAi(md);
       try{ const r=await req({kind:'render-md',text:md}); setBody(d,md,(r&&r.ok)?r.html:null); }
       catch{ d.textContent=md; d.classList.remove('pac-md'); }   // plain text: pre-wrap must stay on
       enh(d); pin(); updateScroll();
@@ -1103,7 +1109,7 @@
       const bytes=pacChatBytes(msg, cid||null, attRefs, lbl, sys);
       if(bytes>PAC_LIMITS.chat){ addMsg('status', pacTooLargeText('Message', bytes, PAC_LIMITS.chat)); updateScroll(); return false; }   // too large: reported in the log AND to the caller
       sending=true; el.go.disabled=true;
-      el.inp.value=''; autosize(); const shown=shownMe(q); const um=addMsg('me',shown,mine); if(!ext) atts=[]; renderChips();
+      el.inp.value=''; autosize(); const shown=shownMe(shownUserText(q)); const um=addMsg('me',shown,mine); if(!ext) atts=[]; renderChips();
       if(q){ addActions(um,'me',shown); lastUser=q; }
       const sendTime=Date.now();
       let _waiting=true, _elTimer=null;
@@ -1113,7 +1119,7 @@
       // Live markdown while streaming: re-render the accumulated text through the shared
       // renderer (render-md), throttled to ~150ms. A seq guard drops stale renders so a
       // slow one can't clobber a newer one (or the final).
-      const renderLive=()=>{ const my=++_rseq, cur=acc;
+      const renderLive=()=>{ const my=++_rseq, cur=shownAi(acc);
         req({kind:'render-md',text:cur}).then(r=>{ if(my!==_rseq||!thinking.isConnected) return; setBody(thinking,cur,(r&&r.ok)?r.html:null); enh(thinking); pin(); updateScroll(); }).catch(()=>{}); };
       try{
         const r=await reqChat(msg, cid||null, (ev)=>{

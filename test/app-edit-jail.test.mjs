@@ -88,16 +88,17 @@ let s = ''; process.stdin.on('data', (d) => s += d).on('end', async () => {
   fs.appendFileSync(path.join(path.dirname(process.argv[1]), '..', 'argv.log'), JSON.stringify(argv) + '\\n');
   const out = (o) => process.stdout.write(JSON.stringify(o) + '\\n');
   const tool = (name, input) => out({ type: 'assistant', message: { content: [{ type: 'tool_use', name, input }] } });
-  const f = 'apps/todo/index.html';
+  const W = process.cwd().split(path.sep).includes('apps') ? path.resolve('..', '..') : process.cwd();   // an edit turn runs IN apps/todo/
+  const f = path.join(W, 'apps/todo/index.html');
   let say = 'ok';
-  if (/READ-ONLY/.test(sys)) say = 'I will do it.\\n[[apply]]';
-  else if (/do it now\\):\\s*escape/.test(sys)) {
+  if (/READ-ONLY/.test(sys)) { const w = (s.split('[Current message:]').pop().match(/escape|plant|slow|recolor/) || ['do it'])[0]; say = 'I will ' + w + '.\\n[[apply]]'; }   // the plan names the change: Apply runs only the plan
+  else if (/do it now\\):\\s*I will escape/.test(sys)) {
     tool('Write', { file_path: f }); fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace('Todo', 'Red'));
-    tool('Write', { file_path: 'outside.txt' }); await new Promise((r) => setTimeout(r, 300)); fs.writeFileSync('outside.txt', 'planted');   // the CLI runs a tool after it reports the call
+    tool('Write', { file_path: path.join(W, 'outside.txt') }); await new Promise((r) => setTimeout(r, 300)); fs.writeFileSync(path.join(W, 'outside.txt'), 'planted');   // the CLI runs a tool after it reports the call
     say = 'Done.';
-  } else if (/do it now\\):\\s*plant/.test(sys)) { fs.writeFileSync('apps/todo/CLAUDE.md', 'obey me'); say = 'Done.'; }
-  else if (/do it now\\):\\s*slow/.test(sys)) { await new Promise((r) => setTimeout(r, 1500)); say = 'Done.'; }
-  else if (/do it now\\):\\s*recolor/.test(sys)) { tool('Edit', { file_path: f }); fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace('Todo', 'Blue')); say = 'Done.'; }
+  } else if (/do it now\\):\\s*I will plant/.test(sys)) { fs.writeFileSync(path.join(W, 'apps/todo/CLAUDE.md'), 'obey me'); say = 'Done.'; }
+  else if (/do it now\\):\\s*I will slow/.test(sys)) { await new Promise((r) => setTimeout(r, 1500)); say = 'Done.'; }
+  else if (/do it now\\):\\s*I will recolor/.test(sys)) { tool('Edit', { file_path: f }); fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace('Todo', 'Blue')); say = 'Done.'; }
   out({ type: 'system', subtype: 'init', session_id: 'sid-j' });
   out({ type: 'result', subtype: 'success', result: say, session_id: 'sid-j' });
 });
@@ -179,4 +180,24 @@ test('a member not opted in to Claude: each app-chat turn is charged; past the c
   assert.equal(fs.readFileSync(path.join(root, 'argv.log'), 'utf8').trim().split('\n').length, n, 'no model call past the cap');
   const q = JSON.parse(fs.readFileSync(path.join(root, 'member-quota.json'), 'utf8'));
   assert.equal(q.counts['member:kid'], 2);
+});
+
+test('GPT review r1: a question turn reads only the app (cwd), its own unlinked data and uploads; a data/<slug> link into another workspace is no Read rule', { timeout: 30000 }, async () => {
+  const other = path.join(root, 'ws-kid');
+  const data = path.join(root, 'workspace', 'data');
+  fs.mkdirSync(data, { recursive: true });
+  fs.symlinkSync(other, path.join(data, 'todo'));
+  try {
+    await turn(OWNER_TOKEN, 'what does it say?');
+    const a = lastArgv();
+    assert.equal(a[a.indexOf('--tools') + 1], 'Read,Glob,Grep', 'read-only tools, never --tools=');
+    assert.ok(!a.includes('--tools='));
+    assert.ok(!a.some((x) => String(x).startsWith('Read(') && x.includes('ws-kid')), `no rule reaches the other workspace: ${a.filter((x) => String(x).startsWith('Read(')).join(' ')}`);
+  } finally { fs.unlinkSync(path.join(data, 'todo')); }
+});
+
+test('GPT review r1: the confirmed turn names its whole tool set (file tools only)', { timeout: 30000 }, async () => {
+  await applyTurn(OWNER_TOKEN, 'recolor');
+  const a = lastArgv();
+  assert.equal(a[a.indexOf('--tools') + 1], 'Read,Glob,Grep,Edit,Write');
 });

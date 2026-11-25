@@ -11,6 +11,7 @@ import path from 'node:path';
 import { skip, chromium } from './helpers-note-link.mjs';
 import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, OWNER_TOKEN } from './helpers-web.mjs';
 import { writeFakeCli } from './helpers-platform.mjs';
+import { FAKE_PERMS_SRC } from './helpers-fake-claude-perms.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
 import { hashPassword } from '../lib/auth.mjs';
 
@@ -18,27 +19,37 @@ const SHOTS = process.env.PA_SHOTS || '';
 const ENGINE = process.env.PA_E2E_ENGINE || 'chromium';
 const PAGE = '<!doctype html><html><head><meta charset="utf-8"></head><body><h1 id="t">Todo</h1><canvas id="ink" width="80" height="40"></canvas>'
   + '<script>const g=document.getElementById("ink").getContext("2d");g.fillRect(0,0,40,40);</script></body></html>';
-// The fake model. A READ-ONLY (unconfirmed) turn plans and ends with the marker — except "write anyway",
-// which writes regardless (the server must roll it back). A confirmed owner turn edits the file named by
-// the plan in its system line. A member's confirmed turn (no tools) returns the whole page.
+// The fake model, with the REAL CLI's permission model (test/helpers-fake-claude-perms.mjs): it can only
+// read or write what its argv lets the real CLI read or write, and with no tools it prints its calls as
+// text the way the real model did live. A READ-ONLY (unconfirmed) turn answers from the page it can read,
+// or plans and ends with the marker — except "write anyway", a CLI that writes regardless (the server must
+// roll it back). A confirmed owner turn edits index.html through the jail; refused, it says it could not.
+// A member's confirmed turn (no tools) returns the whole page.
 const FAKE = `#!/usr/bin/env node
+${FAKE_PERMS_SRC}
 let s = ''; process.stdin.on('data', (d) => s += d).on('end', async () => {
   const fs = await import('node:fs');
-  const sys = process.argv.join(' ');
+  const argv = process.argv.slice(2), sys = argv.join(' '), p = perms(argv);
   const cur = s.split('[Current message:]').pop();
-  const f = 'apps/todo/index.html';
   const red = (h) => h.replace('<h1 id="t">', '<h1 id="t" style="color:rgb(200, 0, 0)">');
   let say = 'nothing to do';
   if (/READ-ONLY/.test(sys)) {
-    if (/write anyway/.test(cur)) { fs.writeFileSync(f, red(fs.readFileSync(f, 'utf8'))); say = 'Done, it is red.'; }
-    else if (/make it red|break it/.test(cur)) say = 'I will change the title as asked.\\n[[apply]]';
-    else say = 'The title says Todo.';
+    const inlined = /PAGE \\(index\\.html\\) START/.test(s);
+    if (p.noTools && !inlined) say = 'I will look at the app.\\n\\n<invoke name="Read">\\n<parameter name="file_path">' + process.cwd() + '/apps/todo/index.html</parameter>\\n</invoke>';
+    else if (/write anyway/.test(cur)) { const f = fs.existsSync('index.html') ? 'index.html' : 'apps/todo/index.html'; fs.writeFileSync(f, red(fs.readFileSync(f, 'utf8'))); say = 'Done, it is red.'; }
+    else if (/make it red|break it/.test(cur)) say = 'I will ' + cur.match(/make it red|break it/)[0] + ' — the title only.\\n[[apply]]';   // Apply runs only this plan
+    else { const page = inlined ? s : p.read('index.html'); const t = page && /<h1 id="t"[^>]*>([^<]*)</.exec(page); say = t ? 'The title says ' + t[1] + '.' : 'I could not read the app.'; }
   } else if (/You write ONE superelf mini-app/.test(sys)) {
     const cur2 = s.match(/Change this app:\\n\\n([\\s\\S]*?)\\n\\nThe change:/);
     say = '\\x60\\x60\\x60json\\n{"slug":"todo","title":"Todo"}\\n\\x60\\x60\\x60\\n\\x60\\x60\\x60html\\n' + red(cur2 ? cur2[1] : '') + '\\n\\x60\\x60\\x60';
-  } else if (/confirmed this change \\(do it now\\):\\s*break it/.test(sys)) { fs.writeFileSync(f, '<html><body><h1 id="t">broken</h1><script>let = ;</script></body></html>'); say = 'Rewrote it.'; }
-  else if (/confirmed this change \\(do it now\\):\\s*make it red/.test(sys)) { fs.writeFileSync(f, red(fs.readFileSync(f, 'utf8'))); say = 'Made the title red.'; }
+  } else if (/do it now\\):\\s*I will (break it|make it red)/.test(sys)) {
+    const broken = /do it now\\):\\s*I will break it/.test(sys);
+    const page = p.read('index.html');
+    const ok = page !== null && p.write('index.html', broken ? '<html><body><h1 id="t">broken</h1><script>let = ;</script></body></html>' : red(page));
+    say = ok ? (broken ? 'Rewrote it.' : 'Made the title red.') : "I haven't changed anything. This turn is read-only, so I can't edit the app.";
+  }
   process.stdout.write(JSON.stringify({ type: 'system', subtype: 'init', session_id: 'sid-e' }) + '\\n');
+  p.text(say);
   process.stdout.write(JSON.stringify({ type: 'result', subtype: 'success', result: say, session_id: 'sid-e' }) + '\\n');
 });
 `;
@@ -131,6 +142,8 @@ test('long-press the title → panel docks beside the app with its picture; a ch
   // A question is answered; nothing changes and no Apply is offered.
   await sendInPanel(page, 'what does the title say?');
   await p.locator('text=The title says Todo.').waitFor({ timeout: 20000 });
+  assert.equal(await p.locator('text=<invoke').count(), 0, 'no tool-call markup in any bubble');
+  assert.doesNotMatch(await p.locator('.pac-log').innerText(), /\/(private|var|tmp|data)\//, 'no node paths in the log');
   assert.equal(await p.locator('.pac-change-app').count(), 0, 'a question offers no Apply');
   assert.equal(fs.readFileSync(path.join(root, 'workspace', 'apps', 'todo', 'index.html'), 'utf8'), PAGE, 'a question changes nothing');
   // A write without the confirm step is rolled back by the server, and said.
@@ -145,6 +158,7 @@ test('long-press the title → panel docks beside the app with its picture; a ch
   await shot(page, 'uac-plan');
   await p.locator('.pac-change-app', { hasText: '改 · Apply' }).click();
   await page.locator('#aeUndo').waitFor({ state: 'visible', timeout: 20000 });
+  assert.deepEqual(await p.locator('.pac-m.me').evaluateAll((els) => els.map((e) => e.textContent.trim()).filter((t) => t.startsWith('改'))), ['改 · Apply'], 'the tap shows as 改 · Apply, never its confirm id');
   await p.locator('text=已完成 · Done').waitFor({ timeout: 15000 });   // said only after the reload loaded
   await page.frameLocator('#fr').locator('#t').waitFor();
   for (let i = 0; i < 50 && (await titleColor(page)) !== 'rgb(200, 0, 0)'; i++) await page.waitForTimeout(200);
@@ -225,4 +239,27 @@ test('the server refuses: an edit turn from an app, another\'s app, "change supe
   const pnl = await fetch(`http://127.0.0.1:${port}/api/app-edit/panel`, { headers: { authorization: `Bearer ${KID}` } });
   assert.equal(pnl.status, 200, 'members get the panel on a private node');
   assert.match(fs.readFileSync(path.join(root, 'ws-kid', 'apps', 'todo', 'index.html'), 'utf8'), /<h1 id="t">/, "the member's app is untouched by refused turns");
+});
+
+// F2-06: the shell's app bar hides by itself only on touch. A mouse user who brought it back can still reach ⋯.
+test('mouse: the bar brought back by the handle stays, so ⋯ is reachable; a finger tap still hides by itself', { skip, timeout: 60000 }, async () => {
+  const { ctx, page } = await signIn({ width: 1280, height: 800 });
+  const onScreen = () => page.evaluate(() => document.querySelector('#ftitle').getBoundingClientRect().top >= 0);
+  if (!(await onScreen())) await page.click('#barpeek');   // a real mouse click: pointerType 'mouse'
+  await page.waitForTimeout(3500);   // past BAR_IDLE_MS (2.5 s)
+  assert.ok(await onScreen(), 'a mouse-shown bar is still there');
+  await page.click('#fmore');
+  await page.locator('#frameMenu button').first().waitFor();
+  await shot(page, 'bar-mouse-stays');
+  await ctx.close();
+  const tctx = await browser.newContext({ viewport: { width: 820, height: 1180 }, hasTouch: true });
+  const tp = await tctx.newPage();
+  await tp.goto(`http://127.0.0.1:${port}/`); await tp.waitForSelector('#login[open]');
+  await tp.fill('#luser', 'owner'); await tp.fill('#lpin', 'owner-pass-123'); await tp.click('#loginBtn');
+  await tp.waitForFunction(() => !document.querySelector('#login[open]'));
+  await tp.click('.ecard[data-es="todo"]'); await tp.frameLocator('#fr').locator('#t').waitFor();
+  await tp.tap('#barpeek');
+  await tp.waitForFunction(() => document.querySelector('#frame').classList.contains('barin'));
+  await tp.waitForFunction(() => !document.querySelector('#frame').classList.contains('barin'), null, { timeout: 6000 });   // CONTROL: touch keeps the clock
+  await tctx.close();
 });
