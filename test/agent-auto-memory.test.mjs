@@ -198,6 +198,8 @@ const PROCESS_STARTS = {
   'lib/vernotes.mjs': { why: 'git', refs: ["execFileSync('git'"] },
   'lib/version-auto.mjs': { why: 'git', refs: ["execFileSync('git'"] },
   'lib/publish/release.mjs': { why: 'git clone/fetch/commit/push of the public repo for the release cut (docs/adr/0039)', refs: ["execFileSync('git'", "execFileSync('git'"] },
+  'lib/selfpub/checkout.mjs': { why: 'git in the core-change checkout: hooks off, no outside config, scrubbed env, timeout (docs/adr/0044)', refs: ["execFileSync('git'"] },
+  'lib/selfpub/verify.mjs': { why: 'node --test on the changed checkout, optionally inside the configured sandbox (docs/adr/0044)', refs: ['execFile'] },
   'tools/fetch-daily-digest.mjs': { why: 'node tools/websearch.mjs (its claude run goes through lib/runner.mjs runClaude)',
     refs: ['execFileSync(process.execPath'] },
   'tools/gen-builtin-app-versions.mjs': { why: 'git log, show (builds lib/builtin-app-versions.json)', refs: ["execFileSync('git'"] },

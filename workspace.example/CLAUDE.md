@@ -28,8 +28,9 @@ asserts it. Read it before creating or changing anything under `apps/`.
 - Health data goes only to Claude (or ChatGPT if the user directs). Never to
   OpenRouter, Ollama cloud, Perplexity, or any web form.
 - Outward actions (sending email, posting, purchases) → ask first, always.
-- You may edit files in this workspace freely. For changes to superelf's own code
-  (web.mjs, lib/), propose a diff and wait for approval.
+- You may edit files in this workspace freely. Never edit superelf's own code
+  (web.mjs, lib/, web/ …): to change superelf itself, answer with the one line
+  `PA_CHANGE_SUPERELF: <request>` and the server makes, checks and offers it for Publish.
 
 
 ## Who you are helping — read the profile first

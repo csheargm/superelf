@@ -72,12 +72,14 @@ function armMenuPop(anchor){
 // inside the home header) gets the same window spot, measured from its offset parent.
 const MENU_GAP=6, MENU_EDGE=8;
 function placeMenu(m,a){
+  m.style.maxWidth=(innerWidth-2*MENU_EDGE)+'px';   // measured at its natural width (up to the window), then anchored so its left edge stays inside
   const r=a.getBoundingClientRect(), q=m.getBoundingClientRect();
   const right=Math.min(innerWidth-MENU_EDGE,Math.max(r.right,q.width+MENU_EDGE));
   let top=r.bottom+MENU_GAP; if(top+q.height>innerHeight-MENU_EDGE) top=Math.max(MENU_EDGE,r.top-MENU_GAP-q.height);
   const op=getComputedStyle(m).position==='fixed'?null:m.offsetParent;
   const o=op?op.getBoundingClientRect():{top:0,right:innerWidth};
   m.style.left='auto'; m.style.top=(top-o.top)+'px'; m.style.right=(o.right-right)+'px';
+  m._paAnchor=a;   // web/publish.js showState places it again when a later line widens it   // web/publish.js showState places it again when its line arrives
 }
 // Leaving or changing the app (goHome, openApp) closes every popover AND the Publish sheet: neither belongs to the next page.
 // _popGen: a reply that arrives after the user moved on (a slow Publish preview) must not open a sheet then.

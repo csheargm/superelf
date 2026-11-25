@@ -115,6 +115,16 @@ inherits none of its fixes and has always shipped a bug the shared one does not 
 - Modify an app with the Edit tool, not a whole-file Write: an edit costs what it changes,
   a rewrite costs the whole file again (the same measurement above). Delete = remove its directory.
 
+## Changing superelf itself from a node（改 superelf 本身）— docs/adr/0044
+On a running node the served code (`lib/`, `web/`, `tools/`, `web.mjs` …) is NOT edited by the
+main-chat agent: its args deny it and the private node makes it read-only. The owner asks in the
+main chat ("改 superelf：…" or in plain words); the agent answers with the single line
+`PA_CHANGE_SUPERELF: <request>`, and the server runs the core lane in its own git checkout. The
+server checks the change (trusted tests for .css/.md only; code is tested by GitHub CI), renders
+Home at iPhone width (390) before and after, and puts 发布 · Publish under the reply. Publish opens
+a PR; it merges only on green CI, cuts a release, and the node deploys it. GPT review rides the
+nightly run. The rules below are for the core lane's agent and for development checkouts.
+
 ## Editing the shell UI (web/index.html)
 You may improve the shell, but a single JS error at load blanks the whole app.
 Rules: (1) if you remove or rename an element, remove/guard every JS reference to

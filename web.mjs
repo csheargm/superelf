@@ -12,6 +12,8 @@ import { injectDemoBoot } from './lib/demo-boot.mjs';
 import { makeSigninGate, authConfig } from './lib/demo-auth.mjs';
 import { makeDemoRoutes } from './lib/demo-routes.mjs';
 import { handlePublishRoute } from './lib/publish/routes.mjs';
+import { handleSelfpubRoute, selfpubRoot } from './lib/selfpub/routes.mjs';
+import { coreChatTurn, coreDeps, coreRequestOf, endCore, markerRequest, ownerComposer, refuseCore, typedPublish, MAIN_CHAT_RULE } from './lib/selfpub/chat.mjs';
 import { handleAlertsRoute } from './lib/node-alerts.mjs';
 import { handleActivityRoute, refuseStaleUndo, newestEditVersion } from './lib/activity-view.mjs';
 import { loadConfig, configPath, fastLaneGuard, GUARD_DEFAULT_SURFACE, agentCapabilities, appContract, REPLY_LANGUAGE_RULE, OVERRIDABLE_PROMPT_MAX } from './lib/config.mjs';
@@ -50,7 +52,7 @@ import { jobsView, readAuditTail, humanSchedule } from './lib/jobstatus.mjs';
 import { adminConfigView, applyConfigWrite } from './lib/adminconfig.mjs';
 import { runCodex } from './lib/codex.mjs';
 import { laneRunner } from './lib/model-review-agent.mjs';
-import { appOriginated, agentConfined, convoTag, convoReachable, laneArgs, appJailArgs, appReadArgs } from './lib/agent-origin.mjs';
+import { appOriginated, agentConfined, convoTag, convoReachable, laneArgs, appJailArgs, appReadArgs, ownerCodeDenies } from './lib/agent-origin.mjs';
 import { makeJailWatch } from './lib/app-edit-jail.mjs';
 import { cleanReply, scrubPaths, pathScrubStream, REPLY_EMPTY_TEXT } from './lib/reply-clean.mjs';
 import { consumeMemberAiCall, MEMBER_QUOTA_FILE } from './lib/member-quota.mjs';
@@ -1059,7 +1061,8 @@ const REVIEW_ORIGIN = Object.freeze({ fromApp: false });
 // request is confined even for the owner, and an origin that is not stated is confined too.
 // `origin.app` is the app's slug: it tags its conversations (convoTag). Its agent writes nothing (ADR 0019).
 function agentArgs(user, base, origin) {
-  return laneArgs(user, base, cfg.member_args, origin);
+  const args = laneArgs(user, base, cfg.member_args, origin);
+  return agentConfined(user, origin) ? args : [...args, ...ownerCodeDenies(ROOT, selfpubRoot(cfg))];   // served code: core lane + Publish only (ADR 0044)
 }
 // The member_args laneArgs appends to this turn: on a confined turn only. A default's --settings
 // (fast_args, one_shot_args) yields to theirs, or the CLI — which honours only the FIRST --settings —
@@ -1416,6 +1419,11 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
   if (cancel && cancel.nameConvo) cancel.nameConvo(convo.id);   // a conversation turn: the composer's Stop can name it now
   line({ type: 'convo', id: convo.id, title: convo.title, ...(replaced ? { replaced: true, requested: String(convoId).slice(0, 64) } : {}) });
   const beat = setInterval(() => line({ type: 'ping' }), 20000); // keep iOS Safari from aborting on idle
+  // 改 superelf (docs/adr/0044): a typed "改 superelf：…" runs the core lane; a typed 发布 / publish opens a ready change's preview.
+  // TODO(R4 seam): with the lane dispatch below, out of chat().
+  const coreOn = !oneShot && !apiKeyBlocked(req, user) && ownerComposer({ user, origin, edit, demo: demoOn(cfg) });   // a Shortcut key on a PIN account never reaches the core lane (GPT review)   // a oneShot caller is a component, never the composer
+  const sp = coreOn ? (typedPublish({ cfg, user, convoId: convo.id, message }) || (coreRequestOf(message) ? await coreChatTurn(coreTurnDeps(user, origin, coreRequestOf(message), convo.id, line)) : null)) : refuseCore({ origin, edit, message });
+  if (sp) { clearInterval(beat); return endCoreTurn(user, convo, sp, startedAt, line, res); }
   // ── Chat → job ─────────────────────────────────────────────────────────────────────────
   // "every morning tell me the pollen" is an instruction to set something up, not a question
   // to answer once. Detection is DETERMINISTIC (lib/jobs/intent.mjs) and deliberately strict:
@@ -1580,7 +1588,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
           // override replaces the guard above, and a capability list it could delete is not one
           // any app author could rely on. A oneShot turn builds no app, so it skips the ~3.7k-char
           // app contract; the language rule and the confined note still ride.
-          systemPrompt: agentSystemPrompt([agentPrompts.global, agentPrompts.app, origin.fromApp ? noChangeRule(chatRole) : null], agentCapabilities(laneRole(user, origin), oneShot ? null : APP_CONTRACT), turnFacts),
+          systemPrompt: agentSystemPrompt([agentPrompts.global, agentPrompts.app, origin.fromApp ? noChangeRule(chatRole) : null, coreOn ? MAIN_CHAT_RULE : null], agentCapabilities(laneRole(user, origin), oneShot ? null : APP_CONTRACT), turnFacts),
         resumeId, timeoutMs: cfg.task_timeout_minutes * 60000, onChild: cancel ? cancel.onChild : undefined,
         onDelta: (t) => (live ? live.push(t) : line({ type: 'delta', text: t })), onTool: (n, b, input) => { if (jailed) editCtx.jail.onTool(n, b, input); const shown = appCwd ? editToolBrief(input, wsDir(user)) : b; line({ type: 'status', text: `${n}${shown ? ` — ${shown}` : ''}` }); } };
       try { r = await enqueue(async () => {
@@ -1653,10 +1661,12 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
     if (edit && edit.scoped && !blank && r.text && !rolledBack) line({ type: 'delta', text: r.text });
     editCtx = null;
     if (edited) { audit('app-edit', { who: user.id, app: edit.slug, changed: edited.line.changed, applied: edited.line.applied, version: edited.line.version || null }); line(edited.line); edited.note = scrubPaths([editUnchangedNote(r.text, edited.line, edit.confirmed), edited.note].filter(Boolean).join('\n\n'), wsDir(user)); if (edited.note) { r = { ...r, text: `${r.text || ''}\n\n${edited.note}` }; line({ type: 'delta', text: `\n\n${edited.note}` }); } }
+    const coreAsk = coreOn && !blank && r.ok !== false ? markerRequest(r.text) : '';   // the main agent handed a superelf change to the core lane (MAIN_CHAT_RULE)
+    if (coreAsk) { const c = await coreChatTurn(coreTurnDeps(user, origin, coreAsk, convo.id, line)); r = { ...r, ok: c.ok, text: c.text, selfpub: c.selfpub }; }
     // by: the lane that ACTUALLY answered (a confined turn's GPT pick runs on Claude), shown under the answer.
     const by = ml.blocked && !(edit && edit.scoped) ? '' : chosen ? (chosen.label || 'Claude') : 'Claude';   // the scoped lane's Claude has no label (self-test F8)
     // ms only on an answer: a refusal (a cap, a failure) shows no "took" (self-test F11).
-    const mdMsg = { role: 'md', text: r.text || '', ...(r.ok === false ? {} : { ms: turnMs }), by, ...(blank || unreadable ? { failed: true } : {}), ...(r.offer ? { offer: { type: 'app-change', label: r.offer.label } } : {}) };   // the button again on reopen (no request: the panel opens empty)
+    const mdMsg = { role: 'md', text: r.text || '', ...(r.ok === false ? {} : { ms: turnMs }), by, ...(blank || unreadable ? { failed: true } : {}), ...(r.offer ? { offer: { type: 'app-change', label: r.offer.label } } : {}), ...(r.selfpub ? { selfpub: r.selfpub } : {}) };   // the button again on reopen (no request: the panel opens empty)
     convo.messages.push(mdMsg);
     // Over the cap the oldest turns are ARCHIVED beside the conversation, never
     // erased (lib/convo-archive.mjs). What this replaces — `convo.messages =
@@ -1688,6 +1698,9 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
   }
 }
 
+// The core lane's wiring (lib/selfpub/chat.mjs): its jailed agent, the renderer, and how its answer is stored.
+const coreTurnDeps = (user, origin, request, convoId, line) => coreDeps({ cfg, enqueue, runClaude, demo: demoOn(cfg), user, origin, request, convoId, line });
+const endCoreTurn = (user, convo, sp, startedAt, line, res) => endCore({ convo, sp, startedAt, line, res, save: () => saveConvo(user, convo) });
 
 // Launch the detached Multi-LLM assessment for the turn just answered (fire-and-forget —
 // all orchestration lives in lib/assess.mjs, R4). Stamps the turn with a stable `aid`
@@ -1942,6 +1955,7 @@ const server = http.createServer(async (req, res) => {
     if (handleActivityRoute(req, res, p, url, { user, cfg, send, demo: demoOn(cfg), wsDir })) return;   // Settings → Activity log (lib/activity-view.mjs)
     if (await handleAlertsRoute(req, res, p, { user, cfg, readBody: (r) => readBody(r, BODY_LIMITS.control), send, audit, demo: demoOn(cfg) })) return;   // owner alerts + host actions (docs/adr/0041)
     if (await handlePublishRoute(req, res, p, { user, cfg, root: ROOT, slugOk, ownAppDir, readBody: (r) => readBody(r, BODY_LIMITS.control), send, audit, demo: demoOn(cfg) })) return;   // owner-only Publish (docs/adr/0039)
+    if (await handleSelfpubRoute(req, res, p, { user, cfg, root: ROOT, readBody: (r) => readBody(r, BODY_LIMITS.control), send, audit, demo: demoOn(cfg), version: appVersion, apiKey: apiKeyBlocked(req, user) })) return;   // version: a function, read only on a selfpub GET (it hashes files: never per request). owner-only core Publish (docs/adr/0044). TODO(R4 seam): the owner publish routes move to lib/publish-routes-table.mjs
     // 改这个应用 · Change this app (lib/app-edit.mjs, ADR 0040): the panel page and its 撤销 · Undo. Owner only in Phase 1.
     if (req.method === 'GET' && p === '/api/app-edit/panel') {
       if (user.role !== 'owner' && user.role !== 'member') return send(res, 403, 'application/json', '{"error":"owner only","code":"edit_owner_only"}');   // members and demo guests: own apps only, the no-tools lane (ADR 0042)

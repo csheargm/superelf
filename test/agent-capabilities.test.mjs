@@ -54,7 +54,7 @@ test('the note is appended OUTSIDE the overridable prompt chain', () => {
   // (test/app-agent-confinement.test.mjs drives that over HTTP).
   // A oneShot turn (PAChat.complete) drops only the app contract; test/chat-one-shot.test.mjs
   // reads both prompts back from argv.
-  assert.match(WEB, /systemPrompt: agentSystemPrompt\(\[agentPrompts\.global, agentPrompts\.app, origin\.fromApp \? noChangeRule\(chatRole\) : null\], agentCapabilities\(laneRole\(user, origin\), oneShot \? null : APP_CONTRACT\), turnFacts\)/,
+  assert.match(WEB, /systemPrompt: agentSystemPrompt\(\[agentPrompts\.global, agentPrompts\.app, origin\.fromApp \? noChangeRule\(chatRole\) : null, coreOn \? MAIN_CHAT_RULE : null\], agentCapabilities\(laneRole\(user, origin\), oneShot \? null : APP_CONTRACT\), turnFacts\)/,
     'the chat agent lane appends it after the override chain');
   assert.match(WEB, /5 \* 60000, agentCapabilities\(laneRole\(user, origin\), APP_CONTRACT\)\)/,
     'and the app ask lane sends the same one');
