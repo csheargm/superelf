@@ -310,11 +310,19 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
   html.pa-printing, html.pa-printing body{
     display:block!important;height:auto!important;min-height:0!important;max-height:none!important;
     overflow:visible!important;margin:0!important;padding:0!important;background:#fff!important}
-  html.pa-printing .pr-sheet{page-break-after:always;break-after:page}
+  /* ONE NOTE PAGE PER SHEET, CENTRED ON THE PAPER (owner 2026-11-25: off-centre, big gaps).
+     The page box has no margin, so desktop browsers have no room for their URL/date header and
+     footer; the sheet is a box in PHYSICAL units (mm, never vh — see the scar above) a little
+     shorter than the paper, so an OS footer that still steals height cannot spill it onto a blank
+     sheet. The image is centred inside it with an even inner margin. --pr-paper-h is set per print
+     from the paper PAPrint chose (Letter 279.4mm / A4 297mm). */
+  html.pa-printing .pr-sheet{display:flex;align-items:center;justify-content:center;box-sizing:border-box;
+    width:100%;height:calc(var(--pr-paper-h,279.4mm) - 12mm);margin-top:6mm;padding:0 6mm;overflow:hidden;
+    page-break-after:always;break-after:page;break-inside:avoid}
   html.pa-printing .pr-sheet:last-child{page-break-after:auto;break-after:auto}
-  html.pa-printing .pr-sheet img{display:block;width:100%;height:auto;
+  html.pa-printing .pr-sheet img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;
     -webkit-print-color-adjust:exact;print-color-adjust:exact}
-  @page{margin:10mm}
+  @page{margin:10mm}               /* the ordinary shell; a note print injects #prPageSize (margin 0) and removes it on teardown */
 }
 /* PA_SHELL_LOOK_CSS */
 /* PA_HOME_V2_CSS */
@@ -2248,7 +2256,18 @@ window.addEventListener('message',async(e)=>{
       if(!pages.length) return reply({ok:false,code:'no-content',error:'没有可打印的内容 · nothing to print'});
       let root=$('#printRoot');
       if(!root){ root=document.createElement('div'); root.id='printRoot'; document.body.appendChild(root); }
+      // A previous print's hold timer must not fire into THIS one — cleared before anything is
+      // built, because the image decode below awaits and the timer could tear the new job down.
+      if(root._paHold){ clearTimeout(root._paHold); root._paHold=0; }
       root.innerHTML=pages.map(()=>'<div class="pr-sheet"><img alt=""></div>').join('');
+      // Paper for the CSS page box. A hint: the dialog's own paper choice still wins, and the
+      // sheet is centred in whatever it picks.
+      const PAPER_MM={letter:{w:'215.9mm',h:'279.4mm'},a4:{w:'210mm',h:'297mm'}};
+      const pz=PAPER_MM[m.paper]||PAPER_MM.letter;
+      root.style.setProperty('--pr-paper-h',pz.h);
+      let ps=document.getElementById('prPageSize');
+      if(!ps){ ps=document.createElement('style'); ps.id='prPageSize'; document.head.appendChild(ps); }
+      ps.textContent='@media print{@page{size:'+pz.w+' '+pz.h+';margin:0}}';
       const imgs=[...root.querySelectorAll('img')];
       // src via property, not innerHTML: a data: URL of a 300dpi page is ~1MB, and building that
       // into an attribute string costs a second copy of every page for no reason.
@@ -2272,9 +2291,9 @@ window.addEventListener('message',async(e)=>{
       // the next print clears that timer first — otherwise print #1's timer fires in the middle of
       // print #2. The surface is display:none on screen, so holding it costs nothing visible.
       const HOLD_MS=600000;
-      if(root._paHold) clearTimeout(root._paHold);          // a previous print's timer must not fire into this one
       const teardown=()=>{ root._paHold=0;
         document.documentElement.classList.remove('pa-printing');
+        const pps=document.getElementById('prPageSize'); if(pps) pps.remove();   // a later Ctrl+P must not inherit this note's paper and zero margin
         root.innerHTML=''; };                               // release ~1MB per page
       root._paHold=setTimeout(teardown,HOLD_MS);
       const t0=Date.now();

@@ -23,29 +23,35 @@
 // print dialog then gives a PDF for free, at the same resolution.
 window.PAPrint = (function(){
   'use strict';
-  // A4 portrait inside 10mm margins is 190mm ≈ 7.48in; 7.48in × 300dpi ≈ 2244px.
+  // Letter width (8.5in) less the 6mm inner margin each side ≈ 8.03in; ×300dpi ≈ 2400px. 2244 is kept (≈280dpi): plenty for ink.
   const TARGET_W=2244;
   // Canvas area guard. iOS caps a canvas far below desktop, and the failure is not an exception —
   // the canvas silently comes back BLANK, which would print empty sheets and look like a data
   // loss. Staying well under the cap and reporting the reduced resolution is the honest trade.
   const MAX_PX=20e6;
-  // EVERY printed page is this shape, and the note page is scaled to FIT INSIDE it. Two failures
-  // forced that rule, one from each direction:
-  //   · shorter than the sheet -> a white band under the writing;
-  //   · taller than the printable box -> a sliver spills, and a sliver costs a WHOLE SHEET.
-  //     (SCAR 2026-09-12, iPad: a 4-page note printed as 8 sheets, content/blank/content/blank,
-  //     each blank carrying the page-number stamp that had spilled off the bottom of the one
-  //     before it.)
+  // EVERY printed page is the pad's own sheet: 816 x 1056 CSS px, a Letter page, the same sheet
+  // the screen draws its fold on. One page = one sheet, rendered whole (paper, rules, stationery,
+  // text, ink) under ONE transform, so the writing never drifts off its lines.
   //
-  // 1.20, not Letter's 1.294, because the printable box is not the sheet. Margins only ever make
-  // the box RELATIVELY TALLER, which is harmless; an OS header/footer steals height ONLY, which
-  // lowers the printable aspect. Measured: at Letter with 10mm margins the box is 1.324, so a
-  // 1.294 render survives about 2% of stolen height and spills at 4%. 1.20 tolerates ~9%, which
-  // covers iOS's URL/date footer, and costs a band of a few percent on a sheet that has none.
-  const PAD_RATIO=0.04, SHEET_ASPECT=1.20;
-  // A runaway guard, not a feature limit: the pad caps its own surface at five sheets, so a page
-  // asking for more than that is a corrupt extent rather than a long note.
-  const MAX_SHEETS_PER_PAGE=8;
+  // SCAR 2026-11-25 (owner): print was off-centre, off the lines and full of gaps, and a page
+  // written on a 12.9in iPad printed at a different size from the same page on an 11in one.
+  // Causes: the image was a 1.20 box (a white band on every sheet, more on A4); only the content
+  // shrank while the rules stayed full size; and the shrink was chosen PER PAGE from how far down
+  // that screen let the user write. Now the scale is one number for the whole note, decided by the
+  // content alone (stored in page-width units, so the device never enters), and the shell centres
+  // each sheet on the paper (web/index.html, #printRoot).
+  const PAD_RATIO=0.04;
+  const LETTER_ASPECT=1056/816;
+  // A4 is relatively taller than Letter. Its sheet is the box the shell leaves inside A4 (6mm each
+  // side, web/index.html .pr-sheet): (297-12)/(210-12). Rendering the page at that shape means the
+  // same handwriting fills an A4 sheet instead of floating in a 20mm band top and bottom; the
+  // ruling simply continues further down, like a real A4 pad. Letter keeps the pad's own sheet.
+  const A4_ASPECT=(297-12)/(210-12);
+  // Paper the shell lays the sheets onto. Default by locale: Letter in the US/Canada/Mexico/
+  // Philippines/Chile/Colombia, A4 elsewhere. Only a hint for the CSS page box — the print dialog's
+  // own paper choice still wins, and the sheet is centred inside whatever it picks.
+  const LETTER_REGIONS=/-(US|CA|MX|PH|CL|CO|VE|GT|CR|PA|DO|PR)$/i;
+  function defaultPaper(lang){ return LETTER_REGIONS.test(String(lang||'')) ? 'letter' : 'a4'; }
   const TXT={
     nothing:'没有可打印的内容 · Nothing to print',
     blocked:'无法打开打印窗口 · The print window could not open',
@@ -60,87 +66,7 @@ window.PAPrint = (function(){
   // exactly page-shaped, so any extra element inside it would push the sheet past one printed page
   // and emit a blank sheet after every note page. Sizes are fractions of the page WIDTH so the
   // stamp is the same physical size whatever resolution the page was rendered at.
-  const NUM_INK='#9aa0a6', NUM_SIZE=0.016, NUM_INSET=0.022;
-
-  // How tall one note page prints, in CSS px. The pad has no paper size — a page's height is a
-  // property of the screen it was last opened on, not of the file — so print derives it from the
-  // ink instead, which is the only height the note actually owns.
-  // Every page is the same, page-shaped box. Nothing is measured from the ink any more: a height
-  // that follows the content is exactly what produced both the band and the spill.
-  // The pad's OWN sheet height when it reports one, so a printed sheet is exactly the page the
-  // user saw — same proportions, and the page number lands at the foot of the paper instead of
-  // floating above a band. SHEET_ASPECT remains the fallback for a host that reports no sheet.
-  //
-  // THE TRADE, stated because it has bitten before. The shell prints images at
-  // width:100%;height:auto, so an image TALLER in aspect than the printable box spills onto the
-  // next sheet and costs a blank one (SCAR 2026-09-12: a 4-page note printed as 8 sheets,
-  // content/blank/content/blank). Letter inside 10mm margins is a box of aspect ~1.324 and the
-  // page is 1.294, so it fits — unless the browser also prints headers and footers, which steal
-  // ~0.4in and take the box to ~1.27. That is a desktop print-dialog option (off on iOS); with it
-  // on, turn it off or expect a trailing blank sheet. The old 1.20 tolerated it at the cost of a
-  // permanent band on every sheet, which is what was reported.
-  // THE EMITTED IMAGE IS SHORTER THAN THE SHEET, DELIBERATELY, and this is the second time that
-  // has had to be learned.
-  //
-  // It briefly used the pad's own sheet height (info.sheetH), so one printed sheet was exactly the
-  // page on screen and the page number sat at the foot of the paper. On a laptop that was right.
-  // On iPad it was not: iOS Safari ALWAYS prints its own header and footer -- the URL, the date,
-  // "Page 1 of 4" -- and there is no setting to turn them off. They steal roughly 0.4in of the
-  // 10.21in printable height, which takes the box from an aspect of ~1.324 down to ~1.26. Our
-  // 1.294 image no longer fitted, so the foot of every image spilled onto the next sheet: a
-  // 2-page note printed as 4 sheets, and the giveaway was that sheets 2 and 4 carried OUR OWN
-  // "1/2" and "2/2" stamps at the top.
-  //
-  // 1.20 survives that, and the cost is a band at the foot of each sheet with the page number
-  // sitting just above it. That is the whole trade: a slightly high page number, or a blank sheet
-  // after every real one. info.sheetH is deliberately NOT read here.
-  function pageHeight(info){ return Math.round((info.width||700)*SHEET_ASPECT); }
-
-  // How much the note page must shrink to sit inside that box, and the left offset that keeps it
-  // centred when it does. Content shorter than the page is left alone (k=1).
-  function fitContent(info,pg){
-    const w=info.width||700, contentH=pg.extent*w + w*PAD_RATIO, pageH=pageHeight(info);
-    const k=contentH>pageH ? pageH/contentH : 1;
-    return { k, dx:(w*(1-k))/2 };
-  }
-  // How many SHEETS a page needs, and how to place each one.
-  //
-  // A page can be taller than a sheet — that is what the seamless view is for, and the pad draws
-  // a divider at every sheet boundary so the fold is visible while writing. Print has to break at
-  // THOSE lines or the divider is a lie. Before this, a tall page was shrunk onto one sheet
-  // instead: a five-sheet note printed at 20% size, which is not a printout of anything.
-  //
-  // Each slice is then fitted to the sheet the same way a short page always was. The slice is
-  // 1.294 tall (Letter) and the emitted image is 1.20, so content shrinks ~7% and sits with a
-  // small band. That band is deliberate: the shell prints images at width:100%;height:auto, so an
-  // image TALLER in aspect than the printable box spills onto the next sheet and costs a blank
-  // one (SCAR 2026-09-12, iPad: a 4-page note printed as 8 sheets, content/blank/content/blank).
-  // 1.20 is the aspect that survives an OS header or footer stealing height; the band is the
-  // price of never seeing that again.
-  // ONE PAGE IS ONE SHEET while SPLIT_TALL_PAGES is off.
-  //
-  // SCAR. A page is now at least as tall as the SCREEN, so it can be taller than a Letter sheet,
-  // and writing at the bottom of the screen sits below the sheet line. Splitting on that line was
-  // literally correct and completely unhelpful: a 2-page note printed as 4 sheets, three of them
-  // nearly empty. What the user counted was pages, and what they expected back was pages.
-  //
-  // So a page prints as ONE sheet with its content fitted, which is what fitContent has always
-  // done. Splitting exists for a page that is genuinely several sheets long — the seamless view —
-  // and that view is withdrawn, so the flag is off rather than the code deleted.
-  const SPLIT_TALL_PAGES=false;
-  function sheetsOf(info,pg){
-    if(!SPLIT_TALL_PAGES) return 1;
-    const w=info.width||700, sheetH=info.sheetH||pageHeight(info);
-    const contentH=pg.extent*w + w*PAD_RATIO;
-    return Math.max(1,Math.min(MAX_SHEETS_PER_PAGE,Math.ceil(contentH/sheetH)));
-  }
-  function fitSlice(info,pg,s){
-    const w=info.width||700, sheetH=info.sheetH||pageHeight(info), pageH=pageHeight(info);
-    if(sheetsOf(info,pg)<=1) return fitContent(info,pg);        // short page: unchanged behaviour
-    const k=pageH/sheetH;                                       // one screen sheet, fitted to one printed sheet
-    return { k, dx:(w*(1-k))/2, dy:-s*sheetH*k };
-  }
-
+  const NUM_INK='#9aa0a6', NUM_SIZE=0.013, NUM_INSET=0.022;
   // How much to scale a page of this size. Pure, and exported, so the pixel-budget decision can
   // be tested without a canvas — the failure it guards against (a silently BLANK canvas on iOS)
   // is invisible in a source-only test.
@@ -149,28 +75,41 @@ window.PAPrint = (function(){
     return px>MAX_PX ? s*Math.sqrt(MAX_PX/px) : s;
   }
 
+  // The printed sheet height in CSS px: the pad's sheet, or a Letter page when a host reports none.
+  function pageHeight(info,paper){ const w=info.width||816;
+    return paper==='a4' ? Math.round(w*A4_ASPECT) : Math.round(info.sheetH||w*LETTER_ASPECT); }
+  // ONE scale for the whole note. A page whose content fits the sheet needs none; otherwise the
+  // deepest page decides, and every page uses that same scale so the handwriting is one size from
+  // the first sheet to the last. Extents are in page-width units, so this is device-independent:
+  // the same strokes give the same k whichever iPad wrote them. Stored strokes are never rewritten.
+  function noteFit(info,paper){
+    const w=info.width||816, sheet=pageHeight(info,paper);
+    // Padding counts for INK (a thick stroke's edge sits below its centreline), not for the
+    // stationery floor, which is exactly one sheet and must not shrink an empty page.
+    let need=0; for(const pg of info.pages||[]){ const ink=pg.inkExtent==null?(pg.extent||0):pg.inkExtent;
+      need=Math.max(need,(pg.extent||0)*w,ink*w+w*PAD_RATIO); }
+    return { k: need<=sheet ? 1 : sheet/need };
+  }
   // Render every page to a PNG data URL by asking the PAD to draw. PAPrint deliberately owns no
   // renderer of its own: a second one would drift from the on-screen note and the printout would
   // quietly stop matching it (R3).
-  async function renderNote(note,inkOnly){
+  async function renderNote(note,inkOnly,sheetPaper){
     if(!note||typeof note.printPage!=='function') throw new Error('this note cannot be printed');
     if(typeof note.printPrime==='function') await note.printPrime();
     const info=note.printInfo();
-    const w=info.width||700;
+    const w=info.width||816;
     // undefined leaves the note's own paper colour in place; white is the ink-only default.
     const paper=inkOnly===false?undefined:PAPER_WHITE;
     const out=[]; const warn={photo:false,lowRes:false,lightInk:false};
-    // Every page contributes at least one sheet, and a tall one contributes several.
-    const plan=[];
-    for(let i=0;i<info.pages.length;i++){ const n=sheetsOf(info,info.pages[i]);
-      for(let sh=0;sh<n;sh++) plan.push({i,sh}); }
-    for(const {i,sh} of plan){
+    // One note page is one sheet.
+    const plan=info.pages.map((_,i)=>i);
+    const fit=noteFit(info,sheetPaper), hCss=pageHeight(info,sheetPaper);
+    for(const i of plan){
       const pg=info.pages[i];
       if(pg.unresolved) warn.photo=true;
       // Only a concern on white: against the note's own tint these strokes read fine, which is why
       // they were drawn. Dropping them onto white without a word would be ink silently lost.
       if(paper&&pg.lightInk) warn.lightInk=true;
-      const hCss=pageHeight(info), fit=fitSlice(info,pg,sh);
       // Fit the sheet's pixel budget: shrink the scale rather than the page, so a very tall page
       // prints smaller instead of coming back blank.
       const scale=fitScale(w,hCss);
@@ -188,20 +127,16 @@ window.PAPrint = (function(){
     return { pages:out, warn };
   }
 
-  // Bottom-right, muted, on EVERY page including a lone one. This was multi-page only at first,
-  // on the theory that "1 / 1" is noise; asked for on every sheet instead, because a printed page
-  // that leaves the app is a loose piece of paper and a page marking is what makes it filable.
-  // Numeric rather than "Page 1 of 4": a fraction needs no translation, and every other
-  // user-facing string here has to carry both languages.
+  // Bottom CENTRE, small and muted, on every sheet: a real journal page carries nothing else in
+  // its footer. Numeric so it needs no translation. Sized from the image width so it is the same
+  // physical size at any render resolution, and inset so it clears a printer's unprintable edge.
   function stampPageNumber(ctx,c,n,total){
     ctx.save();
     ctx.setTransform(1,0,0,1,0,0);            // printPage restores the transform; draw in device px
     const size=Math.max(8,Math.round(c.width*NUM_SIZE)), inset=Math.round(c.width*NUM_INSET);
     ctx.font='500 '+size+'px -apple-system,system-ui,sans-serif';
-    ctx.fillStyle=NUM_INK; ctx.textAlign='right'; ctx.textBaseline='alphabetic';
-    // Inset from BOTH edges by the same width-fraction, so the stamp clears the non-printable
-    // border a printer keeps even when the user selects "no margins".
-    ctx.fillText(n+' / '+total, c.width-inset, c.height-inset);
+    ctx.fillStyle=NUM_INK; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+    ctx.fillText(total>1 ? n+' / '+total : String(n), c.width/2, c.height-inset);
     ctx.restore();
   }
 
@@ -221,20 +156,21 @@ window.PAPrint = (function(){
 
   return {
     TARGET_W, MAX_PX, TXT,
-    pageHeight, fitScale, fitContent, SHEET_ASPECT,
+    pageHeight, fitScale, noteFit, defaultPaper,
     // Print an open PANote. Returns {ok, error, notes:[...]} — it renders NOTHING itself and
     // shows no UI, so the caller decides how to surface the outcome (PANote uses its own flash).
     note:async(api,opts)=>{
       opts=opts||{};
       let r;
-      try{ r=await renderNote(api,opts.inkOnly); }
+      const paper=opts.paper==='letter'||opts.paper==='a4' ? opts.paper : defaultPaper(navigator.language);
+      try{ r=await renderNote(api,opts.inkOnly,paper); }
       catch(err){ return {ok:false,error:String((err&&err.message)||err)}; }
       if(!r.pages.length) return {ok:false,error:TXT.nothing};
       const notes=[];
       if(r.warn.photo) notes.push(TXT.noPhoto);
       if(r.warn.lowRes) notes.push(TXT.lowRes);
       if(r.warn.lightInk) notes.push(TXT.lightInk);
-      const res=await ask({ kind:'print', title:opts.title||'', pages:r.pages });
+      const res=await ask({ kind:'print', title:opts.title||'', paper, pages:r.pages });
       // A shell that cannot print says so. Never report success because the call returned.
       if(!res||!res.ok) return {ok:false,error:(res&&res.error)||TXT.blocked,notes};
       return {ok:true,notes,pages:r.pages.length};

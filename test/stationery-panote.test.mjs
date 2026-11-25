@@ -81,7 +81,7 @@ test('choosing or changing stationery changes the save fingerprint (else the sav
 
 // ── drawPaper, extracted and run against a recording context ───────────────────────────────
 function drawPaperWith({ nb, stn, seamless = false }) {
-  const src = between(ENGINE, '    function drawPaper(ctx,h,bg,fit){', '\n    function drawDots(');
+  const src = between(ENGINE, '    function drawPaper(ctx,h,bg,fit,pw){', '\n    function drawDots(');
   const bgCtx = recordingCtx();
   // eslint-disable-next-line no-new-func
   const f = new Function('S', `let {bgCtx,W,H,NB,STN,seamless,PAGE_H,PAPER_WHITE,DEFAULT_TPL,RULE_INK,MARGIN_TPL}=S;
@@ -256,7 +256,7 @@ test('the picker group exists only when the host opts in AND the component is in
 });
 test('print primes the design and treats a stationery page as a full sheet', () => {
   assert.match(E, /if\(STN&&NB\.stationery\) await STN\.prime\(NB\.stationery,cap\);/);
-  assert.match(E, /drawPaper\(ctx,hCss,paper,fit\);/);
+  assert.match(E, /drawPaper\(ctx,hCss\/k,paper,null,W\/k\);/);
   assert.match(E, /extent:Math\.max\(pageExtent\(p\),STN&&STN\.has\(NB\.stationery\)\?PAGE_H\/W:0\),/);
 });
 test('delivery: only the Journal carries the component; designs ride with it; R4 budget', () => {
