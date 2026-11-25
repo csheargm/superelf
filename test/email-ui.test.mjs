@@ -51,7 +51,7 @@ test('dots: both new keys mark, clear on first tap, and stay cleared (persisted 
     const el = fakeEl();
     markNew(el, key);
     assert.ok(el.classes.has('pa-new'), `${key}: dot appears`);
-    el.handlers.pointerdown();
+    el.handlers.click();
     assert.ok(!el.classes.has('pa-new'), `${key}: dot cleared on tap`);
     assert.ok(seen.has(key), `${key}: recorded as seen`);
     const again = fakeEl();

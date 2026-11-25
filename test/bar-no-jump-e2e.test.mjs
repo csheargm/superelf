@@ -55,10 +55,13 @@ async function hideShow(page, frame, bar, line) {
   await frame.evaluate(() => PAAppBar.show()); await page.waitForTimeout(SETTLE_MS);
   const shown = await topOf(page, frame, line);
   await frame.evaluate(() => PAAppBar.hide()); await page.waitForTimeout(SETTLE_MS);
+  // Under a loaded full suite the .18s slide can run past SETTLE_MS: wait for it to finish, not a longer sleep.
+  await frame.waitForFunction((s) => document.querySelector(s).getBoundingClientRect().bottom <= 1, bar, { timeout: 5000 }).catch(() => { /* the assert below names it */ });
   assert.equal(await frame.evaluate((s) => document.querySelector(s).getAttribute('data-paab-hidden'), bar), '1', 'CONTROL: the bar hid');
   assert.ok(await frame.evaluate((s) => document.querySelector(s).getBoundingClientRect().bottom <= 1, bar), 'CONTROL: the bar is off-screen');
   const hidden = await topOf(page, frame, line);
   await frame.evaluate(() => PAAppBar.show()); await page.waitForTimeout(SETTLE_MS);
+  await frame.waitForFunction((s) => document.querySelector(s).getBoundingClientRect().top >= -1, bar, { timeout: 5000 }).catch(() => { /* still() below names a bar that never came back */ });
   const back = await topOf(page, frame, line);
   return { shown, hidden, back };
 }

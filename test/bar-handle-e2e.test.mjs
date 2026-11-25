@@ -76,6 +76,7 @@ test('Journal (shell handle shown): a long title leaves no header control under 
   for (const viewport of [PHONE, { width: 820, height: 1180 }, { width: 1280, height: 800 }]) {
     const { ctx, page, frame } = await open('notes', viewport, () => !!document.querySelector('.pan-top'));
     try {
+      await page.waitForFunction(() => document.querySelector('#frame').classList.contains('ownbar'));   // the app's bar is up, so its 'ready' cannot put the class back below
       await page.evaluate(() => document.querySelector('#frame').classList.remove('ownbar'));   // the shell-handle case
       await frame.evaluate(() => { document.querySelector('.pan-htitle').textContent = 'A very long note title that goes on and on and on'; });
       await page.waitForFunction(() => document.querySelector('#fr').getBoundingClientRect().top >= document.querySelector('#barpeek').getBoundingClientRect().bottom);   // the strip has laid out
