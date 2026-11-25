@@ -67,10 +67,10 @@ async function showActivityLog(note){
   if(!d){ d=document.createElement('dialog'); d.id='activityLog'; d.style.maxWidth='420px'; document.body.appendChild(d); }
   const tip=rows&&rows.some((r)=>r.canDiff)&&!_SEEN.has(ACTIVITY_TIP_KEY);
   const list=!rows?`<p style="color:var(--danger)">${ACTIVITY_UNREADABLE}</p>`:!rows.length?`<p class="act-empty" style="color:var(--muted)">${ACTIVITY_EMPTY}</p>`
-    :(tip?`<p class="act-tip" style="font-size:13px;color:var(--muted)">${ACTIVITY_TIP}</p>`:'')+'<div class="act-rows" style="max-height:60vh;overflow-y:auto">'+activityGroups(rows,n).map((g)=>activityRowHtml(g,n)).join('')+'</div>';
+    :'<div class="act-rows" style="max-height:60vh;overflow-y:auto">'+activityGroups(rows,n).map((g)=>activityRowHtml(g,n)).join('')+'</div>';
   d.innerHTML=`<b>${ACTIVITY_TITLE}</b>${typeof note==='string'?`<p class="act-note" style="font-size:13px">${esc(note)}</p>`:''}<div class="act-body">${list}</div><div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="plain" id="activityClose">${ACTIVITY_CLOSE}</button></div>`;
   d.querySelector('#activityClose').onclick=()=>d.close();
   d.querySelector('.act-body').onclick=(e)=>{ const b=e.target.closest('button[data-k]'); if(b) activityAct(d,b); };
   if(!d.open) d.showModal();
-  if(tip){ _SEEN.add(ACTIVITY_TIP_KEY); _saveSeen(); }   // shown once, now that it is on screen
+  if(tip) PATipsShell.tip(ACTIVITY_TIP_KEY,()=>d.querySelector('.act-rows button[data-k]'),ACTIVITY_TIP);   // the ONE tip mechanism, inside the dialog
 }

@@ -57,7 +57,8 @@ test('owner: amber dot on ☰ → card with the problem, its meaning and the tip
   assert.match(text, /需要处理 · Needs attention/);
   assert.match(text, /系统盘已用 92% · The system disk is 92% full/);
   assert.match(text, /updates and saving can fail/);
-  assert.match(text, /新：.* · New:/, 'one-time tip');
+  assert.match(await page.locator('.pat-tip[data-tip="tip:owner-alerts"]').innerText({ timeout: 5000 }), /^新：.* · New:/, 'one-time tip (PATips, beside the card)');
+  assert.doesNotMatch(text, /新：/, 'not a line inside the card');
   await page.click('#oaCard [data-oa="cleanup-disk"]');
   await page.waitForFunction(() => /完成 · Done/.test(document.querySelector('#oaCard')?.innerText || ''), null, { timeout: 20000 });
   assert.equal(await page.$('#menu .oa-dot'), null, 'the check passed: no dot');
@@ -65,7 +66,7 @@ test('owner: amber dot on ☰ → card with the problem, its meaning and the tip
   setHealth(FULL);
   await page.reload(); await page.waitForSelector('#menu .oa-dot', { state: 'attached' });
   await page.click('#hmore'); await page.click('#menu'); await page.waitForSelector('#oaCard');
-  assert.doesNotMatch(await page.locator('#oaCard').innerText(), /新：/, 'the tip shows once');
+  await page.waitForTimeout(1000); assert.equal(await page.locator('.pat-tip[data-tip="tip:owner-alerts"]').count(), 0, 'the tip shows once');
   await ctx.close();
 });
 

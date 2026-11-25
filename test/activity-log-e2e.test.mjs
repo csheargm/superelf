@@ -67,6 +67,7 @@ test('Activity log: only what matters, plain sentences, local time; app change �
     { at: now, ev: 'node-health-failed', ok: false }, { at: now, ev: 'app-edit', who: 'owner', app: 'notes', changed: true, applied: true, version: v }]
     .map((r) => JSON.stringify(r)).join('\n') + '\n');
   await openLog(page); await page.waitForSelector('#activityLog .act-row');
+  await page.waitForSelector('#activityLog .pat-tip[data-tip="tip:activity-app-changes"]', { timeout: 5000 });   // the ONE tip mechanism, inside the dialog
   const text = await page.locator('#activityLog').textContent();
   assert.match(text, /Mom 修改了应用「notes」 · Mom changed the app "notes"/);
   assert.match(text, /“rename the title”/);
@@ -94,7 +95,7 @@ test('Activity log: only what matters, plain sentences, local time; app change �
   assert.equal(await page.locator('#activityLog .act-undo').count(), 0, 'nothing left to undo on that row');
   // The tip shows once only.
   await page.click('#activityClose'); await page.click('#auditBtn'); await page.waitForSelector('#activityLog .act-row');
-  assert.equal(await page.locator('#activityLog .act-tip').count(), 0);
+  await page.waitForTimeout(300); assert.equal(await page.locator('.pat-tip').count(), 0);
   // Fix it → the Needs attention drawer.
   await page.click('#activityLog .act-fix');
   await page.waitForSelector('#drawer.open');

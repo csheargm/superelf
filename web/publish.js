@@ -10,13 +10,12 @@ const PAPublish=(()=>{
   const WHAT_TEXT='发布会先检查隐私，再在 GitHub 上开一个合并请求（PR）；CI 检查通过后自动合并，此应用成为 superelf 的一部分，所有人可见，下次部署后出现在演示站。 · Publishing first scans for private data, then opens a pull request on GitHub; when CI checks pass it merges, the app becomes part of superelf for everyone, and it appears on the demo after the next deploy.';
   const url=(slug)=>'/api/apps/'+encodeURIComponent(slug)+'/publish';
   const post=(slug,body)=>api(url(slug),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body||{})});
-  // The menu item; the first time it is on screen it carries the one-time bilingual tip line.
+  // The menu item; its one-time bilingual tip is a PATips tip beside it (armTip).
   // The second line (#pubState) says what Publish would do for THIS app; check() fills it in.
   function item(){
-    const seen=_SEEN.has(TIP_KEY);
     return '<button data-a="publish" id="pubItem">发布到公开仓库 · Publish to the public repo'
       +'<span id="pubState" style="display:block;font-size:11px;opacity:.65"></span>'
-      +(seen?'':'<span class="pub-tip" style="display:block;font-size:11px;opacity:.75">新：审核后公开分享此应用 · New: share this app publicly after a privacy check</span>')+'</button>';
+      +'</button>';
   }
   // repo: { inRepo, upToDate, changedFiles } from the server (lib/publish/status.mjs), or null.
   function stateText(repo){
@@ -36,7 +35,8 @@ const PAPublish=(()=>{
   // armTip(slug) runs each time the owner's ⋯ menu opens: it also shows a publish result the owner
   // has not seen yet (they closed the wait sheet, or left the app), and re-attaches the watcher to
   // a publish still running. The node keeps the status in memory, so a node restart forgets it.
-  function armTip(slug){ const b=$('#pubItem'); if(b) markNew(b,TIP_KEY); if(b&&slug) check(slug); }
+  const TIP='新：审核后公开分享此应用 · New: share this app publicly after a privacy check';
+  function armTip(slug){ const b=$('#pubItem'); if(b&&!_SEEN.has(TIP_KEY)) PATipsShell.tip(TIP_KEY,'#pubItem',TIP); if(b&&slug) check(slug); }   // the ONE tip mechanism
   const SEEN_KEY=(slug)=>'pub:seen:'+slug;
   const seenAt=(slug)=>{ try{ return localStorage.getItem(SEEN_KEY(slug)); }catch{ return null; /* no storage: show it again, harmless */ } };
   const markSeen=(slug,st)=>{ try{ localStorage.setItem(SEEN_KEY(slug),String(st.at)); }catch{ /* no storage: the result may show once more */ } };

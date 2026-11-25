@@ -2629,6 +2629,7 @@ function renderShellVfy(){ const btn=$('#shellVfy'); btn.textContent=(shellVerif
 $('#shellVfy').onclick=()=>{ shellVerifyOn=!shellVerifyOn; renderShellVfy(); };
 
 /* PA_SETTINGS_JS */
+/* PA_TIPS_STORE_JS */
 /* PA_SETTINGS_HEAD_JS */
 /* PA_ACTIVITY_JS */
 /* PA_OWNER_ALERTS_JS */
@@ -2672,6 +2673,7 @@ PAAppEdit.bindBar();
   // Fetch the profile (ME, incl. appOrder) in parallel; gate only the app grid on it so the
   // saved My-Apps order applies on first paint, while convos/family load concurrently.
   const profileReady=loadProfile().then(()=>PADrawerSections.paint());   // the account's remembered sections
+  PATipsShell.ready(profileReady);   // the shell's tips read their 'seen' list from the profile (web/tips-store.js)
   await Promise.allSettled([profileReady.finally(loadApps), loadFamilyApps(), loadConvos(), convoId?openConvo(convoId):Promise.resolve()]);
   if(!convoId) showEmptyState();
   if(refreshing){ try{ sessionStorage.removeItem('pa_refreshing'); }catch{} $('#reload').classList.remove('spin'); }
@@ -2753,5 +2755,6 @@ if (navigator.standalone) document.documentElement.classList.add('standalone');
 // Must be a window property — a top-level const is NOT reachable as window._VER_NOTES.
 try{ window._VER_NOTES=JSON.parse(`<!--APP_NOTES-->`); }catch{ /* R5: raw file or bad embed → sheet shows its in-page empty message */ }
 </script>
+<!--PA_TIPS_UI-->   <!-- PATips (web/tips.inline.html): after the shell script, before DOMContentLoaded registers the first tip -->
 </body>
 </html>

@@ -208,7 +208,7 @@ test('⋯ on the open app lists 改这个应用 first with a one-time tip; phone
   await openMore(page);
   const first = page.locator('#frameMenu button').first();
   assert.match(await first.textContent(), /^改这个应用 · Change this app/);
-  assert.match(await first.textContent(), /长按标题可修改此应用/, 'the tip shows the first time');
+  assert.match(await page.locator('.pat-tip[data-tip="tip:app-edit"]').innerText({ timeout: 5000 }), /^长按标题可修改此应用/, 'the tip (PATips) shows the first time');
   await shot(page, 'cta-menu-phone');
   await first.click();
   await page.locator('#aePanel').waitFor();
@@ -219,7 +219,7 @@ test('⋯ on the open app lists 改这个应用 first with a one-time tip; phone
   await shot(page, 'cta-sheet-phone');
   await page.click('#aeClose');
   await openMore(page);
-  assert.doesNotMatch(await page.locator('#frameMenu button').first().textContent(), /长按标题/, 'the tip is shown once');
+  await page.waitForTimeout(800); assert.equal(await page.locator('.pat-tip[data-tip="tip:app-edit"]').count(), 0, 'the tip is shown once');
   await ctx.close();
 });
 
