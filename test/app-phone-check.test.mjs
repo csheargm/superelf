@@ -128,6 +128,7 @@ test('GPT review: winning font-size, a min-width media block a phone sees, touch
   assert.match(phoneTextProblems(page('@media (min-width:320px){p{font-size:14px}}')).join(), /正文/);
   assert.deepEqual(phoneTextProblems(page('@media (min-width:768px){p{font-size:14px}}')), []);
   assert.match(phoneProblems(page('@media (min-width:300px){.w{width:900px}}')).join(), /900px/);
+  assert.deepEqual(phoneProblems(page('@media (min-width:320px) and (min-height:1000px){.w{width:900px}}')), []);
   assert.deepEqual(phoneTextProblems(page('.menu{display:none} .row:hover .menu{display:block} @media (hover:none){.menu{display:block}}')), []);
   assert.deepEqual(phoneTextProblems(page('.row:hover .tag{display:inline-block}')), []);
 });

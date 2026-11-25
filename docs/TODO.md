@@ -776,3 +776,4 @@ Without it they now FAIL (R14), not pass as `# pass 0 / # fail 0`. To run them:
 
 ## Phone-first rule (2026-11-25)
 - Phone-first rule: a real browser check for NEW apps from the app maker (render at 390px in headless WebKit, read scrollWidth, smallest font, tap sizes) is not built: Playwright is a dev dependency only, so the node has no browser to run it. lib/app-phone-check.mjs stays a static scan (its known limits are listed there). Seam: an optional check in lib/demo-app.mjs parseApp when PA_PLAYWRIGHT is set.
+- Phone hover check edge cases (GPT review r2, 3-round cap): a hide on a qualified selector (`.menu[data-collapsed]{display:none}`) is not seen, and an exact-target reveal later overridden by a hide still counts as a way in. Both make the check pass a fault (never block a good app). Seam: hoverOnly in lib/app-phone-check.mjs; the real browser check above would replace it.
