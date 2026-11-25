@@ -26,7 +26,7 @@ function startOllamaStub() {
   return new Promise((r) => { const srv = http.createServer((req, res) => {
     let b = ''; req.on('data', (c) => { b += c; }).on('end', () => {
       const msgs = JSON.parse(b).messages, apply = msgs.some((m) => m.role === 'user' && m.content.startsWith('Change this app:'));
-      const text = apply && mode === 'same' ? `Kept it.\n\n\`\`\`html\n${PAGE}\n\`\`\`` : mode === 'marker' && !apply ? `${APP_MARKER} {"edit":"calendar-planner","title":"Calendar Planner","request":"make the title red"}`
+      const text = apply && (mode === 'same' || mode === 'verbatim') ? `Kept it.\n\n\`\`\`html\n${mode === 'same' ? PAGE : withOwnPolicy(ensureAskAi(PAGE, 'Calendar Planner'))}\n\`\`\`` : mode === 'marker' && !apply ? `${APP_MARKER} {"edit":"calendar-planner","title":"Calendar Planner","request":"make the title red"}`
         : apply ? `I added it.\n\n\`\`\`html\n${pageWith(nextExtra)}\n\`\`\`\n\n\`\`\`json\n{"title":"Calendar Planner"}\n\`\`\``
         : mode === 'lie' ? LIE : `I will add a Day / Week / Month / Year switcher above the calendar.\n${PLAN_MARKER}`;
       res.writeHead(200, { 'content-type': 'application/x-ndjson' });
@@ -127,11 +127,15 @@ const req = (v, p) => fetch(`http://127.0.0.1:${demo.port}${p}`, { headers: { 'c
 test('GPT review r2: a page that is the same once the demo\'s own additions are in is no change (no write, no Undo step)', async () => {
   const v = await visit('198.51.100.26'); const file = seedApp(v);
   const shaped = withOwnPolicy(ensureAskAi(PAGE, 'Calendar Planner')); fs.writeFileSync(file, shaped);
-  mode = 'plan'; const ev1 = await chat(v, { message: ASK });
-  mode = 'same'; const ev2 = await chat(v, { message: confirmOf(ev1).message, convoId: ev1.find((e) => e.type === 'convo').id });
-  assert.ok(done(ev2).text.includes(SAME_PAGE));
-  assert.equal(ev2.find((e) => e.type === 'app-edit').applied, false);
-  assert.equal(fs.readFileSync(file, 'utf8'), shaped);
+  for (const m of ['same', 'verbatim']) {   // the bare page, and the stored page echoed whole (GPT review r3)
+    mode = 'plan'; const ev1 = await chat(v, { message: ASK });
+    mode = m; const ev2 = await chat(v, { message: confirmOf(ev1).message, convoId: ev1.find((e) => e.type === 'convo').id });
+    assert.ok(done(ev2).text.includes(SAME_PAGE), m);
+    assert.equal(ev2.find((e) => e.type === 'app-edit').applied, false);
+    assert.equal(fs.readFileSync(file, 'utf8'), shaped);
+  }
+  const evU = await chat(v, { message: 'undo' });
+  assert.equal(evU.find((e) => e.type === 'app-edit').undone, undefined, 'no Undo step was made');
   mode = 'plan';
 });
 
