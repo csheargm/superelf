@@ -42,10 +42,12 @@ test('the watch flags writes outside the app and protected names inside it', () 
     assert.equal(watch.tried.length, 5);
     assert.ok(badJailName('a/AGENTS.override.md') && badJailName('.git/x') && !badJailName('a/notes.md'));
     fs.writeFileSync(path.join(w, 'outside.txt'), 'planted');
-    assert.deepEqual(undoOutside(watch), [], 'a file the turn created is removed');
+    const aside = path.join(w, 'aside');
+    assert.deepEqual(undoOutside(watch, aside), { left: [], moved: ['outside.txt'] }, 'a file the turn created is moved aside');
+    assert.equal(fs.readFileSync(path.join(aside, '1-outside.txt'), 'utf8'), 'planted', 'kept, never deleted');
     fs.writeFileSync(path.join(w, 'theirs.txt'), 'another request');
     const w2 = makeJailWatch(app, w); w2.onTool('Write', '', { file_path: 'theirs.txt' });
-    assert.deepEqual(undoOutside(w2), ['theirs.txt'], 'a file that was already there is named, never deleted');
+    assert.deepEqual(undoOutside(w2, aside).left, ['theirs.txt'], 'a file that was already there is named, never deleted');
     assert.equal(fs.existsSync(path.join(w, 'theirs.txt')), true);
     fs.writeFileSync(path.join(w, 'secret.txt'), 's'); fs.symlinkSync(path.join(w, 'secret.txt'), path.join(app, 'link.txt'));
     const w3 = makeJailWatch(app, w); w3.onTool('Write', '', { file_path: 'apps/todo/link.txt' });
@@ -137,8 +139,8 @@ test('owner Apply: a write outside apps/<slug>/ rolls the whole turn back and sa
   const ed = lines.find((l) => l.type === 'app-edit');
   assert.deepEqual([ed.applied, ed.jailed], [false, true]);
   assert.equal(ownerPage(), PAGE, 'the app is as it was');
-  assert.equal(fs.existsSync(path.join(root, 'workspace', 'outside.txt')), false, 'the outside file it created is gone');
-  assert.match(lines.find((l) => l.type === 'done').text, /rolled back[\s\S]*outside\.txt/);
+  assert.equal(fs.existsSync(path.join(root, 'workspace', 'outside.txt')), false, 'the outside file it created is moved out');
+  assert.match(lines.find((l) => l.type === 'done').text, /rolled back[\s\S]*moved to the undo folder: outside\.txt/);
   const a = lastArgv();
   assert.ok(!a.includes(SKIP_PERMISSIONS), 'the owner\'s bypass never reaches the jailed turn');
   assert.ok(a.some((x) => /^Edit\(\/\/.*\/apps\/todo\/\*\*\)$/.test(x)), 'the only allow rule is the app folder');

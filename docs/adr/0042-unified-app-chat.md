@@ -33,7 +33,7 @@ Owner decisions on the two review leftovers.
    the next agent). Measured on CLI 2.1.327: inside → written, outside and protected names → denied.
    The server backstop (lib/app-edit-jail.mjs) watches every file tool call; one naming a path outside
    the app or a protected name, or a new protected file in the app folder, rolls back the WHOLE turn
-   (the app from its undo copy, outside files the turn created removed) and the reply says so. Known
+   (the app from its undo copy, outside files the turn created moved into .app-versions/<slug>/.outside-<time>/) and the reply says so. Known
    limit: an existing outside file changed anyway cannot be restored; it is named. "change superelf: …"
    still goes to the owner's main agent, unjailed.
 2. **Members not opted in to Claude are metered.** Each of their app-chat turns on Claude (no tools)
