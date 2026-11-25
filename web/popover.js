@@ -30,6 +30,8 @@ function anchorGone(a){
   return false;
 }
 function menuKey(e){ if(e.key==='Escape'&&menuOpen()){ e.preventDefault(); e.stopImmediatePropagation(); closeMenuPop(true); } }   // one Escape closes one layer
+// A keyboard Enter / Space on an outside control (a click with no press, detail 0) closes the menu and does only that.
+function menuKeyClick(ev){ if(ev.detail!==0||ev.target.closest('.cmenu-pop')) return; ev.stopPropagation(); ev.preventDefault(); closeMenuPop(); }
 function menuBlur(){ closeMenuPop(); }
 // The click that follows the closing pointerdown is swallowed, so it never reaches what is underneath (the drawer
 // backdrop's close, a row that would open): the first outside tap only closes the menu. The swallower lives until
@@ -49,7 +51,7 @@ function swallowClick(at){
 }
 function closeMenuPop(refocus){
   document.querySelectorAll(MENU_SEL).forEach((m)=>m.remove());
-  if(_menuOutside){ document.removeEventListener('pointerdown',_menuOutside,true); _menuOutside=null; }
+  if(_menuOutside){ document.removeEventListener('pointerdown',_menuOutside,true); document.removeEventListener('click',menuKeyClick,true); _menuOutside=null; }
   clearInterval(_menuWatch); _menuWatch=0;
   removeEventListener('keydown',menuKey,true); removeEventListener('blur',menuBlur);
   const a=_menuAnchor; _menuAnchor=null;
@@ -60,7 +62,7 @@ function armMenuPop(anchor){
   _menuAnchor=anchor||null;
   // iOS Safari fires no click for a tap on a plain element (a title, text): the outside tap is seen at pointerdown.
   _menuOutside=(ev)=>{ if(ev.button>0||ev.target.closest('.cmenu-pop')) return; ev.stopPropagation(); closeMenuPop(); swallowClick(ev.target); };   // primary button / touch / pen only
-  setTimeout(()=>{ if(_menuOutside) document.addEventListener('pointerdown',_menuOutside,true); },0);
+  setTimeout(()=>{ if(_menuOutside){ document.addEventListener('pointerdown',_menuOutside,true); document.addEventListener('click',menuKeyClick,true); } },0);
   addEventListener('keydown',menuKey,true); addEventListener('blur',menuBlur);
   if(_menuAnchor) _menuWatch=setInterval(()=>{ if(_menuAnchor&&anchorGone(_menuAnchor)) closeMenuPop(); },MENU_WATCH_MS);
 }

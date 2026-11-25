@@ -3,6 +3,10 @@
 Problems found while doing an asked-for task, not needed for that task. One line each; the task
 that found it in brackets. Pick from here; do not open a side session per item.
 
+## Publish sheet edge cases · 发布面板边角 (GPT review round 3, 2026-11-25, cap reached)
+- web/publish.js watch()/go(): a status reply after goHome/openApp or a newer preview can still open a sheet (preview replies are guarded by popGen/openSeq; status notices are not).
+- web/publish.js open(): pressing 发布 clears the sheet's click handler, so ✕ · Close does nothing while the request is pending, and stays dead if it rejects.
+
 ## App faces after home v2 · 新首页后的应用面板数字
 - `faceAge`/`faceHtml`/`FACE_FRESH_MS` in `web/index.html` and the `.ecard .face` CSS (index.html, shell-look.css) are unused since home v2 moved faces to the chips row; delete them with their tests in `test/app-face.test.mjs`.
 - The chips row shows a face value without its age, so a stale count can look live; port the age rule into `PAHome.chips` first.
