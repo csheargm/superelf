@@ -99,7 +99,8 @@
 .pac-row{position:absolute;left:0;right:0;bottom:0;display:flex;flex-direction:column;gap:6px;padding:8px 12px calc(10px + env(safe-area-inset-bottom,0px));background:transparent;pointer-events:none;z-index:4}
 .pac-row>*{pointer-events:auto}
 .pac-frow{display:flex;align-items:flex-end;gap:4px;background:var(--bg,#f4f4f5);border:1px solid var(--line,#e6e6e6);border-radius:20px;padding:2px 4px;box-shadow:0 2px 12px rgba(0,0,0,.22)}
-.pac-plus,.pac-tool{background:none;border:none;color:var(--muted,#888);font-size:20px;width:30px;height:34px;cursor:pointer;flex-shrink:0;padding:0}
+.pac-plus{background:none;border:none;color:var(--muted,#888);font-size:20px;width:30px;height:34px;cursor:pointer;flex-shrink:0}
+.pac-tool{background:none;border:none;color:var(--muted,#888);font-size:20px;width:30px;height:34px;cursor:pointer;flex-shrink:0;padding:0}
 .pac-tool svg{width:20px;height:20px;vertical-align:middle}
 .pac-inp{flex:1;font:inherit;font-size:var(--pac-fs,14px);padding:7px 8px;border:none;background:transparent;color:var(--text,#111);outline:none;resize:none;max-height:120px;line-height:1.4;overflow-y:auto}
 .pac-go{background:var(--accent,#0a7a5a);color:#fff;border:none;border-radius:50%;width:34px;height:34px;padding:0;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;flex-shrink:0}
@@ -1094,9 +1095,10 @@
     // the model said nothing (R5). No existing caller inspects the value, so this is additive.
     async function send(text,o){   // o: {attachments:[{name,path}], model} — a host's own files and lane for THIS turn (the summary's page images); the composer's chips stay
       if(sending) return false;                 // a turn is already streaming
+      let typed=null;   // the composer's words when tapped, if a host's beforeSend makes the send wait
       // A host's last word on the chips before they are read (the app chat retakes a stale screenshot,
       // web/app-edit-panel.html). Held as a send, so a second tap cannot slip in while it runs.
-      if(!(o&&Array.isArray(o.attachments))&&typeof opts.beforeSend==='function'){ sending=true; const was=_loadSeq; if(typeof text!=='string') text=el.inp.value;   // the words as tapped, not as edited while it waits
+      if(!(o&&Array.isArray(o.attachments))&&typeof opts.beforeSend==='function'){ sending=true; const was=_loadSeq; if(typeof text!=='string') text=typed=el.inp.value;   // the words as tapped, not as edited while it waits
         try{ await opts.beforeSend(); }
         catch(err){ addMsg('status','⚠ '+((err&&err.message)||err)); }   // R5: said in the log; the send goes on with the chips as they are
         finally{ sending=false; }
@@ -1119,7 +1121,8 @@
       const bytes=pacChatBytes(msg, cid||null, attRefs, lbl, sys);
       if(bytes>PAC_LIMITS.chat){ addMsg('status', pacTooLargeText('Message', bytes, PAC_LIMITS.chat)); updateScroll(); return false; }   // too large: reported in the log AND to the caller
       sending=true; el.go.disabled=true;
-      el.inp.value=''; autosize(); const shown=shownMe(shownUserText(q)); const um=addMsg('me',shown,mine); if(!ext) atts=[]; renderChips();
+      const later=(typed!==null&&el.inp.value!==typed)?el.inp.value:'';   // typed while a host's beforeSend ran: kept as the next draft
+      el.inp.value=''; el.inp.value=later; autosize(); const shown=shownMe(shownUserText(q)); const um=addMsg('me',shown,mine); if(!ext) atts=[]; renderChips();
       if(q){ addActions(um,'me',shown); lastUser=q; }
       const sendTime=Date.now();
       let _waiting=true, _elTimer=null;
