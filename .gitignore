@@ -8,6 +8,7 @@ state.json
 state-web.json
 model-health.json
 model-review.json
+member-quota.json
 # Claude sign-in: the long-lived token (lib/claude-token.mjs) and the watchdog's state (lib/claude-auth.mjs)
 claude-token
 claude-auth.json

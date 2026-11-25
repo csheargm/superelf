@@ -23,3 +23,21 @@ chat has to hand off with an offer button. Owner asked for one chat that does bo
 - One extra tap per change (safety; protects against misread questions).
 - Non-owner edits are whole-file rewrites (slow, size-limited).
 - Supersedes ADR 0040's "two chats" split; keeps all of its safety rules.
+
+## Addendum (2026-11-24, v5.17.x): the app chat changes only the app; member usage metered
+Owner decisions on the two review leftovers.
+1. **The owner's 改 · Apply is jailed to apps/<slug>/.** The confirmed turn runs the full agent with
+   lib/agent-origin.mjs `appJailArgs`: no skip-permissions, `default` mode, Bash and MCP off, the only
+   allow rule `Edit(<real app dir>/**)`, and CLAUDE.md / CLAUDE.local.md / AGENTS.md / AGENTS.override.md
+   / GEMINI.md and every dot-name denied even inside the app (ADR 0019: a planted instruction file steers
+   the next agent). Measured on CLI 2.1.327: inside → written, outside and protected names → denied.
+   The server backstop (lib/app-edit-jail.mjs) watches every file tool call; one naming a path outside
+   the app or a protected name, or a new protected file in the app folder, rolls back the WHOLE turn
+   (the app from its undo copy, outside files the turn created removed) and the reply says so. Known
+   limit: an existing outside file changed anyway cannot be restored; it is named. "change superelf: …"
+   still goes to the owner's main agent, unjailed.
+2. **Members not opted in to Claude are metered.** Each of their app-chat turns on Claude (no tools)
+   charges a per-member daily counter (lib/member-quota.mjs, the demo's quota store, `member-quota.json`
+   beside config.json; cap `member_limits.ai_calls_per_user_per_day`, default 30, read at use time).
+   Past the cap the turn makes no model call and answers with a bilingual limit line. Ollama turns and
+   typed "undo" are not charged.

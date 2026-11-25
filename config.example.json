@@ -31,5 +31,6 @@
   "users": [],
   "max_concurrent": 5,
   "public_base_url": "",
-  "local_origin": ""
+  "local_origin": "",
+  "member_limits": { "ai_calls_per_user_per_day": 30 }
 }

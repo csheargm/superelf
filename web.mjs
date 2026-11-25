@@ -48,7 +48,9 @@ import { jobsView, readAuditTail, humanSchedule } from './lib/jobstatus.mjs';
 import { adminConfigView, applyConfigWrite } from './lib/adminconfig.mjs';
 import { runCodex } from './lib/codex.mjs';
 import { laneRunner } from './lib/model-review-agent.mjs';
-import { appOriginated, agentConfined, convoTag, convoReachable, laneArgs } from './lib/agent-origin.mjs';
+import { appOriginated, agentConfined, convoTag, convoReachable, laneArgs, appJailArgs } from './lib/agent-origin.mjs';
+import { makeJailWatch } from './lib/app-edit-jail.mjs';
+import { consumeMemberAiCall, MEMBER_QUOTA_FILE } from './lib/member-quota.mjs';
 import { runAssessment, pickPanel } from './lib/assess.mjs';
 import { runResearch } from './lib/research.mjs';
 import { MODEL_HEALTH_FILENAME, ollamaHttpError, modelHealthFor, runModelCheck } from './lib/model-health.mjs';
@@ -1300,7 +1302,13 @@ function offerApply(user, edit, message, r, line) {
   return { ...r, text: o.text };
 }
 // A member's edit turn: one no-tools model call per attempt (Ollama, or Claude with --tools=), never Codex.
+const memberQuota = makeQuotaStore(path.join(ROOT, MEMBER_QUOTA_FILE));   // lib/member-quota.mjs
 async function scopedEditTurn(user, edit, message, convo, lane, origin, cancel) {
+  // Claude for a member not opted in to it: one charge per turn on their daily counter (ADR 0042 addendum).
+  if (lane.provider !== 'ollama' && !agentAllowed(user)) {
+    const q = consumeMemberAiCall({ cfg, store: memberQuota, userId: user.id });
+    if (!q.ok) { audit('member-ai-limit', { who: user.id, app: edit.slug }); return { ok: false, text: q.error }; }
+  }
   const deadline = cfg.task_timeout_minutes * 60000;   // one fail-closed deadline for either provider
   const ask = async (messages) => {
     const signal = cancel ? AbortSignal.any([cancel.signal, AbortSignal.timeout(deadline)]) : AbortSignal.timeout(deadline);
@@ -1496,7 +1504,11 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
       // LIVE cfg on every turn, so a config.json edit applies to the next one (docs/adr/0011).
       const baseArgs = oneShot ? oneShotBaseArgs(tierArgs, cfg.one_shot_args, memberArgsOf(user, origin)) : tierArgs;
       // An unconfirmed edit turn plans with NO tools: nothing can write before 改 · Apply (GPT review 2026-11-24).
-      const extraArgs = agentArgs(user, edit && !edit.confirmed && !edit.superelf ? [...baseArgs, ...NO_TOOLS_ARGS] : baseArgs, origin);   // owner's own chat: unrestricted. an app's turn or a member's: no skip-permissions.
+      // A confirmed one is jailed to apps/<slug>/ (lib/agent-origin.mjs appJailArgs) and watched (lib/app-edit-jail.mjs).
+      const jailed = !!(edit && edit.confirmed && !edit.superelf && editCtx);
+      const extraArgs = jailed ? appJailArgs(baseArgs, fs.realpathSync(edit.dir))
+        : agentArgs(user, edit && !edit.confirmed && !edit.superelf ? [...baseArgs, ...NO_TOOLS_ARGS] : baseArgs, origin);
+      if (jailed && !editCtx.jail) editCtx.jail = makeJailWatch(edit.dir, wsDir(user));   // owner's own chat: unrestricted. an app's turn or a member's: no skip-permissions.
       const cancelled = () => !!cancel && cancel.signal.aborted;   // a oneShot caller that left, or the composer's explicit Stop (lib/turn-stop.mjs)
         // The SAME resolved skill the fast lanes get (profile override → config → built-in).
         // It was resolved only inside the ollama branch, so an app's directive applied on one
@@ -1532,7 +1544,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
           // app contract; the language rule and the confined note still ride.
           systemPrompt: agentSystemPrompt([agentPrompts.global, agentPrompts.app, origin.fromApp ? noChangeRule(chatRole) : null], agentCapabilities(laneRole(user, origin), oneShot ? null : APP_CONTRACT), turnFacts),
         resumeId, timeoutMs: cfg.task_timeout_minutes * 60000, onChild: cancel ? cancel.onChild : undefined,
-        onDelta: (t) => line({ type: 'delta', text: t }), onTool: (n, b) => line({ type: 'status', text: `${n}${b ? ` — ${b}` : ''}` }) };
+        onDelta: (t) => line({ type: 'delta', text: t }), onTool: (n, b, input) => { if (jailed) editCtx.jail.onTool(n, b, input); line({ type: 'status', text: `${n}${b ? ` — ${b}` : ''}` }); } };
       r = await enqueue(async () => {
         if (cancelled()) return CHAT_CANCELLED;   // still queued when its caller left: never spawn
         let x = await runClaude({ ...opts, prompt: histPrompt });
