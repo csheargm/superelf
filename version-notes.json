@@ -1,4 +1,12 @@
 {
+  "v5.26.0": {
+    "date": "2026-11-25",
+    "features": [
+      "停靠窗口可拖动内侧边缘调整大小 · Docked windows resize from a visible inner edge"
+    ],
+    "fixes": [],
+    "through": "70051b52750f57dd831f83c54cae605ee1d7b340"
+  },
   "v5.25.2": {
     "date": "2026-11-25",
     "features": [],
