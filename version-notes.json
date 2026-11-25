@@ -1,4 +1,12 @@
 {
+  "v5.22.1": {
+    "date": "2026-11-25",
+    "features": [],
+    "fixes": [
+      "聊天图标清晰、最后一条不被挡 · Clear chat icons, last message never under the box"
+    ],
+    "through": "59517e8e41c8a38805c479a3e383564a4f25c322"
+  },
   "v5.22.0": {
     "date": "2026-11-25",
     "features": [
