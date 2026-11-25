@@ -728,3 +728,11 @@ Without it they now FAIL (R14), not pass as `# pass 0 / # fail 0`. To run them:
 
 ## Drawer sections — review leftover (GPT review cap, 2026-11-24)
 - test/drawer-sections-e2e.test.mjs reads the page clock just after the drawer renders; a render and read straddling midnight could still mismatch (seconds-wide window). Fix: freeze the page clock (page.clock) and seed chats from that time.
+
+### Unified app chat — GPT review round 3 leftovers (2026-11-24)
+- Owner Apply runs the full agent in the whole workspace; app files/history could steer it outside apps/<slug>/. Owner decision: stage owner edits in an app-only sandbox? (by design today, same as the main chat).
+- Members on a private node get Claude (no tools) in the app chat even when not opted in to Claude, with no per-member meter. Owner decision: meter it, or Ollama-only for members not opted in.
+- The member lane drops image attachments (the panel's screenshot); it should say so or pass them.
+- Done trusts the iframe load event; the service worker's 503 fallback page still counts as loaded.
+- A confirm id is bound to the slug, not the app instance: delete + re-create within 10 minutes reuses it (same user only).
+- Text inside an app page can make the planner print [[apply]] on a question; the user still has to tap Apply.

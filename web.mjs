@@ -17,7 +17,7 @@ import { handleActivityRoute, refuseStaleUndo } from './lib/activity-view.mjs';
 import { loadConfig, configPath, fastLaneGuard, GUARD_DEFAULT_SURFACE, agentCapabilities, appContract, REPLY_LANGUAGE_RULE, OVERRIDABLE_PROMPT_MAX } from './lib/config.mjs';
 import { runClaude, APPEND_SYSTEM_PROMPT_MAX } from './lib/runner.mjs';
 import { agentAllowed, lanesFor, memberLane, NO_PLAIN_LANE_TEXT, AGENT_OFF_TEXT } from './lib/member-lanes.mjs';
-import { cancelOnClose, createTurnCancel, createTurnStops } from './lib/turn-stop.mjs';
+import { cancelOnClose, createTurnCancel, createTurnStops, CANCELLED_TEXT } from './lib/turn-stop.mjs';
 import { watchConfig } from './lib/config-watch.mjs';
 import { oneShotBaseArgs, oneShotModel, yieldSettings, NO_TOOLS_ARGS } from './lib/one-shot.mjs';
 import { mintConfirm, planOffer, applyMessage, APPLY_LABEL } from './lib/app-edit-confirm.mjs';
@@ -1072,7 +1072,7 @@ async function runAgent(message, extraArgs, cwd, timeoutMs, systemPrompt) {
 // --effort stays the user's. lib/one-shot.mjs holds the rules; both values are read per turn,
 // never copied here (docs/adr/0011).
 // What a cancelled oneShot turn answers and stores, instead of the killed child's raw stream-json.
-const CHAT_CANCELLED = Object.freeze({ ok: false, text: '已取消 · Cancelled' });   // == PAC_CANCELLED in web/chat-ui.inline.html (test/chat-cancel.test.mjs)
+const CHAT_CANCELLED = Object.freeze({ ok: false, text: CANCELLED_TEXT });   // == PAC_CANCELLED in web/chat-ui.inline.html (test/chat-cancel.test.mjs)
 // A oneShot caller that goes away (the studio's Cancel or timeout aborts the shell relay's fetch,
 // which closes this socket) can no longer use the answer, so the run stops: the claude child is
 // killed, and a turn still queued never spawns one (chat() checks `signal`). Before this, the
@@ -1294,21 +1294,23 @@ function offerApply(user, edit, message, r, line) {
   if (edit.confirmed || edit.superelf || edit.undo) return r;
   const o = planOffer(r.text);
   if (!o.offered) return r;
-  const id = mintConfirm({ who: user.id, slug: edit.slug, plan: `${message}\n\n${o.text}`, request: message });
+  const id = mintConfirm({ who: user.id, slug: edit.slug, plan: o.text, request: message });
   line({ type: 'app-change-confirm', slug: edit.slug, label: APPLY_LABEL, message: applyMessage(id) });
   return { ...r, text: o.text };
 }
 // A member's edit turn: one no-tools model call per attempt (Ollama, or Claude with --tools=), never Codex.
-async function scopedEditTurn(user, edit, message, convo, lane, origin) {
+async function scopedEditTurn(user, edit, message, convo, lane, origin, cancel) {
+  const deadline = cfg.task_timeout_minutes * 60000;   // one fail-closed deadline for either provider
   const ask = async (messages) => {
-    if (lane.provider === 'ollama') return streamOllama({ url: cfg.ollama_url, model: lane.model, messages, onDelta: () => {} });
+    const signal = cancel ? AbortSignal.any([cancel.signal, AbortSignal.timeout(deadline)]) : AbortSignal.timeout(deadline);
+    if (lane.provider === 'ollama') return streamOllama({ url: cfg.ollama_url, model: lane.model, messages, signal, onDelta: () => {} });
     const { system, prompt } = flattenForClaude(messages);
     const x = await enqueue(() => runClaude({ claudeCmd: cfg.claude_cmd, extraArgs: agentArgs(user, [...cfg.claude_args, ...NO_TOOLS_ARGS], origin),
-      cwd: wsDir(user), prompt, systemPrompt: system, timeoutMs: cfg.task_timeout_minutes * 60000 }));
+      cwd: wsDir(user), prompt, systemPrompt: system, timeoutMs: deadline, onChild: cancel ? cancel.onChild : undefined }));
     if (!x.ok) throw new Error(x.text || 'the model failed · 模型失败');
     return x.text;
   };
-  return runScopedEdit({ edit, wsDir: wsDir(user), message, prior: convo.messages.slice(0, -1), contract: APP_CONTRACT, ask });
+  return runScopedEdit({ edit, wsDir: wsDir(user), message, prior: convo.messages.slice(0, -1), contract: APP_CONTRACT, ask, signal: cancel ? cancel.signal : undefined });
 }
 
 async function chatTurn(req, res, user, body, hold, cancel = null) {
@@ -1435,7 +1437,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
     for (;;) {
     if (ml.blocked && !(edit && edit.scoped)) r = { ok: false, text: NO_PLAIN_LANE_TEXT };   // a member's app chat has its own no-tools lane (GPT review)   // no plain lane for this member: said, never the agent
     else if (edit && edit.undo) { r = undoAppEdit(edit, { wsDir: wsDir(user) }); line(r.line); audit('app-edit-undo', { who: user.id, app: edit.slug, undone: !!r.line.undone }); }   // a typed "undo": no model
-    else if (edit && edit.scoped) r = await scopedEditTurn(user, edit, message, convo, chosen, origin);   // a member's app chat: no tools, the server writes (lib/app-edit-lane.mjs)
+    else if (edit && edit.scoped) r = await scopedEditTurn(user, edit, message, convo, chosen, origin, cancel);   // a member's app chat: no tools, the server writes (lib/app-edit-lane.mjs)
     else if (chosen && chosen.provider === 'ollama') {
       // Fast lane: text-only Ollama model. Stateless, so send recent history for context.
       // Global honesty guard + the app's own directive (e.g. the Bible app's "reply in Chinese
@@ -1578,6 +1580,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
         canEdit: user.role === 'owner' && origin.fromApp && typeof app === 'string' && slugOk(app) }) };
     }
     if (edit && !blank && r.ok !== false) r = offerApply(user, edit, message, r, line);   // a plan → the 改 · Apply button (lib/app-edit-confirm.mjs)
+    if (edit && cancel && cancel.signal.aborted) edit.stopped = true;   // a Stop never leaves a half-done change applied (GPT review r3)
     const edited = finishAppEdit(edit, editCtx, { wsDir: wsDir(user) });   // inline checks; a failing or unconfirmed change is rolled back
     editCtx = null;
     if (edited) { audit('app-edit', { who: user.id, app: edit.slug, changed: edited.line.changed, applied: edited.line.applied, version: edited.line.version || null }); line(edited.line); edited.note = [editUnchangedNote(r.text, edited.line), edited.note].filter(Boolean).join('\n\n'); if (edited.note) { r = { ...r, text: `${r.text || ''}\n\n${edited.note}` }; line({ type: 'delta', text: `\n\n${edited.note}` }); } }

@@ -33,7 +33,7 @@ test('a confirm id is single use and bound to the user, the app and time', () =>
   const t = Date.now(); const id3 = mintConfirm({ who: 'kid', slug: 'todo', plan: 'p' }, t);
   assert.equal(code(() => consumeConfirm(id3, { who: 'kid', slug: 'todo' }, t + CONFIRM_TTL_MS + 1)), 'bad_confirm', 'expired');
   const id4 = mintConfirm({ who: 'kid', slug: 'todo', plan: 'blue' });
-  assert.deepEqual(consumeConfirm(id4, { who: 'kid', slug: 'todo' }), { plan: 'blue', request: 'blue' });
+  assert.deepEqual(consumeConfirm(id4, { who: 'kid', slug: 'todo' }), { plan: 'blue', request: '' });
   assert.equal(code(() => consumeConfirm(id4, { who: 'kid', slug: 'todo' })), 'bad_confirm', 'single use');
   assert.equal(code(() => consumeConfirm('forged-id-000000', { who: 'kid', slug: 'todo' })), 'bad_confirm', 'never minted');
 });
@@ -142,4 +142,44 @@ test('GPT review pins: unconfirmed edit turns plan with no tools, Verify never r
   assert.match(web, /edit && !edit\.confirmed && !edit\.superelf \? \[\.\.\.baseArgs, \.\.\.NO_TOOLS_ARGS\]/);
   assert.match(web, /if \(assess && !edit && agentAllowed\(user\)\)/);
   assert.match(web, /if \(ml\.blocked && !\(edit && edit\.scoped\)\)/);
+});
+
+test('GPT review r3: a long request never pushes out the plan; an attachment after the tap still applies', () => {
+  const long = 'x'.repeat(5000);
+  const id = mintConfirm({ who: 'owner', slug: 'todo', plan: 'I will make the title red.', request: long });
+  assert.equal(applyIdOf(`${applyMessage(id)}\n\n[attached: shot.png]`), id, 'trailing attachment text keeps the id');
+  assert.equal(applyIdOf(`${applyMessage(id)}x`), null, 'no id with junk glued on');
+  const w = ws();
+  try {
+    const e = confirmEdit(ed(w, applyMessage(id)));
+    assert.match(e.plan, /I will make the title red\.$/, 'the plan the user saw is always in');
+  } finally { rmTemp(w); }
+});
+
+test('GPT review r3: a Stop during a confirmed change rolls it back', () => {
+  const w = ws();
+  try {
+    const id = mintConfirm({ who: 'owner', slug: 'todo', plan: 'p', request: 'r' });
+    const e = confirmEdit(ed(w, applyMessage(id)));
+    const ctx = beginAppEdit(e, { wsDir: w });
+    fs.writeFileSync(path.join(w, 'apps', 'todo', 'index.html'), PAGE.replace('Hi', 'Half'));
+    e.stopped = true;
+    const r = finishAppEdit(e, ctx, { wsDir: w });
+    assert.deepEqual([r.line.applied, r.line.stopped], [false, true]);
+    assert.equal(page(w), PAGE);
+  } finally { rmTemp(w); }
+});
+
+test('GPT review r3: the member lane keeps the page out of the system line and never writes after a Stop', async () => {
+  const w = ws();
+  try {
+    const e1 = confirmEdit(ed(w, 'q', KID));
+    await runScopedEdit({ edit: e1, wsDir: w, message: 'q', prior: [], contract: 'C', ask: async (m) => {
+      assert.doesNotMatch(m[0].content, /<h1>Hi/); assert.match(m[1].content, /PAGE \(index.html\) START[\s\S]*<h1>Hi/); return 'ok'; } });
+    const ac = new AbortController();
+    const id = mintConfirm({ who: 'kid', slug: 'todo', plan: 'p' });
+    const e2 = confirmEdit(ed(w, applyMessage(id), KID));
+    const r = await runScopedEdit({ edit: e2, wsDir: w, message: 'x', prior: [], contract: 'C', signal: ac.signal, ask: async () => { ac.abort(); return BUILT; } });
+    assert.equal(r.ok, false); assert.equal(page(w), PAGE, 'nothing written after the Stop');
+  } finally { rmTemp(w); }
 });
