@@ -1879,26 +1879,28 @@
     // A second paper renderer would drift from this one and the printout would slowly stop
     // looking like the note — the failure mode is silent, which is why it is not worth the
     // convenience (R3).
-    function drawPaper(ctx,h,bg,fit){
-      const live=!ctx||ctx===bgCtx; ctx=ctx||bgCtx; h=h||H;
-      ctx.clearRect(0,0,W,h);
+    // `pw` is the paper width in the context's units: print draws the WHOLE sheet under its one
+    // content transform, so a shrunk note still gets paper and rules out to the sheet's edge.
+    function drawPaper(ctx,h,bg,fit,pw){
+      const live=!ctx||ctx===bgCtx; ctx=ctx||bgCtx; h=h||H; pw=pw||W;
+      ctx.clearRect(0,0,pw,h);
       // `bg` is how PRINT asks for white without changing the note. On screen the tint separates
       // the page from the app; on paper it is a full-bleed colour wash that costs a great deal of
       // toner and buys nothing. The rule lines stay — they are what the handwriting sits on.
-      ctx.fillStyle=bg||paperColor(); ctx.fillRect(0,0,W,h);   // background colour fills behind the lines
+      ctx.fillStyle=bg||paperColor(); ctx.fillRect(0,0,pw,h);   // background colour fills behind the lines
       // Stationery FIRST, over the ground and under every line — and on paper too, even on white:
       // it is part of the page, not a tint. `fit` is print's content transform, so the design
       // shrinks WITH the ink and stays aligned. Unknown or still decoding: nothing (plain paper).
-      if(STN&&NB.stationery) STN.paint(ctx,NB.stationery,{w:W,h,sheets:live&&seamless?0:1,fit,
+      if(STN&&NB.stationery) STN.paint(ctx,NB.stationery,{w:pw,h,sheets:live&&seamless?0:1,fit,
         onReady:live?()=>{ if(bgCtx) drawPaper(); }:null});
       if(live) syncPaperPickers();                              // picker chrome is screen-only; a print render must not touch the DOM
       const t=NB.template||DEFAULT_TPL;
       if(t==='plain') return;
       const gap=ruleGap();
-      if(t==='dot'){ drawDots(gap,ctx,h); return; }
+      if(t==='dot'){ drawDots(gap,ctx,h,pw); return; }
       ctx.strokeStyle=RULE_INK; ctx.lineWidth=1;
-      for(let y=firstRuleY();y<h;y+=gap){ ctx.beginPath(); ctx.moveTo(0,y+0.5); ctx.lineTo(W,y+0.5); ctx.stroke(); }   // ruled + grid share horizontals
-      if(t==='grid') for(let x=gap;x<W;x+=gap){ ctx.beginPath(); ctx.moveTo(x+0.5,0); ctx.lineTo(x+0.5,h); ctx.stroke(); }
+      for(let y=firstRuleY();y<h;y+=gap){ ctx.beginPath(); ctx.moveTo(0,y+0.5); ctx.lineTo(pw,y+0.5); ctx.stroke(); }   // ruled + grid share horizontals
+      if(t==='grid') for(let x=gap;x<pw;x+=gap){ ctx.beginPath(); ctx.moveTo(x+0.5,0); ctx.lineTo(x+0.5,h); ctx.stroke(); }
       if(MARGIN_TPL[t]) drawMargin(gap,ctx,h);
       // SHEET BOUNDARIES. In seamless view the page is taller than a sheet, so where one sheet
       // ends has to be visible — otherwise writing lands across a fold the user never saw, and
@@ -1913,8 +1915,8 @@
       }
     }
     function paperColor(){ return NB.bgColor||PAPER_WHITE; }   // the page's ground: drawPaper fills it, the swatches tick it, a 信纸 draft zoom sits on it. TODO(R4) seam: the paper/stationery hooks (STN, above)
-    function drawDots(gap,ctx,h){ ctx=ctx||bgCtx; h=h||H; ctx.fillStyle=RULE_INK;   // dot grid = a dot at each ruled/grid intersection
-      for(let y=firstRuleY();y<h;y+=gap) for(let x=gap;x<W;x+=gap){ ctx.beginPath(); ctx.arc(x,y,1.1,0,TAU); ctx.fill(); } }
+    function drawDots(gap,ctx,h,pw){ ctx=ctx||bgCtx; h=h||H; pw=pw||W; ctx.fillStyle=RULE_INK;   // dot grid = a dot at each ruled/grid intersection
+      for(let y=firstRuleY();y<h;y+=gap) for(let x=gap;x<pw;x+=gap){ ctx.beginPath(); ctx.arc(x,y,1.1,0,TAU); ctx.fill(); } }
     function drawMargin(gap,ctx,h){ ctx=ctx||bgCtx; h=h||H; const mx=Math.round(gap*1.6);   // vertical red margin line (Notebook / College)
       ctx.save(); ctx.strokeStyle=MARGIN_INK; ctx.lineWidth=1.5;
       ctx.beginPath(); ctx.moveTo(mx+0.5,0); ctx.lineTo(mx+0.5,h); ctx.stroke(); ctx.restore(); }
@@ -2077,12 +2079,12 @@
       ctx.save();
       ctx.setTransform(scale,0,0,scale,0,0);                    // draw in CSS px; the transform buys the DPI
       ctx.lineCap='round'; ctx.lineJoin='round';                // setupCanvases sets these per context; a fresh one must too
-      drawPaper(ctx,hCss,paper,fit);                            // paper fills the WHOLE page, unscaled (stationery follows `fit`)
-      // …and only the CONTENT shrinks, when a page holds more writing than the sheet can take.
-      // Scaling the paper too would just reproduce the white band this exists to remove.
-      // fit.dy shifts the CONTENT up so a later sheet shows a later slice of a tall page; it is
-      // applied before the scale because it is already expressed in the sheet's own pixels.
-      if(fit&&((fit.k&&fit.k!==1)||fit.dy)){ ctx.translate(fit.dx||0,fit.dy||0); ctx.scale(fit.k||1,fit.k||1); }
+      // ONE transform for paper, rules, stationery, text and ink, so the writing stays on its
+      // lines. `fit.k` is the note-wide scale PAPrint chose (the same for every page); the paper
+      // is drawn out to the sheet edge in the scaled space, so a shrunk note still fills the page.
+      const k=(fit&&fit.k)||1;
+      if(k!==1) ctx.scale(k,k);
+      drawPaper(ctx,hCss/k,paper,null,W/k);
       drawText(ctx,pg.pageHtml);                                // first: on screen the text layer sits BENEATH the ink canvas (ADR 0021); inside fit, so it slices with the rest
       drawImages(pg,ctx);
       // Same back-to-front order as rebuildCommitted: highlighter sits BEHIND pen and marker.

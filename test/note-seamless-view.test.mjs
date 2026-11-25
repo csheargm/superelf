@@ -48,7 +48,7 @@ test('the surface is capped, because a blank canvas looks like a lost note', () 
 test('the sheet boundary is drawn on SCREEN only', () => {
   // A divider on paper would be a line printed across the note. drawPaper already knows which
   // render it is doing (`live`), so this rides that rather than inventing a second signal.
-  const fn = /function drawPaper\(ctx,h,bg,fit\)\{[\s\S]*?\n    \}/.exec(E);
+  const fn = /function drawPaper\(ctx,h,bg,fit,pw\)\{[\s\S]*?\n    \}/.exec(E);
   assert.ok(fn, 'drawPaper must be findable');
   assert.match(fn[0], /if\(live&&seamless&&h>PAGE_H\)/, 'live, seamless, and only when taller than a sheet');
   assert.match(fn[0], /for\(let y=PAGE_H;y<h;y\+=PAGE_H\)/, 'one line per sheet boundary');

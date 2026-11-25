@@ -23,58 +23,59 @@ const S = stripComments(SHELL);
 // Extracted and executed rather than regex-matched: the bug these guard against (a canvas over
 // the platform's area cap comes back BLANK, not an exception) is invisible to a source-only test.
 const API = (() => {
-  const body = /function pageHeight[\s\S]*?return px>MAX_PX \? s\*Math\.sqrt\(MAX_PX\/px\) : s;\n  \}/.exec(P);
-  assert.ok(body, 'pageHeight and fitScale must be extractable');
-  const consts = /const TARGET_W=(\d+);/.exec(P)[1] + ',' + /const MAX_PX=([\d.e]+);/.exec(P)[1];
-  const pads = /const PAD_RATIO=([\d.]+), SHEET_ASPECT=([\d.]+);/.exec(P);
+  const scale = /function fitScale[\s\S]*?return px>MAX_PX \? s\*Math\.sqrt\(MAX_PX\/px\) : s;\n  \}/.exec(P);
+  const geo = /function pageHeight\(info,paper\)[\s\S]*?function noteFit\(info,paper\)\{[\s\S]*?\n  \}/.exec(P);
+  const paper = /const LETTER_REGIONS=[^\n]*\n  function defaultPaper[^\n]*/.exec(P);
+  assert.ok(scale && geo && paper, 'fitScale, pageHeight, noteFit and defaultPaper must be extractable');
+  const T = /const TARGET_W=(\d+);/.exec(P)[1], M = /const MAX_PX=([\d.e]+);/.exec(P)[1];
+  const pad = /const PAD_RATIO=([\d.]+);/.exec(P)[1];
   return new Function(
-    `const TARGET_W=${consts.split(',')[0]}, MAX_PX=${consts.split(',')[1]};` +
-    `const PAD_RATIO=${pads[1]}, SHEET_ASPECT=${pads[2]};` +
-    body[0] + '; return { pageHeight, fitScale, fitContent, TARGET_W, MAX_PX };'
+    `const TARGET_W=${T}, MAX_PX=${M}, PAD_RATIO=${pad}, LETTER_ASPECT=1056/816, A4_ASPECT=285/198;` + paper[0] + ';' +
+    scale[0] + geo[0] + '; return { pageHeight, fitScale, noteFit, defaultPaper, TARGET_W, MAX_PX };'
   )();
 })();
 
 test('a page prints at 300dpi across a sheet', () => {
-  // A4 portrait inside 10mm margins is 190mm ≈ 7.48in. 2244/7.48 ≈ 300.
   assert.equal(API.TARGET_W, 2244);
-  assert.ok(Math.abs(API.TARGET_W / 7.48 - 300) < 2, 'the target width is 300dpi, not a round number');
   // Measured against the real notebook: a 900px-wide page renders 2244px across.
   assert.equal(Math.round(900 * API.fitScale(900, 400)), 2244);
 });
 
-test('every page is the same page-shaped box, whatever the ink', () => {
-  // TWO failures forced this, one from each side. A height that followed the content printed a
-  // white band under short pages; and when it exceeded the printable box, the overflow cost a
-  // WHOLE SHEET (iPad, 2026-09-12: a 4-page note printed as 8 — content, blank, content, blank,
-  // each blank carrying the page-number stamp that had spilled off the page before it).
-  const info = { width: 900 };
-  const sheet = Math.round(900 * 1.20);
-  for (const extent of [0, 0.172, 1.132, 1.234, 2.0]) {
-    assert.equal(API.pageHeight(info, { extent }), sheet, `extent ${extent} is the same box`);
+test('every printed page is the pad sheet, a Letter page', () => {
+  // Not the old 1.20 box: that left a white band under every sheet (owner 2026-11-25).
+  for (const extent of [0, 0.5, 1.2, 2.0]) {
+    assert.equal(API.pageHeight({ width: 816, sheetH: 1056, pages: [{ extent }] }), 1056);
   }
+  assert.equal(API.pageHeight({ width: 816 }), 1056, 'a host without sheetH still gets Letter');
+  // A4 is taller: the page continues down to fill it rather than floating in a band.
+  assert.equal(API.pageHeight({ width: 816, sheetH: 1056 }, 'a4'), Math.round(816 * 285 / 198));
+  assert.match(P, /const A4_ASPECT=\(297-12\)\/\(210-12\);/, 'the A4 box matches the shell 6mm inner margin');
+  assert.doesNotMatch(P, /SHEET_ASPECT/, 'the 1.20 band is gone');
 });
 
-test('a page that holds more than the sheet is scaled to fit, not spilled', () => {
-  const info = { width: 900 };
-  // Shorter than the page: untouched.
-  assert.equal(API.fitContent(info, { extent: 0.5 }).k, 1, 'short pages are not scaled');
-  // Taller: scaled so the ink lands inside the page. Measured on a real render, the lowest ink on
-  // an extent-2.0 page sat at 98.2% of the sheet — inside it, not cut off at the edge.
-  const tall = API.fitContent(info, { extent: 2.0 });
-  assert.ok(tall.k < 1 && tall.k > 0, 'tall pages shrink');
-  assert.ok((2.0 + 0.04) * tall.k <= 1.201, 'and land inside the page');
-  assert.ok(tall.dx > 0, 'and stay centred while they do');
+test('one scale for the whole note, from content alone', () => {
+  const info = (exts) => ({ width: 816, sheetH: 1056, pages: exts.map((extent) => ({ extent })) });
+  assert.equal(API.noteFit(info([0.3, 1.2, 1.29])).k, 1, 'content inside the sheet is never scaled');
+  const k = API.noteFit(info([0.4, 1.37])).k;
+  assert.ok(k < 1 && 1.37 * 816 * k <= 1056, 'the deepest page decides and lands inside the sheet');
+  assert.equal(API.noteFit(info([0.4, 1.37, 0.2])).k, k, 'and every page gets that same k');
 });
 
-test('the page is shorter than the paper, on purpose', () => {
-  // 1.20, not Letter's 1.294. The printable box is NOT the sheet: margins only make it relatively
-  // TALLER (harmless), but an OS header/footer steals height ONLY, which lowers its aspect.
-  // Measured: Letter with 10mm margins is 1.324, so a 1.294 render survives ~2% of stolen height
-  // and spills at 4%. 1.20 tolerates ~9%, which covers iOS's URL/date footer.
-  const letterPrintable = (279.4 - 20) / (215.9 - 20);
-  assert.ok(1.20 < letterPrintable * 0.93,
-    'the render leaves real headroom under the printable box, not a rounding margin');
-  assert.match(P, /SHEET_ASPECT=1\.20;/, 'and the constant says so');
+test('the same strokes print the same from a 12.9in and an 11in iPad', () => {
+  // The device enters print only through screen height, which no longer reaches the geometry:
+  // extents are stored in page-width units and the sheet is fixed. Same content -> same k.
+  const pages = [{ extent: 0.9 }, { extent: 1.33 }];
+  const ipad129 = { width: 816, sheetH: 1056, pages }, ipad11 = { width: 816, sheetH: 1056, pages };
+  assert.equal(API.noteFit(ipad129).k, API.noteFit(ipad11).k);
+  assert.equal(API.pageHeight(ipad129), API.pageHeight(ipad11));
+});
+
+test('paper defaults by locale', () => {
+  assert.equal(API.defaultPaper('en-US'), 'letter');
+  assert.equal(API.defaultPaper('zh-CN'), 'a4');
+  assert.equal(API.defaultPaper('en-GB'), 'a4');
+  assert.equal(API.defaultPaper(''), 'a4');
+  assert.match(P, /kind:'print', title:opts\.title\|\|'', paper, pages:r\.pages/, 'and is sent to the shell');
 });
 
 test('an oversized page loses resolution, never its ink', () => {
@@ -85,7 +86,7 @@ test('an oversized page loses resolution, never its ink', () => {
   assert.ok(huge < full, 'a very tall page is scaled down');
   assert.ok((900 * huge) * (14 * 900 * huge) <= API.MAX_PX * 1.001, 'and lands inside the pixel budget');
   // Every real page measured (max extent 1.07) must stay at full resolution.
-  assert.equal(API.fitScale(900, API.pageHeight({ width: 900 }, { extent: 1.07 })), full,
+  assert.equal(API.fitScale(900, API.pageHeight({ width: 900 })), full,
     'a realistic page is never downscaled');
 });
 
@@ -195,7 +196,7 @@ test('the pad owns the only renderer; PAPrint draws nothing itself', () => {
 });
 
 test('the paper renderer serves the screen and the sheet from one definition', () => {
-  const fn = /function drawPaper\(ctx,h,bg,fit\)\{[\s\S]*?\n    \}/.exec(E);
+  const fn = /function drawPaper\(ctx,h,bg,fit,pw\)\{[\s\S]*?\n    \}/.exec(E);
   assert.ok(fn, 'drawPaper takes a context, a height and a background');
   assert.match(fn[0], /ctx=ctx\|\|bgCtx; h=h\|\|H;/, 'and still defaults to the live layer');
   // Ruled lines are painted onto the CANVAS, so they are image content in the printout and the
@@ -240,8 +241,12 @@ test('the shell prints the pages and nothing else', () => {
   // Chrome must not reach the paper.
   assert.match(S, /html\.pa-printing body>\*:not\(#printRoot\)\{display:none!important\}/, 'shell chrome is hidden');
   assert.match(S, /#printRoot\{display:none\}/, 'and the print surface never shows on screen');
-  // One note page per sheet, fitted to the PAGE WIDTH.
-  assert.match(S, /\.pr-sheet img\{display:block;width:100%;height:auto/, 'the image fills the page width');
+  // One note page per sheet, centred in a physical-unit box on a zero-margin page.
+  assert.match(S, /\.pr-sheet\{display:flex;align-items:center;justify-content:center/, 'the sheet centres its page');
+  assert.match(S, /height:calc\(var\(--pr-paper-h,279\.4mm\) - 12mm\);margin-top:6mm;padding:0 6mm/, 'even inner margin in mm');
+  assert.match(S, /object-fit:contain/, 'the image fits, never crops');
+  assert.match(S, /@page\{margin:0\}/, 'no room for a browser header/footer');
+  assert.match(br[0], /@page\{size:'\+pz\.w\+' '\+pz\.h\+';margin:0\}/, 'page size from the chosen paper');
   assert.match(S, /\.pr-sheet\{[^}]*page-break-after:always/, 'one page per sheet');
 });
 
@@ -334,7 +339,7 @@ test('ink only, on white paper, by default', () => {
   assert.match(P, /inkOnly\s*===\s*false\s*\?\s*undefined\s*:\s*PAPER_WHITE/, 'only an explicit false opts out');
   assert.match(P, /note\.printPage\(i,ctx,scale,hCss,paper\b/, 'and the pad is told which paper');
   // undefined, not white, is what leaves the note's own colour in place.
-  const fn = /function drawPaper\(ctx,h,bg,fit\)\{[\s\S]*?\n    \}/.exec(E);
+  const fn = /function drawPaper\(ctx,h,bg,fit,pw\)\{[\s\S]*?\n    \}/.exec(E);
   assert.ok(fn, 'drawPaper takes a background override');
   assert.match(fn[0], /ctx\.fillStyle=bg\|\|paperColor\(\);/, 'the note keeps its colour when none is given');
   assert.match(E, /function paperColor\(\)\{ return NB\.bgColor\|\|PAPER_WHITE; \}/, '— its own colour, else the default');
@@ -377,7 +382,9 @@ test('every page carries its number, a lone page included', () => {
   const fn = /function stampPageNumber\([\s\S]*?\n  \}/.exec(P);
   assert.ok(fn, 'the stamp is its own function');
   assert.match(fn[0], /n\+' \/ '\+total/, 'a numeric fraction, which needs no translation');
-  assert.match(fn[0], /textAlign='right'/, 'bottom RIGHT');
+  assert.match(P, /NUM_SIZE=0\.013/, 'and small');
+  assert.match(fn[0], /textAlign='center'/, 'bottom CENTRE — nothing else in the footer');
+  assert.match(fn[0], /c\.width\/2, c\.height-inset/, 'centred on the sheet');
 });
 
 test('the page number is drawn INTO the image, never added to the sheet', () => {
@@ -403,89 +410,23 @@ test('the stamp is the same physical size whatever the render resolution', () =>
   assert.match(fn[0], /c\.width\*NUM_INSET/, 'and so does the inset');
   // Both insets come off the WIDTH, so the corner gap is square and clears the printer's
   // non-printable border even at "no margins" (measured 4.2mm at 300dpi).
-  assert.match(fn[0], /c\.width-inset, c\.height-inset/, 'inset from both edges equally');
+  assert.match(fn[0], /c\.height-inset/, "inset from the foot");
 });
 
-test('the paper fills the page even when the writing is shrunk', () => {
-  // Only the CONTENT scales. Scaling the paper with it would shrink the painted area and leave
-  // the very white band that fitting the page to the sheet exists to remove — a mutation that
-  // survived the first pass of these tests, which is why the ORDER is pinned and not just the
-  // presence of a transform.
-  const fn = /function printPage\(i,ctx,scale,hCss,paper,fit\)\{[\s\S]*?\n    \}/.exec(E);
+test('paper, rules and ink share ONE transform', () => {
+  // Owner 2026-11-25: shrunk ink sat in a narrow column off the full-size rule lines. The scale
+  // now comes FIRST and the paper is drawn inside it, out to the sheet edge (W/k), so the lines
+  // shrink with the handwriting that sits on them and still reach the edge of the paper.
+  const fn = /function printPage\(i,ctx,scale,hCss,paper,fit\)\{[\s\S]*?\n      return true; \}/.exec(E);
   assert.ok(fn, 'printPage takes the fit');
-  const paperAt = fn[0].indexOf('drawPaper(');
-  const scaleAt = fn[0].indexOf('ctx.scale(fit.k');
-  assert.ok(paperAt > 0 && scaleAt > 0, 'both the paper and the fit transform are there');
-  assert.ok(paperAt < scaleAt, 'the paper is painted BEFORE the content is scaled down');
-  // And the scale applies to the ink that follows it.
-  const inkAt = fn[0].indexOf('drawImages(');
-  assert.ok(scaleAt < inkAt, 'the ink is drawn inside the scaled transform');
+  const scaleAt = fn[0].indexOf('ctx.scale(k,k)'), paperAt = fn[0].indexOf('drawPaper(ctx,hCss/k,paper,null,W/k)');
+  const inkAt = fn[0].indexOf('drawStroke(');
+  assert.ok(scaleAt > 0 && paperAt > scaleAt && inkAt > paperAt, 'scale, then paper, then ink');
+  assert.doesNotMatch(fn[0], /fit\.dx|fit\.dy|translate/, 'no separate content offset');
+  assert.match(E, /function drawPaper\(ctx,h,bg,fit,pw\)\{/, 'paper takes its own width');
 });
 
-// ── a tall page becomes several sheets ───────────────────────────────────────────────────────
-test('print breaks where the screen draws its divider', () => {
-  // The seamless view draws a fold at every sheet boundary. If print broke somewhere else the
-  // divider would be a lie — writing would land across a boundary the user thought they saw.
-  assert.match(E, /sheetH:PAGE_H,/, 'the pad exports the sheet it divides on');
-  assert.match(P, /const w=info\.width\|\|700, sheetH=info\.sheetH\|\|pageHeight\(info\);/,
-    'print reads it rather than owning a second one');
-});
-
-test('a tall page prints as several sheets instead of one shrunken one', () => {
-  // Before: a five-sheet note was scaled onto a single sheet at 20%, which is not a printout of
-  // anything. fitContent still handles a SHORT page exactly as it did.
-  assert.match(P, /function sheetsOf\(info,pg\)\{/, 'sheets are counted from the content');
-  assert.match(P, /Math\.ceil\(contentH\/sheetH\)/, 'one per sheet-height of content');
-  assert.match(P, /if\(sheetsOf\(info,pg\)<=1\) return fitContent\(info,pg\);/,
-    'a short page keeps its old behaviour exactly');
-  assert.match(P, /dy:-s\*sheetH\*k/, 'each later sheet shows a later slice');
-  // The plan is built before rendering, so the page-number total is known for the first sheet.
-  assert.match(P, /const plan=\[\];/, 'the sheet plan is computed up front');
-});
-
-test('the emitted image aspect is unchanged, deliberately', () => {
-  // The slice is Letter (1.294) but the IMAGE stays 1.20, so content shrinks ~7% and sits with a
-  // small band. The shell prints images at width:100%;height:auto — an image taller in aspect
-  // than the printable box spills onto the next sheet and costs a blank one (SCAR 2026-09-12:
-  // a 4-page note printed as 8 sheets, content/blank/content/blank). The band is what buys that.
-  // The emitted image is SHORTER than the sheet, deliberately. Using the pad's own sheet height
-  // made one printed sheet exactly the page on screen — correct on a laptop, and wrong on iPad,
-  // where iOS Safari always prints its own header and footer (URL, date, "Page 1 of 4") with no
-  // way to switch them off. They take the printable box from ~1.324 to ~1.26, so a 1.294 image
-  // spilled and a 2-page note printed as 4 sheets — sheets 2 and 4 carrying our own "1/2" and
-  // "2/2" stamps at the top, which is how it was identified.
-  assert.match(P, /function pageHeight\(info\)\{ return Math\.round\(\(info\.width\|\|700\)\*SHEET_ASPECT\); \}/,
-    'the image height comes from the safe aspect, never from the page');
-  assert.doesNotMatch(/function pageHeight[\s\S]*?\}/.exec(P)[0], /sheetH/,
-    'info.sheetH must not creep back in here');
-  assert.match(P, /const k=pageH\/sheetH;/, 'a screen sheet is fitted into a printed sheet');
-});
-
-test('the sheet count is bounded', () => {
-  // A corrupt extent should not ask the printer for ten thousand sheets. The pad caps its own
-  // surface at five, so anything past this guard is bad data rather than a long note.
-  assert.match(P, /const MAX_SHEETS_PER_PAGE=8;/, 'a named ceiling');
-  assert.match(P, /Math\.min\(MAX_SHEETS_PER_PAGE,Math\.ceil/, 'applied to the count');
-});
-
-test('one page prints as one sheet', () => {
-  // SCAR. A page is now at least as tall as the SCREEN, so it can exceed a Letter sheet, and
-  // writing at the bottom of the screen sits below the sheet line. Splitting there was literally
-  // correct and completely unhelpful: a 2-page note printed as 4 sheets, three nearly empty.
-  // What the user counted was pages, and what they expected back was pages.
-  assert.match(P, /const SPLIT_TALL_PAGES=false;/, 'splitting is off');
-  assert.match(P, /if\(!SPLIT_TALL_PAGES\) return 1;/, 'so every page contributes exactly one sheet');
-  // The splitting path is kept, not deleted: it exists for a page that is genuinely several
-  // sheets long — the seamless view — which is withdrawn rather than abandoned.
-  assert.match(P, /Math\.ceil\(contentH\/sheetH\)/, 'the split arithmetic survives behind the flag');
-  assert.match(P, /dy:-s\*sheetH\*k/, 'as does the slice offset');
-});
-
-test('a page taller than a sheet is fitted, not cropped', () => {
-  // fitContent scales the whole page down when its content exceeds the sheet. Without it the foot
-  // of a screen-tall page — exactly where "bottom of page 1" gets written — would be cut off.
-  const fn = /function fitContent\(info,pg\)\{[\s\S]*?\n  \}/.exec(P);
-  assert.ok(fn, 'fitContent must be findable');
-  assert.match(fn[0], /const k=contentH>pageH \? pageH\/contentH : 1;/, 'shrink to fit, never crop');
-  assert.match(fn[0], /dx:\(w\*\(1-k\)\)\/2/, 'and stay centred while it does');
+test('one note page prints as one sheet', () => {
+  assert.match(P, /const plan=info\.pages\.map\(\(_,i\)=>i\);/, 'a sheet per page, nothing more');
+  assert.doesNotMatch(P, /sheetsOf|fitSlice|fitContent/, 'per-page fitting is gone');
 });
