@@ -1,4 +1,12 @@
 {
+  "v5.25.1": {
+    "date": "2026-11-25",
+    "features": [],
+    "fixes": [
+      "改应用后总能回到聊天和撤销 · After an app change you can always reopen chat and undo"
+    ],
+    "through": "b757f5071507b2a2194dc5f08b420cf4cafebb44"
+  },
   "v5.25.0": {
     "date": "2026-11-25",
     "features": [
