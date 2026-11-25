@@ -5,7 +5,9 @@
 // markdown list. Then: every visible control is the element hit at its centre — in the app AND in
 // the shell above the iframe (the home ⋯ tip used to paint over the app's ＋ ✕) — and a real tap
 // reaches it; bubbles of one kind share one computed size; the composer clears the last bubble.
-// Autosizing itself is iOS-only: test/text-size-adjust.test.mjs pins that rule.
+// Autosizing itself is iOS-only: test/text-size-adjust.test.mjs pins that rule. Known limits: run it
+// with PA_E2E_ENGINE=webkit for Safari's engine (the harness default is Chromium); the PWA case
+// patches navigator.standalone/matchMedia only, CSS display-mode media queries still see a tab.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -25,7 +27,7 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewp
 <script>PAChat.fullscreen({title:'Red Flags 危险信号',placeholder:'Describe a symptom… 描述症状…',greeting:${JSON.stringify(GREET)},persist:'redflags'}).open('triage');</script></body></html>`;
 const SHORT = '**胀气**通常不危险。\n\n- 少吃产气食物\n- 饭后散步\n- 伴**剧烈腹痛**、发热，立即就医';
 const LONG = '## 贲门癌的危险信号\n\n' + Array.from({ length: 12 }, (_, i) => `${i + 1}. **信号${i + 1}**：进行性吞咽困难、体重下降、呕血或黑便，持续两周以上必须做胃镜。Progressive dysphagia — see a doctor.`).join('\n');
-const TURNS = [['胀气', SHORT], ['喷门癌', LONG]];
+const TURNS = [['胀气', SHORT, '少吃产气食物'], ['喷门癌', LONG, '信号12']];
 const SETTLE_MS = 1200, TURN_WAIT_MS = 20000;
 const CONTROLS = '.pac-fs.on :is(.pac-toList,.pac-newC,.pac-close,.pac-plus,.pac-inp,.pac-go,.pac-model)';
 
@@ -59,11 +61,13 @@ for (const pwa of [false, true]) test(`iPhone${pwa ? ' home-screen PWA' : ''}: a
     await page.tap('.ecard[data-es="redflags"]');
     const app = page.frameLocator('#fr'); await app.locator('.pac-fs.on .pac-inp').waitFor();
     const fr = page.frame({ url: /\/app\/owner\/redflags\// });
-    for (const [ask] of TURNS) {
-      const k = await app.locator('.pac-m.ai').count();
+    n = 0;   // each case starts at the short reply; the server may replay the earlier case's chat, so wait on THIS turn
+    for (const [ask, , mark] of TURNS) {
+      const k = await app.locator('.pac-fs.on .pac-m.me').count();
       await app.locator('.pac-fs.on .pac-inp').tap(); await app.locator('.pac-fs.on .pac-inp').fill(ask);
       await app.locator('.pac-fs.on .pac-go').tap();
-      await fr.waitForFunction((c) => document.querySelectorAll('.pac-m.ai.pac-md').length >= c, k, { timeout: TURN_WAIT_MS });
+      await fr.waitForFunction(([c, w]) => { const me = document.querySelectorAll('.pac-fs.on .pac-m.me'), ai = document.querySelectorAll('.pac-fs.on .pac-m.ai.pac-md');
+        return me.length > c && ai.length && ai[ai.length - 1].textContent.includes(w); }, [k, mark], { timeout: TURN_WAIT_MS });
     }
     await page.waitForTimeout(SETTLE_MS);
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `iphone${pwa ? '-pwa' : ''}-after-two-replies.png`) });
@@ -85,6 +89,7 @@ for (const pwa of [false, true]) test(`iPhone${pwa ? ' home-screen PWA' : ''}: a
         for (const c of cs) { const x = b.x + c.x, y = b.y + c.y; if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) out.push((e.id || e.className) + ' over ' + c.c); } }
       return out; }, [box, ctls]);
     assert.deepEqual(over, [], 'no shell layer paints over an app control');
+    assert.equal(await page.evaluate(() => { const t = document.getElementById('hTip'); return !!t && getComputedStyle(t).display !== 'none'; }), false, 'the home tip is not shown over an open app');
     // A real tap reaches the model pill, then ☰ (it opens the list over the rest, so it goes last);
     // send / ＋ / the input would start other flows, and their hit test above covers them.
     await fr.evaluate(() => { window.__taps = []; document.addEventListener('click', (e) => window.__taps.push(e.target.className), true); });
@@ -93,6 +98,7 @@ for (const pwa of [false, true]) test(`iPhone${pwa ? ' home-screen PWA' : ''}: a
       assert.ok((await fr.evaluate(() => window.__taps.splice(0))).some((t) => String(t).includes(c.c.split(' ').pop())), `${c.c}: the tap arrived`);
       await page.keyboard.press('Escape'); await page.waitForTimeout(200);
     }
+    assert.ok(await fr.evaluate(() => !!document.querySelector('.pac-list.on')), 'the ☰ tap opened the list');
     const m = await fr.evaluate(() => { const ms = [...document.querySelectorAll('.pac-fs.on .pac-m.ai,.pac-fs.on .pac-m.me')];
       const row = document.querySelector('.pac-fs.on .pac-inp').closest('.pac-row') || document.querySelector('.pac-fs.on .pac-inp').parentElement;
       const log = document.querySelector('.pac-fs.on .pac-log'); log.scrollTop = log.scrollHeight;
