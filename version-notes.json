@@ -1,4 +1,12 @@
 {
+  "v5.22.4": {
+    "date": "2026-11-25",
+    "features": [],
+    "fixes": [
+      "手写日记打印成整页 · Journal prints as a full handwritten page"
+    ],
+    "through": "3ea2e61a4cc46d6722205d9881cfe09df2eeb7c2"
+  },
   "v5.22.3": {
     "date": "2026-11-25",
     "features": [],
