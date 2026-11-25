@@ -17,7 +17,7 @@ let s = ''; process.stdin.on('data', (d) => s += d).on('end', async () => {
   const i = process.argv.indexOf('--append-system-prompt');
   let say = 'SYSTEM:' + (i > 0 ? process.argv[i + 1] : '');
   if (/READ-ONLY/.test(say) && /make it red/.test(cur)) say = 'I will make it red.\\n[[apply]]';   // unconfirmed: plan only (ADR 0042)
-  else if (/confirmed this change \\(do it now\\):\\s*make it red/.test(say)) { const f = fs.existsSync('index.html') ? 'index.html' : 'apps/todo/index.html'; fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace('<h1>', '<h1 style="color:red">')); say = 'Made it red.'; }
+  else if (/context only[^:]*:\\s*make it red/.test(say)) { const f = fs.existsSync('index.html') ? 'index.html' : 'apps/todo/index.html'; fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace('<h1>', '<h1 style="color:red">')); say = 'Made it red.'; }
   process.stdout.write(JSON.stringify({ type: 'system', subtype: 'init', session_id: 'sid-h' }) + '\\n');
   process.stdout.write(JSON.stringify({ type: 'result', subtype: 'success', result: say, session_id: 'sid-h' }) + '\\n');
 });

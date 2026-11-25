@@ -42,8 +42,8 @@ let s = ''; process.stdin.on('data', (d) => s += d).on('end', async () => {
   } else if (/You write ONE superelf mini-app/.test(sys)) {
     const cur2 = s.match(/Change this app:\\n\\n([\\s\\S]*?)\\n\\nThe change:/);
     say = '\\x60\\x60\\x60json\\n{"slug":"todo","title":"Todo"}\\n\\x60\\x60\\x60\\n\\x60\\x60\\x60html\\n' + red(cur2 ? cur2[1] : '') + '\\n\\x60\\x60\\x60';
-  } else if (/confirmed this change \\(do it now\\):\\s*(break it|make it red)/.test(sys)) {
-    const broken = /do it now\\):\\s*break it/.test(sys);
+  } else if (/context only[^:]*:\\s*(break it|make it red)/.test(sys)) {
+    const broken = /context only[^:]*:\\s*break it/.test(sys);
     const page = p.read('index.html');
     const ok = page !== null && p.write('index.html', broken ? '<html><body><h1 id="t">broken</h1><script>let = ;</script></body></html>' : red(page));
     say = ok ? (broken ? 'Rewrote it.' : 'Made the title red.') : "I haven't changed anything. This turn is read-only, so I can't edit the app.";

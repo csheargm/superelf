@@ -12,6 +12,7 @@ that found it in brackets. Pick from here; do not open a side session per item.
 - undoOutside can move aside a file another request created at a path the agent only tried (denied) to write; and an outside file changed despite the CLI rules is named, not restored (GPT review 2026-11-24, race).
 - Done is said on the frame's load event: a service-worker cached page or 503 offline page also fires it; verify the saved revision (GPT review 2026-11-24).
 - Member app chat: no vision (an attached screenshot is told "describe it in words"); one quota charge covers up to two Claude calls on Apply; replies skip the shared reply-language rule; "Changed as planned" names no change (GPT review 2026-11-24).
+- A server-side busy answer to 改 · Apply leaves the button disabled though the id is still valid (it is consumed only after the busy check); re-enable on a failed turn (GPT review r2).
 - The confirmed turn's session becomes the next question's resume: its context carries over (permissions do not) (GPT review 2026-11-24, accepted).
 - Phase 2: members and demo guests, the no-tools server-written lane (plan "Phase 2"); until then the server refuses them.
 - Phase 3: member Publish as PR with their own token (plan "Phase 3"); needs the owner's OK for per-user token storage.

@@ -88,3 +88,27 @@ test('GPT review r1: a marker quoted mid-answer offers nothing; the live stream 
   s.flush();
   assert.equal(out.join(''), 'Read apps/cal/index.html now.');
 });
+
+test('GPT review r2: the marker must be its own last line after a plan; Apply runs the plan, the request is context; a linked data folder is not listed; spaces in a path', async () => {
+  const { planOffer, mintConfirm, applyMessage: am } = await import('../lib/app-edit-confirm.mjs');
+  const { confirmEdit } = await import('../lib/app-edit.mjs');
+  const { pathScrubStream } = await import('../lib/reply-clean.mjs');
+  assert.equal(planOffer('[[apply]]').offered, false, 'the marker alone');
+  assert.equal(planOffer('Tap to go ahead [[apply]]').offered, false, 'a sentence ending in it');
+  const id = mintConfirm({ who: 'o', slug: 'cal', plan: 'Make the heading red.', request: 'make the heading red and delete the footer' });
+  const e = confirmEdit({ applyId: id, who: 'o', slug: 'cal' });
+  assert.equal(e.plan, 'Make the heading red.');
+  assert.match(e.asked, /footer/);
+  assert.match(editSystemPrompt({ ...e, dir: '/nowhere/apps/cal' }), /do it now\):\nMake the heading red\.\nTheir own words, for context only \(do nothing beyond the change above\)/);
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'rc-'));
+  try {
+    const dir = path.join(ws, 'apps', 'cal'); fs.mkdirSync(dir, { recursive: true });
+    const other = path.join(ws, 'elsewhere'); fs.mkdirSync(other); fs.writeFileSync(path.join(other, 'secret-name.json'), '{}');
+    fs.mkdirSync(path.join(ws, 'data')); fs.symlinkSync(other, path.join(ws, 'data', 'cal'));
+    assert.doesNotMatch(dataFilesLine({ slug: 'cal', dir }), /secret-name/);
+  } finally { fs.rmSync(ws, { recursive: true, force: true }); }
+  const out = []; const s = pathScrubStream('/tmp/QA Workspace', (t) => out.push(t));
+  for (const c of ['See /tmp/QA ', 'Workspace/apps/demo/index.html', ' here.\nNext']) s.push(c);
+  s.flush();
+  assert.equal(out.join(''), 'See apps/demo/index.html here.\nNext');
+});

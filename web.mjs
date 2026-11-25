@@ -1320,6 +1320,7 @@ function offerApply(user, edit, message, r, line) {
   const o0 = planOffer(r.text);
   if (!o0.offered) return r;
   const o = { ...o0, text: scrubPaths(cleanReply(o0.text).text, wsDir(user)) };   // the plan Apply runs is the plan the user saw (GPT review r1)
+  if (!o.text.trim()) return { ...r, text: o.text };   // nothing readable left: no plan, no Apply (GPT review r2)
   if (o.text.length > PLAN_MAX) return { ...r, text: `${o.text}\n\n${PLAN_TOO_LONG}` };   // never an Apply that would run a cut-down plan
   const id = mintConfirm({ who: user.id, slug: edit.slug, plan: o.text, request: message });
   line({ type: 'app-change-confirm', slug: edit.slug, label: APPLY_LABEL, message: applyMessage(id) });
