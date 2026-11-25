@@ -13,6 +13,9 @@ function tree() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pa-copy-'));
   const repo = path.join(root, 'workspace.example', 'apps', 'tasks'); fs.mkdirSync(repo, { recursive: true });
   fs.writeFileSync(path.join(repo, 'index.html'), '<h1>T</h1>\n'); fs.writeFileSync(path.join(repo, 'meta.json'), JSON.stringify({ title: '待办 Tasks' }));
+  const shelf = path.join(root, 'shared-apps', 'tasks'); fs.mkdirSync(shelf, { recursive: true });   // a git node: the repo's shelf IS the shelf
+  fs.writeFileSync(path.join(shelf, 'index.html'), '<h1>S</h1>\n');
+  fs.writeFileSync(path.join(shelf, 'meta.json'), JSON.stringify({ title: '待办 Shelf', shared: true, sharedBy: 'owner', version: '1.2.0', promotedFrom: { uid: 'owner', slug: 'tasks' }, files: { 'index.html': 'abc' } }));
   const mk = (slug, meta) => { const d = path.join(root, 'ws', 'apps', slug); fs.mkdirSync(path.join(d, 'data'), { recursive: true });
     fs.writeFileSync(path.join(d, 'index.html'), '<h1>changed</h1>\n'); fs.writeFileSync(path.join(d, 'data', 'x.json'), '{"secret":1}');
     fs.writeFileSync(path.join(d, 'meta.json'), JSON.stringify(meta)); return d; };
@@ -28,13 +31,20 @@ test('copySource: string form for anyone, object form only for the owner\'s own 
   assert.equal(copySource(true, 'owner'), null);
 });
 
-test('publishTarget maps a shelf copy (and its -mine rename) to the repo app, with its title', () => {
+test('publishTarget maps a shelf copy (and its -mine rename) to the repo shelf app, an own-app copy to workspace.example', () => {
   const { root, mk } = tree();
   try {
     for (const slug of ['tasks', 'tasks-mine']) {
       const t = publishTarget({ appDir: mk(slug, { title: 'Mine', forkedFrom: 'tasks' }), slug, owner: 'owner', root });
-      assert.deepEqual(t, { slug: 'tasks', copyOf: { slug: 'tasks', title: '待办 Tasks' } }, slug);
+      assert.equal(t.slug, 'tasks'); assert.equal(t.base, 'shared-apps', slug);
+      assert.deepEqual(t.copyOf, { slug: 'tasks', title: '待办 Shelf', path: 'shared-apps/tasks/' });
+      assert.deepEqual(t.keepMeta, { shared: true, sharedBy: 'owner', version: '1.2.0', promotedFrom: { uid: 'owner', slug: 'tasks' } }, 'shelf fields kept, files not');
     }
+    const o = publishTarget({ appDir: mk('t2', { forkedFrom: { uid: 'owner', slug: 'tasks' } }), slug: 't2', owner: 'owner', root });
+    assert.equal(o.base, 'workspace.example/apps'); assert.deepEqual(o.copyOf, { slug: 'tasks', title: '待办 Tasks', path: 'workspace.example/apps/tasks/' });
+    const dock = path.join(root, 'builtin-apps', 'shared-apps', 'tasks'); fs.mkdirSync(dock, { recursive: true }); fs.writeFileSync(path.join(dock, 'index.html'), 'x');
+    fs.writeFileSync(path.join(dock, 'meta.json'), JSON.stringify({ title: 'Image copy' }));
+    assert.equal(publishTarget({ appDir: mk('t3', { forkedFrom: 'tasks' }), slug: 't3', owner: 'owner', root }).copyOf.title, 'Image copy', 'a Docker node reads the image\'s repo shelf');
     const own = publishTarget({ appDir: mk('mine', { title: 'Own' }), slug: 'mine', owner: 'owner', root });
     assert.deepEqual(own, { slug: 'mine', copyOf: null }, 'an own app is unchanged');
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
@@ -46,8 +56,10 @@ test('publishTarget refuses another user\'s app and an app not in the repo, nami
     const peer = mk('schoolwork', { forkedFrom: { uid: 'test', author: 'test', slug: 'schoolwork' } });
     assert.throws(() => publishTarget({ appDir: peer, slug: 'schoolwork', owner: 'owner', root }),
       (e) => e.code === 'FORK_OTHER' && /copy of test's app/.test(e.message) && /Make an app/.test(e.message) && !/original author/.test(e.message));
-    const gone = mk('gone', { forkedFrom: 'not-in-repo' });
+    const gone = mk('gone', { forkedFrom: { uid: 'owner', slug: 'not-in-repo' } });
     assert.throws(() => publishTarget({ appDir: gone, slug: 'gone', owner: 'owner', root }), (e) => e.code === 'FORK_NOT_IN_REPO' && /not in the public repo/.test(e.message));
+    const unshared = mk('u', { forkedFrom: 'no-shelf-entry' });
+    assert.throws(() => publishTarget({ appDir: unshared, slug: 'u', owner: 'owner', root }), (e) => e.code === 'FORK_NOT_IN_REPO', 'no shelf entry: it cannot go back');
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -58,6 +70,9 @@ test('collect: a copy goes only as its source, with no data/ and no per-user met
     const { files } = collectApp(d, 'tasks', { owner: 'owner' });
     assert.deepEqual(files.map((f) => f.path), ['workspace.example/apps/tasks/index.html', 'workspace.example/apps/tasks/meta.json']);
     assert.deepEqual(JSON.parse(files[1].content.toString()), { title: 'Mine' }, 'forkedFrom, shared, gitRef, dataSettings stripped');
+    const shelfFiles = collectApp(d, 'tasks', { owner: 'owner', base: 'shared-apps', keepMeta: { sharedBy: 'owner' } }).files;
+    assert.deepEqual(shelfFiles.map((f) => f.path), ['shared-apps/tasks/index.html', 'shared-apps/tasks/meta.json']);
+    assert.deepEqual(JSON.parse(shelfFiles[1].content.toString()), { title: 'Mine', sharedBy: 'owner' }, 'the repo shelf fields come back');
     assert.throws(() => collectApp(d, 'tasks'), (e) => e.code === 'FORKED_APP', 'no owner: refused (status, old callers)');
     assert.throws(() => collectApp(d, 'tasks-mine', { owner: 'owner' }), (e) => e.code === 'FORKED_APP', 'not as its own slug');
     const peer = mk('p', { forkedFrom: { uid: 'kid', slug: 'tasks' } });
@@ -68,7 +83,7 @@ test('collect: a copy goes only as its source, with no data/ and no per-user met
 test('GPT review: a shelf entry another account shared is theirs; a bad meta refuses; other repo refuses', () => {
   const { root, mk } = tree();
   try {
-    const shelf = path.join(root, 'shared-apps', 'tasks'); fs.mkdirSync(shelf, { recursive: true });
+    const shelf = path.join(root, 'shared-apps', 'tasks');
     fs.writeFileSync(path.join(shelf, 'meta.json'), JSON.stringify({ sharedBy: 'kid' }));
     const d = mk('tasks-mine', { forkedFrom: 'tasks' });
     assert.throws(() => publishTarget({ appDir: d, slug: 'tasks-mine', owner: 'owner', root }), (e) => e.code === 'FORK_OTHER');

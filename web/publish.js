@@ -55,7 +55,7 @@ const PAPublish=(()=>{
   const watching=new Set();
   async function check(slug){
     const b=$('#pubItem');
-    let j; try{ const r=await api(url(slug)); j=await r.json(); }catch{ return; /* offline: the next ⋯ open looks again */ }
+    let j; try{ const r=await api(url(slug)); if(!r.ok) return; /* no answer: the owner's copy item stays off */ j=await r.json(); }catch{ return; /* offline: the next ⋯ open looks again */ }
     showState(b,j&&j.repo,j);
     const st=j&&j.status; if(!st) return;
     if(TERMINAL.has(st.state)){ if(seenAt(slug)!==String(st.at)){ notice(st); markSeen(slug,st); } }

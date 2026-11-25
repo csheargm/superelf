@@ -79,11 +79,14 @@ Publish action that does the same path with the same guards.
   overrides); a missing or empty term file still refuses.
 - The server refuses a forked app (`meta.forkedFrom`) for preview and publish (`FORKED_APP`), with one
   exception (2026-11-25, owner report "School Helper"): the OWNER's copy of an app that is in the repo
-  (`workspace.example/apps/<source>/`) publishes back to that source folder. `forkedFrom` as a string (a
-  shelf copy, maybe renamed `<slug>-mine`) or an object whose `uid` is the owner names the source
-  (lib/publish/copy-target.mjs); collect re-checks it on the very bytes it sends and strips the
-  per-user meta. A copy of another user's app (`FORK_OTHER`) or of an app not in the repo
-  (`FORK_NOT_IN_REPO`) is refused with what to do instead; the ⋯ menu shows that line, not Publish.
+  publishes back to that app's repo folder (lib/publish/copy-target.mjs). A shelf copy (`forkedFrom`
+  a string, maybe renamed `<slug>-mine`) goes to the repo shelf `shared-apps/<slug>/` (what the node's
+  shelf is seeded from) and only when the node's shelf entry was shared by the owner; its repo shelf
+  meta fields are kept. A copy of the owner's own app (`forkedFrom.uid` = owner) goes to
+  `workspace.example/apps/<slug>/`. Collect re-checks the source on the very bytes it sends and strips
+  per-user meta; data/ never goes. A copy of another user's app (`FORK_OTHER`), of an app not in the
+  repo (`FORK_NOT_IN_REPO`), or with Publish set to another repo or remote (`FORK_OTHER_REPO`) is
+  refused with what to do instead; the ⋯ menu shows that line, not Publish.
   The sheet says which app it updates. Members are unchanged (403).
 - Preview answers a sha256 of the collected snapshot; Publish collects again and refuses unless the
   hash matches (`SNAPSHOT_CHANGED`), so the owner publishes exactly the bytes they confirmed.

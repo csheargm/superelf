@@ -1,6 +1,6 @@
 // Owner report 2026-11-25: the owner's copy of a repo app showed Publish, then refused. Now the copy publishes
 // back to its source app (docs/adr/0039 addendum). Real throwaway node + fake GitHub: the PR writes the SOURCE
-// folder with only index.html + meta.json (no data/, per-user meta stripped); a member's copy is still 403;
+// folder (the repo shelf, shared-apps/<slug>/) with only index.html + meta.json (no data/, per-user meta stripped); a member's copy is still 403;
 // in a real browser the sheet names the app it updates (phone and iPad).
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -24,6 +24,7 @@ before(async () => {
   cfg.users.push({ id: 'kid', name: 'Kid', role: 'member', token: MEMBER_TOKEN, workspace: 'members/kid' });
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2));
   put(path.join(root, 'workspace.example', 'apps', 'tasks'), { 'index.html': '<h1 id="t">Tasks</h1>\n', 'meta.json': JSON.stringify({ title: '待办 Tasks' }) });
+  put(path.join(root, 'shared-apps', 'tasks'), { 'index.html': '<h1 id="t">Tasks shelf</h1>\n', 'meta.json': JSON.stringify({ title: '待办 Tasks', shared: true, sharedBy: 'owner', version: '1.0.0' }) });
   put(path.join(root, 'workspace', 'apps', 'tasks-mine'), { 'index.html': '<h1 id="t">Tasks, changed</h1>\n', 'data/list.json': '{"private":true}',
     'meta.json': JSON.stringify({ title: '待办 Tasks', forkedFrom: 'tasks', shared: false, gitRef: 'abc', dataSettings: { a: 1 } }) });
   put(path.join(root, 'workspace', 'apps', 'schoolwork'), { 'index.html': '<h1 id="t">School Helper</h1>\n',   // the owner's screen: a copy of another user's app
@@ -39,17 +40,17 @@ after(async () => { if (browser) await browser.close(); if (web) await stopWeb(w
 test('owner copy → PR against the source folder, only index.html + meta.json; member copy still 403', async () => {
   const url = '/api/apps/tasks-mine/publish';
   const g = await (await api(port, url)).json();
-  assert.deepEqual(g.copyOf, { slug: 'tasks', title: '待办 Tasks' }); assert.equal(g.refused, null);
+  assert.deepEqual(g.copyOf, { slug: 'tasks', title: '待办 Tasks', path: 'shared-apps/tasks/' }); assert.equal(g.refused, null);
   const pv = await (await api(port, url, { method: 'POST', body: '{"preview":true}' })).json();
-  assert.deepEqual(pv.preview.files.map((f) => f.path), ['workspace.example/apps/tasks/index.html', 'workspace.example/apps/tasks/meta.json']);
-  assert.deepEqual(pv.preview.copyOf, { slug: 'tasks', title: '待办 Tasks' });
+  assert.deepEqual(pv.preview.files.map((f) => f.path), ['shared-apps/tasks/index.html', 'shared-apps/tasks/meta.json']);
+  assert.deepEqual(pv.preview.copyOf, { slug: 'tasks', title: '待办 Tasks', path: 'shared-apps/tasks/' });
   assert.equal(gh.st.requests.length, 0, 'preview sends nothing');
   const r = await api(port, url, { method: 'POST', body: JSON.stringify({ hash: pv.preview.hash }) });
   assert.equal(r.status, 202, await r.clone().text());
   const tree = [...gh.st.trees.values()][0].tree.map((t) => t.path).sort();
-  assert.deepEqual(tree, ['lib/builtin-app-versions.json', 'workspace.example/apps/tasks/index.html', 'workspace.example/apps/tasks/meta.json']);
+  assert.deepEqual(tree, ['lib/builtin-app-versions.json', 'shared-apps/tasks/index.html', 'shared-apps/tasks/meta.json']);
   const metaBlob = [...gh.st.trees.values()][0].tree.find((t) => t.path.endsWith('meta.json'));
-  assert.deepEqual(JSON.parse(gh.st.blobs.get(metaBlob.sha).toString()), { title: '待办 Tasks' }, 'per-user meta stripped');
+  assert.deepEqual(JSON.parse(gh.st.blobs.get(metaBlob.sha).toString()), { title: '待办 Tasks', shared: true, sharedBy: 'owner', version: '1.0.0' }, 'per-user meta stripped; the shelf fields are the repo\'s');
   assert.match(gh.st.pulls[0].head, /^publish\/tasks-/);
   const st = await (await api(port, url)).json();
   assert.ok(st.status && st.status.pr, 'the status is read under the copy\'s own slug');
@@ -85,7 +86,7 @@ for (const [name, vp] of [['phone', { width: 390, height: 844 }], ['iPad', { wid
     await page.click('#frameMenu #pubItem');
     const copy = page.locator('#pubSheet #pubCopy'); await copy.waitFor({ timeout: 15000 });
     assert.equal(await copy.textContent(), '更新共享应用 待办 Tasks · Updates the shared app 待办 Tasks');
-    assert.match(await page.locator('#pubFiles').textContent(), /workspace\.example\/apps\/tasks\/index\.html/);
+    assert.match(await page.locator('#pubFiles').textContent(), /shared-apps\/tasks\/index\.html/);
     if (process.env.PA_SHOTS) await page.screenshot({ path: path.join(process.env.PA_SHOTS, `copy-back-${name}.png`) });
     await ctx.close();
   });
