@@ -113,11 +113,13 @@ jobs:
         #   N changes), skipped on CI by PA_E2E_SKIP.
         # 2026-11-24: EVERY OS +1 (ubuntu 193, windows 278): app-edit-e2e member test (own copy via the one app chat), skipped on CI by PA_E2E_SKIP.
         # 2026-11-24: EVERY OS +2 (ubuntu 195, windows 280): iphone-chat-e2e (iPhone tab + home-screen PWA), skipped on CI by PA_E2E_SKIP.
+        # 2026-11-24: EVERY OS +4 (ubuntu 199, windows 284): demo-signin-link-e2e (other-browser link, expired link,
+        #   good link, 429 / sent), skipped on CI by PA_E2E_SKIP.
         include:
           - os: ubuntu-latest
-            max_skipped: 195
+            max_skipped: 199
           - os: windows-latest
-            max_skipped: 280
+            max_skipped: 284
     env:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED
