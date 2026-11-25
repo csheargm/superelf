@@ -209,7 +209,7 @@ test('GPT review r5: share and delete refuse while an edit runs, so its rollback
 });
 
 // 说「好」也能改 · Owner report 2026-11-24 (Red Flags): a typed yes and tool talk.
-import { isTypedConfirm, pendingConfirm, toolTalkReplacement, REOFFER_LINE, ASK_AGAIN_LINE } from '../lib/app-edit-confirm.mjs';
+import { isTypedConfirm, pendingConfirm, toolTalkReplacement, saysNo, REOFFER_LINE, ASK_AGAIN_LINE } from '../lib/app-edit-confirm.mjs';
 test('a short typed yes counts as the tap; anything more stays a normal turn (known limits)', () => {
   for (const t of ['yes', 'Yes!', 'ok', 'go ahead', 'do it', 'apply', 'yes please.', 'ok, do it', '好', '好的', '可以', '改吧', '确认', '好的，改吧', '嗯 好'])
     assert.equal(isTypedConfirm(t), true, t);
@@ -239,6 +239,9 @@ test('tool/session talk in a plan turn is replaced: the pending plan + its butto
   const id = mintConfirm({ ...key, plan: 'Base text 18px.' });
   for (const t of ['Write tool is off', "the block is in the session's tool setup", 'the session’s tool list', 'Editing needs to be re-enabled'])
     assert.deepEqual(toolTalkReplacement(t, key), { text: `Base text 18px.\n\n${REOFFER_LINE}`, id }, t);
+  assert.deepEqual(toolTalkReplacement('Edit tool is off', key, false), { text: ASK_AGAIN_LINE, id: null }, 'never re-offered after a no');
+  for (const m of ['no, leave it as is', "don't", '不要改', '算了']) assert.equal(saysNo(m), true, m);
+  for (const m of ['Yes, I want the size of the fonts suitable for iPhone', 'make it bigger', '好']) assert.equal(saysNo(m), false, m);
 });
 test('the plan prompt forbids tool talk and asks for a plan with the marker on every change request', () => {
   const p = editSystemPrompt({ slug: 'todo', confirmed: false });
