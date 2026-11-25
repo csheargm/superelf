@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { rmTemp } from './helpers-tmp.mjs';
 import { APP_CHAT_EVIDENCE_RULE, recordRequest, listHistory, diffText, diffTrees, diffVersion, notesForApp, gitLinesForApp,
-  appAboutContext, editHistoryContext, changeSummary, SUMMARY_SHOWN_LINES, DIFF_MAX_CHARS, CONTEXT_MAX_CHARS, NOTE_LINES_MAX, REQUEST_MAX, FACTS_END } from '../lib/app-history.mjs';
+  appAboutContext, editHistoryContext, changeSummary, SUMMARY_SHOWN_LINES, SUMMARY_FALLBACK, DIFF_MAX_CHARS, CONTEXT_MAX_CHARS, NOTE_LINES_MAX, REQUEST_MAX, FACTS_END } from '../lib/app-history.mjs';
 import { snapshotApp, EDIT_WHY } from '../lib/app-versions.mjs';
 import { appEditOf, beginAppEdit, finishAppEdit, VERSIONS_DIR } from '../lib/app-edit.mjs';
 
@@ -237,12 +237,17 @@ test('changeSummary: the server\'s one-line account of an applied change, from t
     fs.writeFileSync(path.join(a, 'index.html'), 'x\n.m{color:var(--accent)}\ny');
     fs.writeFileSync(path.join(b, 'index.html'), 'x\n.m{color:#2e7d32}\ny');
     fs.writeFileSync(path.join(a, 'meta.json'), '{}'); fs.writeFileSync(path.join(b, 'meta.json'), '{}');
-    assert.equal(changeSummary(a, b), '改动：index.html 1 行 · Changed: 1 line in index.html\n现在是 · Now: `.m{color:#2e7d32}`');
-    assert.equal(changeSummary(a, a), '', 'no change, no summary');
+    assert.equal(changeSummary(a, b), '改动：`index.html` 1 行 · Changed: 1 line in `index.html`\n现在是 · Now: `.m{color:#2e7d32}`');
+    assert.equal(changeSummary(a, a), SUMMARY_FALLBACK, 'files said changed but no text difference seen: still says so, never blank');
+    assert.equal(changeSummary(path.join(t, 'gone'), b).startsWith('改动：'), true);
     fs.writeFileSync(path.join(b, 'new.js'), 'let a=`x`;');
     fs.writeFileSync(path.join(b, 'index.html'), 'x\n' + Array.from({ length: 6 }, (_, i) => `l${i}`).join('\n') + '\ny');
     const s = changeSummary(a, b);
-    assert.match(s, /^改动：index\.html 6 行，新文件 new\.js · Changed: 6 lines in index\.html, new file new\.js\n/);
-    assert.equal((s.match(/`/g) || []).length, SUMMARY_SHOWN_LINES * 2, 'only the first few new lines are quoted');
+    assert.match(s, /^改动：`index\.html` 6 行，新文件 `new\.js` · Changed: 6 lines in `index\.html`, new file `new\.js`\n/);
+    assert.equal((s.split('\n')[1].match(/`/g) || []).length, SUMMARY_SHOWN_LINES * 2, 'only the first few new lines are quoted');
+    fs.writeFileSync(path.join(b, 'index.html'), 'x\nconst s=`a${b}`;\ny'); fs.rmSync(path.join(b, 'new.js'));
+    assert.match(changeSummary(a, b), /Now: `` const s=`a\$\{b\}`; ``$/, 'a template literal is shown as written');
+    fs.writeFileSync(path.join(b, 'a\n# b`.js'), '1');
+    assert.doesNotMatch(changeSummary(a, b), /\n# b/, 'a file name never shapes the Markdown');
   } finally { rmTemp(t); }
 });
