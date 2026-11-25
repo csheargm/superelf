@@ -80,3 +80,17 @@ test('Change this app: a "Done" for a turn that changed nothing is corrected', (
   assert.equal(editUnchangedNote('Done — added the week view.', { changed: true, applied: true }), '');
   assert.equal(editUnchangedNote('Nothing needed changing.', { changed: false }), '');
 });
+
+// Owner report 2026-11-24 (Red Flags' own chat): "tap Change this app under my reply" and no button under it.
+import { NO_BUTTON_NOTE } from '../lib/app-chat-honesty.mjs';
+test('the button and the words that name it come from ONE decision', () => {
+  const said = "No. This chat can't change this app or any app.\n\nTo change it, tap **改这个应用 · Change this app** under my reply.";
+  const owner = honestReply({ reply: said, message: 'Can y can you modify this app?', priorUserTexts: [], inApp: true, canEdit: true });
+  assert.equal(owner.offer && owner.offer.type, 'app-change', 'the owner gets the button the reply names');
+  assert.equal(owner.note, '');
+  const pointsOnly = honestReply({ reply: said, message: 'hello', priorUserTexts: [], inApp: true, canEdit: true });
+  assert.ok(pointsOnly.offer, 'even when the wording was missed, a reply that names the panel carries it');
+  const member = honestReply({ reply: said, message: 'Can you modify this app?', priorUserTexts: [], inApp: true, canEdit: false });
+  assert.deepEqual([member.offer, member.note], [null, NO_BUTTON_NOTE], 'no button → a note saying so');
+  for (const m of ['can you modify this app?', 'please edit the title', 'could you tweak the colours']) assert.equal(asksForChange(m), true, m);
+});
