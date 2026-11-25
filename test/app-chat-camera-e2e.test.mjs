@@ -17,7 +17,7 @@ import { hashPassword } from '../lib/auth.mjs';
 
 const SHOTS = process.env.PA_SHOTS || '';
 const ENGINE = process.env.PA_E2E_ENGINE || 'chromium';
-const PAGE = '<!doctype html><html><head><meta charset="utf-8"></head><body><!-- a comment -- with a double hyphen --><h1 id="t">Todo</h1></body></html>';
+const PAGE = '<!doctype html><html><head><meta charset="utf-8"></head><body><!-- a comment -- with a double hyphen --><template><!-- inside -- a template --></template><h1 id="t">Todo</h1></body></html>';
 const BLANK = '<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>';   // nothing to draw: PASnap fails closed
 const FAKE = `#!/usr/bin/env node
 ${FAKE_PERMS_SRC}
@@ -108,6 +108,13 @@ test('camera beside ＋: tip once, a fresh labelled shot per tap (max 3), a stal
   const ups = fs.readdirSync(path.join(root, 'workspace', path.dirname(sent[0])));
   assert.ok(ups.length >= 6, 'every tap and the retake uploaded a new file');
   await shot(page, 'cam-retaken');
+  // The app reloading ITSELF (not Apply/Undo) also makes a shot stale (GPT review).
+  await cam.click(); await p.locator('.pac-chip img').first().waitFor();
+  await page.frameLocator('#fr').locator('body').evaluate(() => location.reload());
+  await page.frameLocator('#fr').locator('#t').waitFor();
+  await page.waitForTimeout(500);
+  await ask(p, 'what is attached');
+  await p.locator('text=应用已变，已重新截图 · The app changed, so the screenshot was retaken').nth(1).waitFor({ timeout: 15000 });
   kept = { ctx, page };   // the same device for the next test: the tip is remembered per device
 });
 let kept = null;

@@ -54,29 +54,34 @@ var PAShotFresh={
   const RETAKEN='应用已变，已重新截图 · The app changed, so the screenshot was retaken';
   const DROPPED='应用已变，旧截图已移除（未能重新截图）· The app changed; the old screenshot was removed (it could not be retaken)';
   const CAM_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
-  let gen=0, shots=[], snapSeq=0;   // shots: [{path,gen,mine}] — what PAShotFresh judges
+  const SNAP_WAIT_MS=25000;   // the shell's snap (6 s) + upload (15 s) bound, plus slack: a lost answer never holds the composer
+  let gen=0, shots=[], snapSeq=0, busy=Promise.resolve();   // shots: [{path,gen,mine}] — what PAShotFresh judges
   const waits=new Map();
   // The shell takes the picture (it holds the app frame): {pa:'edit-snap',id} → {pa:'edit-snap-res',id,shot}.
-  function snapNow(){ const id='s'+(++snapSeq); return new Promise((res)=>{ waits.set(id,res); parent.postMessage({pa:'edit-snap',id},'*'); }); }
+  function snapNow(){ const id='s'+(++snapSeq); return new Promise((res)=>{ waits.set(id,res); parent.postMessage({pa:'edit-snap',id},'*');
+    setTimeout(()=>{ if(waits.delete(id)) res(null); },SNAP_WAIT_MS); }); }
+  // One capture at a time, and a send waits for the one in flight (GPT review): a late picture never lands in the next draft.
+  const serial=(f)=>{ const r=busy.then(f,f); busy=r.catch(()=>{}); return r; };
+  const live=()=>shots.filter((s)=>chat.attachments().some((a)=>a.path===s.path));   // the user's ✕ removed some
   function addShot(sh,why){
-    chat.attach({name:sh.name||'screen.png',path:sh.path,thumb:sh.thumb,label:PAShotFresh.label(Date.now())});
+    chat.attach({name:sh.name||'screen.png',path:sh.path,thumb:sh.thumb,label:PAShotFresh.label(sh.at||Date.now())});
     shots.push({path:sh.path,gen:typeof sh.gen==='number'?sh.gen:gen,mine:true});
   }
   function drop(paths){ for(const p of paths){ chat.detach(p); } shots=shots.filter((s)=>!paths.includes(s.path)); }
-  async function camera(){
+  const camera=()=>serial(async()=>{
     const sh=await snapNow();
     if(!(sh&&sh.path)){ note(CAM_FAIL); return; }
-    drop(PAShotFresh.makeRoom(shots.filter((s)=>chat.attachments().some((a)=>a.path===s.path)),gen));
+    shots=live(); drop(PAShotFresh.makeRoom(shots,gen));
     addShot(sh);
-  }
+  });
   // Before a message goes: a shot of ours taken before the app last reloaded is retaken, or removed and said — never sent stale.
-  async function beforeSend(){
-    shots=shots.filter((s)=>chat.attachments().some((a)=>a.path===s.path));   // the user's ✕ removed some
+  const beforeSend=()=>serial(async()=>{
+    shots=live();
     const old=PAShotFresh.stale(shots,gen); if(!old.length) return;
     drop(old);
     const sh=await snapNow();
-    if(sh&&sh.path){ addShot(sh); note(RETAKEN); } else note(DROPPED);
-  }
+    if(sh&&sh.path&&sh.gen===gen){ drop(PAShotFresh.makeRoom(live(),gen)); addShot(sh); note(RETAKEN); } else note(DROPPED);   // reloaded again mid-retake: dropped, said
+  });
   function mount(m){
     chat=PAChat.mount(document.getElementById('chat'),{
       placeholder:'提问，或说说想怎么改 · Ask, or say what to change',

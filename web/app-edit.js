@@ -50,10 +50,13 @@ const PAAppEdit=(()=>{
       w.postMessage({pa:'snap',id},'*');
     });
   }
-  async function upload(slug,dataUrl){
-    if(!dataUrl) return null;
-    try{ const r=await api('/api/upload',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:'screen-'+slug+'.png',data:dataUrl.split(',')[1]})});
-      const j=await r.json(); return j&&j.ok?{name:j.name,path:j.path,thumb:dataUrl,gen}:null; }
+  // A PNG, by its signature: the app frame answers the snap, so it chooses the bytes (GPT review).
+  const PNG_B64='iVBORw0KGgo', UP_MS=15000;
+  async function upload(slug,dataUrl,g,at){
+    if(!dataUrl||!dataUrl.startsWith('data:image/png;base64,'+PNG_B64)) return null;
+    try{ const r=await api('/api/upload',{method:'POST',headers:{'content-type':'application/json'},signal:AbortSignal.timeout(UP_MS),
+        body:JSON.stringify({name:'screen-'+slug+'-'+(++snapSeq)+'.png',data:dataUrl.split(',')[1]})});   // unique: two shots in one ms never share a file
+      const j=await r.json(); return j&&j.ok?{name:j.name,path:j.path,thumb:dataUrl,gen:g,at}:null; }
     catch(_){ return null; /* the panel then says there is no picture and asks for one (fail closed) */ }
   }
   function layout(){
@@ -78,7 +81,7 @@ const PAAppEdit=(()=>{
     if(frameSlug()!==slug||frameUid()!==UID){ openApp(UID,slug,title); await loaded(); }
     if(!canEdit()) return;
     close(); const my=++openSeq;
-    const shot=await upload(slug,await snap());
+    const g0=gen, at0=Date.now(), shot=await upload(slug,await snap(),g0,at0);
     if(my!==openSeq||!canEdit()||frameSlug()!==slug) return;   // Home, another app or another open came first
     S=build(slug,title||$('#ftitle').textContent||slug); layout(); addEventListener('resize',layout);
     const me=S;
@@ -88,11 +91,15 @@ const PAAppEdit=(()=>{
     S.fr.addEventListener('load',()=>{ if(S!==me) return; const tip=onceTip(CHAT_TIP_KEY), camTip=onceTip(CAM_TIP_KEY);   // the one-time tips, shown in the panel
       me.fr.contentWindow.postMessage({pa:'edit-init',slug,title:me.title,shot,tip,camTip,snap:true,gen,prefill:typeof prefill==='string'?prefill.slice(0,2000):''},'*'); },{once:true});
   }
+  // Any new document in #fr (the app reloading or navigating itself, not only Apply/Undo) makes earlier shots stale.
+  document.addEventListener('load',(e)=>{ if(S&&e.target&&e.target.id==='fr') bumpGen(); },true);
+  function bumpGen(){ gen++; if(S&&S.fr.contentWindow) S.fr.contentWindow.postMessage({pa:'edit-gen',gen},'*'); }
   function onceTip(k){ if(_SEEN.has(k)) return false; _SEEN.add(k); _saveSeen(); return true; }
   // The panel's camera (web/app-edit-panel.html): a picture of the app NOW, uploaded, or null (the panel says it cannot).
   addEventListener('message',async(e)=>{ const m=e.data;
     if(!S||!m||m.pa!=='edit-snap'||e.source!==S.fr.contentWindow||typeof m.id!=='string') return;
-    const me=S, shot=canEdit()&&frameSlug()===me.slug?await upload(me.slug,await snap()):null;
+    const me=S, g=gen, at=Date.now();   // the load and the time the picture was TAKEN, not when its upload came back (GPT review)
+    const shot=canEdit()&&frameSlug()===me.slug?await upload(me.slug,await snap(),g,at):null;
     if(S===me&&me.fr.contentWindow) me.fr.contentWindow.postMessage({pa:'edit-snap-res',id:m.id,shot},'*'); });
   // The next load of the app frame that is not the blank placeholder (appFrameLeave loads about:blank first).
   function loaded(){ const fr=$('#fr'); return new Promise((res)=>{ const t=setTimeout(()=>{ fr.removeEventListener('load',on); res(false); },LOAD_MS);
@@ -107,7 +114,7 @@ const PAAppEdit=(()=>{
   }
   // The app reloads in place, beside the panel: the same leave-then-load openApp uses (its last save is kept, ADR 0018).
   // Resolves true once the reloaded app loaded, false when it did not within LOAD_MS.
-  function reloadApp(){ if(!S) return Promise.resolve(false); gen++; if(S.fr.contentWindow) S.fr.contentWindow.postMessage({pa:'edit-gen',gen},'*'); appFrameLeave(); const wait=loaded(); PASW.frameLoad(UID,S.slug); return wait; }   // after the leave: it swaps #fr for a fresh frame
+  function reloadApp(){ if(!S) return Promise.resolve(false); bumpGen(); appFrameLeave(); const wait=loaded(); PASW.frameLoad(UID,S.slug); return wait; }   // after the leave: it swaps #fr for a fresh frame
   async function reloadThenDone(){ const me=S; const ok=await reloadApp(); if(!me||S!==me) return;
     say(ok?DONE:RELOAD_FAILED); me.el.querySelector('#aeUndo').style.display=''; }
   function say(t){ if(S&&S.fr.contentWindow) S.fr.contentWindow.postMessage({pa:'edit-note',text:t},'*'); }

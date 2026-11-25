@@ -32,9 +32,9 @@ var PASnap = PASnap || (function(){
     }
   }
   function stripComments(root){
-    const it=document.createNodeIterator(root,NodeFilter.SHOW_COMMENT), dead=[];
-    for(let n=it.nextNode();n;n=it.nextNode()) dead.push(n);
-    dead.forEach((n)=>n.remove());
+    const dead=[], walk=(r)=>{ const it=document.createNodeIterator(r,NodeFilter.SHOW_COMMENT); for(let n=it.nextNode();n;n=it.nextNode()) dead.push(n);
+      r.querySelectorAll&&r.querySelectorAll('template').forEach((t)=>walk(t.content)); };   // a <template>'s content is its own fragment, still serialized (GPT review)
+    walk(root); dead.forEach((n)=>n.remove());
   }
   function svgOf(w,h){
     const root=document.documentElement, clone=root.cloneNode(true);
