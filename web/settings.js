@@ -2,7 +2,7 @@
 let ME={};
 async function loadProfile(){
   try{ ME=await (await api('/api/profile')).json(); }catch{ ME={}; }
-  $('#pName').value=ME.name||''; $('#pAbout').value=ME.about||''; $('#pPrefs').value=ME.prefs||'Short and plain, no preamble · bullet points, not paragraphs · EN + 中文 for technical terms · explain simply · be direct';
+  $('#pName').value=ME.name||''; $('#pAbout').value=ME.about||''; $('#pPrefs').value=ME.prefs||'';   // empty until the user writes one: no prefilled style
   $('#pAutoUpdate').checked=!!ME.autoUpdateApps;
   $('#pAge').textContent = (ME.age!=null?`年龄 ${ME.age} · Age ${ME.age} · `:'')+roleLine(ME.role||'member');
   $('#pBriefEmail').value=ME.briefingEmail||'';
