@@ -1644,7 +1644,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
     if (edit && cancel && cancel.signal.aborted) edit.stopped = true;   // a Stop never leaves a half-done change applied (GPT review r3)
     const edited = finishAppEdit(edit, editCtx, { wsDir: wsDir(user) });   // inline checks; a failing or unconfirmed change is rolled back
     editCtx = null;
-    if (edited) { audit('app-edit', { who: user.id, app: edit.slug, changed: edited.line.changed, applied: edited.line.applied, version: edited.line.version || null }); line(edited.line); edited.note = [editUnchangedNote(r.text, edited.line), edited.note].filter(Boolean).join('\n\n'); if (edited.note) { r = { ...r, text: `${r.text || ''}\n\n${edited.note}` }; line({ type: 'delta', text: `\n\n${edited.note}` }); } }
+    if (edited) { audit('app-edit', { who: user.id, app: edit.slug, changed: edited.line.changed, applied: edited.line.applied, version: edited.line.version || null }); line(edited.line); edited.note = scrubPaths([editUnchangedNote(r.text, edited.line), edited.note].filter(Boolean).join('\n\n'), wsDir(user)); if (edited.note) { r = { ...r, text: `${r.text || ''}\n\n${edited.note}` }; line({ type: 'delta', text: `\n\n${edited.note}` }); } }
     // by: the lane that ACTUALLY answered (a confined turn's GPT pick runs on Claude), shown under the answer.
     const by = ml.blocked ? '' : chosen ? chosen.label : 'Claude';
     const mdMsg = { role: 'md', text: r.text || '', ms: turnMs, by, ...(blank || unreadable ? { failed: true } : {}) };

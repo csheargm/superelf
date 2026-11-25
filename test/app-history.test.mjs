@@ -238,6 +238,10 @@ test('changeSummary: the server\'s one-line account of an applied change, from t
     fs.writeFileSync(path.join(b, 'index.html'), 'x\n.m{color:#2e7d32}\ny');
     fs.writeFileSync(path.join(a, 'meta.json'), '{}'); fs.writeFileSync(path.join(b, 'meta.json'), '{}');
     assert.equal(changeSummary(a, b), '改动：`index.html` 1 行 · Changed: 1 line in `index.html`\n现在是 · Now:\n```\n.m{color:#2e7d32}\n```');
+    const long = 'p{' + 'margin:0;'.repeat(40) + 'color:';
+    fs.writeFileSync(path.join(a, 'index.html'), long + 'blue}'); fs.writeFileSync(path.join(b, 'index.html'), long + 'green}');
+    assert.match(changeSummary(a, b), /\n…[^\n]*color:green\}\n```$/, 'a long line is shown from its change');
+    fs.writeFileSync(path.join(a, 'index.html'), 'x\n.m{color:var(--accent)}\ny'); fs.writeFileSync(path.join(b, 'index.html'), 'x\n.m{color:#2e7d32}\ny');
     assert.equal(changeSummary(a, a), SUMMARY_FALLBACK, 'files said changed but no text difference seen: still says so, never blank');
     assert.equal(changeSummary(path.join(t, 'gone'), b).startsWith('改动：'), true);
     fs.writeFileSync(path.join(b, 'new.js'), 'let a=`x`;');
