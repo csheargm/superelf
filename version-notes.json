@@ -2,7 +2,10 @@
   "v5.20.1": {
     "date": "2026-11-25",
     "features": [],
-    "fixes": []
+    "fixes": [
+      "手机友好第二轮 · Phone-friendly round 2"
+    ],
+    "through": "90c9a4260cca19033c1c6a3dca4d47782c11aff4"
   },
   "v5.20.0": {
     "date": "2026-11-25",
