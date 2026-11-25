@@ -1,7 +1,7 @@
 /* PAHomeLook（主页外观）— the pieces of the new look that are LOGIC, kept out of web/index.html
    (already over the R4 budget). Pure helpers are exposed for test/new-look.test.mjs.
    - greeting(now): 早安 / 午安 / 晚上好 with the English beside it, 中文 first.
-   - dateLine(now): ["11月24日 周二", "Tue, Nov 24"].
+   - dateLine(now): ["2026年11月24日 周二", "Tue, Nov 24, 2026"].
    - chatGroups(list, now, limit): chats grouped by day (今天 / 昨天 / 11月20日), newest first;
      only the first `limit` rows unless expanded, so the drawer shows today's/yesterday's (max 5) + 更多 · More.
    - convosHtml(list, activeId, expanded, esc): the drawer markup; rows keep class .convo + data-id
@@ -9,13 +9,13 @@
    - bindAa(root): the single "Aa" text-size control; it reveals the existing .fs-dn/.fs-up pair. */
 const PAHomeLook=(function(){
   const RECENT=5;
-  const WD_ZH=['周日','周一','周二','周三','周四','周五','周六'];
   const WD_EN=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const MON_EN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   function greeting(now){ const h=(now||new Date()).getHours();
     return h<5?['夜深了','Good night']:h<12?['早安','Good morning']:h<18?['午安','Good afternoon']:['晚上好','Good evening']; }
-  function dateLine(now){ const d=now||new Date();
-    return [`${d.getMonth()+1}月${d.getDate()}日 ${WD_ZH[d.getDay()]}`,`${WD_EN[d.getDay()]}, ${MON_EN[d.getMonth()]} ${d.getDate()}`]; }
+  // With the year (owner 2026-11-24), through Intl: 中文 "2026年11月24日 周二", English "Tue, Nov 24, 2026".
+  const ZH_DATE=new Intl.DateTimeFormat('zh-CN',{year:'numeric',month:'long',day:'numeric'}), ZH_WD=new Intl.DateTimeFormat('zh-CN',{weekday:'short'});
+  const EN_DATE=new Intl.DateTimeFormat('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
+  function dateLine(now){ const d=now||new Date(); return [`${ZH_DATE.format(d)} ${ZH_WD.format(d)}`,EN_DATE.format(d)]; }
   const dayKey=(d)=>`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
   function dayLabel(ms,now){ const d=new Date(ms), n=now||new Date();
     if(dayKey(d)===dayKey(n)) return '今天 · Today';
