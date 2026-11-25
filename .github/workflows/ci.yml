@@ -131,11 +131,12 @@ jobs:
         # 2026-11-25: EVERY OS +2 (ubuntu 239, windows 325): menu-anchor-e2e (1680 and 390 widths), skipped on CI by PA_E2E_SKIP.
         # 2026-11-25: EVERY OS +2 (ubuntu 241, windows 327): demo-profile-name-e2e (Google and email sign-in), skipped on CI by PA_E2E_SKIP.
         # 2026-11-25: EVERY OS +2 (ubuntu 243, windows 329): demo-app-edit-e2e (desktop + iPhone), skipped on CI by PA_E2E_SKIP.
+        # 2026-11-25: EVERY OS +8 (ubuntu 251, windows 337): app-back-e2e (4 cases x desktop + iPhone), skipped on CI by PA_E2E_SKIP.
         include:
           - os: ubuntu-latest
-            max_skipped: 243
+            max_skipped: 251
           - os: windows-latest
-            max_skipped: 329
+            max_skipped: 337
     env:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED
