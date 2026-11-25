@@ -1657,7 +1657,9 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
     if (edit && cancel && cancel.signal.aborted) edit.stopped = true;   // a Stop never leaves a half-done change applied (GPT review r3)
     const edited = finishAppEdit(edit, editCtx, { wsDir: wsDir(user) });   // inline checks; a failing or unconfirmed change is rolled back
     // The no-tools lane streams nothing: its answer goes before any note (self-test F1/F2) — never a "now green" for a change the checks rolled back (GPT review).
-    if (edit && edit.scoped && !blank && r.text && !(edited && edited.line.changed && !edited.line.applied)) line({ type: 'delta', text: r.text });
+    const rolledBack = !!(edited && edited.line.changed && !edited.line.applied);
+    if (edit && edit.scoped && edit.confirmed && rolledBack) r = { ...r, text: '' };   // nor stored or sent in done (GPT review r2): the note says what happened
+    if (edit && edit.scoped && !blank && r.text && !rolledBack) line({ type: 'delta', text: r.text });
     editCtx = null;
     if (edited) { audit('app-edit', { who: user.id, app: edit.slug, changed: edited.line.changed, applied: edited.line.applied, version: edited.line.version || null }); line(edited.line); edited.note = scrubPaths([editUnchangedNote(r.text, edited.line, edit.confirmed), edited.note].filter(Boolean).join('\n\n'), wsDir(user)); if (edited.note) { r = { ...r, text: `${r.text || ''}\n\n${edited.note}` }; line({ type: 'delta', text: `\n\n${edited.note}` }); } }
     // by: the lane that ACTUALLY answered (a confined turn's GPT pick runs on Claude), shown under the answer.

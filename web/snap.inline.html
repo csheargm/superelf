@@ -30,7 +30,7 @@ var PASnap = PASnap || (function(){
       // A fixed bar is drawn where the user sees it: in the clone it would sit against the page's own box (self-test F6:
       // the bottom "Add task" bar came out at the top of a short page). Pinned to its live place in page coordinates.
       if(getComputedStyle(s).position==='fixed'){ const r=s.getBoundingClientRect();
-        d.style.setProperty('position','absolute','important'); d.style.setProperty('margin','0','important');
+        d.style.setProperty('position','absolute','important'); d.style.setProperty('margin','0','important'); d.style.setProperty('box-sizing','border-box','important');   // the live rect is the border box (GPT review r2)
         for(const [k,v] of [['top',r.top+scrollY],['left',r.left+scrollX],['width',r.width],['height',r.height]]) d.style.setProperty(k,v+'px','important');
         d.style.setProperty('right','auto','important'); d.style.setProperty('bottom','auto','important'); }
       if(s.scrollTop>0||s.scrollLeft>0){ d.style.overflow='hidden';
