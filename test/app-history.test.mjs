@@ -256,11 +256,13 @@ test('changeSummary: the server\'s one-line account of an applied change, from t
     const q = changeSummary(a, b);
     assert.doesNotMatch(q, /<invoke|\[\[apply\]\]|```\s*\[/, 'nothing the reply cleaner strips, no early fence end');
     assert.equal(cleanReply(q).text, q, 'the cleaner leaves the summary whole');
-    fs.writeFileSync(path.join(b, 'a\n# b`.js'), '1');
-    assert.doesNotMatch(changeSummary(a, b), /\n# b/, 'a file name never shapes the Markdown');
-    fs.writeFileSync(path.join(b, '<invoke>.js'), '1');
-    const withName = changeSummary(a, b);
-    assert.equal(cleanReply(withName).text, withName, 'a file name the cleaner would strip is neutralised too');
+    if (process.platform !== 'win32') {   // Windows forbids newline and '<' in file names: the case cannot exist there
+      fs.writeFileSync(path.join(b, 'a\n# b`.js'), '1');
+      assert.doesNotMatch(changeSummary(a, b), /\n# b/, 'a file name never shapes the Markdown');
+      fs.writeFileSync(path.join(b, '<invoke>.js'), '1');
+      const withName = changeSummary(a, b);
+      assert.equal(cleanReply(withName).text, withName, 'a file name the cleaner would strip is neutralised too');
+    }
   } finally { rmTemp(t); }
 });
 
