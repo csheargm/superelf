@@ -27,9 +27,9 @@ const TITLE_MIN_PX = 60;     // the note title keeps room for a few characters, 
 const CHIP_TEXT_PX = 14, META_PX = 13, PREVIEW_PX = 14;
 const LONG = '<p>' + 'Long answer text '.repeat(40) + '</p><pre><code>const reallyLongVariableName = someFunction(argumentNumberOne, argumentNumberTwo, argumentNumberThree);</code></pre><table><tr>'
   + '<th>Column header</th>'.repeat(6) + '</tr><tr>' + '<td>cell value 123</td>'.repeat(6) + '</tr></table>';
-// What a real reply carries under it: the meta line and the action icons (same classes as mkab / the shell's .mab).
-const PAC_ACTS = '<small class="pa-took">DeepSeek · 中文 · took 1.2s</small><div><button type="button" class="pac-ab">⧉</button><button type="button" class="pac-ab">🔊</button><button type="button" class="pac-ab">↻</button></div>';
-const MSG_ACTS = '<small class="pa-took">DeepSeek · took 1.2s</small><div class="msg-actions"><button type="button" class="mab">⧉</button><button type="button" class="mab">🔊</button></div>';
+// What a real reply carries under it: the meta line and the action icons (same classes and SVG markup as mkab / the shell's .mab).
+const PAC_ACTS = '<small class="pa-took">DeepSeek · 中文 · took 1.2s</small><div><button type="button" class="pac-ab"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/></svg></button><button type="button" class="pac-ab"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/></svg></button><button type="button" class="pac-ab"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/></svg></button></div>';
+const MSG_ACTS = '<small class="pa-took">DeepSeek · took 1.2s</small><div class="msg-actions"><button type="button" class="mab"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/></svg></button><button type="button" class="mab"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/></svg></button></div>';
 // On a phone the chat reads at phone size; on an iPad / desktop the sizes stay as they were (CONTROL: under 16px).
 // mode: 'phone' = phone sizes; 'control' = a wide touch page keeps its old sizes (bubbles under 16px).
 async function judgeText(t, where, logSel, cls, acts, mode, bad) {

@@ -53,7 +53,11 @@ export function chatText(sel) {
   const px = (s) => [...document.querySelectorAll(s)].filter(vis).map((e) => parseFloat(getComputedStyle(e).fontSize));
   return { bubble: px(sel.bubble), meta: px(sel.meta), title: px(sel.title),
     action: [...document.querySelectorAll(sel.action)].filter(vis).map((e) => { const r = e.getBoundingClientRect(), s = getComputedStyle(e);
-      return { glyph: parseFloat(s.fontSize), w: r.width, h: r.height, opacity: +s.opacity }; }) };
+      // The RENDERED glyph: the icon's SVG box. A text glyph (⎘ ✎) is measured as 0 — iOS has no font for them and
+      // drew a tiny faint fallback while font-size said 20px (owner iPhone 2026-11-25), so font-size proves nothing.
+      const g = e.querySelector('svg'), gr = g && g.getBoundingClientRect();
+      return { glyph: gr ? Math.min(gr.width, gr.height) : 0, w: r.width, h: r.height, opacity: +s.opacity,
+        kind: e.closest('.pac-acts.me,.msg.me') ? 'me' : 'ai' }; }) };
 }
 export async function checkChatText(target) { return target.evaluate(chatText, CHAT_SEL); }
 // Judge a chatText result for a phone; returns the failures as text.
@@ -64,6 +68,25 @@ export function chatTextFailures(where, m) {
   if (m.meta.some((x) => x < CHAT_META_MIN_PX)) bad.push(`${where}: meta line ${m.meta.join('/')}px`);
   if (m.title.some((x) => x < CHAT_TITLE_MIN_PX)) bad.push(`${where}: header title ${m.title.join('/')}px`);
   for (const a of m.action) if (a.glyph < ACTION_GLYPH_MIN_PX || a.w < TAP_MIN_PX - 0.5 || a.h < TAP_MIN_PX - 0.5 || a.opacity < 0.95)
-    bad.push(`${where}: action icon ${a.glyph}px ${Math.round(a.w)}x${Math.round(a.h)} opacity ${a.opacity}`);
+    bad.push(`${where}: ${a.kind} action icon glyph ${a.glyph}px ${Math.round(a.w)}x${Math.round(a.h)} opacity ${a.opacity}`);
+  return bad;
+}
+
+// Composer clearance（输入框不压住消息）: after scrolling the log to its end, the last message's bottom sits at or above
+// the composer's top (chips + pills + pill), and the ↓ jump button, if shown, is above the composer too. Runs in the page.
+export function composerClearance(sel) {
+  const log = document.querySelector(sel.log); log.scrollTop = log.scrollHeight;
+  const items = [...log.children].filter((e) => e.getClientRects().length), last = items[items.length - 1];
+  const row = document.querySelector(sel.row).getBoundingClientRect(), j = document.querySelector(sel.jump);
+  return { lastBottom: last ? last.getBoundingClientRect().bottom : null, composerTop: row.top,
+    logBottom: log.getBoundingClientRect().bottom, jumpBottom: j && j.getClientRects().length ? j.getBoundingClientRect().bottom : null };
+}
+export const PAC_CLEAR_SEL = { log: '.pac-log', row: '.pac-row', jump: '.pac-scroll' };
+export function clearanceFailures(where, c) {
+  const bad = [];
+  if (c.lastBottom == null) bad.push(`${where}: no message measured`);   // empty is failure (R14)
+  else if (c.lastBottom > c.composerTop + 0.5) bad.push(`${where}: last message bottom ${Math.round(c.lastBottom)} under composer top ${Math.round(c.composerTop)}`);
+  if (c.logBottom > c.composerTop + 0.5) bad.push(`${where}: the log runs under the composer (${Math.round(c.logBottom)} > ${Math.round(c.composerTop)})`);
+  if (c.jumpBottom != null && c.jumpBottom > c.composerTop + 0.5) bad.push(`${where}: ↓ button over the composer`);
   return bad;
 }
