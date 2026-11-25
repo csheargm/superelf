@@ -1104,7 +1104,7 @@
           loading.remove();
           if(r&&r.ok&&r.data&&r.data.messages){ for(const mm of r.data.messages){
             if(my!==_loadSeq) return false;       // bail mid-render if superseded (the loop awaits render-md/attach-url)
-            if(mm.role==='md'){ const ae=await addAI(mm.text); if(my!==_loadSeq) return false; addActions(ae,'ai',mm.text, lastUser); _addTook(ae,mm.ms,mm.by); if(mm.assess&&mm.aid) addAssessRow(ae, mm.text, Object.assign({aid:mm.aid},mm.assess), curConvo); }
+            if(mm.role==='md'){ const ae=await addAI(mm.text); if(my!==_loadSeq) return false; addActions(ae,'ai',mm.text, lastUser); _addTook(ae,mm.ms,mm.by); if(mm.assess&&mm.aid) addAssessRow(ae, mm.text, Object.assign({aid:mm.aid},mm.assess), curConvo); if(mm.offer&&mm.offer.type==='app-change') addChangeApp(ae,{type:'app-change',label:mm.offer.label,request:''}); }
             else { const ct=shownMe(cleanMe(mm.text)); const im=await attImgs(mm.attachments); if(my!==_loadSeq) return false; const me=addMsg('me',ct,im); if(ct) addActions(me,'me',ct); lastUser=cleanMe(mm.text)||lastUser; } }
             shown=r.data.messages.length>0; } }
         catch(e){ if(my!==_loadSeq) return false; loading.className='pac-m status'; loading.textContent='Could not load this chat — please try again. 无法加载对话，请重试。'; return; } }   // R5: surface the failure, never a silent blank
@@ -1273,7 +1273,7 @@
         loading.remove();
         if(r&&r.ok&&r.data&&r.data.messages){ for(const mm of r.data.messages){
           if(my!==_loadSeq) return;          // bail mid-render if superseded (the loop awaits render-md/attach-url)
-          if(mm.role==='md'){ const ae=await addAI(mm.text); if(my!==_loadSeq) return false; addActions(ae,'ai',mm.text, lastUser); _addTook(ae,mm.ms,mm.by); if(mm.assess&&mm.aid) addAssessRow(ae, mm.text, Object.assign({aid:mm.aid},mm.assess), curConvo); }
+          if(mm.role==='md'){ const ae=await addAI(mm.text); if(my!==_loadSeq) return false; addActions(ae,'ai',mm.text, lastUser); _addTook(ae,mm.ms,mm.by); if(mm.assess&&mm.aid) addAssessRow(ae, mm.text, Object.assign({aid:mm.aid},mm.assess), curConvo); if(mm.offer&&mm.offer.type==='app-change') addChangeApp(ae,{type:'app-change',label:mm.offer.label,request:''}); }
           else { const ct=shownMe(cleanMe(mm.text)); const im=await attImgs(mm.attachments); if(my!==_loadSeq) return false; const me=addMsg('me',ct,im); if(ct) addActions(me,'me',ct); lastUser=cleanMe(mm.text)||lastUser; } } }
       }catch(e){ if(my!==_loadSeq) return; loading.className='pac-m status'; loading.textContent='Could not load this chat — please try again. 无法加载对话，请重试。'; }   // R5: surface the failure, never a silent blank
       if(my!==_loadSeq) return;

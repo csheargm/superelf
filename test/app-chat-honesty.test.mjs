@@ -70,7 +70,8 @@ test('honestReply: note on a claim, the offer only where the panel works', () =>
 test('finishHonest streams the note and the offer, and returns the stored text', () => {
   const lines = [];
   const out = finishHonest({ reply: CLAIMS[0], message: 'yes', prior: [{ role: 'me', text: 'please add a year view' }, { role: 'md', text: 'Sure, shall I?' }], inApp: true, canEdit: true, line: (o) => lines.push(o) });
-  assert.equal(out, `${CLAIMS[0]}\n\n${NO_CHANGE_NOTE}`);
+  assert.equal(out.text, `${CLAIMS[0]}\n\n${NO_CHANGE_NOTE}`);
+  assert.equal(out.offer && out.offer.type, 'app-change', 'the offer is returned to be stored with the reply');
   assert.deepEqual(lines.map((l) => l.type), ['delta', 'app-change']);
   assert.equal(lines[1].request, 'please add a year view');
 });

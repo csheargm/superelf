@@ -12,7 +12,13 @@ const PAPublish=(()=>{
   const post=(slug,body)=>api(url(slug),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body||{})});
   // The menu item; its one-time bilingual tip is a PATips tip beside it (armTip).
   // The second line (#pubState) says what Publish would do for THIS app; check() fills it in.
-  function item(){
+  // A copy (meta.json forkedFrom) is never published (lib/publish/collect.mjs refuseFork): the ONE gate for every
+  // menu — the drawer row and the open app's ⋯ — is here, so no menu offers a Publish that can only refuse.
+  // In its place one quiet line says why and what to do (no button: there is nothing to tap).
+  const FORK_LINE='复制来的应用不能发布；可请原作者发布 · A copied app can\'t be published; ask its original author to publish it';
+  const isFork=(slug)=>typeof FORK_APPS!=='undefined'&&FORK_APPS.has(slug);
+  function item(slug){
+    if(isFork(slug)) return '<div id="pubFork" style="padding:8px 12px;font-size:12px;opacity:.65">'+FORK_LINE+'</div>';
     return '<button data-a="publish" id="pubItem">发布到公开仓库 · Publish to the public repo'
       +'<span id="pubState" style="display:block;font-size:11px;opacity:.65"></span>'
       +'</button>';
@@ -36,7 +42,7 @@ const PAPublish=(()=>{
   // has not seen yet (they closed the wait sheet, or left the app), and re-attaches the watcher to
   // a publish still running. The node keeps the status in memory, so a node restart forgets it.
   const TIP='新：审核后公开分享此应用 · New: share this app publicly after a privacy check';
-  function armTip(slug){ const b=$('#pubItem'); if(b&&!_SEEN.has(TIP_KEY)) PATipsShell.tip(TIP_KEY,'#pubItem',TIP); if(b&&slug) check(slug); }   // the ONE tip mechanism
+  function armTip(slug){ if(isFork(slug)) return; const b=$('#pubItem'); if(b&&!_SEEN.has(TIP_KEY)) PATipsShell.tip(TIP_KEY,'#pubItem',TIP); if(b&&slug) check(slug); }   // the ONE tip mechanism
   const SEEN_KEY=(slug)=>'pub:seen:'+slug;
   const seenAt=(slug)=>{ try{ return localStorage.getItem(SEEN_KEY(slug)); }catch{ return null; /* no storage: show it again, harmless */ } };
   const markSeen=(slug,st)=>{ try{ localStorage.setItem(SEEN_KEY(slug),String(st.at)); }catch{ /* no storage: the result may show once more */ } };
@@ -51,7 +57,7 @@ const PAPublish=(()=>{
   }
   function sheet(html,withGo){
     let s=$('#pubSheet'); if(!s){ s=document.createElement('div'); s.id='pubSheet'; s.className='cmenu-pop';
-      s.style.cssText='left:8px;right:8px;top:64px;max-height:70vh;overflow:auto;padding:12px;font-size:14px'; document.body.appendChild(s); }
+      s.style.cssText='left:8px;right:8px;top:auto;bottom:calc(8px + env(safe-area-inset-bottom));max-height:60vh;overflow:auto;padding:12px;font-size:14px'; document.body.appendChild(s); }   // at the bottom: never over the app's header or its chips (owner report 2026-11-25)
     s.innerHTML=html+'<div class="sheet-acts"><button data-pub="close" class="plain" id="pubClose">关闭 · Close</button>'+(withGo?'<button data-pub="go" id="pubGo" class="primary">发布 · Publish</button>':'')+'</div>';
     s.onclick=(e)=>{ const b=e.target.closest('[data-pub]'); if(b&&b.dataset.pub==='close') s.remove(); };
     return s;

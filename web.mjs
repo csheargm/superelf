@@ -93,7 +93,7 @@ import { pageImageFile, IMG_BAD_PATH, IMG_NOT_FOUND } from './lib/note-page-imag
 import { buildFollowup, followupDeps } from './lib/summary-followup.mjs';
 import { writerClaudeBase, writerLaneMs } from './lib/research-writer.mjs';
 import { snapshotApps, appBuildWarnings } from './lib/app-postcheck.mjs';
-import { earlierShotsLine, appEditOf, confirmEdit, refuseIfEditBusy, editBusyBody, dropAppHistory, editSystemPrompt, beginAppEdit, finishAppEdit, undoAppEdit, VERSIONS_DIR } from './lib/app-edit.mjs';
+import { earlierShotsLine, appEditOf, appEditable, confirmEdit, refuseIfEditBusy, editBusyBody, dropAppHistory, editSystemPrompt, beginAppEdit, finishAppEdit, undoAppEdit, VERSIONS_DIR } from './lib/app-edit.mjs';
 import { APP_CHAT_EVIDENCE_RULE, appAboutContext, editHistoryContext } from './lib/app-history.mjs';
 import { noChangeRule, finishHonest, editUnchangedNote } from './lib/app-chat-honesty.mjs';
 import { isBlankAnswer, laneFailureText, shouldFallBackToAgent, fallbackStatusText, chatTurnLogLine, turnErrorText } from './lib/chat-outcome.mjs';
@@ -1376,7 +1376,10 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
   catch (e) { if (!e.status) throw e; if (res.headersSent) { res.end(JSON.stringify({ type: 'error', text: e.message }) + '\n'); return; } return send(res, e.status, 'application/json', JSON.stringify({ error: e.message, code: e.code })); }
   const system = edit ? editSystemPrompt(edit) : body.system;
   const turnFacts = (max) => appTurnFacts(user, edit, app, max);   // what changed on this app: facts, outside the override chain
-  const chatRole = user.role === 'owner' ? 'owner' : 'member';
+  // canEdit = the shell's canEdit (web/app-edit.js): the owner, in an app in their OWN apps folder. Decided once:
+  // the prompt names the button only when the server will send it (GPT review).
+  const canEditHere = user.role === 'owner' && typeof app === 'string' && slugOk(app) && appEditable(appsDir(user), app);
+  const chatRole = user.role !== 'owner' ? 'member' : canEditHere ? 'owner' : 'ownerShared';
   // A oneShot caller that left while this turn was queued: nothing is saved, nothing spawns.
   if (cancel && cancel.signal.aborted) { audit('chat-cancelled', { who: user.id, convo: convoId || '', queued: true }); if (!res.writableEnded) res.end(); return; }
   // Decided ONCE per turn, from the shell relay's header OR the app slug (lib/agent-origin.mjs),
@@ -1645,8 +1648,9 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
     // No-write lanes (an app's chat on any lane, a fast lane anywhere): never a false "Done" (lib/app-chat-honesty.mjs).
     // TODO(R4 seam): with the post-turn checks above.
     if (!blank && r.ok !== false && !edit && (origin.fromApp || ml.blocked || (chosen && (chosen.provider === 'ollama' || chosen.provider === 'research')))) {
-      r = { ...r, text: finishHonest({ reply: r.text || '', message, prior: convo.messages.slice(0, -1), inApp: origin.fromApp, line,
-        canEdit: user.role === 'owner' && origin.fromApp && typeof app === 'string' && slugOk(app) }) };
+      const h = finishHonest({ reply: r.text || '', message, prior: convo.messages.slice(0, -1), inApp: origin.fromApp, line,
+        canEdit: origin.fromApp && canEditHere && appEditable(appsDir(user), app) });   // re-checked after the model: a delete mid-turn (GPT review r2)
+      r = { ...r, text: h.text, offer: h.offer };
     }
     if (edit && !blank && r.ok !== false) r = offerApply(user, edit, message, r, line, convo.id);   // a plan → the 改 · Apply button (lib/app-edit-confirm.mjs)
     // Never shown: tool-call markup printed as text, the plan marker, the node's own paths (lib/reply-clean.mjs).
@@ -1668,7 +1672,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
     // by: the lane that ACTUALLY answered (a confined turn's GPT pick runs on Claude), shown under the answer.
     const by = ml.blocked && !(edit && edit.scoped) ? '' : chosen ? (chosen.label || 'Claude') : 'Claude';   // the scoped lane's Claude has no label (self-test F8)
     // ms only on an answer: a refusal (a cap, a failure) shows no "took" (self-test F11).
-    const mdMsg = { role: 'md', text: r.text || '', ...(r.ok === false ? {} : { ms: turnMs }), by, ...(blank || unreadable ? { failed: true } : {}) };
+    const mdMsg = { role: 'md', text: r.text || '', ...(r.ok === false ? {} : { ms: turnMs }), by, ...(blank || unreadable ? { failed: true } : {}), ...(r.offer ? { offer: { type: 'app-change', label: r.offer.label } } : {}) };   // the button again on reopen (no request: the panel opens empty)
     convo.messages.push(mdMsg);
     // Over the cap the oldest turns are ARCHIVED beside the conversation, never
     // erased (lib/convo-archive.mjs). What this replaces — `convo.messages =

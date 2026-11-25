@@ -777,3 +777,12 @@ Without it they now FAIL (R14), not pass as `# pass 0 / # fail 0`. To run them:
 ## Phone-first rule (2026-11-25)
 - Phone-first rule: a real browser check for NEW apps from the app maker (render at 390px in headless WebKit, read scrollWidth, smallest font, tap sizes) is not built: Playwright is a dev dependency only, so the node has no browser to run it. lib/app-phone-check.mjs stays a static scan (its known limits are listed there). Seam: an optional check in lib/demo-app.mjs parseApp when PA_PLAYWRIGHT is set.
 - Phone hover check edge cases (GPT review r2, 3-round cap): a hide on a qualified selector (`.menu[data-collapsed]{display:none}`) is not seen, and an exact-target reveal later overridden by a hide still counts as a way in. Both make the check pass a fault (never block a good app). Seam: hoverOnly in lib/app-phone-check.mjs; the real browser check above would replace it.
+
+## Publish a copy's change back to its source (deferred 2026-11-25)
+A copied app (meta.json `forkedFrom`) shows no Publish: web/publish.js `item(slug)` is the ONE gate, and the server
+still refuses (lib/publish/collect.mjs refuseFork, web.mjs bump). "Send my change back to the original" needs:
+`forkedFrom` as a string (shelf copy, lib/sharedapps.mjs) or an object (peer copy, web.mjs fork routes) mapped to the
+repo folder; the `<slug>-mine` rename; copies of another user's app (not in the repo, another owner); snapshot hashing
+and LOCAL_META stripping re-checked. Only the owner's copy of a repo shelf app is safe to start with.
+
+- App chat offer, shared app with the same slug as one of the owner's own apps (GPT review, fork-publish-honesty): the broker sends only the slug, so the server offers 改这个应用 and the shell then refuses the click (the frame belongs to another account). Fix: the relay should name the app's account, and the gate should require it to be the owner's own.
