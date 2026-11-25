@@ -54,12 +54,17 @@ test('R2-4: the Apply prompt asks for the sentence in the plan\'s language', asy
   } finally { fs.rmSync(ws, { recursive: true, force: true }); }
 });
 
-test('R2-5: every edit prompt says the shared theme variables cannot restyle an app', async () => {
-  const { CONCRETE_VALUE_RULE } = await import('../lib/app-edit-confirm.mjs');
+test('R2-5: both Apply turns say the shared theme variables cannot restyle an app', async () => {
+  const { THEME_TOKENS_RULE, applyNowPrompt } = await import('../lib/app-edit-confirm.mjs');
   const theme = src('web/theme-tokens.css');
   for (const v of ['--bg', '--card', '--text', '--muted', '--line', '--accent', '--danger']) {
     assert.ok(theme.includes(v + ':'), `${v} is still a shared theme token`);
-    assert.ok(CONCRETE_VALUE_RULE.includes(v), `the rule names ${v}`);
+    assert.ok(THEME_TOKENS_RULE.includes(v), `the rule names ${v}`);
   }
-  assert.match(CONCRETE_VALUE_RULE, /set the property itself on the element/);
+  assert.ok(applyNowPrompt('p').includes(THEME_TOKENS_RULE), 'owner Apply');
+  const { ws, dir } = tmpApp(); let seen;
+  try {
+    await runScopedEdit({ edit: { slug: 'todo', dir, confirmed: true, plan: 'p' }, wsDir: ws, message: 'x', prior: [], contract: '', ask: async (m) => { seen = seen || m; return 'no blocks'; } }).catch(() => {});
+    assert.ok(seen[1].content.includes(THEME_TOKENS_RULE), 'member Apply');
+  } finally { fs.rmSync(ws, { recursive: true, force: true }); }
 });
