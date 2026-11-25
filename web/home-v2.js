@@ -113,7 +113,7 @@ const PAHome=(function(){
   function startMake(){ const i=$('#box'); i.value=T.starter; i.focus(); i.setSelectionRange(i.value.length,i.value.length); i.dispatchEvent(new Event('input')); }
   function closeMore(){ const m=$('#hmenu'); if(m&&!m.hidden){ m.hidden=true; $('#hmore').setAttribute('aria-expanded','false'); } }
   function bind(){
-    $('#hmore').onclick=(e)=>{ e.stopPropagation(); const m=$('#hmenu'); m.hidden=!m.hidden; $('#hmore').setAttribute('aria-expanded',String(!m.hidden)); };   // the press on ⋯ also closes its tip (PATips)
+    $('#hmore').onclick=(e)=>{ e.stopPropagation(); const m=$('#hmenu'); m.hidden=!m.hidden; if(!m.hidden) placeMenu(m,$('#hmore')); $('#hmore').setAttribute('aria-expanded',String(!m.hidden)); };   // the press on ⋯ also closes its tip (PATips)
     $('#hmenu').addEventListener('click',(e)=>{ if(e.target.closest('button')&&!e.target.closest('.aa')) closeMore(); });
     // pointerdown as well as click: iOS Safari sends no click for a tap on plain text, so the menu stayed (web/popover.js).
     for(const ev of ['pointerdown','click']) document.addEventListener(ev,(e)=>{ if(!e.target.closest('#hmenu,#hmore')) closeMore(); },true);   // + click: a keyboard Enter outside

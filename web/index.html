@@ -573,14 +573,14 @@ $('#convos').onclick=(e)=>{
   if(menuId){ e.stopPropagation(); convoMenu(menuId, e.target.closest('.convo'), e.target.closest('[data-menu]')); return; }
   const id=e.target.closest('.convo')?.dataset.id; if(id) openConvo(id);
 };
-/* PA_POPOVER_JS */   /* closeMenuPop / armMenuPop / flipMenuUp: the shared ⋯-popover close (web/popover.js, R3) */
+/* PA_POPOVER_JS */   /* closeMenuPop / armMenuPop / placeMenu: the shared ⋯-popover close (web/popover.js, R3) */
 function closeConvoMenu(){ closeMenuPop(); }
 function convoMenu(id, convoEl, anchor){
   closeConvoMenu();
   const m=document.createElement('div'); m.id='convoMenu'; m.className='cmenu-pop';
   m.innerHTML='<button data-a="rename">Rename</button><button data-a="delete" class="del">Delete</button>';
   document.body.appendChild(m);
-  const r=anchor.getBoundingClientRect(); m.style.top=(r.bottom+4)+'px'; m.style.right=Math.max(6,innerWidth-r.right)+'px'; flipMenuUp(m,r);
+  placeMenu(m,anchor);
   m.onclick=async(ev)=>{ const b=ev.target.closest('button'); if(!b) return; const a=b.dataset.a; closeConvoMenu();
     if(a==='rename') startRename(convoEl, id);
     else if(a==='delete'){ if(confirm('Delete this chat?')){ await api('/api/convos/'+encodeURIComponent(id),{method:'DELETE'}); if(id===convoId) newConvo(); else loadConvos(); } }
@@ -1223,7 +1223,7 @@ function appMenu(name, anchor){
     +(shared&&!forked?`<button data-a="bump">发布更新 ${nextVer} · Publish update ${nextVer}</button>`:'')
     +'<button data-a="delete" class="del">Delete</button>';
   document.body.appendChild(m);
-  const r=anchor.getBoundingClientRect(); m.style.top=(r.bottom+4)+'px'; m.style.right=Math.max(6,innerWidth-r.right)+'px'; flipMenuUp(m,r);
+  placeMenu(m,anchor);
   m.onclick=async(ev)=>{ const b=ev.target.closest('button'); if(!b) return; const a=b.dataset.a; closeAppMenu();
     if(a==='edit-app') PAAppEdit.open(name,anchor.closest('.dapp')?.querySelector('.dapp-name')?.textContent);
     else if(a==='up') moveApp(name,-1);
