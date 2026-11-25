@@ -12,12 +12,18 @@ export async function startStubSupabase() {
   const { privateKey, publicKey } = crypto.generateKeyPairSync('ec', { namedCurve: 'P-256' });
   const jwk = { ...publicKey.export({ format: 'jwk' }), kid: KID, alg: 'ES256', use: 'sig' };
   const calls = [];
+  const replies = {};
   const srv = await listen(http.createServer((req, res) => {
     if (req.url === '/auth/v1/.well-known/jwks.json') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ keys: [jwk] })); }
     calls.push({ method: req.method, url: req.url, auth: req.headers.authorization || '' });
     // CORS: the shell (another origin) calls /auth/v1/* from the browser.
-    res.writeHead(req.url.startsWith('/auth/v1/') ? 200 : 404, { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'content-type': 'application/json' });
-    res.end('{}');
+    // A suite may set replies[pathPrefix] = (url) => ({ status, body }) to play an error or a session.
+    const hit = Object.keys(replies).find((k) => req.url.startsWith(k));
+    const out = hit ? replies[hit](req.url) : { status: req.url.startsWith('/auth/v1/') ? 200 : 404, body: {} };
+    const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'content-type': 'application/json' };
+    if (req.method === 'OPTIONS') { res.writeHead(204, cors); return res.end(); }
+    res.writeHead(out.status, cors);
+    res.end(JSON.stringify(out.body));
   }));
   const url = `http://127.0.0.1:${srv.address().port}`;
   const iss = `${url}/auth/v1`;
@@ -28,5 +34,5 @@ export async function startStubSupabase() {
     const sig = crypto.sign('sha256', Buffer.from(`${head}.${body}`), { key, dsaEncoding: 'ieee-p1363' }).toString('base64url');
     return `${head}.${body}.${sig}`;
   }
-  return { srv, url, iss, jwt, calls };
+  return { srv, url, iss, jwt, calls, replies };
 }

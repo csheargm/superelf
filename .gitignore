@@ -45,7 +45,7 @@ workspace/apps/*/*
 !workspace/apps/*/index.html
 !workspace/apps/*/meta.json
 
-node_modules/
+node_modules
 .DS_Store
 certs/
 *.crt
