@@ -32,6 +32,8 @@ test('GPT review: a capped width, a commented-out block and a forced height are 
   assert.match(phoneProblems(page('.a{width:600px;max-width:150%}')).join(), /600px/);   // round 2: over 100% does not cap
   assert.match(phoneProblems(page('.a{width:600px;max-width:300px;max-width:none}')).join(), /600px/);   // the last max-width wins
   assert.match(phoneProblems(page('.l::before{content:"<!--"} .wide{width:600px}')).join(), /600px/);   // "<!--" inside CSS is not a comment
+  assert.match(phoneProblems(page('.a{width:600px;max-width:none!important;max-width:100%}')).join(), /600px/);   // r3: !important wins
+  assert.match(phoneProblems(page('.a{width:600px;max-width:100%;max-width:30rem}')).join(), /600px/);   // r3: a rem cap is not counted
 });
 
 test('the gate the edit lane and the demo maker use carries the phone check', () => {
