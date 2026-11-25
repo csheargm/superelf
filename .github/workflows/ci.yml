@@ -135,11 +135,12 @@ jobs:
         # 2026-11-25: EVERY OS +11 (ubuntu 262, windows 348): panel-window-e2e (9) and panel-window-review-e2e (2), skipped on CI by PA_E2E_SKIP.
         # 2026-11-25: EVERY OS +2 (ubuntu 264, windows 350): publish-copy-back-e2e (phone + iPad), skipped on CI by PA_E2E_SKIP.
         # 2026-11-25: EVERY OS +3 (ubuntu 267, windows 353): demo-askai-keep-e2e (desktop + iPhone, older-page wipe), skipped on CI by PA_E2E_SKIP.
+        # 2026-11-25: EVERY OS +3 (ubuntu 270, windows 356): panel-window-dock-edge-e2e (desktop mouse, iPad finger + Pencil), skipped on CI by PA_E2E_SKIP.
         include:
           - os: ubuntu-latest
-            max_skipped: 267
+            max_skipped: 270
           - os: windows-latest
-            max_skipped: 353
+            max_skipped: 356
     env:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED
