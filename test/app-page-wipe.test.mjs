@@ -27,7 +27,7 @@ test('a page that only SHOWS the code (a string, a non-running script) is not re
   for (const html of [page('el.textContent = "document.write(1)"'), page("help.textContent = 'document.body.innerHTML = x'"),
     '<script type="text/plain">document.write(1)</script>', '<script type="application/json">{"a":"document.open()"}</script>'])
     assert.deepEqual(pageWipeProblems(html), [], html);
-  for (const html of [page('x = `${document.body.innerHTML = 1}`'), '<script type="module">document.write(1)</script>', '<script type="text/javascript">document.open()</script>'])
+  for (const html of [page('x = `${document.body.innerHTML = 1}`'), '<script type="module">document.write(1)</script>', '<script type="text/javascript">document.open()</script>', '<script type="">document.write(1)</script>'])
     assert.deepEqual(pageWipeProblems(html), [PAGE_WIPE_TEXT], html);
 });
 test('the shell Undo names the change it offered: a newer change since is refused, never undone instead', async () => {

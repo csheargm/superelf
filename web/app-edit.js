@@ -151,7 +151,7 @@ const PAAppEdit=(()=>{
   async function undoFromMenu(slug,v){
     try{ const r=await api('/api/apps/'+encodeURIComponent(slug)+'/undo?v='+encodeURIComponent(v),{method:'POST'}); const j=await r.json(); const t=j.text||j.error||('HTTP '+r.status);
       if(S&&slug===S.slug){ say(t); undoLeft(j.left); } else shout(t);
-      if(j.undone&&frameSlug()===slug){ bumpGen(); appFrameLeave(); PASW.frameLoad(UID,slug); } }
+      if(j.undone&&frameSlug()===slug&&frameUid()===UID){ bumpGen(); appFrameLeave(); PASW.frameLoad(UID,slug); } }
     catch(err){ shout('撤销失败 · Undo failed: '+((err&&err.message)||'')); }
   }
   // The menu opens at once; 撤销上次修改 · Undo last change joins it (after Change this app) when the server says one exists.

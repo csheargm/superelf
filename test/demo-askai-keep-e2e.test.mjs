@@ -120,7 +120,7 @@ for (const [name, viewport] of [['desktop', { width: 1280, height: 800 }], ['iph
   });
 }
 
-test('an older page that re-renders document.body still keeps its Ask AI button, and it opens the chat', { skip, timeout: 60000 }, async () => {
+test('a page with the current mount that re-renders document.body still keeps its Ask AI button, and it opens the chat', { skip, timeout: 60000 }, async () => {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   try {
     await openCalendar(page);
