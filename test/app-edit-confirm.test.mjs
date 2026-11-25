@@ -192,3 +192,18 @@ test('GPT review r4: words on the Apply line itself are not a tap; an over-long 
   assert.match(WEB, /cancel\.signal\.aborted \? \{ ok: false, text: CANCELLED_TEXT \} : runClaude/, 'a member turn stopped while queued never spawns');
   assert.equal((WEB.match(/if \(edit && cancel && cancel\.signal\.aborted\) edit\.stopped = true;/g) || []).length, 2, 'both the done and the crash path mark a Stop');
 });
+
+test('GPT review r5: share and delete refuse while an edit runs, so its rollback cannot undo them', async () => {
+  const { editBusyBody } = await import('../lib/app-edit.mjs');
+  const w = ws();
+  try {
+    const e = confirmEdit(ed(w, 'make it red'));
+    assert.equal(editBusyBody(w, 'todo'), null);
+    const ctx = beginAppEdit(e, { wsDir: w });
+    assert.equal(JSON.parse(editBusyBody(w, 'todo')).code, 'edit_busy');
+    finishAppEdit(e, ctx, { wsDir: w });
+    assert.equal(editBusyBody(w, 'todo'), null, 'free again after the turn');
+    const WEB = fs.readFileSync(new URL('../web.mjs', import.meta.url), 'utf8');
+    assert.equal((WEB.match(/editBusyBody\(wsDir\(user\), slug\)/g) || []).length, 2, 'the share and the delete route');
+  } finally { rmTemp(w); }
+});

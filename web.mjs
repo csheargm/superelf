@@ -89,7 +89,7 @@ import { pageImageFile, IMG_BAD_PATH, IMG_NOT_FOUND } from './lib/note-page-imag
 import { buildFollowup, followupDeps } from './lib/summary-followup.mjs';
 import { writerClaudeBase, writerLaneMs } from './lib/research-writer.mjs';
 import { snapshotApps, appBuildWarnings } from './lib/app-postcheck.mjs';
-import { appEditOf, confirmEdit, refuseIfEditBusy, dropAppHistory, editSystemPrompt, beginAppEdit, finishAppEdit, undoAppEdit, VERSIONS_DIR } from './lib/app-edit.mjs';
+import { appEditOf, confirmEdit, refuseIfEditBusy, editBusyBody, dropAppHistory, editSystemPrompt, beginAppEdit, finishAppEdit, undoAppEdit, VERSIONS_DIR } from './lib/app-edit.mjs';
 import { APP_CHAT_EVIDENCE_RULE, appAboutContext, editHistoryContext } from './lib/app-history.mjs';
 import { noChangeRule, finishHonest, editUnchangedNote } from './lib/app-chat-honesty.mjs';
 import { isBlankAnswer, laneFailureText, shouldFallBackToAgent, fallbackStatusText, chatTurnLogLine, turnErrorText } from './lib/chat-outcome.mjs';
@@ -1895,6 +1895,7 @@ const server = http.createServer(async (req, res) => {
       if (!dir) return send(res, 400, 'application/json', LINKED_APP);
       const metaFile = path.join(dir, 'meta.json');
       if (!fs.existsSync(metaFile)) return send(res, 404, 'application/json', '{"error":"not found"}');
+      const busyShare = editBusyBody(wsDir(user), slug); if (busyShare) return send(res, 409, 'application/json', busyShare);   // a Stop's rollback would undo the toggle
       const { shared } = await readBody(req, BODY_LIMITS.control);
       // READ-BEFORE-WRITE (empty-overwrite class): the swallowed parse this
       // replaces turned an unreadable meta.json into {}, so flipping the share
@@ -2014,6 +2015,7 @@ const server = http.createServer(async (req, res) => {
       if (!dir) return send(res, 400, 'application/json', LINKED_APP);
       // Not theirs (or mistyped): say so instead of a 200 for nothing deleted (F4-5).
       if (!fs.existsSync(dir)) return send(res, 404, 'application/json', '{"error":"没有这个应用 · No such app"}');
+      const busyDel = editBusyBody(wsDir(user), slug); if (busyDel) return send(res, 409, 'application/json', busyDel);   // a rollback would bring the app back
       fs.rmSync(dir, { recursive: true, force: true });
       dropAppHistory(wsDir(user), slug);   // a new app under this name must not undo into the deleted one (ADR 0040)
       return send(res, 200, 'application/json', '{"ok":true}');
