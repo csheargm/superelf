@@ -16,7 +16,7 @@ import { handleAlertsRoute } from './lib/node-alerts.mjs';
 import { handleActivityRoute, refuseStaleUndo } from './lib/activity-view.mjs';
 import { loadConfig, configPath, fastLaneGuard, GUARD_DEFAULT_SURFACE, agentCapabilities, appContract, REPLY_LANGUAGE_RULE, OVERRIDABLE_PROMPT_MAX } from './lib/config.mjs';
 import { runClaude, APPEND_SYSTEM_PROMPT_MAX } from './lib/runner.mjs';
-import { agentAllowed, lanesFor, memberLane, NO_PLAIN_LANE_TEXT, AGENT_OFF_TEXT } from './lib/member-lanes.mjs';
+import { agentAllowed, lanesFor, memberLane, NO_PLAIN_LANE_TEXT, AGENT_OFF_TEXT, PLAIN_LANE_STATUS } from './lib/member-lanes.mjs';
 import { cancelOnClose, createTurnCancel, createTurnStops, CANCELLED_TEXT } from './lib/turn-stop.mjs';
 import { watchConfig } from './lib/config-watch.mjs';
 import { oneShotBaseArgs, oneShotModel, yieldSettings, NO_TOOLS_ARGS } from './lib/one-shot.mjs';
@@ -93,7 +93,7 @@ import { pageImageFile, IMG_BAD_PATH, IMG_NOT_FOUND } from './lib/note-page-imag
 import { buildFollowup, followupDeps } from './lib/summary-followup.mjs';
 import { writerClaudeBase, writerLaneMs } from './lib/research-writer.mjs';
 import { snapshotApps, appBuildWarnings } from './lib/app-postcheck.mjs';
-import { appEditOf, confirmEdit, refuseIfEditBusy, editBusyBody, dropAppHistory, editSystemPrompt, beginAppEdit, finishAppEdit, undoAppEdit, VERSIONS_DIR } from './lib/app-edit.mjs';
+import { earlierShotsLine, appEditOf, confirmEdit, refuseIfEditBusy, editBusyBody, dropAppHistory, editSystemPrompt, beginAppEdit, finishAppEdit, undoAppEdit, VERSIONS_DIR } from './lib/app-edit.mjs';
 import { APP_CHAT_EVIDENCE_RULE, appAboutContext, editHistoryContext } from './lib/app-history.mjs';
 import { noChangeRule, finishHonest, editUnchangedNote } from './lib/app-chat-honesty.mjs';
 import { isBlankAnswer, laneFailureText, shouldFallBackToAgent, fallbackStatusText, chatTurnLogLine, turnErrorText } from './lib/chat-outcome.mjs';
@@ -1303,7 +1303,7 @@ async function chat(req, res, user, body) {
 function appTurnFacts(user, edit, app, max) {
   const notes = () => { try { return JSON.parse(appNotesJson(ROOT, undefined, buildId.head())); } catch { return {}; /* notes unreadable: the block says "none" */ } };
   if (edit && edit.undo) return '';   // a typed Undo calls no model: no facts to build
-  if (edit && !edit.superelf) return editHistoryContext({ slug: edit.slug, appDir: edit.dir, versionsRoot: path.join(wsDir(user), VERSIONS_DIR), versionsRel: VERSIONS_DIR, repoRoot: ROOT, notes: notes(), max, skip: edit.inFlight || null });
+  if (edit && !edit.superelf) return [edit.shotsLine, editHistoryContext({ slug: edit.slug, appDir: edit.dir, versionsRoot: path.join(wsDir(user), VERSIONS_DIR), versionsRel: VERSIONS_DIR, repoRoot: ROOT, notes: notes(), max, skip: edit.inFlight || null })].filter(Boolean).join('\n');
   if (edit || typeof app !== 'string' || !slugOk(app)) return '';
   const dir = path.join(appsDir(user), app);
   if (max !== undefined && max < APP_CHAT_EVIDENCE_RULE.length) return '';
@@ -1412,6 +1412,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
   // they are still persisted and reloadable by the app via /api/convos/:id.
   if (!convo) { convo = { id: newId(), title: (tag ? appTitle(message) : message.trim().slice(0, 48)), sessionId: null, messages: [], updated: Date.now(), app: tag, label: label || undefined }; }
   if (convo.id !== convoId) hold(convo.id);   // a new conversation: a follow-up naming it queues behind this turn
+  if (edit) edit.shotsLine = earlierShotsLine(convo.messages);   // before this turn's own message (self-test F9)
   convo.messages.push({ role: 'me', text: message, attachments: Array.isArray(attachments) ? attachments.slice(0, 10) : undefined });
   convo.updated = Date.now();
   saveConvo(user, convo); // appears in history now, not after the reply
@@ -1474,7 +1475,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
   const ml = memberLane(user, chosen, cfg.chat_models, (m) => laneServed(m, modelHealth.gone()));
   if (ml.status) laneStatus = ml.status;
   chosen = edit ? (edit.scoped ? scopedLane(model ? ml.lane : null) : null) : ml.lane;   // the owner's edit turn needs tools (the agent lane, null); a member's is the no-tools lane (Claude; an Ollama model only when the user picked one)
-  if (edit) laneStatus = '';
+  if (edit) laneStatus = edit.scoped && !agentAllowed(user) ? `${PLAIN_LANE_STATUS} — ${chosen.label || 'Claude'}` : '';   // a member's app chat says its lane too (self-test F8)
   if (laneStatus) line({ type: 'status', text: laneStatus });
   let fellBack = false;   // lib/chat-outcome.mjs: ONE retry on the agent lane for an app turn a fast lane left blank
   let editCtx = null;   // the undo copy of an edit turn; checked in the catch too, so a crashed turn never leaves a broken app
@@ -1655,11 +1656,16 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
     }
     if (edit && cancel && cancel.signal.aborted) edit.stopped = true;   // a Stop never leaves a half-done change applied (GPT review r3)
     const edited = finishAppEdit(edit, editCtx, { wsDir: wsDir(user) });   // inline checks; a failing or unconfirmed change is rolled back
+    // The no-tools lane streams nothing: its answer goes before any note (self-test F1/F2) — never a "now green" for a change the checks rolled back (GPT review).
+    const rolledBack = !!(edited && edited.line.changed && !edited.line.applied);
+    if (edit && edit.scoped && edit.confirmed && rolledBack) r = { ...r, text: '' };   // nor stored or sent in done (GPT review r2): the note says what happened
+    if (edit && edit.scoped && !blank && r.text && !rolledBack) line({ type: 'delta', text: r.text });
     editCtx = null;
-    if (edited) { audit('app-edit', { who: user.id, app: edit.slug, changed: edited.line.changed, applied: edited.line.applied, version: edited.line.version || null }); line(edited.line); edited.note = scrubPaths([editUnchangedNote(r.text, edited.line), edited.note].filter(Boolean).join('\n\n'), wsDir(user)); if (edited.note) { r = { ...r, text: `${r.text || ''}\n\n${edited.note}` }; line({ type: 'delta', text: `\n\n${edited.note}` }); } }
+    if (edited) { audit('app-edit', { who: user.id, app: edit.slug, changed: edited.line.changed, applied: edited.line.applied, version: edited.line.version || null }); line(edited.line); edited.note = scrubPaths([editUnchangedNote(r.text, edited.line, edit.confirmed), edited.note].filter(Boolean).join('\n\n'), wsDir(user)); if (edited.note) { r = { ...r, text: `${r.text || ''}\n\n${edited.note}` }; line({ type: 'delta', text: `\n\n${edited.note}` }); } }
     // by: the lane that ACTUALLY answered (a confined turn's GPT pick runs on Claude), shown under the answer.
-    const by = ml.blocked ? '' : chosen ? chosen.label : 'Claude';
-    const mdMsg = { role: 'md', text: r.text || '', ms: turnMs, by, ...(blank || unreadable ? { failed: true } : {}) };
+    const by = ml.blocked && !(edit && edit.scoped) ? '' : chosen ? (chosen.label || 'Claude') : 'Claude';   // the scoped lane's Claude has no label (self-test F8)
+    // ms only on an answer: a refusal (a cap, a failure) shows no "took" (self-test F11).
+    const mdMsg = { role: 'md', text: r.text || '', ...(r.ok === false ? {} : { ms: turnMs }), by, ...(blank || unreadable ? { failed: true } : {}) };
     convo.messages.push(mdMsg);
     // Over the cap the oldest turns are ARCHIVED beside the conversation, never
     // erased (lib/convo-archive.mjs). What this replaces — `convo.messages =
@@ -1956,7 +1962,7 @@ const server = http.createServer(async (req, res) => {
         refuseStaleUndo(wsDir(user), edit.slug, url.searchParams.get('v'));   // Activity log: undo THAT change only, never a newer one
         const u = undoAppEdit(edit, { wsDir: wsDir(user) });
         audit('app-edit-undo', { who: user.id, app: edit.slug, undone: !!u.line.undone });
-        return send(res, 200, 'application/json', JSON.stringify({ ok: true, text: u.text, undone: !!u.line.undone }));
+        return send(res, 200, 'application/json', JSON.stringify({ ok: true, text: u.text, undone: !!u.line.undone, left: u.line.left }));
       } catch (e) { if (!e.status) throw e; return send(res, e.status, 'application/json', JSON.stringify({ error: e.message, code: e.code })); }
     }
     if (req.method === 'PATCH' && p.endsWith('/share') && p.startsWith('/api/apps/')) {

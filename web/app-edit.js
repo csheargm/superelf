@@ -118,15 +118,19 @@ const PAAppEdit=(()=>{
     say(ok?DONE:RELOAD_FAILED); me.el.querySelector('#aeUndo').style.display=''; }
   function say(t){ if(S&&S.fr.contentWindow) S.fr.contentWindow.postMessage({pa:'edit-note',text:t},'*'); }
   async function undo(){
-    if(!S) return;
+    if(!S) return; const me=S;
     try{ const r=await api('/api/apps/'+encodeURIComponent(S.slug)+'/undo',{method:'POST'}); const j=await r.json();
-      say(j.text||j.error||('HTTP '+r.status)); if(j.undone) reloadApp(); }
+      if(S!==me) return;   // another app's panel opened meanwhile: never its Undo (GPT review)
+      say(j.text||j.error||('HTTP '+r.status)); if(j.undone) reloadApp(); undoLeft(j.left); }
     catch(err){ say('撤销失败 · Undo failed: '+((err&&err.message)||'')); }
   }
+  // Nothing left to undo: 撤销 · Undo goes (self-test F11: it stayed after both changes were undone).
+  function undoLeft(n){ if(S&&n===0) S.el.querySelector('#aeUndo').style.display='none'; }
   // Every event of the panel's chat passes here (the broker's chat relay).
   function onEvent(ev){
     if(!S||!ev||ev.type!=='app-edit'||ev.slug!==S.slug) return;
     if(ev.applied&&!ev.undone) reloadThenDone(); else if(ev.applied) reloadApp();
+    if(ev.undone||'left' in ev) undoLeft(ev.left);
   }
   function frameRec(win){ return S&&win&&S.fr.contentWindow===win?S.rec:null; }
   const kindOk=(k)=>KINDS.has(k);

@@ -175,8 +175,7 @@ test('long-press the title → panel docks beside the app with its picture; a ch
   await page.locator('#aeUndo').waitFor({ state: 'visible', timeout: 20000 });
   assert.deepEqual(await p.locator('.pac-m.me').evaluateAll((els) => els.map((e) => e.textContent.trim()).filter((t) => t.startsWith('改'))), ['改 · Apply'], 'the tap shows as 改 · Apply, never its confirm id');
   await p.locator('text=已完成 · Done').waitFor({ timeout: 15000 });   // said only after the reload loaded
-  await p.locator('text=改动：index.html 1 行 · Changed: 1 line in index.html').waitFor();   // the server's account, from the diff
-  assert.match(await p.locator('.pac-log').innerText(), /现在是 · Now:\s*.*color:rgb\(200, 0, 0\)/, 'the summary quotes the line as it now reads');
+  await p.locator('text=改动：1 行 · Changed: 1 line').waitFor();   // the server's plain account, from the diff (self-test F4: no code)
   await assertStatusClear(p, '已完成 · Done');
   await page.frameLocator('#fr').locator('#t').waitFor();
   for (let i = 0; i < 50 && (await titleColor(page)) !== 'rgb(200, 0, 0)'; i++) await page.waitForTimeout(200);
