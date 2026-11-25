@@ -13,7 +13,8 @@ const WEB = fs.readFileSync(path.join(ROOT, 'web.mjs'), 'utf8');
 test('the menu order the owner approved: 改这个应用 first, then 发布 · Publish', () => {
   const m = SHELL.match(/m\.innerHTML=\(ROLE==='owner'\?PAAppEdit\.item\(\):''\)[\s\S]{0,400}?PAPublish\.item\(name\)/);
   assert.ok(m, 'drawer ⋯: Change this app before Publish');
-  assert.match(SHELL, /m\.innerHTML=item\(\)\+PAPublish\.item\(slug\);/, "the open app's ⋯: the same order");
+  assert.match(SHELL, /m\.innerHTML=item\(\)\+\(window\.PADemoAuth\?'':PAPublish\.item\(slug\)\);/, "the open app's ⋯: the same order (no Publish on the demo)");
+  assert.match(SHELL, /m\.querySelector\('#aeItem'\)\.after\(u\)/, 'Undo last change joins right after Change this app');
 });
 
 test('the panel is the only window whose chat skips the app-origin header, and it has the chat kinds only', () => {

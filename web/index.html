@@ -2043,7 +2043,7 @@ window.addEventListener('message',async(e)=>{
     } else if(m.kind==='convo'){
       reply(await relayCall('/api/convos/'+encodeURIComponent(m.convoId||''),undefined,'json','data'));
     } else if(m.kind==='app-convos'){
-      reply(await relayCall('/api/app-convos?app='+encodeURIComponent(fr.edit?'app-edit:'+appSlug:appSlug),undefined,'raw'));   // == EDIT_TAG_PREFIX in lib/agent-origin.mjs
+      reply(await relayCall('/api/app-convos?app='+encodeURIComponent(fr.edit&&!window.PADemoAuth?'app-edit:'+appSlug:appSlug),undefined,'raw'));   // == EDIT_TAG_PREFIX in lib/agent-origin.mjs; the demo files the panel's turns under the app's own chat (lib/demo-routes.mjs)
     } else if(m.kind==='health'){
       reply(await relayCall('/api/health?days='+encodeURIComponent(m.days||7),undefined,'json','days'));
     } else if(m.kind==='briefings'){

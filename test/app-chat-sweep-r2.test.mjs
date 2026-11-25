@@ -23,7 +23,7 @@ test('R2-1: a kept status is its own log line, not the reply bubble', () => {
 
 test('R2-2: only the owner\'s panel gets the auto-shot, the camera and its tip', () => {
   const js = src('web/app-edit.js');
-  assert.match(js, /const sees=ROLE==='owner';/);
+  assert.match(js, /const sees=ROLE==='owner'&&!window\.PADemoAuth;/);   // the demo guest's lane cannot see pictures either
   assert.match(js, /shot=sees\?await upload\(/);
   assert.match(js, /camTip=sees&&onceTip\(CAM_TIP_KEY\)/);
   assert.match(js, /snap:sees,/);

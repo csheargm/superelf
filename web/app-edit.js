@@ -9,9 +9,11 @@
 // One chat per app (ADR 0042): it answers questions and, after the server's 改 · Apply step, changes the
 // app. A turn the server applied ({type:'app-edit',applied:true}) reloads the app in place; only once the
 // reload loaded does the panel say 已完成 · Done and show 撤销 · Undo (a failed reload says so, Undo still shown).
-// Members use it on their own apps too (the server runs their no-tools lane); never on the demo.
+// Members and demo guests use it on their own apps too (the server runs their no-tools lane). It is the SHELL's way back:
+// it never depends on the app's page (self-test 2026-11-25: a rewritten page removed its own Ask AI, so the chat and
+// Undo were lost). The ⋯ also offers 撤销上次修改 · Undo last change while a change can be undone.
 const PAAppEdit=(()=>{
-  const ITEM='改这个应用 · Change this app';
+  const ITEM='改这个应用 · Change this app', UNDO_ITEM='撤销上次修改 · Undo last change', EDITS_MS=3000, SAY_MS=5000;
   const TIP_KEY='tip:app-edit';
   const TIP='长按标题可修改此应用 · Long-press the title to change this app';
   const CHAT_TIP_KEY='tip:app-chat', CAM_TIP_KEY='tip:app-chat-camera';
@@ -30,7 +32,7 @@ const PAAppEdit=(()=>{
 #aePanel.sheet{left:0;right:0;bottom:0;height:55%;border-left:0;border-top:1px solid var(--line);border-radius:12px 12px 0 0;box-shadow:0 -4px 16px rgba(0,0,0,.15)}
 #aePanel.sheet .ae-h{padding-top:6px}
 #frame.ae-sheet{bottom:55%}`;
-  const owner=()=>(ROLE==='owner'||ROLE==='member')&&!window.PADemoAuth;   // the server decides the lane by role
+  const owner=()=>ROLE==='owner'||ROLE==='member';   // demo guests are members of their own workspace; the server decides the lane by role
   const canEdit=()=>owner()&&frameOpen()&&frameUid()===UID&&!!frameSlug();
   function item(){
     return '<button data-a="edit-app" id="aeItem">'+ITEM+'</button>';
@@ -80,7 +82,7 @@ const PAAppEdit=(()=>{
     if(frameSlug()!==slug||frameUid()!==UID){ openApp(UID,slug,title); await loaded(); }
     if(!canEdit()) return;
     close(); const my=++openSeq;
-    const sees=ROLE==='owner';   // a member's lane cannot see pictures (lib/app-edit-lane.mjs): no auto-shot, no camera, no camera tip (self-test round 2)
+    const sees=ROLE==='owner'&&!window.PADemoAuth;   // a member's lane cannot see pictures (lib/app-edit-lane.mjs): no auto-shot, no camera, no camera tip (self-test round 2)
     const g0=gen, at0=Date.now(), shot=sees?await upload(slug,await snap(),g0,at0):null;
     if(my!==openSeq||!canEdit()||frameSlug()!==slug) return;   // Home, another app or another open came first
     S=build(slug,title||$('#ftitle').textContent||slug); layout(); addEventListener('resize',layout);
@@ -118,12 +120,15 @@ const PAAppEdit=(()=>{
   async function reloadThenDone(){ const me=S; const ok=await reloadApp(); if(!me||S!==me) return;
     say(ok?DONE:RELOAD_FAILED); me.el.querySelector('#aeUndo').style.display=''; }
   function say(t){ if(S&&S.fr.contentWindow) S.fr.contentWindow.postMessage({pa:'edit-note',text:t},'*'); }
+  // One Undo at a time (panel or ⋯): a double tap must not take back two changes (GPT review r3).
+  let undoing=false;
   async function undo(){
-    if(!S) return; const me=S;
+    if(!S||undoing) return; const me=S; undoing=true;
     try{ const r=await api('/api/apps/'+encodeURIComponent(S.slug)+'/undo',{method:'POST'}); const j=await r.json();
       if(S!==me) return;   // another app's panel opened meanwhile: never its Undo (GPT review)
       say(j.text||j.error||('HTTP '+r.status)); if(j.undone) reloadApp(); undoLeft(j.left); }
     catch(err){ say('撤销失败 · Undo failed: '+((err&&err.message)||'')); }
+    finally{ undoing=false; }
   }
   // Nothing left to undo: 撤销 · Undo goes (self-test F11: it stayed after both changes were undone).
   function undoLeft(n){ if(S&&n===0) S.el.querySelector('#aeUndo').style.display='none'; }
@@ -136,16 +141,38 @@ const PAAppEdit=(()=>{
   function frameRec(win){ return S&&win&&S.fr.contentWindow===win?S.rec:null; }
   const kindOk=(k)=>KINDS.has(k);
   // The open app's ⋯ and the long-press on its title.
+  // How many changes of this app can be undone (0 when the server cannot say: the item is then not shown).
+  async function editsLeftOf(slug){ try{ const r=await api('/api/apps/'+encodeURIComponent(slug)+'/edits',{signal:AbortSignal.timeout(EDITS_MS)}); const j=await r.json(); return j&&j.ok?{left:j.left|0,v:String(j.v||'')}:{left:0,v:''}; }
+    catch(_){ return {left:0,v:''}; /* offline or refused: no Undo item; the panel's own Undo stays */ } }
+  // A short line over the app (no panel open): what the shell's Undo did.
+  function shout(t){ let el=$('#aeSay'); if(!el){ el=document.createElement('div'); el.id='aeSay'; el.setAttribute('role','status');
+      el.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom));z-index:13;max-width:90vw;padding:10px 14px;border-radius:10px;background:var(--fg,#222);color:var(--bg,#fff);font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,.25)';
+      document.body.appendChild(el); }
+    el.textContent=t; el.hidden=false; clearTimeout(shout.t); shout.t=setTimeout(()=>{ el.hidden=true; },SAY_MS); }
+  // 撤销上次修改 · Undo last change, from the shell's ⋯: the app reloads whether or not its page still has a chat.
+  // v: the change the menu offered; the server refuses (409) if a newer one arrived since, never undoing that one instead.
+  async function undoFromMenu(slug,v){
+    if(undoing) return; undoing=true;
+    try{ const r=await api('/api/apps/'+encodeURIComponent(slug)+'/undo?v='+encodeURIComponent(v),{method:'POST'}); const j=await r.json(); const t=j.text||j.error||('HTTP '+r.status);
+      if(S&&slug===S.slug){ say(t); undoLeft(j.left); } else shout(t);
+      if(j.undone&&frameSlug()===slug&&frameUid()===UID){ bumpGen(); appFrameLeave(); PASW.frameLoad(UID,slug); } }
+    catch(err){ shout('撤销失败 · Undo failed: '+((err&&err.message)||'')); }
+    finally{ undoing=false; }
+  }
+  // The menu opens at once; 撤销上次修改 · Undo last change joins it (after Change this app) when the server says one exists.
   function frameMenu(anchor){
     closeMenuPop();
     const slug=frameSlug(), title=$('#ftitle').textContent;
     const m=document.createElement('div'); m.id='frameMenu'; m.className='cmenu-pop';
-    m.innerHTML=item()+PAPublish.item(slug);   // PAPublish decides for a fork (ONE gate)
+    m.innerHTML=item()+(window.PADemoAuth?'':PAPublish.item(slug));   // PAPublish decides for a fork (ONE gate); the demo has no Publish
     document.body.appendChild(m);
     placeMenu(m,anchor);
+    editsLeftOf(slug).then(({left,v})=>{ if(!(left>0)||!v||!m.isConnected||frameSlug()!==slug||m.querySelector('#aeUndoItem')) return;
+      const u=document.createElement('button'); u.dataset.a='undo-app'; u.id='aeUndoItem'; u.dataset.v=v; u.textContent=UNDO_ITEM;
+      m.querySelector('#aeItem').after(u); placeMenu(m,anchor); });
     m.onclick=(ev)=>{ const b=ev.target.closest('button'); if(!b) return; closeMenuPop();
-      if(b.dataset.a==='edit-app') open(slug,title); else if(b.dataset.a==='publish') PAPublish.open(slug); };
-    armTip(); PAPublish.armTip(slug); armMenuPop(anchor);
+      if(b.dataset.a==='edit-app') open(slug,title); else if(b.dataset.a==='undo-app') undoFromMenu(slug,b.dataset.v); else if(b.dataset.a==='publish') PAPublish.open(slug); };
+    armTip(); if(!window.PADemoAuth) PAPublish.armTip(slug); armMenuPop(anchor);
   }
   function bindBar(){
     const more=$('#fmore'), t=$('#ftitle');

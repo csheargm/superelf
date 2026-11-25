@@ -3,6 +3,11 @@
 Problems found while doing an asked-for task, not needed for that task. One line each; the task
 that found it in brackets. Pick from here; do not open a side session per item.
 
+## The way back to an app's chat · 回去的路 (fix/askai-survives, 2026-11-25)
+- lib/app-postcheck.mjs pageWipeProblems is a text heuristic: an alias (`const b = document.body; b.innerHTML = …`) or a runtime error on load is not seen; a headless load check on the node would catch both (the shell ⋯ and the <html>-hung Ask AI button are the backstop meanwhile).
+- Ask AI mount upgrade (GPT review r2, 2026-11-25): a page saved with the older body-hung mount keeps it, even after an edit (ensureAskAi leaves an existing mount alone), so its own body redraw still removes that button; the shell ⋯ (Change this app / Undo) is the way back there.
+- No check yet that a control the reply names (e.g. "Year view") exists and changes the page; the real-model self-test is the only reader of screen vs reply.
+
 ## Publish sheet edge cases · 发布面板边角 (GPT review round 3, 2026-11-25, cap reached)
 - web/publish.js watch()/go(): a status reply after goHome/openApp or a newer preview can still open a sheet (preview replies are guarded by popGen/openSeq; status notices are not).
 - web/publish.js open(): pressing 发布 clears the sheet's click handler, so ✕ · Close does nothing while the request is pending, and stays dead if it rejects.
