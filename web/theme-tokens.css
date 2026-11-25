@@ -7,6 +7,11 @@
    --accent as TEXT on --card 5.7:1 light, 6.0:1 dark; white on --accent-fill 5.7:1 light, 4.8:1 dark.
    In dark mode --accent is the TEXT blue and --accent-fill the BUTTON blue: no single blue clears
    4.5:1 both as text on near-black and under white text. */
+/* iOS text autosizing (iOS 自动放大文字): WebKit on iPhone inflates LONG text blocks by its own factor, so
+   a long bubble rendered ~2x while a short one beside it stayed 14px (owner 2026-11-24, Red Flags). This
+   file reaches the shell and every app page, so ONE rule pins every page to the sizes it declares. 100%,
+   not none: none also blocks the user's own zoom in some engines (test/text-size-adjust.test.mjs). */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 :root{
   --bg:#f5f6f8; --card:#ffffff; --text:#0b0c0e; --muted:#63666e; --line:#e3e5ea;
   --accent:#0062d1; --accent-fill:#0062d1; --on-accent:#ffffff; --accent-soft:rgba(0,98,209,.1);
