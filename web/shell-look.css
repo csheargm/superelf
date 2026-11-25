@@ -24,16 +24,12 @@ header .hsub b{ color:var(--text); font-weight:600; }
 header .hsub:empty{ display:none; }
 .dot{ width:8px; height:8px; margin:0 6px 0 2px; }
 .dot.ok{ background:var(--ok); }
-#newSession{ display:inline-flex; align-items:center; gap:4px; min-height:40px; padding:0 12px; background:var(--card); border:0; box-shadow:var(--shadow); font-weight:500; white-space:nowrap; }
-#newSession .pi{ width:16px; height:16px; }
 @media (max-width:440px){
   header{ gap:2px; padding:10px 8px 4px; }
   header h1{ font-size:calc(20px * var(--fs,1)); }
   header .hsub{ white-space:normal; }
   header .hsub .en{ display:none; }
   header .hsub{ padding-left:64px; }
-  #newSession .lbl{ display:none; }
-  #newSession{ padding:0 10px; }
 }
 
 /* One "Aa" control: tap shows the existing smaller / larger pair as a small floating pill. */

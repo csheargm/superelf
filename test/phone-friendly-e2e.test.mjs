@@ -64,6 +64,14 @@ const squeezed = (t) => t.evaluate(() => [...document.querySelectorAll('button,s
   const r = e.getBoundingClientRect(), s = getComputedStyle(e);
   return r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden' && r.top < innerHeight && (r.right > innerWidth + 1 || (r.width > 0 && r.width < 12));
 }).map((e) => (e.id || e.className || e.tagName) + ' ' + Math.round(e.getBoundingClientRect().width) + 'px'));
+// Runs in the page: each visible row of every open .cmenu-pop, with its icon (svg, or the leading text glyph box) and label rects.
+function menuRows() {
+  const box = (e) => { const r = e.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right }; };
+  return [...document.querySelectorAll('.cmenu-pop:not([hidden]) button')].filter((b) => b.getClientRects().length && !b.closest('.aa-set,[hidden]'))
+    .map((b) => { const ic = b.querySelector(':scope > svg'), lb = b.querySelector(':scope > .hm-l,:scope > .lbl');
+      return { id: b.id || b.className, h: b.getBoundingClientRect().height, icon: ic ? box(ic) : null,
+        label: lb && lb.getClientRects().length && lb.textContent.trim() ? box(lb) : (!lb && b.textContent.trim() ? box(b) : null) }; });
+}
 async function tipsClear(where, t, bad) {
   const [h, tips] = [await heads(t), await tipRects(t)];
   for (const tip of tips) for (const r of h) if (overlaps(tip, r)) bad.push(`${where}: tip ${tip.id} covers a title/header`);
@@ -76,6 +84,19 @@ for (const [dev, viewport] of Object.entries(DEVICES)) test(`${dev}: shell + eve
   const bad = [];
   try {
     judge(`${dev} home`, await checkSurface(page), bad); await tipsClear(`${dev} home`, page, bad);
+    // Menu rows（菜单行）: every row of an open .cmenu-pop is icon left + label right on ONE line, 44px+ tall, labelled.
+    // Owner 2026-11-25 (v5.20.2): `.cmenu-pop button{display:block}` beat .ibtn's inline-flex, so each icon sat above its label.
+    await page.evaluate(() => document.querySelectorAll('.pat-tip').forEach((t) => t.remove()));
+    await page.click('#hmore'); await page.waitForSelector('#hmenu:not([hidden])');
+    const rows = await page.evaluate(menuRows); report.push({ where: `${dev} home menu`, rows });
+    assert.ok(rows.length >= 4, `the menu scan saw its rows (R14): ${rows.length}`);
+    for (const r of rows) {
+      if (!r.label) bad.push(`${dev} menu: a row with no visible label ${r.id}`);
+      if (r.h < 43.5) bad.push(`${dev} menu: row ${r.id} is ${r.h}px tall`);
+      if (r.icon && r.label && (r.icon.bottom <= r.label.top || r.label.bottom <= r.icon.top)) bad.push(`${dev} menu: ${r.id} icon and label on different lines`);
+      if (r.icon && r.label && r.icon.right > r.label.left) bad.push(`${dev} menu: ${r.id} icon not left of its label`);
+    }
+    await page.keyboard.press('Escape');
     await page.evaluate(() => openDrawer()); await page.waitForTimeout(SETTLE_MS);
     judge(`${dev} drawer`, await checkSurface(page, { skip: 'main,#emptyState,header' }), bad);   // what the drawer covers is not on screen to a finger
     for (const slug of APPS) {
