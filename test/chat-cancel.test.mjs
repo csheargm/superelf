@@ -227,9 +227,9 @@ test('CONTROL: the interactive composer\'s own reqChat call never marks oneShot'
 // one another — this test is the link. The studio's copy is pinned to PAC_CANCELLED in
 // test/stationery-flow.test.mjs.
 test('R3: the shell, PAChat and the server declare the cancelled sentence once each, identically', () => {
-  const WEB = fs.readFileSync(path.join(ROOT, 'web.mjs'), 'utf8');
+  const WEB = fs.readFileSync(path.join(ROOT, 'lib', 'turn-stop.mjs'), 'utf8');   // the server's one copy (web.mjs and the app-edit lane import it)
   const shell = [...SHELL.matchAll(/const RELAY_CANCELLED='([^']+)'/g)], pac = [...CHAT.matchAll(/const PAC_CANCELLED='([^']+)'/g)];
-  const server = [...WEB.matchAll(/const CHAT_CANCELLED = Object\.freeze\(\{ ok: false, text: '([^']+)' \}\)/g)];
+  const server = [...WEB.matchAll(/export const CANCELLED_TEXT = '([^']+)';/g)];
   assert.equal(shell.length, 1); assert.equal(pac.length, 1); assert.equal(server.length, 1);
   assert.equal(shell[0][1], pac[0][1], 'shell == PAChat');
   assert.equal(server[0][1], pac[0][1], 'server == PAChat: what is stored is what the page said');

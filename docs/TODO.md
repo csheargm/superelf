@@ -21,6 +21,22 @@ that found it in brackets. Pick from here; do not open a side session per item.
 - Undo walks back through edits; there is no Redo button (the replaced copy is kept as <stamp>-undo in .app-versions).
 - Pre-existing, seen while testing: test/member-plain-lane-e2e "owner ticks Agent tools" fails on origin/main too (checkbox click does not change state); WebKit app-own-bar-e2e "Journal pen stroke" fails on origin/main too.
 
+## One chat per app · 一个应用一个对话 (ADR 0042, shipped 2026-11-24)
+Owner decisions (defaults applied, change any by saying so):
+1. Content apps (Bible explain, Journal summaries, notes) keep their in-page Ask AI — applied: yes.
+2. The owner also taps 改 · Apply before a change — applied: yes.
+3. Real iPad check of the screenshot taken when the panel opens (PA_SNAP) — needs the device.
+Follow-ups:
+- Generic apps' Ask AI button → the one chat: the shell takes {pa:'shell',type:'app-chat'} (web/app-edit.js
+  fromAppChat); apps (or PAChat.fullscreen for non-content apps) still need to post it.
+- Shelf app → fork first inside the panel (members today copy the app, then open their copy).
+- Demo guests: the panel stays off on the demo; they change their own apps through the app maker (caps charged).
+- The Apply turn shows as 「改 · Apply (<id>)」 in the user bubble; a nicer label needs a PAChat display hook.
+- GPT review leftovers: a Stop during a member's Apply does not cancel the model call (the page may still be
+  written; Undo restores it); the member lane writes index.html only, so a rename in meta.json is dropped; the
+  stored plan puts the user's request before the shown plan, and a very long request can crowd the plan out.
+- Pending plans are in memory: a node restart forgets them (re-ask, tap Apply again).
+
 ## Verse ink: handwriting frame leftovers (GPT review 2026-11-22, web/ink-frame.inline.html)
 
 - Circle round words (followEnclosures, 2026-11-22): on another width a closed big stroke is re-anchored
@@ -712,3 +728,11 @@ Without it they now FAIL (R14), not pass as `# pass 0 / # fail 0`. To run them:
 
 ## Drawer sections — review leftover (GPT review cap, 2026-11-24)
 - test/drawer-sections-e2e.test.mjs reads the page clock just after the drawer renders; a render and read straddling midnight could still mismatch (seconds-wide window). Fix: freeze the page clock (page.clock) and seed chats from that time.
+
+### Unified app chat — GPT review round 3 leftovers (2026-11-24)
+- Owner Apply runs the full agent in the whole workspace; app files/history could steer it outside apps/<slug>/. Owner decision: stage owner edits in an app-only sandbox? (by design today, same as the main chat).
+- Members on a private node get Claude (no tools) in the app chat even when not opted in to Claude, with no per-member meter. Owner decision: meter it, or Ollama-only for members not opted in.
+- The member lane drops image attachments (the panel's screenshot); it should say so or pass them.
+- Done trusts the iframe load event; the service worker's 503 fallback page still counts as loaded.
+- A confirm id is bound to the slug, not the app instance: delete + re-create within 10 minutes reuses it (same user only).
+- Text inside an app page can make the planner print [[apply]] on a question; the user still has to tap Apply.

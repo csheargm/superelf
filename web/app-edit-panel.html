@@ -32,16 +32,18 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px 
 (function(){
   let chat=null, inited=false;
   const note=(t,id)=>{ const log=document.querySelector('.pac-log'); if(!log) return; const d=document.createElement('div'); d.className='pac-m status'; if(id) d.id=id; d.textContent=t; log.appendChild(d); };
+  const TIP='新：这里可以提问，也可以直接让它改这个应用 · New: ask here, or ask it to change this app';
   const NO_SHOT='未能自动截图，请用 ＋ 添加照片或截屏 · Could not capture the screen — add a photo or a screenshot with ＋';
   function mount(m){
     chat=PAChat.mount(document.getElementById('chat'),{
-      placeholder:'说说想怎么改 · Say what to change',
-      greeting:'改「'+m.title+'」：说说你想改什么，截图已附上 · Change “'+m.title+'”: say what you want, the screenshot is attached. 输入「撤销」可撤销 · Type “undo” to undo.',
+      placeholder:'提问，或说说想怎么改 · Ask, or say what to change',
+      greeting:'「'+m.title+'」：可以提问，也可以让它改这个应用；它先说明要怎么改，点「改 · Apply」才动手 · “'+m.title+'”: ask a question or ask for a change — it says the plan first and changes nothing until you tap Apply.',
     });
     chat.open('edit');
     if(typeof m.prefill==='string'&&m.prefill.trim()) chat.prefill(m.prefill);   // the request the app's chat could not carry out
     if(m.shot&&m.shot.path) chat.attach({name:m.shot.name||'screen.png',path:m.shot.path,thumb:m.shot.thumb});
     else setTimeout(()=>note(NO_SHOT,'noShot'),0);
+    if(m.tip) setTimeout(()=>note(TIP,'aeTip'),0);   // first-use tip, once (the shell remembers it)
   }
   addEventListener('message',(e)=>{
     const m=e.data; if(!m||e.source!==parent) return;

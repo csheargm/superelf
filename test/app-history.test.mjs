@@ -39,6 +39,7 @@ test('an edit turn stores its request; the history lists versions newest first w
   try {
     const user = { id: 'owner', role: 'owner' };
     const edit = appEditOf({ user, body: { edit: 'todo', message: 'make the title red' }, headers: {}, appsDir: path.join(w, 'apps') });
+    Object.assign(edit, { confirmed: true, plan: edit.request });   // as after 改 · Apply
     const ctx = beginAppEdit(edit, { wsDir: w });
     fs.writeFileSync(path.join(a, 'index.html'), '<h1 style="color:red">Todo</h1>\n<p>one</p>\n');
     assert.equal(finishAppEdit(edit, ctx, { wsDir: w }).line.applied, true);

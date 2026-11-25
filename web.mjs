@@ -17,9 +17,11 @@ import { handleActivityRoute, refuseStaleUndo } from './lib/activity-view.mjs';
 import { loadConfig, configPath, fastLaneGuard, GUARD_DEFAULT_SURFACE, agentCapabilities, appContract, REPLY_LANGUAGE_RULE, OVERRIDABLE_PROMPT_MAX } from './lib/config.mjs';
 import { runClaude, APPEND_SYSTEM_PROMPT_MAX } from './lib/runner.mjs';
 import { agentAllowed, lanesFor, memberLane, NO_PLAIN_LANE_TEXT, AGENT_OFF_TEXT } from './lib/member-lanes.mjs';
-import { cancelOnClose, createTurnCancel, createTurnStops } from './lib/turn-stop.mjs';
+import { cancelOnClose, createTurnCancel, createTurnStops, CANCELLED_TEXT } from './lib/turn-stop.mjs';
 import { watchConfig } from './lib/config-watch.mjs';
-import { oneShotBaseArgs, oneShotModel, yieldSettings } from './lib/one-shot.mjs';
+import { oneShotBaseArgs, oneShotModel, yieldSettings, NO_TOOLS_ARGS } from './lib/one-shot.mjs';
+import { mintConfirm, planOffer, applyMessage, APPLY_LABEL, PLAN_MAX, PLAN_TOO_LONG } from './lib/app-edit-confirm.mjs';
+import { runScopedEdit, scopedLane, flattenForClaude } from './lib/app-edit-lane.mjs';
 import { safeJoin, slugOk, drawerOpenOf, tokenOk, dataContentType, readBody, writeFileAtomic, renameWithRetry, decodeBase64Strict, bodyErrorResponse, BODY_LIMITS } from './lib/webutil.mjs';
 import { createConvoLocks, withConvoTurn, QUEUED_TURN_TEXT } from './lib/convo-lock.mjs';
 import { readJsonState, readJsonForUpdate, FILE_OK, FILE_ABSENT, FILE_UNREADABLE, FILE_UNREADABLE_CODE } from './lib/readjson.mjs';
@@ -87,7 +89,7 @@ import { pageImageFile, IMG_BAD_PATH, IMG_NOT_FOUND } from './lib/note-page-imag
 import { buildFollowup, followupDeps } from './lib/summary-followup.mjs';
 import { writerClaudeBase, writerLaneMs } from './lib/research-writer.mjs';
 import { snapshotApps, appBuildWarnings } from './lib/app-postcheck.mjs';
-import { appEditOf, refuseIfEditBusy, dropAppHistory, editSystemPrompt, beginAppEdit, finishAppEdit, undoAppEdit, VERSIONS_DIR } from './lib/app-edit.mjs';
+import { appEditOf, confirmEdit, refuseIfEditBusy, editBusyBody, dropAppHistory, editSystemPrompt, beginAppEdit, finishAppEdit, undoAppEdit, VERSIONS_DIR } from './lib/app-edit.mjs';
 import { APP_CHAT_EVIDENCE_RULE, appAboutContext, editHistoryContext } from './lib/app-history.mjs';
 import { noChangeRule, finishHonest, editUnchangedNote } from './lib/app-chat-honesty.mjs';
 import { isBlankAnswer, laneFailureText, shouldFallBackToAgent, fallbackStatusText, chatTurnLogLine, turnErrorText } from './lib/chat-outcome.mjs';
@@ -1070,7 +1072,7 @@ async function runAgent(message, extraArgs, cwd, timeoutMs, systemPrompt) {
 // --effort stays the user's. lib/one-shot.mjs holds the rules; both values are read per turn,
 // never copied here (docs/adr/0011).
 // What a cancelled oneShot turn answers and stores, instead of the killed child's raw stream-json.
-const CHAT_CANCELLED = Object.freeze({ ok: false, text: '已取消 · Cancelled' });   // == PAC_CANCELLED in web/chat-ui.inline.html (test/chat-cancel.test.mjs)
+const CHAT_CANCELLED = Object.freeze({ ok: false, text: CANCELLED_TEXT });   // == PAC_CANCELLED in web/chat-ui.inline.html (test/chat-cancel.test.mjs)
 // A oneShot caller that goes away (the studio's Cancel or timeout aborts the shell relay's fetch,
 // which closes this socket) can no longer use the answer, so the run stops: the claude child is
 // killed, and a turn still queued never spawns one (chat() checks `signal`). Before this, the
@@ -1286,6 +1288,33 @@ function agentSystemPrompt(head, caps, facts) {
   return [...head, f, caps].filter(Boolean).join('\n\n');
 }
 
+// TODO(R4 seam): these two edit-turn helpers leave web.mjs with the edit-turn wiring (the seam named in chatTurn).
+// An unconfirmed edit turn that planned a change: strip the marker, mint the single-use id, offer the button.
+function offerApply(user, edit, message, r, line) {
+  if (edit.confirmed || edit.superelf || edit.undo) return r;
+  const o = planOffer(r.text);
+  if (!o.offered) return r;
+  if (o.text.length > PLAN_MAX) return { ...r, text: `${o.text}\n\n${PLAN_TOO_LONG}` };   // never an Apply that would run a cut-down plan
+  const id = mintConfirm({ who: user.id, slug: edit.slug, plan: o.text, request: message });
+  line({ type: 'app-change-confirm', slug: edit.slug, label: APPLY_LABEL, message: applyMessage(id) });
+  return { ...r, text: o.text };
+}
+// A member's edit turn: one no-tools model call per attempt (Ollama, or Claude with --tools=), never Codex.
+async function scopedEditTurn(user, edit, message, convo, lane, origin, cancel) {
+  const deadline = cfg.task_timeout_minutes * 60000;   // one fail-closed deadline for either provider
+  const ask = async (messages) => {
+    const signal = cancel ? AbortSignal.any([cancel.signal, AbortSignal.timeout(deadline)]) : AbortSignal.timeout(deadline);
+    if (lane.provider === 'ollama') return streamOllama({ url: cfg.ollama_url, model: lane.model, messages, signal, onDelta: () => {} });
+    const { system, prompt } = flattenForClaude(messages);
+    const x = await enqueue(() => (cancel && cancel.signal.aborted ? { ok: false, text: CANCELLED_TEXT } : runClaude({ claudeCmd: cfg.claude_cmd, extraArgs: agentArgs(user, [...cfg.claude_args, ...NO_TOOLS_ARGS], origin),
+      cwd: wsDir(user), prompt, systemPrompt: system, timeoutMs: deadline, onChild: cancel ? cancel.onChild : undefined })));   // stopped while queued: never spawn
+    if (!x.ok) throw new Error(x.text || 'the model failed · 模型失败');
+    return x.text;
+  };
+  try { return await runScopedEdit({ edit, wsDir: wsDir(user), message, prior: convo.messages.slice(0, -1), contract: APP_CONTRACT, ask, signal: cancel ? cancel.signal : undefined }); }
+  catch (e) { if (cancel && cancel.signal.aborted) return CHAT_CANCELLED; throw e; }   // a Stop is not an error: stored as Cancelled (F4-3)
+}
+
 async function chatTurn(req, res, user, body, hold, cancel = null) {
   const { message, convoId, attachments, app, label, model, assess } = body;
   const oneShot = body.oneShot === true;   // the literal true only (docs/adr/0008)
@@ -1293,7 +1322,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
   // 改这个应用 · Change this app (lib/app-edit.mjs, ADR 0040): the owner's panel turn, or a refusal before anything is saved.
   // TODO(R4 seam): edit-turn wiring leaves chat() with the lane dispatch (the split named above).
   let edit = null;
-  try { edit = appEditOf({ user, body, headers: req.headers, appsDir: appsDir(user) }); if (edit) refuseIfEditBusy(edit, wsDir(user)); }
+  try { edit = appEditOf({ user, body, headers: req.headers, appsDir: appsDir(user), members: !demoOn(cfg) }); if (edit) { refuseIfEditBusy(edit, wsDir(user)); confirmEdit(edit); } }
   catch (e) { if (!e.status) throw e; if (res.headersSent) { res.end(JSON.stringify({ type: 'error', text: e.message }) + '\n'); return; } return send(res, e.status, 'application/json', JSON.stringify({ error: e.message, code: e.code })); }
   const system = edit ? editSystemPrompt(edit) : body.system;
   const turnFacts = (max) => appTurnFacts(user, edit, app, max);   // what changed on this app: facts, outside the override chain
@@ -1397,7 +1426,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
   // F4-2: a member the owner has not opted in never reaches an agent lane (lib/member-lanes.mjs).
   const ml = memberLane(user, chosen, cfg.chat_models, (m) => laneServed(m, modelHealth.gone()));
   if (ml.status) laneStatus = ml.status;
-  chosen = edit ? null : ml.lane;   // an edit turn needs tools: the Claude agent lane (null), whatever the chooser says
+  chosen = edit ? (edit.scoped ? scopedLane(model ? ml.lane : null) : null) : ml.lane;   // the owner's edit turn needs tools (the agent lane, null); a member's is the no-tools lane (Claude; an Ollama model only when the user picked one)
   if (edit) laneStatus = '';
   if (laneStatus) line({ type: 'status', text: laneStatus });
   let fellBack = false;   // lib/chat-outcome.mjs: ONE retry on the agent lane for an app turn a fast lane left blank
@@ -1408,8 +1437,9 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
     editCtx = edit ? beginAppEdit(edit, { wsDir: wsDir(user) }) : null;   // before the agent runs
     // TODO(R4 seam): the retry loop and the lane dispatch inside it leave chat() together (see the seam named below).
     for (;;) {
-    if (ml.blocked) r = { ok: false, text: NO_PLAIN_LANE_TEXT };   // no plain lane for this member: said, never the agent
+    if (ml.blocked && !(edit && edit.scoped)) r = { ok: false, text: NO_PLAIN_LANE_TEXT };   // a member's app chat has its own no-tools lane (GPT review)   // no plain lane for this member: said, never the agent
     else if (edit && edit.undo) { r = undoAppEdit(edit, { wsDir: wsDir(user) }); line(r.line); audit('app-edit-undo', { who: user.id, app: edit.slug, undone: !!r.line.undone }); }   // a typed "undo": no model
+    else if (edit && edit.scoped) r = await scopedEditTurn(user, edit, message, convo, chosen, origin, cancel);   // a member's app chat: no tools, the server writes (lib/app-edit-lane.mjs)
     else if (chosen && chosen.provider === 'ollama') {
       // Fast lane: text-only Ollama model. Stateless, so send recent history for context.
       // Global honesty guard + the app's own directive (e.g. the Bible app's "reply in Chinese
@@ -1465,7 +1495,8 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
       // Before agentArgs, so a confined lane carries it too (it is not a permission flag). Read from the
       // LIVE cfg on every turn, so a config.json edit applies to the next one (docs/adr/0011).
       const baseArgs = oneShot ? oneShotBaseArgs(tierArgs, cfg.one_shot_args, memberArgsOf(user, origin)) : tierArgs;
-      const extraArgs = agentArgs(user, baseArgs, origin);   // owner's own chat: unrestricted. an app's turn or a member's: no skip-permissions.
+      // An unconfirmed edit turn plans with NO tools: nothing can write before 改 · Apply (GPT review 2026-11-24).
+      const extraArgs = agentArgs(user, edit && !edit.confirmed && !edit.superelf ? [...baseArgs, ...NO_TOOLS_ARGS] : baseArgs, origin);   // owner's own chat: unrestricted. an app's turn or a member's: no skip-permissions.
       const cancelled = () => !!cancel && cancel.signal.aborted;   // a oneShot caller that left, or the composer's explicit Stop (lib/turn-stop.mjs)
         // The SAME resolved skill the fast lanes get (profile override → config → built-in).
         // It was resolved only inside the ollama branch, so an app's directive applied on one
@@ -1550,7 +1581,9 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
       r = { ...r, text: finishHonest({ reply: r.text || '', message, prior: convo.messages.slice(0, -1), inApp: origin.fromApp, line,
         canEdit: user.role === 'owner' && origin.fromApp && typeof app === 'string' && slugOk(app) }) };
     }
-    const edited = finishAppEdit(edit, editCtx, { wsDir: wsDir(user) });   // inline checks; a failing change is rolled back
+    if (edit && !blank && r.ok !== false) r = offerApply(user, edit, message, r, line);   // a plan → the 改 · Apply button (lib/app-edit-confirm.mjs)
+    if (edit && cancel && cancel.signal.aborted) edit.stopped = true;   // a Stop never leaves a half-done change applied (GPT review r3)
+    const edited = finishAppEdit(edit, editCtx, { wsDir: wsDir(user) });   // inline checks; a failing or unconfirmed change is rolled back
     editCtx = null;
     if (edited) { audit('app-edit', { who: user.id, app: edit.slug, changed: edited.line.changed, applied: edited.line.applied, version: edited.line.version || null }); line(edited.line); edited.note = [editUnchangedNote(r.text, edited.line), edited.note].filter(Boolean).join('\n\n'); if (edited.note) { r = { ...r, text: `${r.text || ''}\n\n${edited.note}` }; line({ type: 'delta', text: `\n\n${edited.note}` }); } }
     // by: the lane that ACTUALLY answered (a confined turn's GPT pick runs on Claude), shown under the answer.
@@ -1572,11 +1605,13 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
     }
     // Multi-LLM assessment ("Verify · 校验"): detached — the stream ends now, results
     // attach to this turn (mdMsg.assess) and the app polls the existing convo GET.
-    if (assess && agentAllowed(user)) line({ type: 'assess', ...startAssess(user, convo, mdMsg, message, chosen ? chosen.id : 'claude', app, system, origin) });
+    if (assess && !edit && agentAllowed(user)) line(   // never on an edit turn: Verify runs agents outside the Apply gate (GPT review)
+      { type: 'assess', ...startAssess(user, convo, mdMsg, message, chosen ? chosen.id : 'claude', app, system, origin) });
     line({ type: 'done', ok: r.ok, text: blank ? '' : (r.text || ''), by });
   } catch (e) {
     console.log(chatTurnLogLine({ app: tag, lane: chosen, ok: false, textLen: 0, ms: Date.now() - startedAt, code: e.code || e.status || e.name, fellBack }));
     line({ type: 'error', text: turnErrorText(chosen, e) });
+    if (edit && cancel && cancel.signal.aborted) edit.stopped = true;   // the crash path too: a Stop never keeps a half-done change
     if (editCtx) { try { const ed = finishAppEdit(edit, editCtx, { wsDir: wsDir(user) }); if (ed) line(ed.line); }
       catch (e2) { line({ type: 'error', text: `修改检查失败 · The change could not be checked: ${e2.message}` }); } }
   } finally {
@@ -1841,12 +1876,12 @@ const server = http.createServer(async (req, res) => {
     if (await handlePublishRoute(req, res, p, { user, cfg, root: ROOT, slugOk, ownAppDir, readBody: (r) => readBody(r, BODY_LIMITS.control), send, audit, demo: demoOn(cfg) })) return;   // owner-only Publish (docs/adr/0039)
     // 改这个应用 · Change this app (lib/app-edit.mjs, ADR 0040): the panel page and its 撤销 · Undo. Owner only in Phase 1.
     if (req.method === 'GET' && p === '/api/app-edit/panel') {
-      if (user.role !== 'owner' || demoOn(cfg)) return send(res, 403, 'application/json', '{"error":"owner only","code":"edit_owner_only"}');
+      if ((user.role !== 'owner' && user.role !== 'member') || demoOn(cfg)) return send(res, 403, 'application/json', '{"error":"owner only","code":"edit_owner_only"}');   // members: own apps only, the no-tools lane (ADR 0042)
       return sendAppHtml(res, path.join(ROOT, 'web', 'app-edit-panel.html'), 'text/html; charset=utf-8', { 'content-security-policy': APP_CSP, 'cache-control': 'no-cache' });
     }
     if (req.method === 'POST' && /^\/api\/apps\/[^/]+\/undo$/.test(p)) {
       try {
-        const edit = appEditOf({ user, body: { edit: decodeURIComponent(p.split('/')[3]), message: 'undo' }, headers: req.headers, appsDir: appsDir(user) });
+        const edit = appEditOf({ user, body: { edit: decodeURIComponent(p.split('/')[3]), message: 'undo' }, headers: req.headers, appsDir: appsDir(user), members: !demoOn(cfg) });
         refuseStaleUndo(wsDir(user), edit.slug, url.searchParams.get('v'));   // Activity log: undo THAT change only, never a newer one
         const u = undoAppEdit(edit, { wsDir: wsDir(user) });
         audit('app-edit-undo', { who: user.id, app: edit.slug, undone: !!u.line.undone });
@@ -1860,6 +1895,7 @@ const server = http.createServer(async (req, res) => {
       if (!dir) return send(res, 400, 'application/json', LINKED_APP);
       const metaFile = path.join(dir, 'meta.json');
       if (!fs.existsSync(metaFile)) return send(res, 404, 'application/json', '{"error":"not found"}');
+      const busyShare = editBusyBody(wsDir(user), slug); if (busyShare) return send(res, 409, 'application/json', busyShare);   // a Stop's rollback would undo the toggle
       const { shared } = await readBody(req, BODY_LIMITS.control);
       // READ-BEFORE-WRITE (empty-overwrite class): the swallowed parse this
       // replaces turned an unreadable meta.json into {}, so flipping the share
@@ -1979,6 +2015,7 @@ const server = http.createServer(async (req, res) => {
       if (!dir) return send(res, 400, 'application/json', LINKED_APP);
       // Not theirs (or mistyped): say so instead of a 200 for nothing deleted (F4-5).
       if (!fs.existsSync(dir)) return send(res, 404, 'application/json', '{"error":"没有这个应用 · No such app"}');
+      const busyDel = editBusyBody(wsDir(user), slug); if (busyDel) return send(res, 409, 'application/json', busyDel);   // a rollback would bring the app back
       fs.rmSync(dir, { recursive: true, force: true });
       dropAppHistory(wsDir(user), slug);   // a new app under this name must not undo into the deleted one (ADR 0040)
       return send(res, 200, 'application/json', '{"ok":true}');
