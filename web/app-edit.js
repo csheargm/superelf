@@ -141,7 +141,7 @@ const PAAppEdit=(()=>{
     const r=anchor.getBoundingClientRect(); m.style.top=(r.bottom+4)+'px'; m.style.right=Math.max(6,innerWidth-r.right)+'px';
     m.onclick=(ev)=>{ const b=ev.target.closest('button'); if(!b) return; closeMenuPop();
       if(b.dataset.a==='edit-app') open(slug,title); else if(b.dataset.a==='publish') PAPublish.open(slug); };
-    armTip(); PAPublish.armTip(slug); armMenuPop();
+    armTip(); PAPublish.armTip(slug); armMenuPop(anchor);
   }
   function bindBar(){
     const more=$('#fmore'), t=$('#ftitle');

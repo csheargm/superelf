@@ -119,11 +119,12 @@ jobs:
         # 2026-11-25: EVERY OS +2 (ubuntu 202, windows 287): app-chat-camera-e2e (camera + 3-cap + retake after Undo/self-reload;
         #   failure path + tip once), skipped on CI by PA_E2E_SKIP.
         # 2026-11-25: windows +1 (288): app-edit-multi-apply's write half (the fake jail models POSIX rule paths).
+        # 2026-11-25: EVERY OS +7 (ubuntu 209, windows 295): menus-close-e2e (3 devices x bar hold + inventory close paths, stale Publish preview), skipped on CI by PA_E2E_SKIP.
         include:
           - os: ubuntu-latest
-            max_skipped: 202
+            max_skipped: 209
           - os: windows-latest
-            max_skipped: 288
+            max_skipped: 295
     env:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED
