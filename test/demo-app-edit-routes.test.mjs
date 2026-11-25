@@ -107,3 +107,13 @@ test('a guest cannot change another visitor\'s app, nor apply another visitor\'s
   assert.ok(evB2.some((e) => e.type === 'error'), 'another visitor\'s Apply id is refused');
   assert.equal(fs.readFileSync(fileA, 'utf8'), PAGE);
 });
+
+test('GPT review r1: no guest edit beside a main-chat app build (it may rewrite the same app)', async () => {
+  const { guestEditOf } = await import('../lib/demo-app-edit.mjs');
+  const { BUILD_MESSAGES } = await import('../lib/demo-build-job.mjs');
+  const v = await visit('198.51.100.25'); seedApp(v);
+  const user = { id: v.uid, role: 'member', workspace: findWs(v) };
+  assert.throws(() => guestEditOf({ user, app: 'calendar-planner', message: ASK, convoId: 'c1', building: true }), (e) => e.status === 409 && e.message === BUILD_MESSAGES.busy);
+  assert.equal(guestEditOf({ user, app: 'calendar-planner', message: ASK, convoId: 'c1' }).slug, 'calendar-planner');
+  assert.equal(guestEditOf({ user, app: 'no-such-app', message: ASK, convoId: 'c1', building: true }), null, 'not their app: the no-write lane, nothing to lock');
+});
