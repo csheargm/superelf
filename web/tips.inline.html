@@ -4,10 +4,16 @@
      WHY. Owner 2026-11-12: "otherwise I really don't know about these new capabilities". Design rule: every
      new user-facing feature registers a tip in its OWN code, next to the control it explains.
      RULES (owner: minimalist UI — no tours, no modal walls):
-       - at most ONE tip on screen, and at most one per page open: the rest wait for the next open;
-       - one tap (the tip or its ✕) dismisses it for good; the id joins appPrefs[slug].tipsSeen through
-         PAAppPrefs.patch (merged with the stored list; the shared chain keeps every other key and the
-         prompt override);
+       - at most ONE tip on screen, and on an app page at most one per page open: the rest wait for the next open.
+         The shell lives for hours, so its store sets oneAtATimeOnly: after a dismissal the next may show (still one);
+       - EVERY tip can be closed (owner 2026-11-24: tips stayed stuck): its ✕ (44px, 关闭提示 · Dismiss tip),
+         a tap on it, Escape, or the first press anywhere outside it; the tip is removed FIRST, then stored;
+       - 'seen' is stored on the account: a host store (window.PATipsStore — the shell's profile.tipsSeen,
+         web/tips-store.js) or PAAppPrefs (appPrefs[slug].tipsSeen; a sandboxed app's opaque-origin storage
+         never persists, so its prefs go through the shell). Also kept in localStorage and sessionStorage when
+         they work: a refused account write still keeps the tip closed for this session (memory at least);
+       - never over its control's bar, nor over another control (measured: below, above, then the least-covering
+         spot); an anchor inside an [inert] or [hidden] layer is not on screen;
        - placed below the anchor, else above it, clamped inside the viewport; never on top of a small anchor;
        - a short fade only, none under prefers-reduced-motion; colours from the page's tokens (dark mode).
        PATips.register({id, anchor, text, when?, priority?}) anchor = element | selector | () => element; when() → bool
@@ -22,11 +28,12 @@
      Driven by test/tips.test.mjs over the real component and PAAppPrefs. -->
 <style id="pat-style">
 .pat-tip{position:fixed;z-index:2147483000;display:flex;gap:8px;align-items:flex-start;box-sizing:border-box;
-  max-width:min(320px,calc(100vw - 16px));padding:8px 10px;border-radius:10px;font-size:13px;line-height:1.35;
+  max-width:min(320px,calc(100vw - 16px));padding:8px 10px;border-radius:10px;font:13px/1.35 -apple-system,system-ui,"PingFang SC","Noto Sans SC",sans-serif;
   background:var(--card,#fff);color:var(--ink,#1d2321);border:1px solid var(--accent,#0f6355);
   box-shadow:0 4px 14px rgba(0,0,0,.18);opacity:0;transition:opacity .15s ease;cursor:pointer}
 .pat-tip.on{opacity:1}
-.pat-x{flex:none;border:none;background:none;color:var(--muted,#6b7370);font-size:14px;padding:0 2px;cursor:pointer;font-family:inherit}
+.pat-tip>span{align-self:center}
+.pat-x{flex:none;box-sizing:border-box;width:44px;height:44px;margin:-8px -10px -8px 0;border:none;background:none;color:var(--muted,#6b7370);font-size:16px;padding:0;cursor:pointer;font-family:inherit}
 @media(prefers-color-scheme:dark){.pat-tip{background:var(--card,#1c2321);color:var(--ink,#e8ecea);box-shadow:0 4px 14px rgba(0,0,0,.5)}}
 @media(prefers-reduced-motion:reduce){.pat-tip{transition:none}}
 </style>
@@ -34,24 +41,44 @@
 (function(){
   if(window.PATips) return;
   const PREF='tipsSeen';
-  const EDGE_PX=8, GAP_PX=6;                  // viewport margin; space between anchor and tip
-  const CLOSE='关闭 · Dismiss';
+  const EDGE_PX=8, GAP_PX=6, SCAN_PX=8;                  // viewport margin; space between anchor and tip
+  const CLOSE='关闭提示 · Dismiss tip';
+  const LOCAL_KEY='pa_tips_seen';             // localStorage + sessionStorage fallback (per device / per tab)
+  const CTRL_SEL='button,a[href],input,select,textarea,summary,[role=button]';
   const regs=[];                              // [{id, anchor, text, when}] in registration order
   const MAX_W_PX=320;                         // tip width cap, also bounded by the viewport
   // The control's whole BAR: a tip clears it, so it never covers the bar's other controls or a wrapped second row (F3-06).
-  const BAR_SEL='.pan-top,.pac-dhead,.pac-lsearch,.paab-bar,[data-tip-bar]';
+  const BAR_SEL='.pan-top,.pac-dhead,.pac-lsearch,.paab-bar,.cmenu-pop,[data-tip-bar]';   // .cmenu-pop: a shell pop-up menu, so a tip never covers its other items
+  const muted=new Set();
   let seen=null, failed=false, loading=null, cur=null, shown=false, waiting=false, chain=Promise.resolve();
   const prefs=()=>window.PAAppPrefs;
+  // The account store: the host's (the shell) or PAAppPrefs (an app page). {read()→{ok,list}, write(list)→{ok}}.
+  function acct(){
+    if(window.PATipsStore) return window.PATipsStore;
+    const p=prefs(); if(!p) return null;
+    return {read:()=>p.read().then(r=>r&&r.ok?{ok:true,list:listOf(r.prefs[PREF])}:{ok:false}),
+      write:list=>p.patch({[PREF]:[...new Set([...listOf((p.get()||{})[PREF]),...list])]}), reset:()=>p.patch({[PREF]:[]})};
+  }
+  // Device and tab copies. Blocked storage (private mode, an opaque-origin frame) throws: that copy is skipped,
+  // the account copy and this page's memory still hold the dismissal (R5 case c: a hint, not data).
+  // Keyed by account where the host knows it (the shell: two people on one browser never share dismissals).
+  const devKey=()=>{ try{ const w=window.PATipsStore&&window.PATipsStore.who&&window.PATipsStore.who(); return w?LOCAL_KEY+':'+w:LOCAL_KEY; }catch(_){ return LOCAL_KEY; } };
+  function devList(st){ try{ return listOf(JSON.parse(window[st].getItem(devKey())||'[]')); }catch(_){ return null; } }
+  function devPut(st,list){ try{ window[st].setItem(devKey(),JSON.stringify(list)); return true; }catch(_){ return false; } }
   const later=f=>(typeof window.requestAnimationFrame==='function'?window.requestAnimationFrame(f):queueMicrotask(f));
   const listOf=v=>Array.isArray(v)?v.filter(x=>typeof x==='string'):[];
 
   function load(){
     if(loading) return loading;
-    const p=prefs();
-    // No PAAppPrefs, or a refused read: tips do NOT show. Failing quiet is the intended behaviour (R5 case c):
-    // a tip is a hint, not data, and showing it with no way to remember the dismissal would nag on every open.
-    if(!p){ failed=true; loading=Promise.resolve(); return loading; }
-    loading=p.read().then(r=>{ if(r&&r.ok){ seen=new Set(listOf(r.prefs[PREF])); failed=false; } else failed=true; });
+    const a=acct(); let dev=null, tab=null, devOk=false;
+    // Device copies are read AFTER the account answered: the shell's key carries the signed-in account (who()).
+    const devRead=()=>{ dev=devList('localStorage'); tab=devList('sessionStorage'); devOk=!!(dev||tab); };   // either copy can remember a dismissal
+    const merge=(list)=>{ seen=new Set([...(seen||[]),...list,...(dev||[]),...(tab||[])]); };
+    // No account store AND no device storage, or a refused read with none: tips do NOT show (R5 case c): a
+    // hint with no way to remember its dismissal would nag on every open. Device storage alone is enough.
+    if(!a){ devRead(); if(devOk){ merge([]); failed=false; } else failed=true; loading=Promise.resolve(); return loading; }
+    loading=Promise.resolve().then(()=>a.read()).then(r=>{ devRead(); if(r&&r.ok){ merge(r.list||[]); failed=false; } else if(devOk){ merge([]); failed=false; } else failed=true; },
+      ()=>{ devRead(); if(devOk){ merge([]); failed=false; } else failed=true; });   // a thrown read = refused (same rule)
     chain=loading; return loading;
   }
   function resolve(a){
@@ -62,10 +89,17 @@
     const r=el.getBoundingClientRect(), H=window.innerHeight||0, W=window.innerWidth||0;
     return r.width>0&&r.height>0&&r.bottom>0&&r.right>0&&r.top<H&&r.left<W;
   }
-  const onScreen=el=>!!el.isConnected&&visible(el);   // in the document AND (partly) inside the viewport
+  // In the document, (partly) inside the viewport, and not in an inert or hidden layer (the shell header behind
+  // an open app is inert: a tip there painted over the app's own controls and could not be tapped away).
+  const layerOff=el=>{ try{ return typeof el.closest==='function'&&!!el.closest('[inert],[hidden]'); }catch(_){ return false; } };
+  // An open MODAL dialog makes everything outside it inert without an [inert] attribute (GPT r2).
+  const underModal=el=>{ try{ if(typeof el.closest==='function'&&el.closest('dialog[open]:modal')) return false; return !!document.querySelector('dialog[open]:modal'); }catch(_){ return false; } };   // inside one (stacked modals: Settings → Activity log) is fine   // no :modal (old engine): not detected
+  const onScreen=el=>!!el.isConnected&&visible(el)&&!layerOff(el)&&!underModal(el);
   function next(){
+    if(!seen) return null;   // a re-read in flight (a prefs push): nothing decided yet
+    // muted: hidden by a signal this page cannot trust (hide()); not stored, back on a later open.
     for(const t of regs){
-      if(seen.has(t.id)) continue;
+      if(seen.has(t.id)||muted.has(t.id)) continue;
       if(t.when&&!t.when()) continue;
       const el=resolve(t.anchor); if(el&&onScreen(el)) return {t,el};
     }
@@ -115,29 +149,56 @@
     const a=el.getBoundingClientRect(), b=tip.getBoundingClientRect(), h=b.height||0;
     const bar=typeof el.closest==='function'?el.closest(BAR_SEL):null, v=bar?bar.getBoundingClientRect():a;   // vertical: the bar's edges; horizontal: the control's
     const dx=(b.left||0)-EDGE_PX, dy=(b.top||0)-EDGE_PX;          // containing-block offset (0 when none)
-    let top=v.bottom+GAP_PX;
-    if(top+h>H-EDGE_PX){ const up=v.top-GAP_PX-h; top=up>=EDGE_PX?up:(H-v.bottom>v.top?H-EDGE_PX-h:EDGE_PX); }
-    const left=Math.max(EDGE_PX,Math.min(a.left,W-EDGE_PX-w));   // clamp into [EDGE, W-EDGE-width]
-    tip.style.top=Math.round(Math.max(EDGE_PX,top)-dy)+'px'; tip.style.left=Math.round(left-dx)+'px';
+    const clampT=t=>Math.max(EDGE_PX,Math.min(t,H-EDGE_PX-h)), clampL=l=>Math.max(EDGE_PX,Math.min(l,W-EDGE_PX-w));
+    const fits=t=>t>=EDGE_PX&&t+h<=H-EDGE_PX;
+    // Candidates in order of preference; the first one that covers no control wins, else the one covering fewest.
+    const tops=[v.bottom+GAP_PX,v.top-GAP_PX-h,a.bottom+GAP_PX,a.top-GAP_PX-h].filter(fits);
+    if(!tops.length) tops.push(H-v.bottom>v.top?H-EDGE_PX-h:EDGE_PX);
+    const lefts=[clampL(a.left),clampL(a.right-w)];
+    const ctrls=controls(tip,el);
+    let best=null;
+    // Then, if every spot beside the bar covers something, the nearest free band in the viewport (SCAN_PX steps).
+    const band=[]; for(let y=EDGE_PX;y+h<=H-EDGE_PX;y+=SCAN_PX) band.push(y);
+    band.sort((p,q)=>Math.abs(p-v.bottom)-Math.abs(q-v.bottom));
+    outer: for(const t of [...tops,...band]) for(const l of lefts){ const T=clampT(t), n=covers(ctrls,{left:l,top:T,right:l+w,bottom:T+h});
+      if(!best||n<best.n) best={t:T,l,n}; if(n===0) break outer; }
+    tip.style.top=Math.round(best.t-dy)+'px'; tip.style.left=Math.round(best.l-dx)+'px';
   }
+  // The visible controls a tip must not cover (its own anchor included). Bounded: the scan stops at CTRL_MAX.
+  const CTRL_MAX=400;
+  function controls(tip,el){
+    const out=[]; let list=[];
+    try{ list=document.querySelectorAll?document.querySelectorAll(CTRL_SEL):[]; }catch(_){ list=[]; }   // a stub document: nothing to avoid
+    for(const c of list){ if(out.length>=CTRL_MAX) break; if(tip.contains&&tip.contains(c)) continue;
+      const r=c.getBoundingClientRect&&c.getBoundingClientRect(); if(r&&r.width>0&&r.height>0&&r.bottom>0&&r.right>0&&r.top<(window.innerHeight||0)&&r.left<(window.innerWidth||0)&&!layerOff(c)) out.push(r); }   // on screen only: off-screen rows must not use up the budget
+    if(el&&!out.length) out.push(el.getBoundingClientRect());
+    return out;
+  }
+  const hit=(a,b)=>a.left<b.right&&b.left<a.right&&a.top<b.bottom&&b.top<a.bottom;
+  const covers=(ctrls,box)=>ctrls.reduce((n,r)=>n+(hit(r,box)?1:0),0);
+  // An anchor inside an open modal <dialog> (the top layer): the tip goes INTO that dialog, or it would sit under
+  // it, unseen and unclosable. Else <html>, outside the docked-drawer body margin (see place()).
+  function hostOf(el){ let d=null; try{ d=typeof el.closest==='function'?el.closest('dialog[open]'):null; }catch(_){ d=null; } return d||document.documentElement||document.body; }
   function show(t,el){
     const tip=document.createElement('div'); tip.className='pat-tip'; tip.setAttribute('role','status'); tip.setAttribute('data-tip',t.id);
     const txt=document.createElement('span'); txt.textContent=t.text;
     const x=document.createElement('button'); x.className='pat-x'; x.type='button'; x.textContent='✕'; x.setAttribute('aria-label',CLOSE);
-    tip.appendChild(txt); tip.appendChild(x); (document.documentElement||document.body).appendChild(tip);
+    tip.appendChild(txt); tip.appendChild(x); hostOf(el).appendChild(tip);
     place(tip,el); cur={t,el,tip,ro:observe(el)}; shown=true; unwatch();
     tip.addEventListener('click',e=>{ if(e&&e.stopPropagation) e.stopPropagation(); dismiss(); });
+    x.addEventListener('pointerdown',()=>dismiss());   // a host's capture click handler (a pop-up menu's outside-close) may swallow the click
     later(()=>tip.classList.add('on'));
   }
   function dismiss(){
     if(!cur) return chain;
-    const {t,tip}=cur; drop(); if(tip.parentNode) tip.parentNode.removeChild(tip);
-    seen.add(t.id);
-    const stored=listOf((prefs().get()||{})[PREF]);
-    const all=[...new Set([...stored,...seen])];
-    // A refused write leaves the tip dismissed for this open only; it shows again on a later open, which is
-    // the honest outcome (it was not remembered) and costs one more tap, not data (R5 case c).
-    chain=prefs().patch({[PREF]:all}); return chain;
+    const {t,tip}=cur; drop(); if(tip.parentNode) tip.parentNode.removeChild(tip);   // gone FIRST, whatever the stores do
+    if(!seen) seen=new Set(); seen.add(t.id); const all=[...seen];
+    if(window.PATipsStore&&window.PATipsStore.oneAtATimeOnly){ shown=false; later(check); }   // the shell: the next tip may follow, one at a time
+    devPut('sessionStorage',all); devPut('localStorage',all);
+    // A refused account write: the tab and device copies (or this page's memory) keep it closed; it may show
+    // again on another device, which is honest (it was not remembered there) — R5 case c.
+    const a=acct();
+    chain=chain.then(()=>a?a.write(all):{ok:true}).catch(e=>({ok:false,error:String(e&&e.message||e)})); return chain;
   }
   function register(o){
     if(!o||typeof o.id!=='string'||!o.id||typeof o.text!=='string'||!o.text||!o.anchor) throw new Error('PATips.register: id, text and anchor required');
@@ -155,13 +216,18 @@
     if(cur&&!cur.t.priority){ const {tip}=cur; drop(); if(tip.parentNode) tip.parentNode.removeChild(tip); shown=false; }
   }
   function reset(){
-    if(!prefs()) return Promise.resolve({ok:false,error:'no PAAppPrefs'});
-    seen=new Set(); failed=false; shown=false;
-    chain=prefs().patch({[PREF]:[]}); return chain;
+    const a=acct(); if(!a) return Promise.resolve({ok:false,error:'no PAAppPrefs'});
+    seen=new Set(); failed=false; shown=false; devPut('sessionStorage',[]); devPut('localStorage',[]);
+    chain=chain.then(()=>a.reset()); return chain;   // after any dismissal write in flight, never before it
   }
+  // An app frame tells the shell about Escape and presses here, so a SHELL tip closes too.
+  function up(){ try{ if(typeof parent!=='undefined'&&parent&&parent!==window&&parent.postMessage) parent.postMessage({pa:'tips-dismiss-up'},'*'); }catch(_){ /* no parent: nothing to tell (R5 c) */ } }
+  // In an app frame, Escape or a press in the SHELL (focus is often there) never reaches this page: the shell
+  // forwards them as {pa:'tips-dismiss'} (web/tips-store.js). Only from the parent window.
+  window.addEventListener('message',e=>{ const m=e&&e.data; if(m&&m.pa==='tips-dismiss'&&cur&&(!e.source||e.source===parent)) dismiss(); });
   // The shell re-pushes prefs after the Settings dialog saves: a cleared list there shows tips again.
   window.addEventListener('message',e=>{ const m=e&&e.data; if(!(m&&m.pa==='prefs')||!seen) return;
-    loading=null; const before=seen.size;
+    loading=null; const before=seen.size; seen=null;   // re-read whole: a list cleared there shows tips again
     load().then(()=>{ if(seen&&seen.size<before) shown=false; later(check); }); });
   // A shown tip is position:fixed, so it follows its anchor by hand: on scroll (capture: any scroller), resize
   // and click. An anchor detached, hidden (its panel closed) or scrolled off screen drops the tip UNSEEN — the
@@ -190,11 +256,18 @@
     document.addEventListener('pointerdown',e=>{ if(cur&&shown&&!(cur.tip.contains&&cur.tip.contains(e.target))) dismiss(); },true);
     document.addEventListener('scroll',onScroll,true);
     // dismissOnUse: a key press also dismisses it (a press already dismisses every tip, above).
-    const used=e=>{ if(cur&&cur.t.dismissOnUse&&!(e&&e.target&&cur.tip.contains&&cur.tip.contains(e.target))) dismiss(); };
+    const used=e=>{ if(cur&&e&&e.key==='Escape'){ dismiss(); return; }   // Escape closes any tip
+      if(cur&&cur.t.dismissOnUse&&!(e&&e.target&&cur.tip.contains&&cur.tip.contains(e.target))) dismiss(); };
     document.addEventListener('keydown',used,true);
+    // First in line: a page that stops Escape below the window still closes the tip.
+    window.addEventListener('keydown',e=>{ if(cur&&e&&e.key==='Escape') dismiss(); if(e&&e.key==='Escape') up(); },true);
+    document.addEventListener('pointerdown',()=>up(),true);   // in an app frame: the shell's tip closes too (web/tips-store.js)
   }
   window.addEventListener('resize',()=>{ if(cur) follow(); else later(check); });
-  window.PATips={register,check,reset,dismiss,PREF,CLOSE,
+  // hide(): off screen, NOT stored (shows on a later open) — for a signal that may not be the user's own act.
+  // That tip is muted for this page, so it does not pop straight back; the slot frees for the next one.
+  function hide(){ if(!cur) return; const {t,tip}=cur; muted.add(t.id); drop(); shown=false; if(tip.parentNode) tip.parentNode.removeChild(tip); later(check); }
+  window.PATips={register,check,reset,dismiss,hide,PREF,CLOSE,
     seen:()=>seen?[...seen]:null, current:()=>cur?cur.t.id:null, registered:()=>regs.map(r=>({id:r.id,text:r.text})), whenIdle:()=>chain};
 })();
 </script>

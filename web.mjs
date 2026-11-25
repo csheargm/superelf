@@ -22,6 +22,7 @@ import { watchConfig } from './lib/config-watch.mjs';
 import { oneShotBaseArgs, oneShotModel, yieldSettings, NO_TOOLS_ARGS } from './lib/one-shot.mjs';
 import { mintConfirm, planOffer, applyMessage, applyNowPrompt, toolTalkReplacement, retirePending, saysNo, APPLY_LABEL, PLAN_MAX, PLAN_TOO_LONG } from './lib/app-edit-confirm.mjs';
 import { runScopedEdit, scopedLane, flattenForClaude } from './lib/app-edit-lane.mjs';
+import { tipsSeenOf } from './lib/tips-seen.mjs';
 import { safeJoin, slugOk, drawerOpenOf, tokenOk, dataContentType, readBody, writeFileAtomic, renameWithRetry, decodeBase64Strict, bodyErrorResponse, BODY_LIMITS } from './lib/webutil.mjs';
 import { createConvoLocks, withConvoTurn, QUEUED_TURN_TEXT } from './lib/convo-lock.mjs';
 import { readJsonState, readJsonForUpdate, FILE_OK, FILE_ABSENT, FILE_UNREADABLE, FILE_UNREADABLE_CODE } from './lib/readjson.mjs';
@@ -2628,6 +2629,7 @@ const server = http.createServer(async (req, res) => {
         // ☰ drawer sections the member opened or closed（侧栏分组的展开状态）: {secId: true|false}. On the
         // account so a phone and a Mac open the same way; only taps are stored, the shell owns the defaults.
         drawerOpen: drawerOpenOf(prof.drawerOpen),
+        tipsSeen: tipsSeenOf(prof.tipsSeen),   // the shell's dismissed first-use tips (lib/tips-seen.mjs)
         autoUpdateApps: !!prof.autoUpdateApps }));
       if (req.method === 'PUT') {
         if (typeof b.name === 'string' && b.name.trim()) prof.name = b.name.trim().slice(0, 60);
@@ -2741,6 +2743,8 @@ const server = http.createServer(async (req, res) => {
         if (typeof b.autoUpdateApps === 'boolean') prof.autoUpdateApps = b.autoUpdateApps;
         // MERGED, not replaced: the shell sends only the section tapped, so a tap on the phone never undoes one made on the Mac.
         if (b.drawerOpen !== undefined) prof.drawerOpen = drawerOpenOf({ ...drawerOpenOf(prof.drawerOpen), ...drawerOpenOf(b.drawerOpen) });
+        // UNION with the stored list, so two devices never undo each other's dismissals; [] clears (Show tips again).
+        if (Array.isArray(b.tipsSeen)) prof.tipsSeen = b.tipsSeen.length ? tipsSeenOf([...tipsSeenOf(prof.tipsSeen), ...tipsSeenOf(b.tipsSeen)]) : [];   // only a literal [] clears
         const setPin = !user.demo && typeof b.password === 'string' && b.password;   // a demo visitor has no account to set a PIN on (lib/demo.mjs)
         if (setPin) {
            if (apiKeyBlocked(req, user)) return send(res, 403, 'application/json', API_KEY_REFUSED);

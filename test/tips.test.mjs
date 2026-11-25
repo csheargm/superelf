@@ -137,7 +137,7 @@ test('PATips.reset() clears tipsSeen on the account, other keys and the override
 });
 
 test('mutation control (R14): a dismissal that writes nothing shows the tip again on the next visit', async () => {
-  const src = TIPS_SRC.replace('chain=prefs().patch({[PREF]:all}); return chain;', 'return chain;');
+  const src = TIPS_SRC.replace("chain=chain.then(()=>a?a.write(all):{ok:true})", 'chain=chain.then(()=>({ok:true}))');
   assert.notEqual(src, TIPS_SRC, 'the mutation matched');
   const me = meWith();
   const p = page(me, { tipsSrc: src }); p.T.register({ id: 'm', anchor: anchorAt(100), text: '米 · M' }); await flush();
@@ -258,8 +258,8 @@ test('the first show waits two animation frames after register', async () => {
   }
 });
 // Browser bug 2026-11-12: docked note list → the tip sat 320px right of the Draw/Text tabs. R14 per part below.
-const NO_DX = TIPS_SRC.replace("Math.round(left-dx)", 'Math.round(left)'), NO_W = TIPS_SRC.replace("tip.style.width=w+'px'; ", '');
-const ON_BODY = TIPS_SRC.replace('(document.documentElement||document.body).appendChild(tip)', 'document.body.appendChild(tip)');
+const NO_DX = TIPS_SRC.replace("Math.round(best.l-dx)", 'Math.round(best.l)'), NO_W = TIPS_SRC.replace("tip.style.width=w+'px'; ", '');
+const ON_BODY = TIPS_SRC.replace('hostOf(el).appendChild(tip)', 'document.body.appendChild(tip)');
 test('containing block offset 320px: style.left = 605-320, visual left = anchor; tip on <html>, width 320', async () => {
   for (const src of [NO_DX, ON_BODY, NO_W]) assert.notEqual(src, TIPS_SRC, 'the R14 mutation matched');
   for (const src of [TIPS_SRC, NO_DX]) for (const cb of [{ left: 320, top: 0 }, null]) {

@@ -74,10 +74,13 @@ test('owner: ⋯ → Publish (with its one-time tip) → files sheet → Publish
   const { port } = await node({ github_publish_token: FAKE_TOKEN, github_api_url: gh.url, publish_remote_url: rem.bare, publish_poll_ms: 50 });
   const { ctx, page } = await openMenu(port, OWNER_TOKEN);
   try {
+    // One tip at a time (PATips): Change this app's first, closed by Escape; the next open shows Publish's beside its item.
+    assert.match(await page.locator('.pat-tip[data-tip="tip:app-edit"]').innerText({ timeout: 5000 }), /^长按标题.* · Long-press/);
+    await page.keyboard.press('Escape'); await page.evaluate(() => PATips.whenIdle());
+    await reopenMenu(page, port);
     const item = page.locator('#pubItem');
     assert.match(await item.innerText(), /^发布到公开仓库 · Publish/);
-    assert.match(await item.innerText(), /新：.* · New:/, 'one-time bilingual tip line');
-    assert.equal(await item.evaluate((b) => b.classList.contains('pa-new')), true);
+    assert.match(await page.locator('.pat-tip[data-tip="tip:publish"]').innerText({ timeout: 5000 }), /^新：.* · New:/, 'one-time bilingual tip beside the item');
     await item.click();
     await page.waitForSelector('#pubFiles');
     assert.match(await page.locator('#pubFiles').innerText(), /workspace\.example\/apps\/myapp\/index\.html/);

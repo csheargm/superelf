@@ -138,9 +138,11 @@ test('the build pill sits below the header at phone width, also once the header 
   const grow = await page.evaluate(() => { const h = document.querySelector('header'), b0 = h.getBoundingClientRect().bottom; h.style.paddingBottom = '40px'; return h.getBoundingClientRect().bottom - b0; });
   assert.ok(grow > 20, 'CONTROL: the header really grew past the old fixed 60px');
   await waitFor(async () => (await gap()) >= 0, 'the pill follows the header');
-  const tip = await page.evaluate(() => document.getElementById('demoBuildTip').getBoundingClientRect().top - document.getElementById('demoBuild').getBoundingClientRect().bottom);
+  if (await page.waitForSelector('.pat-tip[data-tip="tip:home-more"]', { timeout: 5000 }).then(() => true, () => false)) await page.keyboard.press('Escape');   // one tip at a time: the home one first
+  await page.waitForSelector('.pat-tip[data-tip="tip:demo-build"]', { timeout: 5000 });   // the ONE tip mechanism: the next tip follows a dismissal in the shell
+  const tip = await page.evaluate(() => document.querySelector('.pat-tip').getBoundingClientRect().top - document.getElementById('demoBuild').getBoundingClientRect().bottom);
   assert.ok(tip >= 0, 'the tip sits under the pill');
-  await page.locator('#demoBuildTip').click();   // dismissed: the app tip now raises the input bar, so the grid scrolls the card under it
+  await page.locator('.pat-tip .pat-x').click();   // dismissed: the app tip now raises the input bar, so the grid scrolls the card under it
   await page.locator('text=Allergy & Pollen').last().click();   // an open app: its bar (← Home, A-, A+) is a header too
   await waitFor(async () => page.evaluate(() => document.getElementById('demoBuild').getBoundingClientRect().top >= document.querySelector('#frame .bar').getBoundingClientRect().bottom), 'the pill below the app bar');
   await page.evaluate(() => { document.querySelector('header').style.paddingBottom = ''; });   // header back to size: only the slide can move the pill now

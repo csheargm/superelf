@@ -69,13 +69,12 @@ const PAOwnerAlerts=(()=>{
     const list=open();
     if(!list.length&&!note){ if(c) c.remove(); return; }
     if(!c){ c=document.createElement('div'); c.id='oaCard'; c.setAttribute('role','alert'); $('#drawer .dhead').after(c); }
-    const tip=_SEEN.has(TIP_KEY)?'':`<div class="oa-m oa-tip">${T.tip}</div>`;
+    if(!_SEEN.has(TIP_KEY)) PATipsShell.tip(TIP_KEY,()=>$('#oaCard>b'),T.tip);   // the ONE tip mechanism: shows once the drawer is open
     const helper=list.some((a)=>a.kind!=='job')&&!view.actions.length?`<div class="oa-m">${T.noHelper}</div>`:'';
-    c.innerHTML=`<b>${T.head}</b>${tip}`+list.map((a)=>{ const [what,means]=words(a);
+    c.innerHTML=`<b>${T.head}</b>`+list.map((a)=>{ const [what,means]=words(a);
       return `<div class="oa-a" data-id="${esc(a.id)}">${esc(what)}<div class="oa-m">${esc(means)}</div><div class="oa-btns">${busy?'':buttons(a)}</div></div>`; }).join('')
       +helper+(note?`<div class="oa-note">${esc(note)}</div>`:'')
       +(list.length&&!busy?`<div class="oa-btns"><button class="plain" data-oa="recheck">${T.again}</button><button class="plain" data-snooze>${T.snooze}</button></div>`:'');
-    if(tip&&$('#drawer').classList.contains('open')){ _SEEN.add(TIP_KEY); _saveSeen(); }   // seen only once it was on screen
     c.onclick=onClick;
   }
   async function onClick(ev){

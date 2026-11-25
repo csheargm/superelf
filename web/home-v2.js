@@ -113,9 +113,8 @@ const PAHome=(function(){
   }
   function startMake(){ const i=$('#box'); i.value=T.starter; i.focus(); i.setSelectionRange(i.value.length,i.value.length); i.dispatchEvent(new Event('input')); }
   function closeMore(){ const m=$('#hmenu'); if(m&&!m.hidden){ m.hidden=true; $('#hmore').setAttribute('aria-expanded','false'); } }
-  function seeTip(){ const t=$('#hTip'); if(t) t.remove(); if(!_SEEN.has(MORE_TIP)){ _SEEN.add(MORE_TIP); _saveSeen(); } }
   function bind(){
-    $('#hmore').onclick=(e)=>{ e.stopPropagation(); const m=$('#hmenu'); m.hidden=!m.hidden; $('#hmore').setAttribute('aria-expanded',String(!m.hidden)); seeTip(); };
+    $('#hmore').onclick=(e)=>{ e.stopPropagation(); const m=$('#hmenu'); m.hidden=!m.hidden; $('#hmore').setAttribute('aria-expanded',String(!m.hidden)); };   // the press on ⋯ also closes its tip (PATips)
     $('#hmenu').addEventListener('click',(e)=>{ if(e.target.closest('button')&&!e.target.closest('.aa')) closeMore(); });
     // pointerdown as well as click: iOS Safari sends no click for a tap on plain text, so the menu stayed (web/popover.js).
     for(const ev of ['pointerdown','click']) document.addEventListener(ev,(e)=>{ if(!e.target.closest('#hmenu,#hmore')) closeMore(); },true);   // + click: a keyboard Enter outside
@@ -132,7 +131,7 @@ const PAHome=(function(){
     // After the whole shell script ran: _SEEN (web/settings.js) exists only then, and the demo's Sign in
     // (lib/demo-boot.mjs) has landed beside ⚙, now inside ⋯ — bring it to the header.
     document.addEventListener('DOMContentLoaded',()=>{
-      if(!_SEEN.has(MORE_TIP)){ const t=document.createElement('div'); t.id='hTip'; t.textContent=T.tip; t.onclick=seeTip; $('header').appendChild(t); }
+      if(!_SEEN.has(MORE_TIP)) PATipsShell.tip(MORE_TIP,'#hmore',T.tip);   // the ONE tip mechanism (✕, Escape, outside tap); an old device-only dismissal still counts
       const s=$('#demoSignin'); if(s){ s.classList.add('h-signin'); $('#hmore').before(s); } syncHeader(); });
   }
   return {label,layout,chips,render,setName,bind,startMake,dockInput,T};

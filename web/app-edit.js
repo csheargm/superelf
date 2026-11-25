@@ -33,10 +33,9 @@ const PAAppEdit=(()=>{
   const owner=()=>(ROLE==='owner'||ROLE==='member')&&!window.PADemoAuth;   // the server decides the lane by role
   const canEdit=()=>owner()&&frameOpen()&&frameUid()===UID&&!!frameSlug();
   function item(){
-    const seen=_SEEN.has(TIP_KEY);
-    return '<button data-a="edit-app" id="aeItem">'+ITEM+(seen?'':'<span class="ae-tip" style="display:block;font-size:11px;opacity:.75">'+TIP+'</span>')+'</button>';
+    return '<button data-a="edit-app" id="aeItem">'+ITEM+'</button>';
   }
-  function armTip(){ const b=$('#aeItem'); if(b) markNew(b,TIP_KEY); }
+  function armTip(){ if($('#aeItem')&&!_SEEN.has(TIP_KEY)) PATipsShell.tip(TIP_KEY,'#aeItem',TIP); }   // the ONE tip mechanism
   // The picture of the app in #fr: its own PASnap answers. null = no picture (the panel asks for a photo).
   function snap(){
     const fr=$('#fr'), w=fr&&fr.contentWindow; if(!w) return Promise.resolve(null);

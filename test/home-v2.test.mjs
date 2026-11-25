@@ -105,10 +105,10 @@ test('USER FLOW owner: name + task chip, ⋯ holds every moved control, alert do
     assert.match(await page.textContent('#hChips'), /3 件待办 · 3 tasks/);
     assert.equal(await page.isVisible('#hAvatar'), true); assert.equal(await page.isVisible('#homeForm #box'), true, 'the ask ring holds the one composer');
     const apps = await homeApps(page); assert.equal(new Set(apps).size, apps.length, `no app twice: ${apps}`);
-    assert.equal(await page.isVisible('#hTip'), true, 'first-use tip beside ⋯');
+    assert.equal(await page.waitForSelector('.pat-tip[data-tip="tip:home-more"]', { timeout: 5000 }).then(() => true, () => false), true, 'first-use tip beside ⋯ (PATips)');
     assert.equal(await page.isVisible('#settings'), false);
     await page.click('#hmore');
-    assert.equal(await page.isVisible('#hTip'), false, 'opening ⋯ retires the tip');
+    assert.equal(await page.isVisible('.pat-tip[data-tip="tip:home-more"]'), false, 'opening ⋯ retires the tip');
     for (const s of ['#menu', 'header .aa-btn', '#reload', '#settings', '#newSession']) assert.equal(await page.isVisible(s), true, `${s} in ⋯`);
     await page.keyboard.press('Escape'); assert.equal(await page.isVisible('#hmenu'), false);
     await page.evaluate(() => { const d = document.createElement('span'); d.className = 'oa-dot'; document.querySelector('#menu').appendChild(d); });

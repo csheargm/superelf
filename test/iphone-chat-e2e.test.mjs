@@ -53,13 +53,14 @@ const standalone = () => { Object.defineProperty(navigator, 'standalone', { get:
   window.matchMedia = (q) => (/display-mode:\s*standalone/.test(q) ? { matches: true, media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} } : m.call(window, q)); };
 
 for (const pwa of [false, true]) test(`iPhone${pwa ? ' home-screen PWA' : ''}: after two replies every control answers a tap, sizes agree, composer clears the answer`, { skip, timeout: 120000 }, async () => {
+  await fetch(`http://127.0.0.1:${port}/api/profile`, { method: 'PUT', headers: { 'content-type': 'application/json', authorization: `Bearer ${OWNER_TOKEN}` }, body: JSON.stringify({ tipsSeen: [] }) });   // the other run's dismissal is on the account now
   const ctx = await browser.newContext(IPHONE); if (pwa) await ctx.addInitScript(standalone);
   const page = await ctx.newPage(); const errors = []; page.on('pageerror', (e) => errors.push(e.message));
   try {
     await page.goto(`http://127.0.0.1:${port}/`); await page.waitForSelector('#login[open]');
     await page.fill('#luser', 'owner'); await page.fill('#lpin', 'owner-pass-123'); await page.click('#loginBtn');
     await page.waitForFunction(() => !document.querySelector('#login[open]'));
-    assert.ok(await page.evaluate(() => { const t = document.getElementById('hTip'); return !!t && getComputedStyle(t).display !== 'none'; }), 'CONTROL: the home tip shows on the home');
+    assert.ok(await page.waitForSelector('.pat-tip[data-tip="tip:home-more"]', { timeout: 5000 }).then(() => true, () => false), 'CONTROL: the home tip shows on the home');
     const slug = pwa ? 'redflags-pwa' : 'redflags';
     await page.tap(`.ecard[data-es="${slug}"]`);
     const app = page.frameLocator('#fr'); await app.locator('.pac-fs.on .pac-inp').waitFor();
@@ -94,7 +95,7 @@ for (const pwa of [false, true]) test(`iPhone${pwa ? ' home-screen PWA' : ''}: a
         for (const c of cs) { const x = b.x + c.x, y = b.y + c.y; if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) out.push((e.id || e.className) + ' over ' + c.c); } }
       return out; }, [box, ctls]);
     assert.deepEqual(over, [], 'no shell layer paints over an app control');
-    assert.equal(await page.evaluate(() => { const t = document.getElementById('hTip'); return !!t && getComputedStyle(t).display !== 'none'; }), false, 'the home tip is not shown over an open app');
+    assert.equal(await page.evaluate(() => { const t = document.querySelector('.pat-tip[data-tip="tip:home-more"]'); return !!t && getComputedStyle(t).display !== 'none'; }), false, 'the home tip is not shown over an open app');
     // A real tap reaches the model pill, then ☰ (it opens the list over the rest, so it goes last);
     // send / ＋ / the input would start other flows, and their hit test above covers them.
     await fr.evaluate(() => { window.__taps = []; document.addEventListener('click', (e) => window.__taps.push(e.target.className), true); });
