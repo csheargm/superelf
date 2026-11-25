@@ -1,4 +1,12 @@
 {
+  "v5.27.1": {
+    "date": "2026-11-25",
+    "features": [],
+    "fixes": [
+      "超级精灵改自己的测试：Windows 上跳过仅限 POSIX 的、端到端先等回复 · selfpub tests: POSIX-only ones skip on Windows, the e2e waits for the reply"
+    ],
+    "through": "2f62eb30da7d8b082411d84f63cb1afe2cacec14"
+  },
   "v5.27.0": {
     "date": "2026-11-25",
     "features": [
