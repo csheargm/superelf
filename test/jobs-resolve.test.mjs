@@ -131,7 +131,7 @@ test('the model is told what it may use, and told not to invent facts', () => {
   assert.match(q, /pollen:/); assert.match(q, /research:/);
   assert.ok(!q.includes('calendar:'), 'a non-runnable tool must not be offered');
   assert.match(q, /postcode: 12345/, 'what we know is supplied, so it does not have to ask');
-  assert.match(q, /Never invent a postcode, address, URL or credential/);
+  assert.match(q, /Never invent a postcode, country, address, URL or credential/);
   assert.match(q, /ONLY a JSON object/);
   assert.doesNotMatch(buildResolvePrompt('x', { tools, runnable, profile: {} }), /postcode:/, 'nothing known = nothing claimed');
 });

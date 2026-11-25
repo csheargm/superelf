@@ -99,6 +99,7 @@ import { earlierShotsLine, appEditOf, appEditable, confirmEdit, refuseIfEditBusy
 import { APP_CHAT_EVIDENCE_RULE, appAboutContext, editHistoryContext } from './lib/app-history.mjs';
 import { noChangeRule, finishHonest, editUnchangedNote } from './lib/app-chat-honesty.mjs';
 import { isBlankAnswer, laneFailureText, shouldFallBackToAgent, fallbackStatusText, chatTurnLogLine, turnErrorText } from './lib/chat-outcome.mjs';
+import { normCountry, countryFor } from './lib/postcode-country.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 
@@ -1431,7 +1432,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
       const out = await resolvePrompt(message, {
         ask: (q) => enqueue(() => runAgent(q, agentArgs(user, fastBaseArgs(user, origin), origin), wsDir(user), RESOLVE_MS)).then((r) => r.text),
         tools: toolManifests(), runnable: runnableTools(),
-        profile: { postcode: prof.postcode || '', name: prof.name || '' },
+        profile: { postcode: prof.postcode || '', country: countryFor({ postcode: prof.postcode, country: prof.country, locale: req.headers['accept-language'] }), name: prof.name || '' },
       });
       audit('job-chat-draft', { who: user.id, ok: !!out.ok, tool: out.job ? out.job.plan.tool : null });
       if (out.ok || (out.ask && out.ask.length)) {
@@ -2502,7 +2503,7 @@ const server = http.createServer(async (req, res) => {
         // The fast lane, not the agent: this is one small structured answer, not a task.
         ask: (q) => enqueue(() => runAgent(q, agentArgs(user, fastBaseArgs(user, origin), origin), wsDir(user), RESOLVE_MS)).then((r) => r.text),
         tools: toolManifests(), runnable: runnableTools(),
-        profile: { postcode: prof.postcode || '', name: prof.name || '' },
+        profile: { postcode: prof.postcode || '', country: countryFor({ postcode: prof.postcode, country: prof.country, locale: req.headers['accept-language'] }), name: prof.name || '' },
       });
       audit('job-resolve', { who: user.id, ok: !!out.ok, tool: out.job ? out.job.plan.tool : null, ask: out.ask ? out.ask.length : 0 });
       return send(res, out.ok ? 200 : 400, 'application/json', JSON.stringify(out));
@@ -2629,6 +2630,9 @@ const server = http.createServer(async (req, res) => {
         // How many days of briefings to show (default 30). Edited in profile.json or via PUT.
         briefingRetainDays: typeof prof.briefingRetainDays === 'number' ? prof.briefingRetainDays : 30,
         postcode: typeof prof.postcode === 'string' ? prof.postcode : '',
+        // ISO-2, paired with the postcode (lib/postcode-country.mjs). Unsaved → US only for a ZIP-shaped
+        // postcode from a US-locale browser (a prefill the member saves); otherwise blank = ask.
+        country: countryFor({ postcode: prof.postcode, country: prof.country, locale: req.headers['accept-language'] }),
         // ☰ drawer sections the member opened or closed（侧栏分组的展开状态）: {secId: true|false}. On the
         // account so a phone and a Mac open the same way; only taps are stored, the shell owns the defaults.
         drawerOpen: drawerOpenOf(prof.drawerOpen),
@@ -2742,6 +2746,13 @@ const server = http.createServer(async (req, res) => {
           if (!v) delete prof.postcode;
           else if (/^[A-Za-z0-9][A-Za-z0-9 -]{2,11}$/.test(v)) prof.postcode = v.toUpperCase();
           else return send(res, 400, 'application/json', JSON.stringify({ error: 'Invalid postcode · 邮编格式无效' }));
+        }
+        // Country（国家）— a bare postcode matched a town in France for a US user (2026-11-25).
+        if (typeof b.country === 'string') {
+          const c = normCountry(b.country);
+          if (!b.country.trim()) delete prof.country;
+          else if (c) prof.country = c;
+          else return send(res, 400, 'application/json', JSON.stringify({ error: 'Invalid country code · 国家代码无效 (e.g. US, CN, GB)' }));
         }
         if (typeof b.autoUpdateApps === 'boolean') prof.autoUpdateApps = b.autoUpdateApps;
         // MERGED, not replaced: the shell sends only the section tapped, so a tap on the phone never undoes one made on the Mac.
