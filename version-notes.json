@@ -1,4 +1,12 @@
 {
+  "v5.18.5": {
+    "date": "2026-11-24",
+    "features": [],
+    "fixes": [
+      "内部改进 · Internal upkeep"
+    ],
+    "through": "59f3ae880583e3423adc291fd663b12d1604bd23"
+  },
   "v5.18.4": {
     "date": "2026-11-24",
     "features": [],
