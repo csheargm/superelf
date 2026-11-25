@@ -1655,12 +1655,13 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
       else r = { ...r, text: (edit || origin.fromApp) ? scrubPaths(c.text, wsDir(user)) : c.text };
     }
     if (edit && cancel && cancel.signal.aborted) edit.stopped = true;   // a Stop never leaves a half-done change applied (GPT review r3)
-    if (edit && edit.scoped && !blank && r.text) line({ type: 'delta', text: r.text });   // the no-tools lane streams nothing: its answer, cleaned, goes before any note (self-test F1/F2)
     const edited = finishAppEdit(edit, editCtx, { wsDir: wsDir(user) });   // inline checks; a failing or unconfirmed change is rolled back
+    // The no-tools lane streams nothing: its answer goes before any note (self-test F1/F2) — never a "now green" for a change the checks rolled back (GPT review).
+    if (edit && edit.scoped && !blank && r.text && !(edited && edited.line.changed && !edited.line.applied)) line({ type: 'delta', text: r.text });
     editCtx = null;
     if (edited) { audit('app-edit', { who: user.id, app: edit.slug, changed: edited.line.changed, applied: edited.line.applied, version: edited.line.version || null }); line(edited.line); edited.note = scrubPaths([editUnchangedNote(r.text, edited.line, edit.confirmed), edited.note].filter(Boolean).join('\n\n'), wsDir(user)); if (edited.note) { r = { ...r, text: `${r.text || ''}\n\n${edited.note}` }; line({ type: 'delta', text: `\n\n${edited.note}` }); } }
     // by: the lane that ACTUALLY answered (a confined turn's GPT pick runs on Claude), shown under the answer.
-    const by = ml.blocked ? '' : chosen ? (chosen.label || 'Claude') : 'Claude';   // the scoped lane's Claude has no label (self-test F8)
+    const by = ml.blocked && !(edit && edit.scoped) ? '' : chosen ? (chosen.label || 'Claude') : 'Claude';   // the scoped lane's Claude has no label (self-test F8)
     // ms only on an answer: a refusal (a cap, a failure) shows no "took" (self-test F11).
     const mdMsg = { role: 'md', text: r.text || '', ...(r.ok === false ? {} : { ms: turnMs }), by, ...(blank || unreadable ? { failed: true } : {}) };
     convo.messages.push(mdMsg);

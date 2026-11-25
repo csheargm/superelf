@@ -54,6 +54,7 @@ test('F4 + F5: plans and Apply turns are told to use plain words and to check th
 test('F9: earlier pictures are a fact on later turns', () => {
   assert.match(earlierShotsLine([{ role: 'me', text: 'hi', attachments: [{ path: 'uploads/s.png' }] }]), /1 picture\(s\).*uploads\/s\.png/);
   assert.equal(earlierShotsLine([{ role: 'me', text: 'hi' }]), '');
+  assert.equal(earlierShotsLine([{ role: 'me', attachments: [{ path: 'uploads/' + 'a'.repeat(500) + '.png' }, { path: '../x.png' }, { path: 'uploads/a"b.png' }] }]), '', 'client paths: our upload names only, bounded (GPT review)');
 });
 
 test('F7 + F10 + F11 + F12: PAChat and the panel', () => {
@@ -61,6 +62,8 @@ test('F7 + F10 + F11 + F12: PAChat and the panel', () => {
   assert.match(ui, /\.pac-m img\{max-width:min\(120px,50%\);max-height:120px;/, 'F7: a small thumbnail in the bubble');
   assert.match(ui, /el\.inp\.value=el\.inp\.placeholder; h=Math\.max\(h,el\.inp\.scrollHeight\)/, 'F10: the empty box fits its placeholder');
   assert.match(ui, /if\(!_doneFailed\) _addTook/, 'F11: no "took" under a refusal');
+  assert.match(read('web.mjs'), /finishAppEdit\(edit, editCtx[^\n]*\n[^\n]*\n    if \(edit && edit\.scoped && !blank && r\.text && !\(edited && edited\.line\.changed && !edited\.line\.applied\)\)/, 'GPT review: no success sentence for a rolled-back change');
+  assert.match(ae, /if\(S!==me\) return;   \/\/ another app's panel/, 'GPT review: a late Undo answer never touches another panel');
   assert.match(ae, /function undoLeft\(n\)\{ if\(S&&n===0\)/, 'F11: Undo hides at 0 left');
   assert.match(ae, /'<button data-a="edit-app" id="aeItem">'\+ITEM\+'<\/button>'/, 'F12: the item\'s text is its action; the tip is a separate PATips bubble');
 });

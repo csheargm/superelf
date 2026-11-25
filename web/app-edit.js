@@ -118,8 +118,9 @@ const PAAppEdit=(()=>{
     say(ok?DONE:RELOAD_FAILED); me.el.querySelector('#aeUndo').style.display=''; }
   function say(t){ if(S&&S.fr.contentWindow) S.fr.contentWindow.postMessage({pa:'edit-note',text:t},'*'); }
   async function undo(){
-    if(!S) return;
+    if(!S) return; const me=S;
     try{ const r=await api('/api/apps/'+encodeURIComponent(S.slug)+'/undo',{method:'POST'}); const j=await r.json();
+      if(S!==me) return;   // another app's panel opened meanwhile: never its Undo (GPT review)
       say(j.text||j.error||('HTTP '+r.status)); if(j.undone) reloadApp(); undoLeft(j.left); }
     catch(err){ say('撤销失败 · Undo failed: '+((err&&err.message)||'')); }
   }
