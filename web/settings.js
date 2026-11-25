@@ -8,6 +8,7 @@ async function loadProfile(){
   $('#pBriefEmail').value=ME.briefingEmail||'';
   $('#pRetainDays').value=ME.briefingRetainDays||30;
   $('#pPostcode').value=ME.postcode||'';
+  $('#pCountry').value=ME.country||'';   // never pre-guessed: blank = the agent asks (lib/postcode-country.mjs)
   $('#agentMailWrap').style.display=ME.role==='owner'?'block':'none';   // the node's inbox address is owner-facing setup (like the family/shelf blocks)
   $('#nodeCfgWrap').style.display=ME.role==='owner'?'block':'none';     // Node settings · 节点设置 — owner-only config surface (server re-checks role)
   renderAdvanced();
@@ -498,7 +499,7 @@ $('#pSave').onclick=async(e)=>{
   e.preventDefault();
   if(_cfgSaving) return;
   const sent=JSON.stringify(cfgFields());
-  const body={name:$('#pName').value,about:$('#pAbout').value,prefs:$('#pPrefs').value,briefingEmail:$('#pBriefEmail').value,briefingRetainDays:parseInt($('#pRetainDays').value,10)||30, postcode:$('#pPostcode').value.trim(),
+  const body={name:$('#pName').value,about:$('#pAbout').value,prefs:$('#pPrefs').value,briefingEmail:$('#pBriefEmail').value,briefingRetainDays:parseInt($('#pRetainDays').value,10)||30, postcode:$('#pPostcode').value.trim(), country:$('#pCountry').value.trim(),
     autoUpdateApps:$('#pAutoUpdate').checked,
     systemPrompts:collectSystemPrompts()};
   if($('#pPin').value.trim()) body.password=$('#pPin').value.trim();   // too short → the server's 400 is shown below (lib/owner.mjs MIN_PASSWORD)

@@ -13,7 +13,6 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ctext y=%2213%22 font-size=%2213%22%3E🏠%3C/text%3E%3C/svg%3E">
 <style>
 /* PA_BAR_HANDLE_CSS */
-:root { --sab-probe: env(safe-area-inset-bottom, 0px); }
 /* PA_THEME_TOKENS_CSS */
 /* PA_TOUCH_BASE_CSS */
 *{ box-sizing:border-box; margin:0; }
@@ -2723,35 +2722,6 @@ if (navigator.standalone) document.documentElement.classList.add('standalone');
   const f=document.querySelector('form#f'); if(!f||!window.ResizeObserver) return;
   const set=()=>document.documentElement.style.setProperty('--pill-clear', (f.offsetHeight+12)+'px');
   new ResizeObserver(set).observe(f); set();
-})();
-
-// Debug: triple-tap the 管家 title to overlay viewport geometry (for layout bugs).
-(function(){
-  let taps=0, timer=null;
-  document.querySelector('header h1')?.addEventListener('click', ()=>{
-    taps++; clearTimeout(timer); timer=setTimeout(()=>{ taps=0; }, 600);
-    if (taps < 3) return;
-    taps=0;
-    let d=document.getElementById('dbg');
-    if (d) { d.remove(); return; }
-    d=document.createElement('pre'); d.id='dbg';
-    d.style.cssText='position:fixed;top:70px;left:8px;right:8px;z-index:99;background:var(--card);border:1px solid var(--accent);border-radius:8px;padding:10px;font-size:11px;line-height:1.5;white-space:pre-wrap;';
-    const f=document.querySelector('form#f')?.getBoundingClientRect();
-    const b=document.body.getBoundingClientRect();
-    d.textContent=[
-      'standalone: '+(navigator.standalone===true),
-      'screen: '+screen.width+'x'+screen.height,
-      'innerH: '+innerHeight+'  outerH: '+outerHeight,
-      'vv.height: '+(visualViewport?.height)+'  vv.offsetTop: '+(visualViewport?.offsetTop),
-      'html h: '+document.documentElement.getBoundingClientRect().height,
-      'body h: '+b.height+'  body bottom: '+b.bottom,
-      'form bottom: '+f?.bottom+'  (screen bottom should ≈ innerH)',
-      'safe-bottom: '+getComputedStyle(document.documentElement).getPropertyValue('--sab-probe'),
-      'scrollY: '+scrollY,
-      'viewTop offset ≈ (overlay top − 70): below status bar = fixed container',
-    ].join('\n');
-    document.body.appendChild(d);
-  });
 })();
 
 // iOS home-screen apps: after the software keyboard closes, WebKit can leave the

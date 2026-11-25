@@ -10,6 +10,7 @@
     <label id="pBriefWrap">简报邮箱 · Briefing email<br><input id="pBriefEmail" type="email" autocomplete="email" placeholder="留空则不发送 · blank = off" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></label>
     <label>简报保留天数（天，默认 30） · Briefing history (days, default 30)<br><input id="pRetainDays" type="number" min="1" max="3650" placeholder="30" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></label>
     <label id="pZipWrap">邮编 · Postcode（用于花粉等本地数据 · for local data like pollen）<br><input id="pPostcode" placeholder="留空则每次询问 · blank = ask each time" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)"></label>
+    <label id="pCountryWrap">国家代码 · Country (ISO, e.g. US, CN, GB — 与邮编一起查询 · looked up with the postcode)<br><input id="pCountry" maxlength="2" placeholder="留空则询问 · blank = ask" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);text-transform:uppercase"></label>
     <details id="advWrap" style="border:1px solid var(--line);border-radius:8px;padding:0 10px;margin:2px 0 10px">
       <summary style="cursor:pointer;padding:9px 0;color:var(--muted);font-size:13px">高级：AI 系统提示 · Advanced: AI system prompts</summary>
       <div style="padding:2px 0 10px">
