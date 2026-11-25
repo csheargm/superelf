@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { rmTemp } from './helpers-tmp.mjs';
 import { APP_CHAT_EVIDENCE_RULE, recordRequest, listHistory, diffText, diffTrees, diffVersion, notesForApp, gitLinesForApp,
-  appAboutContext, editHistoryContext, DIFF_MAX_CHARS, CONTEXT_MAX_CHARS, NOTE_LINES_MAX, REQUEST_MAX, FACTS_END } from '../lib/app-history.mjs';
+  appAboutContext, editHistoryContext, changeSummary, SUMMARY_SHOWN_LINES, DIFF_MAX_CHARS, CONTEXT_MAX_CHARS, NOTE_LINES_MAX, REQUEST_MAX, FACTS_END } from '../lib/app-history.mjs';
 import { snapshotApp, EDIT_WHY } from '../lib/app-versions.mjs';
 import { appEditOf, beginAppEdit, finishAppEdit, VERSIONS_DIR } from '../lib/app-edit.mjs';
 
@@ -228,4 +228,21 @@ test('a facts budget bounds the whole block, closing marker kept; too small a bu
     assert.ok(t.endsWith(FACTS_END), 'the closing marker survives');
     assert.equal(appAboutContext({ slug: 'todo', appDir: a, repoRoot: w, notes, exec: noGit, max: 50 }), '');
   } finally { rmTemp(w); }
+});
+
+test('changeSummary: the server\'s one-line account of an applied change, from the files', () => {
+  const t = fs.mkdtempSync(path.join(os.tmpdir(), 'pa-sum-')), a = path.join(t, 'a'), b = path.join(t, 'b');
+  try {
+    fs.mkdirSync(a); fs.mkdirSync(b);
+    fs.writeFileSync(path.join(a, 'index.html'), 'x\n.m{color:var(--accent)}\ny');
+    fs.writeFileSync(path.join(b, 'index.html'), 'x\n.m{color:#2e7d32}\ny');
+    fs.writeFileSync(path.join(a, 'meta.json'), '{}'); fs.writeFileSync(path.join(b, 'meta.json'), '{}');
+    assert.equal(changeSummary(a, b), '改动：index.html 1 行 · Changed: 1 line in index.html\n现在是 · Now: `.m{color:#2e7d32}`');
+    assert.equal(changeSummary(a, a), '', 'no change, no summary');
+    fs.writeFileSync(path.join(b, 'new.js'), 'let a=`x`;');
+    fs.writeFileSync(path.join(b, 'index.html'), 'x\n' + Array.from({ length: 6 }, (_, i) => `l${i}`).join('\n') + '\ny');
+    const s = changeSummary(a, b);
+    assert.match(s, /^改动：index\.html 6 行，新文件 new\.js · Changed: 6 lines in index\.html, new file new\.js\n/);
+    assert.equal((s.match(/`/g) || []).length, SUMMARY_SHOWN_LINES * 2, 'only the first few new lines are quoted');
+  } finally { rmTemp(t); }
 });

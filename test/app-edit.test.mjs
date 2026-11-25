@@ -6,7 +6,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { rmTemp } from './helpers-tmp.mjs';
-import { appEditOf, editChecks, beginAppEdit, finishAppEdit, undoAppEdit, editSystemPrompt, VERSIONS_DIR } from '../lib/app-edit.mjs';
+import { appEditOf, editChecks, beginAppEdit, finishAppEdit, undoAppEdit, editSystemPrompt, planPrompt, VERSIONS_DIR } from '../lib/app-edit.mjs';
+import { CONCRETE_VALUE_RULE, applyNowPrompt } from '../lib/app-edit-confirm.mjs';
 import { snapshotApp, listVersions, undoLastEdit, restoreVersion, VERSIONS_KEPT } from '../lib/app-versions.mjs';
 import { convoTag, convoReachable, agentConfined, APP_ORIGIN_HEADER } from '../lib/agent-origin.mjs';
 
@@ -70,6 +71,7 @@ test('a change that passes the checks is applied and undo puts the old app back'
     fs.writeFileSync(path.join(w, 'apps', 'todo', 'index.html'), PAGE.replace('Hi', 'Hello'));
     const out = finishAppEdit(e, ctx, { wsDir: w });
     assert.deepEqual([out.line.changed, out.line.applied], [true, true]);
+    assert.equal(out.note, '改动：index.html 1 行 · Changed: 1 line in index.html\n现在是 · Now: `' + PAGE.replace('Hi', 'Hello') + '`', 'the reply ends with the server\'s account from the diff');
     const u = undoAppEdit(e, { wsDir: w });
     assert.equal(u.line.undone, true);
     assert.equal(fs.readFileSync(path.join(w, 'apps', 'todo', 'index.html'), 'utf8'), PAGE);
@@ -209,4 +211,11 @@ test('GPT review round 3: undo keeps the current sharing; a linked index.html fa
     assert.equal(out.line.applied, false); assert.match(out.line.problems.join(), /link/);
     assert.equal(fs.lstatSync(page).isSymbolicLink(), false, 'rolled back to the real page');
   } finally { rmTemp(w); }
+});
+
+test('owner report 2026-11-24: plan, Apply and its reply all carry the ONE concrete-value rule', () => {
+  assert.match(CONCRETE_VALUE_RULE, /literal value/); assert.match(CONCRETE_VALUE_RULE, /var\(--accent\)/);
+  assert.ok(planPrompt('todo').includes(CONCRETE_VALUE_RULE), 'the plan names the literal value');
+  assert.ok(editSystemPrompt({ slug: 'todo', confirmed: true, plan: 'p' }).includes(CONCRETE_VALUE_RULE), 'the Apply turn sets it');
+  assert.ok(applyNowPrompt('p').includes(CONCRETE_VALUE_RULE), 'the Apply message says it too');
 });

@@ -1367,6 +1367,9 @@
       // it to ask a question about it would cost a second copy of the bytes for nothing.
       attach:(a)=>{ if(!a||!a.path) return false;
         atts.push({name:a.name||'photo.jpg',path:a.path,thumb:a.thumb||null}); renderChips(); return true; },
+      // A host's status line (Done, Undone, a note): added like every message, so it is pinned above the
+      // floating composer row and never left under its chips (owner report 2026-11-24).
+      note:(t,id)=>{ const d=addMsg('status',String(t||'')); if(id) d.id=id; return d; },
       remeasure:setPill,   // a host that reveals this surface must say so — a hidden composer measures 0 (see PA_PILL_RESERVE)
              prefill:(t)=>{ el.inp.value=t; autosize(); el.inp.focus(); } };   // quick-prompt: fill, let user edit/send
   }
