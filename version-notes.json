@@ -1,4 +1,12 @@
 {
+  "v5.19.5": {
+    "date": "2026-11-24",
+    "features": [],
+    "fixes": [
+      "提示都能关掉 · Every tip can be closed"
+    ],
+    "through": "77fdd004a0626da29bf9b55fb92be1b0b3d37676"
+  },
   "v5.19.4": {
     "date": "2026-11-24",
     "features": [],
