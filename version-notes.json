@@ -2,7 +2,10 @@
   "v5.19.7": {
     "date": "2026-11-24",
     "features": [],
-    "fixes": []
+    "fixes": [
+      "应用对话自测第二轮 · App chat self-test round 2"
+    ],
+    "through": "6116d58c26950d3310818501a125aceb7663bc6a"
   },
   "v5.19.6": {
     "date": "2026-11-24",
