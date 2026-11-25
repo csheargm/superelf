@@ -1,4 +1,12 @@
 {
+  "v5.27.0": {
+    "date": "2026-11-25",
+    "features": [
+      "超级精灵改自己可发布 · superelf can publish changes to itself"
+    ],
+    "fixes": [],
+    "through": "286d5b2c7835e8d87f194dea5cc1b1da9106fb35"
+  },
   "v5.26.0": {
     "date": "2026-11-25",
     "features": [
