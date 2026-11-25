@@ -21,7 +21,13 @@ function anchorGone(a){
   if(!a.isConnected) return true;
   const r=a.getBoundingClientRect(); if(!r.width&&!r.height) return true;   // display:none on it or a parent
   const x=r.left+r.width/2, y=r.top+r.height/2;
-  return y<0||y>innerHeight||x<0||x>innerWidth;   // slid or scrolled off screen
+  if(y<0||y>innerHeight||x<0||x>innerWidth) return true;   // slid or scrolled off screen
+  // Scrolled out of a clipping parent (the drawer's list under its header) while still on screen.
+  for(let p=a.parentElement;p&&p!==document.body;p=p.parentElement){
+    const cs=getComputedStyle(p); if(!/(auto|scroll|hidden|clip)/.test(cs.overflowY+' '+cs.overflowX)) continue;
+    const q=p.getBoundingClientRect(); if(y<q.top||y>q.bottom||x<q.left||x>q.right) return true;
+  }
+  return false;
 }
 function menuKey(e){ if(e.key==='Escape'&&menuOpen()){ e.preventDefault(); e.stopImmediatePropagation(); closeMenuPop(true); } }   // one Escape closes one layer
 function menuBlur(){ closeMenuPop(); }
@@ -34,10 +40,11 @@ function swallowClick(at){
   let t=0;
   const eat=(ev)=>{ if(ev.target===at||at.contains(ev.target)||ev.target.contains(at)){ ev.stopPropagation(); ev.preventDefault(); } done(); };
   const next=()=>done();
-  const done=()=>{ clearTimeout(t); document.removeEventListener('click',eat,true); removeEventListener('pointerup',arm,true); };
+  const done=()=>{ clearTimeout(t); document.removeEventListener('click',eat,true); removeEventListener('pointerup',arm,true); removeEventListener('pointercancel',arm,true); };
   // A new press ends it, but only after this press is over (its pointerup), so the press itself never does.
-  const arm=()=>{ removeEventListener('pointerup',arm,true); document.addEventListener('pointerdown',next,{capture:true,once:true}); };
-  document.addEventListener('click',eat,true); addEventListener('pointerup',arm,true);
+  // pointercancel too: a touch that became a scroll sends no pointerup and no click.
+  const arm=()=>{ removeEventListener('pointerup',arm,true); removeEventListener('pointercancel',arm,true); document.addEventListener('pointerdown',next,{capture:true,once:true}); };
+  document.addEventListener('click',eat,true); addEventListener('pointerup',arm,true); addEventListener('pointercancel',arm,true);
   t=setTimeout(done,SWALLOW_MAX_MS);
 }
 function closeMenuPop(refocus){

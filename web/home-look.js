@@ -51,7 +51,7 @@ const PAHomeLook=(function(){
       b.onclick=(e)=>{ e.stopPropagation(); const on=!w.classList.contains('open'); closeAa(); w.classList.toggle('open',on); b.setAttribute('aria-expanded',String(on)); };
     });
     if(!bindAa.doc){ bindAa.doc=1;
-      document.addEventListener('pointerdown',(e)=>{ if(!e.target.closest('.aa')) closeAa(); },true);   // pointerdown: iOS sends no click for a tap on plain text
+      for(const ev of ['pointerdown','click']) document.addEventListener(ev,(e)=>{ if(!e.target.closest('.aa')) closeAa(); },true);   // pointerdown: iOS sends no click for a tap on plain text; click: keyboard
       document.addEventListener('keydown',(e)=>{ if(e.key==='Escape') closeAa(); }); }
   }
   // The header's second line: date, then today's reading when the Bible tile carries a face.

@@ -117,8 +117,8 @@ const PAHome=(function(){
   function bind(){
     $('#hmore').onclick=(e)=>{ e.stopPropagation(); const m=$('#hmenu'); m.hidden=!m.hidden; $('#hmore').setAttribute('aria-expanded',String(!m.hidden)); seeTip(); };
     $('#hmenu').addEventListener('click',(e)=>{ if(e.target.closest('button')&&!e.target.closest('.aa')) closeMore(); });
-    // pointerdown, not click: iOS Safari sends no click for a tap on plain text, so the menu stayed (web/popover.js).
-    document.addEventListener('pointerdown',(e)=>{ if(!e.target.closest('#hmenu,#hmore')) closeMore(); },true);
+    // pointerdown as well as click: iOS Safari sends no click for a tap on plain text, so the menu stayed (web/popover.js).
+    for(const ev of ['pointerdown','click']) document.addEventListener(ev,(e)=>{ if(!e.target.closest('#hmenu,#hmore')) closeMore(); },true);   // + click: a keyboard Enter outside
     document.addEventListener('keydown',(e)=>{ if(e.key==='Escape'&&!$('#hmenu').hidden){ closeMore(); $('#hmore').focus(); } });
     $('#hAvatar').onclick=()=>$('#settings').click();
     $('#homeForm').onsubmit=(e)=>{ e.preventDefault(); submitSend(); };   // Enter in #box, as #f does
