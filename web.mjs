@@ -1302,7 +1302,7 @@ async function chat(req, res, user, body) {
 function appTurnFacts(user, edit, app, max) {
   const notes = () => { try { return JSON.parse(appNotesJson(ROOT, undefined, buildId.head())); } catch { return {}; /* notes unreadable: the block says "none" */ } };
   if (edit && edit.undo) return '';   // a typed Undo calls no model: no facts to build
-  if (edit && !edit.superelf) return editHistoryContext({ slug: edit.slug, appDir: edit.dir, versionsRoot: path.join(wsDir(user), VERSIONS_DIR), versionsRel: VERSIONS_DIR, repoRoot: ROOT, notes: notes(), max });
+  if (edit && !edit.superelf) return editHistoryContext({ slug: edit.slug, appDir: edit.dir, versionsRoot: path.join(wsDir(user), VERSIONS_DIR), versionsRel: VERSIONS_DIR, repoRoot: ROOT, notes: notes(), max, skip: edit.inFlight || null });
   if (edit || typeof app !== 'string' || !slugOk(app)) return '';
   const dir = path.join(appsDir(user), app);
   if (max !== undefined && max < APP_CHAT_EVIDENCE_RULE.length) return '';

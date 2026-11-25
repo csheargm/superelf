@@ -68,6 +68,7 @@ test('a change that passes the checks is applied and undo puts the old app back'
   try {
     const e = ed(w, { edit: 'todo', message: 'x' });
     const ctx = beginAppEdit(e, { wsDir: w });
+    assert.equal(e.inFlight, ctx.version, 'the turn knows its own copy, so its facts can leave it out');
     fs.writeFileSync(path.join(w, 'apps', 'todo', 'index.html'), PAGE.replace('Hi', 'Hello'));
     const out = finishAppEdit(e, ctx, { wsDir: w });
     assert.deepEqual([out.line.changed, out.line.applied], [true, true]);

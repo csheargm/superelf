@@ -263,3 +263,13 @@ test('changeSummary: the server\'s one-line account of an applied change, from t
     assert.equal(cleanReply(withName).text, withName, 'a file name the cleaner would strip is neutralised too');
   } finally { rmTemp(t); }
 });
+
+test('real run 2026-11-24: a turn never sees its own undo copy as an earlier "no difference" change', () => {
+  const { w, a, root } = ws();
+  try {
+    const v = snapshotApp(a, root, 'todo', EDIT_WHY); recordRequest(root, 'todo', v, { request: 'make the month title green', who: 'o' });
+    const facts = (skip) => editHistoryContext({ slug: 'todo', appDir: a, versionsRoot: root, versionsRel: VERSIONS_DIR, repoRoot: w, notes: {}, exec: noGit, skip });
+    assert.match(facts(null), /make the month title green/);
+    assert.doesNotMatch(facts(v), /make the month title green|no difference/, 'the in-flight copy is not a past change');
+  } finally { rmTemp(w); }
+});
