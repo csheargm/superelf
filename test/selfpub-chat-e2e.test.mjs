@@ -17,6 +17,7 @@ import { startFakeGitHub, FAKE_TOKEN } from './helpers-fake-github.mjs';
 import { selfpubFixture, tgit } from './helpers-selfpub.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
 import { hashPassword } from '../lib/auth.mjs';
+const POSIX_ONLY = process.platform === 'win32' && 'the core lane runs on Linux/macOS nodes; its jail rule paths, fake CLI permissions and checkout are POSIX (docs/adr/0044)';
 
 const SHOTS = process.env.PA_SHOTS || '';
 const KID = 'kid-token-abcdefghijkl';
@@ -76,7 +77,7 @@ test('a member typing "change superelf:" is refused plainly; no checkout is made
   assert.ok(!fs.existsSync(path.join(fx.d, 'src', 'repo')), 'no checkout');
 });
 
-test('the main agent cannot write served code: its args deny it and the file is unchanged', async () => {
+test('the main agent cannot write served code: its args deny it and the file is unchanged', { skip: POSIX_ONLY }, async () => {
   const before = fs.readFileSync(path.join(root, 'superelf.md'), 'utf8');
   const ev = await chat(OWNER_TOKEN, 'please edit the served file superelf.md directly');
   const done = ev.find((e) => e.type === 'done');
