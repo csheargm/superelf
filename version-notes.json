@@ -1,4 +1,12 @@
 {
+  "v5.19.8": {
+    "date": "2026-11-24",
+    "features": [],
+    "fixes": [
+      "应用对话自测第二轮 CI 修复 · App chat round 2 CI fix"
+    ],
+    "through": "f859279312398dffc089ef57a1d70bf249a7cf92"
+  },
   "v5.19.7": {
     "date": "2026-11-24",
     "features": [],
