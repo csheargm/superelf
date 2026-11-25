@@ -1,4 +1,12 @@
 {
+  "v5.22.3": {
+    "date": "2026-11-25",
+    "features": [],
+    "fixes": [
+      "复制的应用可发布、应用聊天不再承诺不存在的按钮 · Forked app Publish and honest app chat"
+    ],
+    "through": "1c9bc126d9dda079c40e2605a4c3c48f5f341711"
+  },
   "v5.22.2": {
     "date": "2026-11-25",
     "features": [],
