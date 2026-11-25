@@ -748,3 +748,5 @@ Without it they now FAIL (R14), not pass as `# pass 0 / # fail 0`. To run them:
 - test/member-plain-lane-e2e.test.mjs "owner ticks AI 工具" fails on origin/main 413dd6b9 too (checkbox click does not change state).
 
 - Demo sign-in (lib/demo-boot.mjs): two tabs asking for a link at once — the slower OTP reply stores its verifier last, so the newer link fails in that browser (GPT r2, 2026-11-24; rare race, deferred). Fix idea: keep a small verifier list keyed by request time.
+
+- app-edit typed yes (GPT review r1, deferred): a "yes" sent from a stale tab after its conversation was deleted still applies that chat's pending plan (the plan is consumed before the conversation is loaded); and a plan reply that ends with [[apply]] but also talks about tools is offered as is (the backstop only replaces non-plan replies). Both rare; the prompt forbids tool talk.

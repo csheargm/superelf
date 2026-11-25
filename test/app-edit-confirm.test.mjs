@@ -207,3 +207,44 @@ test('GPT review r5: share and delete refuse while an edit runs, so its rollback
     assert.equal((WEB.match(/editBusyBody\(wsDir\(user\), slug\)/g) || []).length, 3, 'the share, the update and the delete route');
   } finally { rmTemp(w); }
 });
+
+// 说「好」也能改 · Owner report 2026-11-24 (Red Flags): a typed yes and tool talk.
+import { isTypedConfirm, pendingConfirm, toolTalkReplacement, saysNo, REOFFER_LINE, ASK_AGAIN_LINE } from '../lib/app-edit-confirm.mjs';
+test('a short typed yes counts as the tap; anything more stays a normal turn (known limits)', () => {
+  for (const t of ['yes', 'Yes!', 'ok', 'go ahead', 'do it', 'apply', 'yes please.', 'ok, do it', '好', '好的', '可以', '改吧', '确认', '好的，改吧', '嗯 好'])
+    assert.equal(isTypedConfirm(t), true, t);
+  for (const t of ['no', '不好', '不要', 'yes but bigger', '好，再大一点', 'Yes, I want the size of the fonts to suit the iPhone', '是什么', '', 'okay '.repeat(10), 'thanks', '谢谢', 'Apply?', '好吗？', 'please', 'gogo', 'okayokay'])
+    assert.equal(isTypedConfirm(t), false, t);
+});
+test('a typed yes applies the newest plan of THIS conversation only, once', () => {
+  const w = ws();
+  try {
+    const key = { who: 'owner', slug: 'todo' };
+    mintConfirm({ ...key, convo: 'c1', plan: 'old plan' });
+    mintConfirm({ ...key, convo: 'c1', plan: 'make it red' });
+    mintConfirm({ ...key, convo: 'c2', plan: 'other chat' });
+    const yes = (convo, message = 'yes') => appEditOf({ user: OWNER, body: { edit: 'todo', message, convoId: convo }, headers: {}, appsDir: path.join(w, 'apps') });
+    assert.equal(confirmEdit(yes('c9')).confirmed, false, 'another conversation has no plan');
+    const e = confirmEdit(yes('c1'));
+    assert.deepEqual([e.confirmed, e.plan], [true, 'make it red']);
+    assert.equal(pendingConfirm({ ...key, convo: 'c1' }), null, 'the revised-away plan went when the new one was minted; the applied one is gone (single use)');
+    assert.equal(confirmEdit(yes('c1')).confirmed, false, 'a second yes applies nothing');
+    assert.equal(confirmEdit(appEditOf({ user: KID, body: { edit: 'todo', message: 'yes', convoId: 'c2' }, headers: {}, appsDir: path.join(w, 'apps'), members: true })).confirmed, false, 'another user');
+  } finally { rmTemp(w); }
+});
+test('tool/session talk in a plan turn is replaced: the pending plan + its button, or a plain ask', () => {
+  const key = { who: 'owner', slug: 'notes', convo: 'c7' };
+  assert.equal(toolTalkReplacement('The title is blue.', key), null);
+  assert.deepEqual(toolTalkReplacement("I still can't edit index.html. The Edit tool is still disabled in this session.", key), { text: ASK_AGAIN_LINE, id: null });
+  const id = mintConfirm({ ...key, plan: 'Base text 18px.' });
+  for (const t of ['Write tool is off', "the block is in the session's tool setup", 'the session’s tool list', 'Editing needs to be re-enabled'])
+    assert.deepEqual(toolTalkReplacement(t, key), { text: `Base text 18px.\n\n${REOFFER_LINE}`, id }, t);
+  assert.deepEqual(toolTalkReplacement('Edit tool is off', key, false), { text: ASK_AGAIN_LINE, id: null }, 'never re-offered after a no');
+  for (const m of ['no, leave it as is', "don't", '不要改', '算了']) assert.equal(saysNo(m), true, m);
+  for (const m of ['Yes, I want the size of the fonts suitable for iPhone', 'make it bigger', '好']) assert.equal(saysNo(m), false, m);
+});
+test('the plan prompt forbids tool talk and asks for a plan with the marker on every change request', () => {
+  const p = editSystemPrompt({ slug: 'todo', confirmed: false });
+  assert.match(p, /Never mention tools, sessions, permissions/);
+  assert.match(p, /even again or the same one again/);
+});

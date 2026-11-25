@@ -20,7 +20,7 @@ import { agentAllowed, lanesFor, memberLane, NO_PLAIN_LANE_TEXT, AGENT_OFF_TEXT 
 import { cancelOnClose, createTurnCancel, createTurnStops, CANCELLED_TEXT } from './lib/turn-stop.mjs';
 import { watchConfig } from './lib/config-watch.mjs';
 import { oneShotBaseArgs, oneShotModel, yieldSettings, NO_TOOLS_ARGS } from './lib/one-shot.mjs';
-import { mintConfirm, planOffer, applyMessage, applyNowPrompt, APPLY_LABEL, PLAN_MAX, PLAN_TOO_LONG } from './lib/app-edit-confirm.mjs';
+import { mintConfirm, planOffer, applyMessage, applyNowPrompt, toolTalkReplacement, retirePending, saysNo, APPLY_LABEL, PLAN_MAX, PLAN_TOO_LONG } from './lib/app-edit-confirm.mjs';
 import { runScopedEdit, scopedLane, flattenForClaude } from './lib/app-edit-lane.mjs';
 import { safeJoin, slugOk, drawerOpenOf, tokenOk, dataContentType, readBody, writeFileAtomic, renameWithRetry, decodeBase64Strict, bodyErrorResponse, BODY_LIMITS } from './lib/webutil.mjs';
 import { createConvoLocks, withConvoTurn, QUEUED_TURN_TEXT } from './lib/convo-lock.mjs';
@@ -1321,14 +1321,21 @@ function agentSystemPrompt(head, caps, facts) {
 
 // TODO(R4 seam): these two edit-turn helpers leave web.mjs with the edit-turn wiring (the seam named in chatTurn).
 // An unconfirmed edit turn that planned a change: strip the marker, mint the single-use id, offer the button.
-function offerApply(user, edit, message, r, line) {
+function offerApply(user, edit, message, r, line, convoId) {
   if (edit.confirmed || edit.superelf || edit.undo) return r;
   const o0 = planOffer(r.text);
-  if (!o0.offered) return r;
+  if (!o0.offered) {   // backstop: tool/session talk never reaches the user; the pending plan and its button do
+    const key = { who: user.id, slug: edit.slug, convo: convoId };
+    const t = toolTalkReplacement(r.text, key, !saysNo(message));   // never re-offered never to "no, leave it" (GPT review r3)
+    if (t && t.id) line({ type: 'app-change-confirm', slug: edit.slug, label: APPLY_LABEL, message: applyMessage(t.id) });
+    else retirePending(key);   // answered with anything else ("no, leave it"): a later yes applies nothing (GPT review r2)
+    return t ? { ...r, text: t.text } : r;
+  }
   const o = { ...o0, text: scrubPaths(cleanReply(o0.text).text, wsDir(user)) };   // the plan Apply runs is the plan the user saw (GPT review r1)
   if (!o.text.trim()) return { ...r, text: o.text };   // nothing readable left: no plan, no Apply (GPT review r2)
+  if (o.text.length > PLAN_MAX) retirePending({ who: user.id, slug: edit.slug, convo: convoId });   // the shown revision replaces the old plan (GPT review r3)
   if (o.text.length > PLAN_MAX) return { ...r, text: `${o.text}\n\n${PLAN_TOO_LONG}` };   // never an Apply that would run a cut-down plan
-  const id = mintConfirm({ who: user.id, slug: edit.slug, plan: o.text, request: message });
+  const id = mintConfirm({ who: user.id, slug: edit.slug, plan: o.text, request: message, convo: convoId });
   line({ type: 'app-change-confirm', slug: edit.slug, label: APPLY_LABEL, message: applyMessage(id) });
   return { ...r, text: o.text };
 }
@@ -1608,7 +1615,11 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
       }
       // A oneShot run's session holds one answer, so it never becomes the conversation's: the next
       // conversation turn resumes the session it had (or none) and its history block carries these turns.
-      if (r.sessionId && !oneShot) convo.sessionId = r.sessionId;
+      // An Apply turn's session is never resumed (owner report 2026-11-24, Red Flags): resumed by the next
+      // read-only plan turn, the model went on editing, hit the missing Edit tool and said "Edit is disabled
+      // in this session" on every later change. The next turn starts fresh; the history block carries this one.
+      if (jailed) convo.sessionId = null;
+      else if (r.sessionId && !oneShot) convo.sessionId = r.sessionId;
     }
     if (!isBlankAnswer(r) || !agentAllowed(user) || !shouldFallBackToAgent({ lane: chosen, fromApp: origin.fromApp, alreadyFellBack: fellBack })) break;
     console.log(chatTurnLogLine({ app: tag, lane: chosen, ok: false, textLen: 0, ms: Date.now() - startedAt, code: 'empty' }));
@@ -1632,7 +1643,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
       r = { ...r, text: finishHonest({ reply: r.text || '', message, prior: convo.messages.slice(0, -1), inApp: origin.fromApp, line,
         canEdit: user.role === 'owner' && origin.fromApp && typeof app === 'string' && slugOk(app) }) };
     }
-    if (edit && !blank && r.ok !== false) r = offerApply(user, edit, message, r, line);   // a plan → the 改 · Apply button (lib/app-edit-confirm.mjs)
+    if (edit && !blank && r.ok !== false) r = offerApply(user, edit, message, r, line, convo.id);   // a plan → the 改 · Apply button (lib/app-edit-confirm.mjs)
     // Never shown: tool-call markup printed as text, the plan marker, the node's own paths (lib/reply-clean.mjs).
     let unreadable = false;
     if (!blank) {
