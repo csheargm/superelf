@@ -789,3 +789,7 @@ and LOCAL_META stripping re-checked. Only the owner's copy of a repo shelf app i
 
 - Journal print, paper changed in the dialog (GPT review, journal-print): the sheet box height comes from the locale-chosen paper (A4 box 291mm incl. top margin). If a user on an A4 locale picks Letter in the dialog and the browser does not scale the CSS layout, the sheet can clip at the foot or spill a blank sheet. Chrome scales to the chosen paper; iOS Safari unverified. Fix if seen: size the box from the smaller of Letter/A4, or a paper toggle beside 打印.
 - Journal print, GPT round 3 (cap reached): (a) inkExtent includes photo bounds, so a photo reaching the sheet foot shrinks the note ~3%; pad strokes only. (b) two overlapping print requests share one #printRoot; the second can replace the first's pages during image decode. Fix: a job token checked after the await.
+
+## Browser Back (web/app-frame.js) — deferred GPT review edge cases
+- An app opened in the instant between Home's `history.back()` and its popstate replaces the entry being left; the ignored popstate then leaves that app open over the Home entry. Rare (needs a tap within one traversal).
+- Forward into an app entry after the browser recreated the shell document (no bfcache) shows Home: boot reopens from the update record and the hash, not from `history.state.paApp`.

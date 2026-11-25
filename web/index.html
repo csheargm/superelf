@@ -563,6 +563,7 @@ function goHome(){
   if(typeof PAAppEdit!=='undefined') PAAppEdit.close();   // the edit panel belongs to the app it was opened on (web/app-edit.js); absent in the extracted-block tests
   $('#frame').style.display='none'; $('#frame').classList.remove('peek','barin','ownbar'); barHide(); shellBehindApp(false);
   appFrameLeave();   // the app is held while it makes its last save, then removed (web/app-frame.js)
+  if(typeof appHistoryLeft==='function') appHistoryLeft();   // web/app-frame.js; absent in the extracted-block tests. Off the app's history entry, so Back never lands on it again (web/app-frame.js)
   setConvo(null); $('#log').innerHTML='';
   closeDrawer(); loadApps(); loadConvos(); showEmptyState();
 }
@@ -1029,7 +1030,7 @@ window.addEventListener('message',(e)=>{
 });
 
 /* PA_APP_FRAME_JS */
-function openApp(uid,slug,title){ if(uid===UID) promoteApp(slug); if(typeof closeAllPops==='function') closeAllPops(); if(typeof PAAppEdit!=='undefined'){ PAAppEdit.close(); PAAppEdit.syncBar(uid); } appFrameLeave(); $('#ftitle').textContent=title||slug; refreshChatModels(); PASW.frameLoad(uid,slug); $('#frame').classList.remove('ownbar'); $('#frame').classList.add('peek'); $('#frame').style.display='flex'; closeDrawer(); shellBehindApp(true); }
+function openApp(uid,slug,title){ if(uid===UID) promoteApp(slug); if(typeof closeAllPops==='function') closeAllPops(); if(typeof PAAppEdit!=='undefined'){ PAAppEdit.close(); PAAppEdit.syncBar(uid); } appFrameLeave(); $('#ftitle').textContent=title||slug; refreshChatModels(); PASW.frameLoad(uid,slug); if(typeof appHistoryOpened==='function') appHistoryOpened(uid,slug,title); $('#frame').classList.remove('ownbar'); $('#frame').classList.add('peek'); $('#frame').style.display='flex'; closeDrawer(); shellBehindApp(true); }
 /* ══ SHELL_BEHIND_APP_BEGIN — cut out and run by runShell() in test/helpers-shell-dom.mjs, for every suite that calls it ══ */
 // TODO(R4): this file is far over the 300-line budget. Split seam: the app-frame section (bar peek,
 // openApp, this block) moves into web/app-frame.js, the inlined shell part that already holds
