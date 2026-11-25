@@ -1,4 +1,12 @@
 {
+  "v5.20.3": {
+    "date": "2026-11-25",
+    "features": [],
+    "fixes": [
+      "菜单图标与文字同行 · Menu icons beside their labels"
+    ],
+    "through": "f6607607faa8ead9c98146a4596ab2f3f1e79c91"
+  },
   "v5.20.2": {
     "date": "2026-11-25",
     "features": [],
