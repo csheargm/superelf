@@ -253,6 +253,53 @@ test('iPad 1180x820: a finger or Pencil drag on the title moves the window — n
   } finally { await ctx.close(); }
 });
 
+test('GPT review: one pointer owns a drag, a lost pointer never sticks, a cancelled resize is undone, pills sit above a bottom dock, keyboard keeps a dock docked', { skip, timeout: 120000 }, async () => {
+  const { ctx, frame } = await open();
+  try {
+    await frame.locator('#top-ai').click(); await frame.waitForFunction(() => rail.win('chat').isVisible());
+    const r = await frame.evaluate(async () => {
+      rail.win('chat').dock('right');
+      const w = rail.win('chat'), t = w.el.querySelector('.paw-t'), b = t.getBoundingClientRect(), x0 = b.x + 30, y0 = b.y + b.height / 2;
+      const fire = (el, type, id, x, y) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: id, pointerType: id === 1 ? 'pen' : 'touch', clientX: x, clientY: y, buttons: type === 'pointerup' ? 0 : 1 }));
+      const out = {};
+      // Pencil (id 1) drags; a finger (id 2) touches and lifts mid-drag — the Pencil's drag goes on.
+      fire(t, 'pointerdown', 1, x0, y0); fire(t, 'pointermove', 1, x0 - 100, y0 + 200);
+      fire(t, 'pointerdown', 2, x0 + 5, y0); fire(t, 'pointermove', 2, x0 + 400, y0 + 400); fire(t, 'pointerup', 2, x0 + 400, y0 + 400);
+      out.stillMoving = document.documentElement.classList.contains('paw-moving');
+      fire(t, 'pointermove', 1, x0 - 300, y0 + 250); const mid = w.rect();
+      fire(t, 'pointerup', 1, x0 - 300, y0 + 250);
+      out.followedPen = Math.abs(mid.x - (w.rect().x)) < 2 && w.state().mode === 'float' ? true : JSON.stringify([mid, w.rect(), w.state()]);
+      // A lost pointer (capture lost, no pointerup) ends the drag: nothing stays unclickable.
+      const b2 = t.getBoundingClientRect();
+      fire(t, 'pointerdown', 3, b2.x + 30, b2.y + 10); fire(t, 'pointermove', 3, b2.x + 80, b2.y + 60);
+      out.movingBefore = document.documentElement.classList.contains('paw-moving');
+      t.closest('.paw-bar').dispatchEvent(new PointerEvent('lostpointercapture', { bubbles: true, pointerId: 3 }));
+      out.movingAfterLost = document.documentElement.classList.contains('paw-moving');
+      fire(t, 'pointerdown', 4, b2.x + 30, b2.y + 10); fire(t, 'pointermove', 4, b2.x + 80, b2.y + 60);
+      document.querySelector('.paw-bar').dispatchEvent(new FocusEvent('blur')); out.movingAfterElBlur = document.documentElement.classList.contains('paw-moving');
+      window.dispatchEvent(new Event('blur')); out.movingAfterBlur = document.documentElement.classList.contains('paw-moving');
+      // A resize cancelled by Esc is undone (and not saved).
+      w.float({ x: 200, y: 200, w: 400, h: 400 });
+      const r0 = w.rect(), h = w.el.querySelector('.paw-h[data-d=se]'), hb = h.getBoundingClientRect();
+      fire(h, 'pointerdown', 5, hb.x + 5, hb.y + 5); fire(h, 'pointermove', 5, hb.x + 120, hb.y + 90);
+      out.grew = w.rect().w > r0.w;
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      out.undone = JSON.stringify(w.rect()) === JSON.stringify(r0);
+      // A minimised window's pill paints above a bottom-docked Note.
+      await new Promise((z) => setTimeout(z, 50));
+      return out;
+    });
+    assert.deepEqual(r, { stillMoving: true, followedPen: true, movingBefore: true, movingAfterLost: false, movingAfterElBlur: true, movingAfterBlur: false, grew: true, undone: true });
+    await frame.locator('#top-note').click(); await frame.waitForFunction(() => rail.win('note').isVisible());
+    await frame.evaluate(() => { rail.win('note').dock('bottom'); rail.win('chat').minimize(); });
+    const pillTop = await frame.evaluate(() => { const p = document.querySelector('.paw-pill').getBoundingClientRect(), e = document.elementFromPoint(p.x + p.width / 2, p.y + p.height / 2); return !!(e && e.closest('.paw-pill')); });
+    assert.ok(pillTop, 'the pill is the top element at its centre, over the bottom dock');
+    const k = await frame.evaluate(() => { const w = rail.win('note'), bar = w.el.querySelector('.paw-bar'), ev = (key, shift) => bar.dispatchEvent(new KeyboardEvent('keydown', { key, altKey: true, shiftKey: shift, bubbles: true, cancelable: true }));
+      const h0 = w.rect().h; ev('ArrowUp', true); const h1 = w.rect().h; ev('ArrowLeft', false); return { grew: h1 > h0, mode: w.state().mode, where: w.state().where }; });
+    assert.deepEqual(k, { grew: true, mode: 'dock', where: 'left' }, 'Alt+Shift+Up grows the bottom dock; Alt+Left docks it left — never a float');
+  } finally { await ctx.close(); }
+});
+
 test('iPad portrait 820x1180 keeps windows; iPhone 390: Ask AI is a full-screen sheet with ✕, no windows', { skip, timeout: 120000 }, async () => {
   let { ctx, page, frame } = await open({ viewport: { width: 820, height: 1180 }, touch: true });
   try {

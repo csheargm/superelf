@@ -89,3 +89,14 @@ test('every control is labelled 中文 first, then English, for a newcomer', () 
 test('no client-side storage — it throws at the app frame\'s opaque origin', () => {
   assert.doesNotMatch(JS, /localStorage|sessionStorage|indexedDB|document\.cookie/);
 });
+
+test('left + right docks together never cover the page: capped at SIDE max, the reading column stays', () => {
+  const vw = 820, vh = 600;
+  const { rects, push } = G.layout([st({ key: 'a', where: 'left', size: { right: 0.6, left: 0.6, top: 0.5, bottom: 0.5 } }),
+    st({ key: 'b', where: 'right', size: { right: 0.6, left: 0.6, top: 0.5, bottom: 0.5 } }), st({ key: 'c', where: 'top' })], vw, vh);
+  assert.ok(push.left + push.right <= Math.round(0.6 * vw), `capped (${push.left}+${push.right})`);
+  assert.ok(rects.a.x + rects.a.w <= rects.b.x, 'the two docks do not overlap');
+  assert.ok(rects.c.w > 0, 'a top dock between them keeps a positive width');
+  const one = G.layout([st({ key: 'a', where: 'left', size: { right: 0.6, left: 0.6, top: 0.5, bottom: 0.5 } })], vw, vh);
+  assert.equal(one.push.left, Math.round(0.6 * vw), 'control: one side alone is not capped further');
+});

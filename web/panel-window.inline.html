@@ -12,7 +12,7 @@
      through PAAppPrefs (localStorage throws at the app frame's opaque origin). Phones never get here: PASplit's gate
      keeps them on the full-screen sheet. The pure geometry (PAWin.geo) is driven by test/panel-window.test.mjs. -->
 <style id="paw-style">
-/* z-index LITERAL (test/app-load.test.mjs ladder): windows 46/47 above the page, maximised 49, all below .pac-fs/.pan-fs (50). */
+/* z-index LITERAL (test/app-load.test.mjs ladder): windows 46/47 above the page, pills/snap 48 (a bottom dock never covers a pill), maximised 49, all below .pac-fs/.pan-fs (50). */
 .paw-win{position:fixed;z-index:46;display:none;flex-direction:column;box-sizing:border-box;background:var(--card,#fff);
   border:1px solid var(--line,#e2e2de);box-shadow:0 4px 18px rgba(0,0,0,.12)}
 .paw-win.on{display:flex}
@@ -49,7 +49,7 @@
 html.paw-moving .paw-snap.on,html.paw-moving .paw-tgt{display:block}
 html.paw-moving{-webkit-user-select:none;user-select:none}
 html.paw-moving .paw-body{pointer-events:none}
-.paw-pills{position:fixed;right:12px;bottom:12px;z-index:46;display:flex;gap:6px}
+.paw-pills{position:fixed;right:12px;bottom:12px;z-index:48;display:flex;gap:6px}
 .paw-pill{border:1px solid var(--line,#e2e2de);border-radius:18px;background:var(--card,#fff);color:var(--text,#1d2321);
   font:13px/1 -apple-system,system-ui,sans-serif;padding:0 14px;min-height:36px;box-shadow:0 2px 10px rgba(0,0,0,.15);cursor:pointer}
 /* THE PUSH. Sideways: margin on every body child (a flow column and a fixed surface both narrow — PASplit's
@@ -95,6 +95,10 @@ html.paw-pb>body>:is(.pan-fs,.pac-fs){margin-bottom:var(--paw-b)}
     ['right','left'].forEach(side=>{ const g=on(side); if(!g.length) return;
       const px=Math.round(Math.max(...g.map(s=>clampSize(side,s.size[side])))*vw); push[side]=px;
       g.forEach((s,i)=>{ const h=vh/g.length; rects[s.key]={x:side==='right'?vw-px:0,y:Math.round(i*h),w:px,h:Math.round(h)}; }); });
+    // Left + right together never take more than SIDE[1] of the width: the page keeps a reading column.
+    const both=push.left+push.right, cap=Math.round(SIDE[1]*vw);
+    if(push.left&&push.right&&both>cap){ const k=cap/both, l=Math.round(push.left*k), r=cap-l;
+      Object.keys(rects).forEach(key=>{ const q=rects[key]; if(q.x===0){ q.w=l; } else { q.x=vw-r; q.w=r; } }); push.left=l; push.right=r; }
     const x0=push.left, span=vw-push.left-push.right;
     ['top','bottom'].forEach(tb=>{ const g=on(tb); if(!g.length) return;
       const px=Math.round(Math.max(...g.map(s=>clampSize(tb,s.size[tb])))*vh); push[tb]=px;
@@ -148,9 +152,12 @@ html.paw-pb>body>:is(.pan-fs,.pac-fs){margin-bottom:var(--paw-b)}
   function showErr(text){ wins.forEach(w=>{ w.err.textContent=text||''; }); }
   function entry(s){ const e={mode:s.mode,where:s.where,size:Object.assign({},s.size)}; if(s.rect) e.rect=Object.assign({},s.rect); if(s.max) e.max=true; return e; }
   function save(){
-    clearTimeout(saveT); saveT=setTimeout(()=>{ const P=window.PAAppPrefs; if(!P) return;   // no prefs on this page: the layout is simply not kept
-      const all=Object.assign({},P.get()[KEY]), c=cls(); all[c]=Object.assign({},all[c]); wins.forEach(w=>{ all[c][w.s.key]=entry(w.s); });
-      P.patch({[KEY]:all}).then(r=>showErr(r&&r.ok?'':L.save+((r&&r.error)?' — '+r.error:''))); },300);
+    clearTimeout(saveT); saveT=setTimeout(()=>{ const P=window.PAAppPrefs; if(!P) return;
+      if(active){ save(); return; }   // mid-gesture: a transient (maybe cancelled) size is never written   // no prefs on this page: the layout is simply not kept
+      // Re-read first: another device may have saved ITS class since this page loaded; only this class is replaced.
+      P.read().then(rd=>{ if(!(rd&&rd.ok)){ showErr(L.save+' — '+((rd&&rd.error)||'?')); return; }
+        const all=Object.assign({},rd.prefs[KEY]), c=cls(); all[c]=Object.assign({},all[c]); wins.forEach(w=>{ all[c][w.s.key]=entry(w.s); });
+        return P.patch({[KEY]:all}).then(r=>showErr(r&&r.ok?'':L.save+((r&&r.error)?' — '+r.error:''))); }); },300);
   }
   function apply(w){ const e=stored&&stored[cls()]&&stored[cls()][w.s.key]; if(!e||w.touched) return;
     if(e.mode==='float'||e.mode==='dock') w.s.mode=e.mode; if(WHERE.includes(e.where)) w.s.where=e.where;
@@ -160,7 +167,7 @@ html.paw-pb>body>:is(.pan-fs,.pac-fs){margin-bottom:var(--paw-b)}
     if(load.p) return load.p; const P=window.PAAppPrefs; if(!P){ load.p=Promise.resolve(); return load.p; }
     load.p=P.read().then(r=>{ if(!(r&&r.ok)){ showErr(L.read+' — '+((r&&r.error)||'?')); return; }
       stored=r.prefs[KEY]||null;
-      if(!stored&&r.prefs[OLD]){ const v=vp(); stored=migrate(r.prefs[OLD],cls(),v.w,v.h); P.patch({[KEY]:stored,[OLD]:null}); }
+      if(!stored&&r.prefs[OLD]){ const v=vp(); stored=migrate(r.prefs[OLD],cls(),v.w,v.h); P.patch({[KEY]:stored,[OLD]:null}).then(w=>{ if(!(w&&w.ok)) showErr(L.save+' — '+((w&&w.error)||'?')); }); }
       wins.forEach(apply); render(); });
     return load.p;
   }
@@ -179,18 +186,23 @@ html.paw-pb>body>:is(.pan-fs,.pac-fs){margin-bottom:var(--paw-b)}
     Object.assign(snapEl.style,{left:r.x+'px',top:r.y+'px',width:r.w+'px',height:r.h+'px'});
   }
   // One pointer gesture on the bar or a handle. onMove(x,y) runs only past DRAG_PX; onEnd(cancelled).
+  // ONE gesture at a time, owned by ONE pointer: a second finger or the Pencil's partner touch is ignored.
+  // Any way the pointer can be lost (capture lost, window blur, the window destroyed) cancels, so
+  // paw-moving never sticks and the panel bodies never stay unclickable.
+  let active=null;
   function gesture(e,el,onStart,onMove,onEnd){
-    if(e.button>0) return; e.stopPropagation(); if(e.preventDefault) e.preventDefault();
-    const sx=e.clientX, sy=e.clientY; let live=false;
-    try{ el.setPointerCapture(e.pointerId); }catch(_){ /* no capture (a released pointer): moves still arrive over the element */ }
-    const move=ev=>{ if(!live){ if(Math.hypot(ev.clientX-sx,ev.clientY-sy)<DRAG_PX) return; live=true; root.classList.add('paw-moving'); onStart(sx,sy); }
+    if(e.button>0||active) return; e.stopPropagation(); if(e.preventDefault) e.preventDefault();
+    const sx=e.clientX, sy=e.clientY, id=e.pointerId; let live=false;
+    try{ el.setPointerCapture(id); }catch(_){ /* no capture (a released pointer): the window listeners below still end it */ }
+    const mine=ev=>ev.pointerId===id;
+    const move=ev=>{ if(!mine(ev)) return; if(!live){ if(Math.hypot(ev.clientX-sx,ev.clientY-sy)<DRAG_PX) return; live=true; root.classList.add('paw-moving'); onStart(sx,sy); }
       onMove(ev.clientX,ev.clientY); };
-    const off=()=>{ root.classList.remove('paw-moving'); el.removeEventListener('pointermove',move); el.removeEventListener('pointerup',up);
-      el.removeEventListener('pointercancel',cancel); document.removeEventListener('keydown',esc,true); };
-    const up=()=>{ off(); if(live) onEnd(false); }, cancel=()=>{ off(); if(live) onEnd(true); };
-    const esc=ev=>{ if(ev.key==='Escape'){ ev.stopPropagation(); cancel(); } };
-    el.addEventListener('pointermove',move); el.addEventListener('pointerup',up); el.addEventListener('pointercancel',cancel);
-    document.addEventListener('keydown',esc,true);
+    const L2=[[el,'pointermove',move],[window,'pointerup',ev=>{ if(mine(ev)) end(false); }],[window,'pointercancel',ev=>{ if(mine(ev)) end(true); }],
+      [el,'lostpointercapture',ev=>{ if(mine(ev)) end(true); }],[window,'blur',ev=>{ if(ev.target===window) end(true); }],
+      [document,'keydown',ev=>{ if(ev.key==='Escape'){ ev.stopPropagation(); end(true); } }]];
+    function end(cancelled){ if(active!==g) return; active=null; root.classList.remove('paw-moving');
+      L2.forEach(([t,n,f])=>t.removeEventListener(n,f,true)); if(live) onEnd(cancelled); }
+    const g={el,end}; active=g; L2.forEach(([t,n,f])=>t.addEventListener(n,f,true));
   }
   function onBarDown(w,e){
     if(e.target.closest&&e.target.closest('.paw-btn')) return;
@@ -202,7 +214,7 @@ html.paw-pb>body>:is(.pan-fs,.pac-fs){margin-bottom:var(--paw-b)}
       render(); save(); });
   }
   function onHandleDown(w,e,d){
-    const r0=Object.assign({},w.cur), sx=e.clientX, sy=e.clientY;
+    const r0=Object.assign({},w.cur), sx=e.clientX, sy=e.clientY, before=JSON.stringify(w.s);
     gesture(e,e.currentTarget,()=>{},(x,y)=>{ const v=vp(), s=w.s, dx=x-sx, dy=y-sy;
       if(s.mode==='dock'){ const k=(s.where==='tr'||s.where==='br')?'right':s.where;
         s.size[k]=clampSize(k,{right:(v.w-x)/v.w,left:x/v.w,top:y/v.h,bottom:(v.h-y)/v.h}[k]); }
@@ -212,12 +224,18 @@ html.paw-pb>body>:is(.pan-fs,.pac-fs){margin-bottom:var(--paw-b)}
         if(d.includes('w')){ r.w=Math.max(MIN_W,Math.min(r0.w-dx,r0.x+r0.w)); r.x=r0.x+r0.w-r.w; }
         if(d.includes('n')){ r.h=Math.max(MIN_H,Math.min(r0.h-dy,r0.y+r0.h)); r.y=r0.y+r0.h-r.h; }
         setRect(w,r); }
-      render(); },()=>{ w.touched=true; save(); });
+      render(); },cancelled=>{ if(cancelled){ Object.assign(w.s,JSON.parse(before)); render(); return; } w.touched=true; save(); });
   }
   function onKey(w,e){
     if(e.key==='Escape'&&w.s.max){ w.api.restore(); e.preventDefault(); return; }
     const d={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[e.key]; if(!d||!e.altKey) return;
-    e.preventDefault(); const c=Object.assign({},w.cur); w.s.mode='float'; w.s.max=false;
+    e.preventDefault();
+    // Docked: Alt+arrow docks to that edge, Alt+Shift+arrow grows/shrinks the dock — it stays docked.
+    if(w.s.mode==='dock'&&!w.s.max){ const edge={'-1,0':'left','1,0':'right','0,-1':'top','0,1':'bottom'}[d.join()];
+      if(!e.shiftKey){ w.api.dock(edge); return; }
+      const k=(w.s.where==='tr'||w.s.where==='br')?'right':w.s.where, v=vp(), grow={right:-d[0],left:d[0],top:d[1],bottom:-d[1]}[k];
+      w.s.size[k]=clampSize(k,w.s.size[k]+grow*STEP/((k==='top'||k==='bottom')?v.h:v.w)); w.touched=true; render(); save(); return; }
+    const c=Object.assign({},w.cur); w.s.mode='float'; w.s.max=false;
     if(e.shiftKey){ c.w+=d[0]*STEP; c.h+=d[1]*STEP; } else { c.x+=d[0]*STEP; c.y+=d[1]*STEP; }
     setRect(w,c); w.touched=true; render(); save();
   }
@@ -257,7 +275,7 @@ html.paw-pb>body>:is(.pan-fs,.pac-fs){margin-bottom:var(--paw-b)}
       float:(r)=>{ s.mode='float'; s.max=false; if(r) setRect(w,r); w.touched=true; render(); save(); },
       setTitle:(t)=>{ w.titleEl.textContent=String(t||''); w.el.setAttribute('aria-label',w.titleEl.textContent); render(); },
       isVisible:()=>s.open&&!s.min, state:()=>JSON.parse(JSON.stringify(s)), rect:()=>w.cur&&Object.assign({},w.cur),
-      destroy:()=>{ const i=wins.indexOf(w); if(i>=0) wins.splice(i,1); if(w.el.parentNode) w.el.parentNode.removeChild(w.el); render(); } };
+      destroy:()=>{ if(active&&w.el.contains(active.el)) active.end(true); const i=wins.indexOf(w); if(i>=0) wins.splice(i,1); if(w.el.parentNode) w.el.parentNode.removeChild(w.el); render(); } };
     wins.push(w); apply(w); load(); render();
     return w.api;
   }
