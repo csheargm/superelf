@@ -133,11 +133,12 @@ jobs:
         # 2026-11-25: EVERY OS +2 (ubuntu 243, windows 329): demo-app-edit-e2e (desktop + iPhone), skipped on CI by PA_E2E_SKIP.
         # 2026-11-25: EVERY OS +8 (ubuntu 251, windows 337): app-back-e2e (4 cases x desktop + iPhone), skipped on CI by PA_E2E_SKIP.
         # 2026-11-25: EVERY OS +11 (ubuntu 262, windows 348): panel-window-e2e (9) and panel-window-review-e2e (2), skipped on CI by PA_E2E_SKIP.
+        # 2026-11-25: EVERY OS +2 (ubuntu 264, windows 350): publish-copy-back-e2e (phone + iPad), skipped on CI by PA_E2E_SKIP.
         include:
           - os: ubuntu-latest
-            max_skipped: 262
+            max_skipped: 264
           - os: windows-latest
-            max_skipped: 348
+            max_skipped: 350
     env:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED
