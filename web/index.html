@@ -551,6 +551,7 @@ async function openConvo(id){
 // disagree: the drawer's Home was a plain <b> that did nothing at all, and ← Home closed the
 // app and opened the DRAWER instead of going home.
 function goHome(){
+  if(typeof closeAllPops==='function') closeAllPops();   // web/popover.js; absent in the extracted-block tests
   if(typeof PAAppEdit!=='undefined') PAAppEdit.close();   // the edit panel belongs to the app it was opened on (web/app-edit.js); absent in the extracted-block tests
   $('#frame').style.display='none'; $('#frame').classList.remove('peek','barin','ownbar'); barHide(); shellBehindApp(false);
   appFrameLeave();   // the app is held while it makes its last save, then removed (web/app-frame.js)
@@ -564,22 +565,8 @@ $('#convos').onclick=(e)=>{
   if(menuId){ e.stopPropagation(); convoMenu(menuId, e.target.closest('.convo'), e.target.closest('[data-menu]')); return; }
   const id=e.target.closest('.convo')?.dataset.id; if(id) openConvo(id);
 };
-// Shared ⋯-popover close (chats + apps, R3). Closes ONLY on an OUTSIDE pointerdown — a
-// pointerdown ON a menu item must NOT remove the menu before that item's click fires, or
-// the action never runs (this was breaking app move/share/delete AND chat rename/delete).
-let _menuOutside=null;
-function closeMenuPop(){ document.querySelectorAll('.cmenu-pop:not(#hmenu)').forEach((m)=>m.remove()); if(_menuOutside){ document.removeEventListener('click',_menuOutside,true); _menuOutside=null; } }
-function armMenuPop(){
-  // Dismiss on a click OUTSIDE the popup, handled in the CAPTURE phase and stopped there so
-  // it never reaches what's underneath (e.g. the drawer backdrop's close-on-click). So the
-  // FIRST outside click JUST closes the popup and the drawer stays open. A click INSIDE the
-  // popup is let through to run its own item handler.
-  _menuOutside=(ev)=>{ if(ev.target.closest('.cmenu-pop')) return; ev.stopPropagation(); ev.preventDefault(); closeMenuPop(); };
-  setTimeout(()=>{ if(_menuOutside) document.addEventListener('click',_menuOutside,true); },0);
-}
+/* PA_POPOVER_JS */   /* closeMenuPop / armMenuPop / flipMenuUp: the shared ⋯-popover close (web/popover.js, R3) */
 function closeConvoMenu(){ closeMenuPop(); }
-// A menu that would run off the bottom opens ABOVE its ⋯ instead (its rows are 44px tall now).
-function flipMenuUp(m,r){ const h=m.getBoundingClientRect().height; if(r.bottom+4+h>innerHeight-6) m.style.top=Math.max(6,r.top-4-h)+'px'; }
 function convoMenu(id, convoEl, anchor){
   closeConvoMenu();
   const m=document.createElement('div'); m.id='convoMenu'; m.className='cmenu-pop';
@@ -590,7 +577,7 @@ function convoMenu(id, convoEl, anchor){
     if(a==='rename') startRename(convoEl, id);
     else if(a==='delete'){ if(confirm('Delete this chat?')){ await api('/api/convos/'+encodeURIComponent(id),{method:'DELETE'}); if(id===convoId) newConvo(); else loadConvos(); } }
   };
-  armMenuPop();
+  armMenuPop(anchor);
 }
 function startRename(convoEl, id){
   const tEl=convoEl.querySelector('.t'); const cur=tEl.textContent;
@@ -990,7 +977,8 @@ const BAR_IDLE_MS=2500;
 // later press inside the bar start a 5s countdown — including on a bar that was meant to stay.
 let _barIdle=null;
 function barShow(){ clearTimeout(_barIdle); _barIdle=null; $('#frame').classList.add('barin'); }
-function barHide(){ clearTimeout(_barIdle); _barIdle=null; $('#frame').classList.remove('barin'); }
+// The bar takes its menus with it (owner 2026-11-24): a ⋯ menu left over the app with no bar has no visible close.
+function barHide(){ clearTimeout(_barIdle); _barIdle=null; $('#frame').classList.remove('barin'); if(typeof closeBarMenus==='function') closeBarMenus(); }
 // Shown ON REQUEST, rather than on open, it has to leave by itself as well: on touch there is no
 // pointerleave, and a bar that needed a second tap to dismiss would cost more than it saves.
 // The app's OWN bar (PAAppBar) dropped this timer (ADR 0034); this one keeps it: the shell sees no tap inside the
@@ -999,7 +987,9 @@ function barHide(){ clearTimeout(_barIdle); _barIdle=null; $('#frame').classList
 // TOUCH ONLY (owner F2-06, as in PAAppBar): shown by a mouse / trackpad, it stays until the pointer goes into
 // the app (the frame's focus, below) — a mouse user must be able to reach ⋯. A pen or a finger keeps the clock.
 let _barByMouse=false;
-function barShowTemporarily(){ barShow(); if(!_barByMouse) _barIdle=setTimeout(barHide,BAR_IDLE_MS); }
+// While one of its menus is open the bar never leaves on its clock: the clock restarts instead.
+function barIdleEnd(){ if(typeof barMenuOpen==='function'&&barMenuOpen()) _barIdle=setTimeout(barIdleEnd,BAR_IDLE_MS); else barHide(); }
+function barShowTemporarily(){ barShow(); if(!_barByMouse) _barIdle=setTimeout(barIdleEnd,BAR_IDLE_MS); }
 function frameOpen(){ return $('#frame').classList.contains('peek'); }
 $('#barpeek').addEventListener('pointerdown',(e)=>{ _barByMouse=e.pointerType==='mouse'; });
 $('#frame').querySelector('.bar').addEventListener('pointerover',(e)=>{ if(e.pointerType==='mouse'&&_barIdle){ _barByMouse=true; barShow(); } });   // a mouse on the bar holds it
@@ -1030,7 +1020,7 @@ window.addEventListener('message',(e)=>{
 });
 
 /* PA_APP_FRAME_JS */
-function openApp(uid,slug,title){ if(uid===UID) promoteApp(slug); if(typeof PAAppEdit!=='undefined'){ PAAppEdit.close(); PAAppEdit.syncBar(uid); } appFrameLeave(); $('#ftitle').textContent=title||slug; refreshChatModels(); PASW.frameLoad(uid,slug); $('#frame').classList.remove('ownbar'); $('#frame').classList.add('peek'); $('#frame').style.display='flex'; closeDrawer(); shellBehindApp(true); }
+function openApp(uid,slug,title){ closeAllPops(); if(uid===UID) promoteApp(slug); if(typeof PAAppEdit!=='undefined'){ PAAppEdit.close(); PAAppEdit.syncBar(uid); } appFrameLeave(); $('#ftitle').textContent=title||slug; refreshChatModels(); PASW.frameLoad(uid,slug); $('#frame').classList.remove('ownbar'); $('#frame').classList.add('peek'); $('#frame').style.display='flex'; closeDrawer(); shellBehindApp(true); }
 /* ══ SHELL_BEHIND_APP_BEGIN — cut out and run by runShell() in test/helpers-shell-dom.mjs, for every suite that calls it ══ */
 // TODO(R4): this file is far over the 300-line budget. Split seam: the app-frame section (bar peek,
 // openApp, this block) moves into web/app-frame.js, the inlined shell part that already holds
@@ -1237,7 +1227,7 @@ function appMenu(name, anchor){
     else if(a==='delete'){ if(confirm(`Delete "${name}"?`)){ await api('/api/apps/'+encodeURIComponent(name),{method:'DELETE'}); loadApps(); } }
   };
   if(ROLE==='owner'){ PAAppEdit.armTip(); PAPublish.armTip(name); }
-  armMenuPop();
+  armMenuPop(anchor);
 }
 $('#dApps').onclick=async(e)=>{
   const menu=e.target.closest('[data-appmenu]');

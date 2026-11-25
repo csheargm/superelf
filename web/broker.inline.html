@@ -34,6 +34,9 @@ var PA = PA || (function () {
       parent.postMessage(Object.assign({ pa: 'req', id, kind }, data || {}), '*');
     });
   }
+  // Every tap in the app tells the shell, so a shell ⋯ menu over the app closes (web/popover.js): a
+  // default-prevented touch (the Journal pad) moves no focus the shell could see. Data-free, passive.
+  addEventListener('pointerdown', () => { try { parent.postMessage({ pa: 'shell', type: 'tap' }, '*'); } catch (_) { /* no parent: nothing to close */ } }, { capture: true, passive: true });
   return { req };
 })();
 </script>
