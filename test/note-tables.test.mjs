@@ -91,7 +91,7 @@ test('printing draws the cells, not just the words in them', () => {
 });
 
 test('the table popover joins the one-at-a-time set', () => {
-  assert.match(E, /for\(const sel of \['\.pan-stylepop','\.pan-tablepop'\]\)/, 'closePops closes it');
+  assert.match(E, /for\(const sel of \['\.pan-stylepop','\.pan-tablepop'[^\]]*\]\)/, 'closePops closes it');   // the phone ⋯ menu (.pan-ovf) joined the set too
   const guard = /e\.target\.closest\('([^']+)'\)\) return;/.exec(E);
   assert.match(guard[1], /\.pan-ftable/, 'and its button is exempt from the outside-tap close');
 });

@@ -194,6 +194,10 @@
 .pac-vchip.pend{cursor:default;border-style:dashed}
 .pac-mmenu{position:absolute;left:12px;bottom:var(--pac-pill);background:var(--card,#fff);border:1px solid var(--line,#e6e6e6);border-radius:12px;box-shadow:0 6px 22px rgba(0,0,0,.28);padding:5px;z-index:9;min-width:180px}
 .pac-mg{font-size:10px;color:var(--muted,#888);padding:6px 10px 2px;text-transform:uppercase;letter-spacing:.05em}
+.pac-confirm:disabled{opacity:.45!important;cursor:default!important}   /* a spent 改 · Apply chip (retireConfirms); !important: the chip's inline style */
+/* A finger (pointer:coarse): the chat / notes list reads at 13px meta and 14px previews (phone audit #16). The
+   44px hit areas and the composer chips' 14px come from web/touch-base.css, which every page carries. */
+@media (pointer:coarse){ .pac-lday,.pac-lchip,.pac-ltime,.pac-lai,.pac-lsmsg,.pac-mg{font-size:13px} .pac-lprev{font-size:14px} }
 .pac-mi{display:block;width:100%;text-align:left;font:inherit;font-size:14px;padding:8px 10px;border:none;background:none;color:var(--text,#111);cursor:pointer;border-radius:7px}
 .pac-mi.on{background:color-mix(in srgb,var(--accent,#0a7a5a) 15%,transparent);font-weight:600}
 .pac-mopt{display:block;width:100%;text-align:left;font:inherit;font-size:15px;padding:12px 14px;border:none;background:none;color:var(--text,#111);cursor:pointer;border-radius:8px}
@@ -926,7 +930,11 @@
     function addChangeApp(bubble,ev){ const b=document.createElement('button'); b.type='button'; b.className='pac-change-app';
       b.textContent=String(ev.label||'改这个应用 · Change this app'); b.style.cssText='display:block;align-self:flex-start;max-width:82%;margin:6px 0 2px;padding:6px 12px;border-radius:16px;border:1px solid currentColor;background:transparent;color:inherit;font:inherit;cursor:pointer';
       // 改 · Apply (ADR 0042): the server minted the message; the tap sends it as the next turn, once.
-      b.onclick=ev.type==='app-change-confirm'?()=>{ b.disabled=true; send(String(ev.message)).then((ok)=>{ if(!ok) b.disabled=false; }); }:()=>parent.postMessage({pa:'shell',type:'change-app',request:String(ev.request||'').slice(0,2000)},'*'); bubble.after(b); }
+      if(ev.type==='app-change-confirm') b.classList.add('pac-confirm');
+      b.onclick=ev.type==='app-change-confirm'?()=>{ send(String(ev.message)).then((ok)=>{ if(!ok) b.disabled=false; }); }:()=>parent.postMessage({pa:'shell',type:'change-app',request:String(ev.request||'').slice(0,2000)},'*'); bubble.after(b); }
+    // Once any later turn is sent — the chip's own tap or a typed "yes" — an 改 · Apply chip is spent: really
+    // disabled (a second tap would re-send the confirm) and visibly so (.pac-confirm:disabled in #pac-style).
+    function retireConfirms(){ el.log.querySelectorAll('.pac-confirm').forEach((c)=>{ c.disabled=true; }); }
     function addActions(bubble,kind,rawText,prompt,scopeKey){   // scopeKey: the thread this bubble was rendered in (send() passes its snapshot); default = the thread shown now
       if(kind==='ai') rawText=shownAi(rawText);
       const bar=document.createElement('div'); bar.className='pac-acts '+kind;
@@ -1120,6 +1128,7 @@
       // the user still has their work — the incident's shape was that they did not.
       const bytes=pacChatBytes(msg, cid||null, attRefs, lbl, sys);
       if(bytes>PAC_LIMITS.chat){ addMsg('status', pacTooLargeText('Message', bytes, PAC_LIMITS.chat)); updateScroll(); return false; }   // too large: reported in the log AND to the caller
+      retireConfirms();   // a new turn (a typed "yes" too) answers every 改 · Apply above it — only once it passed pre-flight (GPT review)
       sending=true; el.go.disabled=true;
       const later=(typed!==null&&el.inp.value!==typed)?el.inp.value:'';   // typed while a host's beforeSend ran: kept as the next draft
       el.inp.value=''; el.inp.value=later; autosize(); const shown=shownMe(shownUserText(q)); const um=addMsg('me',shown,mine); if(!ext) atts=[]; renderChips();
@@ -1472,7 +1481,22 @@
       // Re-measure right after the overlay becomes visible (offsetHeight forces the layout that
       // makes the reading real), or the log keeps the un-measured fallback for the session.
       let chatApi=null;
-      const show=()=>{ ov.classList.add('on'); if(chatApi) chatApi.remeasure(); }, hide=()=>ov.classList.remove('on');
+      // THE KEYBOARD (phone audit): iOS keeps the layout viewport when the keyboard opens, so this inset:0
+      // overlay's composer would sit under it. While shown, the overlay follows visualViewport's visible box.
+      // Known limit: an emulator has no keyboard, so this is not proven on a real iPhone.
+      // TODO(R4 seam): fullscreen()'s overlay host (this, show/hide) → its own part when this file is split.
+      const vv=(typeof window!=='undefined'&&window.visualViewport)||null;
+      const fitKb=()=>{ if(!vv) return; const kb=ov.classList.contains('on')&&innerHeight-vv.height-vv.offsetTop>1;
+        ov.style.top=kb?vv.offsetTop+'px':''; ov.style.height=kb?vv.height+'px':''; ov.style.bottom=kb?'auto':''; };
+      if(vv){ vv.addEventListener('resize',fitKb); vv.addEventListener('scroll',fitKb); }
+      // FOCUS (GPT review): the page under the overlay is made inert while it is up, so Tab cannot reach the
+      // hidden note; closing hands focus back to whatever opened it.
+      let back=null, inerted=[];
+      const show=()=>{ if(!ov.classList.contains('on')){ back=document.activeElement;
+          inerted=[...document.body.children].filter(n=>n!==ov&&!n.inert&&!/^(SCRIPT|STYLE)$/.test(n.tagName)&&!n.matches('.pac-drawerhost,.pac-lb,.pac-fs,#pa-notice')); inerted.forEach(n=>{ n.inert=true; }); }
+        ov.classList.add('on'); fitKb(); if(chatApi) chatApi.remeasure(); },
+        hide=()=>{ const was=ov.classList.contains('on'); ov.classList.remove('on'); fitKb();
+          if(was){ inerted.forEach(n=>{ n.inert=false; }); inerted=[]; if(back&&back.isConnected&&typeof back.focus==='function') back.focus(); back=null; } };
       // onShow: reveal this overlay + let the app dismiss any covering surface (e.g. a draw pad)
       const api=Chat(host, Object.assign({}, o, { onShow:()=>{ show(); o.onShow&&o.onShow(); },
         onClose:()=>{ hide(); o.onClose&&o.onClose(); } }));

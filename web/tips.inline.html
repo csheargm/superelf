@@ -20,7 +20,9 @@
          priority:true  goes ahead of every non-priority tip (owner 2026-11-13: "Home moved" must not wait
                         behind older unseen tips), and replaces one already on screen, unseen, so it shows THIS
                         open. Default false: registration order, as before.
-         dismissOnUse:true  the first press or key anywhere on the page also dismisses it for good (F2-07:
+           pen:true       a Pencil tip: waits until this page has seen a pen pointer (pointerType 'pen'), so a phone or
+                        a mouse never shows it (phone audit #3).
+       dismissOnUse:true  the first press or key anywhere on the page also dismisses it for good (F2-07:
                         the app-bar tip explains a bar that then moves; it must not outstay the first tap).
        PATips.check()   re-look now (a feature that just opened a sheet or dialog calls it)
        PATips.reset()   forget tipsSeen on the account (Settings: Show tips again · 重新显示提示)
@@ -45,11 +47,16 @@
   const CLOSE='关闭提示 · Dismiss tip';
   const LOCAL_KEY='pa_tips_seen';             // localStorage + sessionStorage fallback (per device / per tab)
   const CTRL_SEL='button,a[href],input,select,textarea,summary,[role=button]';
+  // Also kept clear: a page's title and header bar (phone audit #2: the tip sat on every app's title and on the
+  // app-chat panel's ☰ row). Not controls, so a tip may still cover them when nothing else is free.
+  // [data-tip-clear]: any other block a page wants left readable (the home greeting).
+  const HEAD_SEL='h1,header,[role=banner],nav,[data-tip-clear]';
   const regs=[];                              // [{id, anchor, text, when}] in registration order
   const MAX_W_PX=320;                         // tip width cap, also bounded by the viewport
   // The control's whole BAR: a tip clears it, so it never covers the bar's other controls or a wrapped second row (F3-06).
   const BAR_SEL='.pan-top,.pac-dhead,.pac-lsearch,.paab-bar,.cmenu-pop,[data-tip-bar]';   // .cmenu-pop: a shell pop-up menu, so a tip never covers its other items
   const muted=new Set();
+  let penSeen=false;
   let seen=null, failed=false, loading=null, cur=null, shown=false, waiting=false, chain=Promise.resolve();
   const prefs=()=>window.PAAppPrefs;
   // The account store: the host's (the shell) or PAAppPrefs (an app page). {read()→{ok,list}, write(list)→{ok}}.
@@ -101,6 +108,7 @@
     for(const t of regs){
       if(seen.has(t.id)||muted.has(t.id)) continue;
       if(t.when&&!t.when()) continue;
+      if(t.pen&&!penSeen) continue;
       const el=resolve(t.anchor); if(el&&onScreen(el)) return {t,el};
     }
     return null;
@@ -167,10 +175,13 @@
   // The visible controls a tip must not cover (its own anchor included). Bounded: the scan stops at CTRL_MAX.
   const CTRL_MAX=400;
   function controls(tip,el){
-    const out=[]; let list=[];
-    try{ list=document.querySelectorAll?document.querySelectorAll(CTRL_SEL):[]; }catch(_){ list=[]; }   // a stub document: nothing to avoid
-    for(const c of list){ if(out.length>=CTRL_MAX) break; if(tip.contains&&tip.contains(c)) continue;
-      const r=c.getBoundingClientRect&&c.getBoundingClientRect(); if(r&&r.width>0&&r.height>0&&r.bottom>0&&r.right>0&&r.top<(window.innerHeight||0)&&r.left<(window.innerWidth||0)&&!layerOff(c)) out.push(r); }   // on screen only: off-screen rows must not use up the budget
+    const out=[];
+    const q=sel=>{ try{ return document.querySelectorAll?[...document.querySelectorAll(sel)]:[]; }catch(_){ return []; } };   // a stub document: nothing to avoid
+    const H=window.innerHeight||0, heads=q(HEAD_SEL);   // headers first, so the CTRL_MAX budget never drops them
+    for(const c of [...heads,...q(CTRL_SEL)]){ if(out.length>=CTRL_MAX) break; if(tip.contains&&tip.contains(c)) continue;
+      const r=c.getBoundingClientRect&&c.getBoundingClientRect(); if(!(r&&r.width>0&&r.height>0&&r.bottom>0&&r.right>0&&r.top<H&&r.left<(window.innerWidth||0)&&!layerOff(c))) continue;   // on screen only: off-screen rows must not use up the budget
+      if(r.height>H/2&&heads.includes(c)) continue;   // a <header> wrapping the whole page is not a bar
+      out.push(r); }
     if(el&&!out.length) out.push(el.getBoundingClientRect());
     return out;
   }
@@ -184,7 +195,7 @@
     const txt=document.createElement('span'); txt.textContent=t.text;
     const x=document.createElement('button'); x.className='pat-x'; x.type='button'; x.textContent='✕'; x.setAttribute('aria-label',CLOSE);
     tip.appendChild(txt); tip.appendChild(x); hostOf(el).appendChild(tip);
-    place(tip,el); cur={t,el,tip,ro:observe(el)}; shown=true; unwatch();
+    place(tip,el); cur={t,el,tip,ro:observe(el)}; cur.mo=layerWatch(); shown=true; unwatch();
     tip.addEventListener('click',e=>{ if(e&&e.stopPropagation) e.stopPropagation(); dismiss(); });
     x.addEventListener('pointerdown',()=>dismiss());   // a host's capture click handler (a pop-up menu's outside-close) may swallow the click
     later(()=>tip.classList.add('on'));
@@ -203,7 +214,7 @@
   function register(o){
     if(!o||typeof o.id!=='string'||!o.id||typeof o.text!=='string'||!o.text||!o.anchor) throw new Error('PATips.register: id, text and anchor required');
     if(!regs.some(r=>r.id===o.id)){
-      const t={id:o.id,anchor:o.anchor,text:o.text,when:typeof o.when==='function'?o.when:null,priority:o.priority===true,dismissOnUse:o.dismissOnUse===true};
+      const t={id:o.id,anchor:o.anchor,text:o.text,when:typeof o.when==='function'?o.when:null,priority:o.priority===true,pen:o.pen===true,dismissOnUse:o.dismissOnUse===true};
       const at=t.priority?regs.findIndex(r=>!r.priority):-1;   // after earlier priority tips, before the rest
       if(at<0) regs.push(t); else regs.splice(at,0,t);
     }
@@ -247,7 +258,14 @@
     try{ const ro=new RO(onScroll); ro.observe(el); if(document.documentElement) ro.observe(document.documentElement); return ro; }
     catch(_){ return null; }   // same fallback as above: a refused observe leaves the other re-place paths (R5 c)
   }
-  function drop(){ if(cur&&cur.ro) cur.ro.disconnect(); cur=null; }
+  // A layer turning [inert]/[hidden] fires no scroll, click or resize: the shell opening an app over the home made the
+  // header inert and the home ⋯ tip stayed on top of every app's title bar (phone audit #2). Watch exactly those two.
+  function layerWatch(){
+    const MO=window.MutationObserver; if(typeof MO!=='function'||!document.documentElement) return null;
+    try{ const mo=new MO(onScroll); mo.observe(document.documentElement,{subtree:true,attributes:true,attributeFilter:['inert','hidden']}); return mo; }
+    catch(_){ return null; }   // old engine: the click/scroll/resize re-checks remain (R5 c)
+  }
+  function drop(){ if(cur&&cur.ro) cur.ro.disconnect(); if(cur&&cur.mo) cur.mo.disconnect(); cur=null; }
   if(typeof document.addEventListener==='function'){
     document.addEventListener('transitionend',onScroll,true);   // an ancestor's slide finished: re-place
     document.addEventListener('click',()=>{ follow(); later(check); },true);
@@ -261,7 +279,7 @@
     document.addEventListener('keydown',used,true);
     // First in line: a page that stops Escape below the window still closes the tip.
     window.addEventListener('keydown',e=>{ if(cur&&e&&e.key==='Escape') dismiss(); if(e&&e.key==='Escape') up(); },true);
-    document.addEventListener('pointerdown',()=>up(),true);   // in an app frame: the shell's tip closes too (web/tips-store.js)
+    document.addEventListener('pointerdown',e=>{ up(); if(e&&e.pointerType==='pen'&&!penSeen){ penSeen=true; later(check); } },true);   // in an app frame: the shell's tip closes too (web/tips-store.js)
   }
   window.addEventListener('resize',()=>{ if(cur) follow(); else later(check); });
   // hide(): off screen, NOT stored (shows on a later open) — for a signal that may not be the user's own act.

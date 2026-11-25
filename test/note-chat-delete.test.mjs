@@ -120,7 +120,7 @@ function appHandler(reply) {
   const log = [];
   const entry = { id: 'n1', chat: 'c9' };
   const fn = new Function(
-    'entryById', 'PAChat', 'paNotice', 'IDX_PATH', 'askData', 'railChat', 'curId', 'syncAsk', 'syncDrawer',
+    'entryById', 'PAChat', 'paNotice', 'IDX_PATH', 'askData', 'railChat', 'fsChat', 'curId', 'syncAsk', 'syncDrawer',
     `return ({ ${src[0].replace(/,$/, '')} }).onDeleteAi;`)(
     () => entry,
     { deleteConvo: async () => { log.push('server delete'); return reply; } },
@@ -128,6 +128,7 @@ function appHandler(reply) {
     'idx',
     { unbindConvo: () => { log.push('unbind'); delete entry.chat; } },
     { newChat: () => log.push('reset surface') },
+    null,   // fsChat: no full-screen chat made (a wide screen)
     'n1',
     () => log.push('syncAsk'),
     () => log.push('syncDrawer'),

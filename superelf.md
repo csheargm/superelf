@@ -316,7 +316,7 @@ They are mutually exclusive — an app receiving both would scale twice (1.5 ren
 Do NOT add your own `fontScale` listener; there is one setter and it is already there.
 
 ## App build rules — sent with every agent turn
-Each of these broke a generated app (e2e 2026-11-13). The node flags a `<form>` tag.
+Each broke a generated app once.
 1. **The app's data file goes through PAStore** (below). A missing file answers
    `{ok:false, code:'not-found'}` — hyphen — and that alone means FIRST RUN: start empty, save.
    Never test `'not_found'`: no app read answers it, so every save is refused.
@@ -326,6 +326,7 @@ Each of these broke a generated app (e2e 2026-11-13). The node flags a `<form>` 
    confirm its handler exists, is wired to its control, and saves via PAStore if it must persist.
    Where feasible run a node smoke check (`node --check` on the script, plus the pure logic on
    one real input). Report what you verified per requirement and one thing the user should try.
+4. **Phone first:** works 390px wide, no sideways scroll (no fixed width over 390px); checked.
 
 ## Broker API — the ONLY way out of the sandbox
 Apps are sandboxed: opaque origin, `connect-src 'none'`, no token. `fetch`, XHR, CDNs and

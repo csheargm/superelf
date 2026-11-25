@@ -287,7 +287,8 @@ test('anchor rendered after register: the observers re-check, the tip shows with
     MO.fire(); MO.fire(); for (let i = 0; i < 4; i++) { await flush(); raf.run(); }
     if (src === NO_WATCH) { assert.equal(p.T.current(), null, 'R14: without the observers it waits for a click'); continue; }
     assert.equal(p.T.current(), 'late', 'shown with no click');
-    assert.ok(MO.all.length === 1 && [...MO.all, ...IO.all].every((o) => !o.els.length), 'one body observer, all disconnected after show');
+    const pend = MO.all.filter((o) => !o.els.includes(p.doc.documentElement));   // the shown tip's own [inert] watcher (test/tips-phone.test.mjs) aside. TODO(R4): split this file by concern (placement / store / observers)
+    assert.ok(pend.length === 1 && MO.all.length === 2 && [...pend, ...IO.all].every((o) => !o.els.length), 'one body observer, all disconnected after show');
   }
 });
 

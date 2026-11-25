@@ -763,3 +763,8 @@ Without it they now FAIL (R14), not pass as `# pass 0 / # fail 0`. To run them:
 
 ## App chat self-test round 2 · known limits (GPT review r3, cap reached)
 - The kept lane-routing status (web.mjs laneStatus, `keep: true`) stays in the log even when that lane returns blank and the one retry falls back to the agent lane; the fallback's own notice is transient. Seam: emit the fallback notice with `keep: true` too, or retract the first one.
+
+## Phone-friendly · known limits (GPT review)
+- The full-screen chat (web/chat-ui.inline.html fitKb) and longevity's chat box read the app iframe's own visualViewport. If iOS shrinks only the shell's visual viewport when the keyboard opens, the iframe sees no change and the composer can stay under the keyboard. Seam: the shell posts its visualViewport box to the app frame, and fitKb uses that. Needs a real iPhone with Web Inspector to prove (the keyboard problem was already unsolved after 5 attempts).
+- WebKit does not focus a tapped button, so closing the full-screen chat cannot hand focus back to Ask AI after a tap (only after keyboard use).
+- lib/app-phone-check.mjs strips HTML comments with a regex: a literal "<style>" inside a script string can keep a later commented-out block in the scan, so its width is flagged although the browser never applies it (GPT review r3, cap reached). Seam: drop <script> bodies before the comment pass.

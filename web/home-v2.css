@@ -118,7 +118,9 @@ body.home-on #emptyState{ flex:1 1 auto; flex-direction:column; align-items:cent
   #emptyState #eApps{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:18px 4px; }
   .ecard.dk{ width:auto; min-width:0; }
   .dk-ic{ width:50px; height:50px; border-radius:16px; }
-  .ecard.dk > b{ font-size:12px; white-space:normal; overflow-wrap:anywhere; } .ecard.dk > b small{ font-size:10px; }
+  /* Labels 13px, one line each, "…" at the end — never a mid-word wrap like "owner-allerg-y" (audit #12). */
+  .ecard.dk > b{ font-size:13px; max-width:100%; } .ecard.dk > b,.ecard.dk > b small{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ecard.dk > b small{ font-size:13px; }
   #emptyState .grid-sep{ grid-column:1 / -1; }
 }
 @media (prefers-reduced-motion:reduce){ header .mark .spark,header .mark .blink{ animation:none !important; } .st{ transition:none; } .st:active{ transform:none; } }
