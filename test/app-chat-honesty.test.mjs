@@ -92,5 +92,7 @@ test('the button and the words that name it come from ONE decision', () => {
   assert.ok(pointsOnly.offer, 'even when the wording was missed, a reply that names the panel carries it');
   const member = honestReply({ reply: said, message: 'Can you modify this app?', priorUserTexts: [], inApp: true, canEdit: false });
   assert.deepEqual([member.offer, member.note], [null, NO_BUTTON_NOTE], 'no button → a note saying so');
+  assert.ok(honestReply({ reply: 'Tap Change this app under my reply.', message: 'hello', priorUserTexts: [], inApp: true, canEdit: true }).offer, 'English half alone');
+  assert.equal(honestReply({ reply: 'Tap Change this app under my reply.', message: 'hello', priorUserTexts: [], inApp: true, canEdit: false }).note, NO_BUTTON_NOTE);
   for (const m of ['can you modify this app?', 'please edit the title', 'could you tweak the colours']) assert.equal(asksForChange(m), true, m);
 });

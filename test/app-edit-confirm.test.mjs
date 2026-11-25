@@ -213,7 +213,7 @@ import { isTypedConfirm, pendingConfirm, toolTalkReplacement, REOFFER_LINE, ASK_
 test('a short typed yes counts as the tap; anything more stays a normal turn (known limits)', () => {
   for (const t of ['yes', 'Yes!', 'ok', 'go ahead', 'do it', 'apply', 'yes please.', 'ok, do it', '好', '好的', '可以', '改吧', '确认', '好的，改吧', '嗯 好'])
     assert.equal(isTypedConfirm(t), true, t);
-  for (const t of ['no', '不好', '不要', 'yes but bigger', '好，再大一点', 'Yes, I want the size of the fonts to suit the iPhone', '是什么', '', 'okay '.repeat(10)])
+  for (const t of ['no', '不好', '不要', 'yes but bigger', '好，再大一点', 'Yes, I want the size of the fonts to suit the iPhone', '是什么', '', 'okay '.repeat(10), 'thanks', '谢谢', 'Apply?', '好吗？', 'please'])
     assert.equal(isTypedConfirm(t), false, t);
 });
 test('a typed yes applies the newest plan of THIS conversation only, once', () => {
@@ -228,8 +228,8 @@ test('a typed yes applies the newest plan of THIS conversation only, once', () =
     assert.equal(confirmEdit(yes('c1', 'make it bigger')).confirmed, false, 'a new request is not a yes');
     const e = confirmEdit(yes('c1'));
     assert.deepEqual([e.confirmed, e.plan], [true, 'make it red']);
-    assert.equal(pendingConfirm({ ...key, convo: 'c1' }).id !== undefined, true, 'the older plan is still there…');
-    assert.equal(pendingConfirm({ ...key, convo: 'c1' }).plan, 'old plan', '…but the applied one is gone (single use)');
+    assert.equal(pendingConfirm({ ...key, convo: 'c1' }), null, 'the revised-away plan went when the new one was minted; the applied one is gone (single use)');
+    assert.equal(confirmEdit(yes('c1')).confirmed, false, 'a second yes applies nothing');
     assert.equal(confirmEdit(appEditOf({ user: KID, body: { edit: 'todo', message: 'yes', convoId: 'c2' }, headers: {}, appsDir: path.join(w, 'apps'), members: true })).confirmed, false, 'another user');
   } finally { rmTemp(w); }
 });
