@@ -94,6 +94,7 @@ import { pageImageFile, IMG_BAD_PATH, IMG_NOT_FOUND } from './lib/note-page-imag
 import { buildFollowup, followupDeps } from './lib/summary-followup.mjs';
 import { writerClaudeBase, writerLaneMs } from './lib/research-writer.mjs';
 import { snapshotApps, appBuildWarnings } from './lib/app-postcheck.mjs';
+import { editsLeft } from './lib/app-versions.mjs';
 import { earlierShotsLine, appEditOf, appEditable, confirmEdit, refuseIfEditBusy, editBusyBody, dropAppHistory, editSystemPrompt, beginAppEdit, finishAppEdit, undoAppEdit, VERSIONS_DIR } from './lib/app-edit.mjs';
 import { APP_CHAT_EVIDENCE_RULE, appAboutContext, editHistoryContext } from './lib/app-history.mjs';
 import { noChangeRule, finishHonest, editUnchangedNote } from './lib/app-chat-honesty.mjs';
@@ -1942,12 +1943,19 @@ const server = http.createServer(async (req, res) => {
     if (await handlePublishRoute(req, res, p, { user, cfg, root: ROOT, slugOk, ownAppDir, readBody: (r) => readBody(r, BODY_LIMITS.control), send, audit, demo: demoOn(cfg) })) return;   // owner-only Publish (docs/adr/0039)
     // 改这个应用 · Change this app (lib/app-edit.mjs, ADR 0040): the panel page and its 撤销 · Undo. Owner only in Phase 1.
     if (req.method === 'GET' && p === '/api/app-edit/panel') {
-      if ((user.role !== 'owner' && user.role !== 'member') || demoOn(cfg)) return send(res, 403, 'application/json', '{"error":"owner only","code":"edit_owner_only"}');   // members: own apps only, the no-tools lane (ADR 0042)
+      if (user.role !== 'owner' && user.role !== 'member') return send(res, 403, 'application/json', '{"error":"owner only","code":"edit_owner_only"}');   // members and demo guests: own apps only, the no-tools lane (ADR 0042)
       return sendAppHtml(res, path.join(ROOT, 'web', 'app-edit-panel.html'), 'text/html; charset=utf-8', { 'content-security-policy': APP_CSP, 'cache-control': 'no-cache' });
+    }
+    // How many changes can be undone: the shell's ⋯ shows 撤销上次修改 · Undo last change while one exists (web/app-edit.js).
+    if (req.method === 'GET' && /^\/api\/apps\/[^/]+\/edits$/.test(p)) {
+      try {
+        const edit = appEditOf({ user, body: { edit: decodeURIComponent(p.split('/')[3]), message: 'undo' }, headers: req.headers, appsDir: appsDir(user), members: true });
+        return send(res, 200, 'application/json', JSON.stringify({ ok: true, left: editsLeft(path.join(wsDir(user), VERSIONS_DIR), edit.slug) }));
+      } catch (e) { if (!e.status) throw e; return send(res, e.status, 'application/json', JSON.stringify({ error: e.message, code: e.code })); }
     }
     if (req.method === 'POST' && /^\/api\/apps\/[^/]+\/undo$/.test(p)) {
       try {
-        const edit = appEditOf({ user, body: { edit: decodeURIComponent(p.split('/')[3]), message: 'undo' }, headers: req.headers, appsDir: appsDir(user), members: !demoOn(cfg) });
+        const edit = appEditOf({ user, body: { edit: decodeURIComponent(p.split('/')[3]), message: 'undo' }, headers: req.headers, appsDir: appsDir(user), members: true });   // a demo guest undoes their own app too (lib/demo-app-edit.mjs)
         refuseStaleUndo(wsDir(user), edit.slug, url.searchParams.get('v'));   // Activity log: undo THAT change only, never a newer one
         const u = undoAppEdit(edit, { wsDir: wsDir(user) });
         audit('app-edit-undo', { who: user.id, app: edit.slug, undone: !!u.line.undone });
