@@ -1,4 +1,12 @@
 {
+  "v5.20.0": {
+    "date": "2026-11-25",
+    "features": [
+      "手机友好 · Phone-friendly apps, chats and notes"
+    ],
+    "fixes": [],
+    "through": "9b542aa17c4b1895bd00916b43a91eafe9226bed"
+  },
   "v5.19.8": {
     "date": "2026-11-24",
     "features": [],
