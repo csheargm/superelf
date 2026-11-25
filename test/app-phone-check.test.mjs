@@ -25,6 +25,12 @@ test('widths only a wider screen sees, comments, and max-width are not faults', 
   assert.deepEqual(phoneProblems(page('@media (min-width:700px){.side{width:640px} .x{min-width:500px}} /* width:999px */ .m{max-width:1200px;border-width:2px}')), []);
 });
 
+test('GPT review: a capped width, a commented-out block and a forced height are not faults', () => {
+  assert.deepEqual(phoneProblems(page('.card{width:600px;max-width:100%} button{height:24px !important}')), []);
+  assert.deepEqual(phoneProblems(page('', '<!-- <style>.demo{width:800px}</style> -->')), []);
+  assert.match(phoneProblems(page('.card{width:600px;max-width:500px}')).join(), /600px/);   // capped above a phone still scrolls
+});
+
 test('the gate the edit lane and the demo maker use carries the phone check', () => {
   assert.ok(appHtmlProblems(page('.w{width:1024px}')).some((t) => /横向滚动/.test(t)));
 });

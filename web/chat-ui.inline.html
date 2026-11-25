@@ -1113,7 +1113,6 @@
         if(was!==_loadSeq) return false; }   // another chat was opened meanwhile: this tap was for the old one (GPT review)
       const ext=!!(o&&Array.isArray(o.attachments)); const q=(typeof text==='string'?text:el.inp.value).trim(); const mine=ext?o.attachments.slice():atts.slice();
       if(!q&&!mine.length) return false;        // nothing to send
-      retireConfirms();                         // a new turn (a typed "yes" too) answers every 改 · Apply above it
       const k=key, myLoad=_loadSeq;           // snapshot: the user may switch threads mid-send (myLoad: the thread shown when this turn began)
       const cid = curConvo;
       const first=!cid;
@@ -1129,6 +1128,7 @@
       // the user still has their work — the incident's shape was that they did not.
       const bytes=pacChatBytes(msg, cid||null, attRefs, lbl, sys);
       if(bytes>PAC_LIMITS.chat){ addMsg('status', pacTooLargeText('Message', bytes, PAC_LIMITS.chat)); updateScroll(); return false; }   // too large: reported in the log AND to the caller
+      retireConfirms();   // a new turn (a typed "yes" too) answers every 改 · Apply above it — only once it passed pre-flight (GPT review)
       sending=true; el.go.disabled=true;
       const later=(typed!==null&&el.inp.value!==typed)?el.inp.value:'';   // typed while a host's beforeSend ran: kept as the next draft
       el.inp.value=''; el.inp.value=later; autosize(); const shown=shownMe(shownUserText(q)); const um=addMsg('me',shown,mine); if(!ext) atts=[]; renderChips();
@@ -1489,7 +1489,14 @@
       const fitKb=()=>{ if(!vv) return; const kb=ov.classList.contains('on')&&innerHeight-vv.height-vv.offsetTop>1;
         ov.style.top=kb?vv.offsetTop+'px':''; ov.style.height=kb?vv.height+'px':''; ov.style.bottom=kb?'auto':''; };
       if(vv){ vv.addEventListener('resize',fitKb); vv.addEventListener('scroll',fitKb); }
-      const show=()=>{ ov.classList.add('on'); fitKb(); if(chatApi) chatApi.remeasure(); }, hide=()=>{ ov.classList.remove('on'); fitKb(); };
+      // FOCUS (GPT review): the page under the overlay is made inert while it is up, so Tab cannot reach the
+      // hidden note; closing hands focus back to whatever opened it.
+      let back=null, inerted=[];
+      const show=()=>{ if(!ov.classList.contains('on')){ back=document.activeElement;
+          inerted=[...document.body.children].filter(n=>n!==ov&&!n.inert&&!/^(SCRIPT|STYLE)$/.test(n.tagName)&&!n.matches('.pac-drawerhost,.pac-lb,.pac-fs')); inerted.forEach(n=>{ n.inert=true; }); }
+        ov.classList.add('on'); fitKb(); if(chatApi) chatApi.remeasure(); },
+        hide=()=>{ const was=ov.classList.contains('on'); ov.classList.remove('on'); fitKb();
+          if(was){ inerted.forEach(n=>{ n.inert=false; }); inerted=[]; if(back&&back.isConnected&&typeof back.focus==='function') back.focus(); back=null; } };
       // onShow: reveal this overlay + let the app dismiss any covering surface (e.g. a draw pad)
       const api=Chat(host, Object.assign({}, o, { onShow:()=>{ show(); o.onShow&&o.onShow(); },
         onClose:()=>{ hide(); o.onClose&&o.onClose(); } }));

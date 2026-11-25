@@ -144,13 +144,24 @@ for (const [dev, viewport] of Object.entries(DEVICES)) {
       if ((await chipPx(fr)).some((x) => x < CHIP_TEXT_PX)) bad.push(`${dev} ask-ai: chip text under ${CHIP_TEXT_PX}px — audit #11`);
       // A spent 改 · Apply: a later typed turn disables it, really and visibly.
       await fr.evaluate((s) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'pac-change-app pac-confirm'; b.textContent = '改 · Apply'; b.style.cssText = 'cursor:pointer'; document.querySelector(s + ' .pac-log').appendChild(b); }, scope);
+      // GPT review: a send refused by the size pre-flight is not a turn, so the chip stays live.
+      await fr.evaluate((s) => { document.querySelector(s + ' .pac-inp').value = 'x'.repeat(1100 * 1024); }, scope);
+      await fr.click(`${scope} .pac-go`); await page.waitForTimeout(300);
+      assert.equal(await fr.evaluate((s) => document.querySelector(s + ' .pac-confirm').disabled, scope), false, 'an oversized, refused send leaves Apply live');
       await fr.fill(`${scope} .pac-inp`, 'yes'); await fr.click(`${scope} .pac-go`); await page.waitForTimeout(500);
       const chip = await fr.evaluate((s) => { const b = document.querySelector(s + ' .pac-confirm'); return { disabled: b.disabled, opacity: +getComputedStyle(b).opacity }; }, scope);
       assert.ok(chip.disabled && chip.opacity < 0.6, `a typed "yes" retires the Apply chip: ${JSON.stringify(chip)}`);
       if (phone) {   // ✕ is the way back to the note
+        assert.ok(await fr.evaluate(() => document.querySelector('.pan').closest('[inert]') !== null), 'the note under the full-screen chat is inert (GPT review)');
         await fr.click('.pac-fs.on .pac-top .pac-close'); await page.waitForTimeout(400);
+        assert.ok(await fr.evaluate(() => !document.querySelector('[inert]') && !document.activeElement.closest('.pac-fs')), 'closing lifts inert and leaves no focus in the hidden chat');   // WebKit does not focus a tapped button, so the restored target is not asserted
         assert.ok(!(await fr.$('.pac-fs.on')), '✕ closes the full-screen chat');
         assert.ok(await fr.evaluate(() => !!document.querySelector('.pan-top').offsetWidth), 'back on the note');
+      }
+      if (!phone) {   // GPT review: the rail was made wide; narrowed to a phone, Ask AI must go full screen, not into the closed rail
+        await page.setViewportSize(DEVICES.iPhone); await page.waitForTimeout(1200); await noTips(fr);
+        await fr.click('.pan-hask'); await page.waitForTimeout(1200);
+        assert.ok(await fr.$('.pac-fs.on'), 'narrowed after the rail was made: Ask AI opens full screen');
       }
     } finally { await ctx.close(); }
     assert.deepEqual(bad, [], bad.join('\n'));

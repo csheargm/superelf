@@ -262,7 +262,7 @@ function loadFullscreen(chatFactory, src = CHAT) {
   assert.ok(from > 0 && to > from, 'the fullscreen factory must stay one contiguous block');
   const body = src.slice(from, to).replace(/,\s*$/, '');
   const mkEl = () => { const c = new Set(); return { className: '', appendChild() {}, classList: { add: (x) => c.add(x), remove: (x) => c.delete(x), contains: (x) => c.has(x) } }; };
-  const doc = { createElement: mkEl, body: { appendChild() {} } };
+  const doc = { createElement: mkEl, body: { appendChild() {}, children: [] }, activeElement: null };   // children/activeElement: show()'s inert + focus hand-back
   // eslint-disable-next-line no-new-func
   return new Function('document', 'Chat', `return ({${body}}).fullscreen;`)(doc, chatFactory);
 }
@@ -358,7 +358,7 @@ test('MUTATION 1: restore the flat 84px fallback → the un-measured iPhone surf
 });
 
 test('MUTATION 2: drop show()\'s re-measure → a revealed surface is never measured', () => {
-  const noHook = CHAT.replace('const show=()=>{ ov.classList.add(\'on\'); fitKb(); if(chatApi) chatApi.remeasure(); }', 'const show=()=>{ ov.classList.add(\'on\'); fitKb(); }');
+  const noHook = CHAT.replace('ov.classList.add(\'on\'); fitKb(); if(chatApi) chatApi.remeasure(); }', 'ov.classList.add(\'on\'); fitKb(); }');
   assert.notEqual(noHook, CHAT, 'the mutation matched nothing');
   const f = mkFullscreen({ rowPx: () => rowHeight(IPHONE, {}), src: noHook });
   f.api.show();

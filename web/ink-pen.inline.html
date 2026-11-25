@@ -34,7 +34,8 @@
 .pip-probe{position:fixed;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
 .pip-sheet{position:fixed;z-index:7;display:none;flex-direction:column;gap:10px;padding:12px;border-radius:14px;
   bottom:calc(126px + env(safe-area-inset-bottom,0px));background:var(--card,#fff);border:1px solid var(--line,#e2e2de);
-  box-shadow:0 3px 14px rgba(0,0,0,.2)}
+  box-shadow:0 3px 14px rgba(0,0,0,.2);
+  max-height:calc(100dvh - 134px - env(safe-area-inset-bottom,0px));overflow-y:auto;overscroll-behavior:contain}   /* a short screen scrolls the sheet, so its top row stays reachable (GPT review) */
 .pip-sheet.on{display:flex}
 .pip-sheet.pip-drop{bottom:auto}
 .pip-row{display:flex;gap:6px;justify-content:center}
