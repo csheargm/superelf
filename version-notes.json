@@ -1,4 +1,12 @@
 {
+  "v5.22.0": {
+    "date": "2026-11-25",
+    "features": [
+      "新应用手机优先 · Phone-first rule for every new app"
+    ],
+    "fixes": [],
+    "through": "043e21c022ddecb67734fe1c04c44e887abbb81d"
+  },
   "v5.21.0": {
     "date": "2026-11-25",
     "features": [
