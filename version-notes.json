@@ -1,4 +1,12 @@
 {
+  "v5.17.1": {
+    "date": "2026-11-24",
+    "features": [],
+    "fixes": [
+      "修复 iPhone 卡住与字体忽大忽小 · iPhone freeze and jumping text size"
+    ],
+    "through": "5198d2ba0cfe3a94d83f2a012641ee1aa313395a"
+  },
   "v5.17.0": {
     "date": "2026-11-24",
     "features": [
