@@ -1,4 +1,12 @@
 {
+  "v5.19.1": {
+    "date": "2026-11-24",
+    "features": [],
+    "fixes": [
+      "说「好」也能改 · Typing yes applies the plan"
+    ],
+    "through": "3b3c9054c3ad6403001a37d0ff8b77ee4c1d7b13"
+  },
   "v5.19.0": {
     "date": "2026-11-24",
     "features": [
