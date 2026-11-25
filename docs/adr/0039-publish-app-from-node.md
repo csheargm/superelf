@@ -77,7 +77,14 @@ Publish action that does the same path with the same guards.
 ## Addendum (2026-11-24): publish hardening
 - Term files default to `/data/.publish-terms/` when that folder exists (`publish_terms_root` still
   overrides); a missing or empty term file still refuses.
-- The server refuses a forked app (`meta.forkedFrom`) for preview and publish (`FORKED_APP`).
+- The server refuses a forked app (`meta.forkedFrom`) for preview and publish (`FORKED_APP`), with one
+  exception (2026-11-25, owner report "School Helper"): the OWNER's copy of an app that is in the repo
+  (`workspace.example/apps/<source>/`) publishes back to that source folder. `forkedFrom` as a string (a
+  shelf copy, maybe renamed `<slug>-mine`) or an object whose `uid` is the owner names the source
+  (lib/publish/copy-target.mjs); collect re-checks it on the very bytes it sends and strips the
+  per-user meta. A copy of another user's app (`FORK_OTHER`) or of an app not in the repo
+  (`FORK_NOT_IN_REPO`) is refused with what to do instead; the ⋯ menu shows that line, not Publish.
+  The sheet says which app it updates. Members are unchanged (403).
 - Preview answers a sha256 of the collected snapshot; Publish collects again and refuses unless the
   hash matches (`SNAPSHOT_CHANGED`), so the owner publishes exactly the bytes they confirmed.
 - PII rules are tested with lastIndex reset, so a /g rule can never skip a match.

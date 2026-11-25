@@ -12,13 +12,16 @@ const PAPublish=(()=>{
   const post=(slug,body)=>api(url(slug),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body||{})});
   // The menu item; its one-time bilingual tip is a PATips tip beside it (armTip).
   // The second line (#pubState) says what Publish would do for THIS app; check() fills it in.
-  // A copy (meta.json forkedFrom) is never published (lib/publish/collect.mjs refuseFork): the ONE gate for every
-  // menu — the drawer row and the open app's ⋯ — is here, so no menu offers a Publish that can only refuse.
-  // In its place one quiet line says why and what to do (no button: there is nothing to tap).
-  const FORK_LINE='复制来的应用不能发布；可请原作者发布 · A copied app can\'t be published; ask its original author to publish it';
+  // A copy (meta.json forkedFrom): the OWNER's copy of a repo app publishes back to that app (the server
+  // decides, lib/publish/copy-target.mjs; check() swaps the item for the server's line when it cannot).
+  // Anyone else sees one quiet line: publishing is the node owner's (lib/publish/routes.mjs answers 403).
+  const MEMBER_FORK_LINE='发布只对节点主人开放 · Only the node\'s owner can publish apps';
   const isFork=(slug)=>typeof FORK_APPS!=='undefined'&&FORK_APPS.has(slug);
+  const isOwner=()=>typeof ROLE!=='undefined'&&ROLE==='owner';
+  const forkLine=(t)=>'<div id="pubFork" style="padding:8px 12px;font-size:12px;opacity:.65">'+esc(t)+'</div>';
+  const copyText=(c)=>`更新共享应用 ${c.title} · Updates the shared app ${c.title}`;
   function item(slug){
-    if(isFork(slug)) return '<div id="pubFork" style="padding:8px 12px;font-size:12px;opacity:.65">'+FORK_LINE+'</div>';
+    if(isFork(slug)&&!isOwner()) return forkLine(MEMBER_FORK_LINE);
     return '<button data-a="publish" id="pubItem">发布到公开仓库 · Publish to the public repo'
       +'<span id="pubState" style="display:block;font-size:11px;opacity:.65"></span>'
       +'</button>';
@@ -31,9 +34,10 @@ const PAPublish=(()=>{
     return `有 ${repo.changedFiles} 处改动未发布 · ${repo.changedFiles} change${repo.changedFiles===1?'':'s'} not yet published`;
   }
   // b: the item of the menu that asked — a late answer for app A never touches app B's menu.
-  function showState(b,repo){
+  function showState(b,repo,j){
+    if(j&&j.refused&&b&&b.isConnected){ b.outerHTML=forkLine(j.refused.error); return; }   // a copy that cannot go back: say why, no button
     const l=b&&b.isConnected&&b.querySelector('#pubState'); if(!l) return;
-    l.textContent=stateText(repo);
+    l.textContent=[j&&j.copyOf?copyText(j.copyOf):'',stateText(repo)].filter(Boolean).join(' — ');
     const off=!!(repo&&repo.upToDate); b.disabled=off; b.style.opacity=off?'.5':''; b.style.pointerEvents=off?'none':'';   // a tap on the line text must not reach the menu's handler
     // The line arrives after the menu was placed: keep the menu's bottom on screen.
     const m=b.closest('#appMenu'); if(m&&m.style.top){ const over=m.getBoundingClientRect().bottom-(innerHeight-6); if(over>0) m.style.top=Math.max(6,parseFloat(m.style.top)-over)+'px'; }
@@ -42,7 +46,7 @@ const PAPublish=(()=>{
   // has not seen yet (they closed the wait sheet, or left the app), and re-attaches the watcher to
   // a publish still running. The node keeps the status in memory, so a node restart forgets it.
   const TIP='新：审核后公开分享此应用 · New: share this app publicly after a privacy check';
-  function armTip(slug){ if(isFork(slug)) return; const b=$('#pubItem'); if(b&&!_SEEN.has(TIP_KEY)) PATipsShell.tip(TIP_KEY,'#pubItem',TIP); if(b&&slug) check(slug); }   // the ONE tip mechanism
+  function armTip(slug){ if(isFork(slug)&&!isOwner()) return; const b=$('#pubItem'); if(b&&!_SEEN.has(TIP_KEY)) PATipsShell.tip(TIP_KEY,'#pubItem',TIP); if(b&&slug) check(slug); }   // the ONE tip mechanism
   const SEEN_KEY=(slug)=>'pub:seen:'+slug;
   const seenAt=(slug)=>{ try{ return localStorage.getItem(SEEN_KEY(slug)); }catch{ return null; /* no storage: show it again, harmless */ } };
   const markSeen=(slug,st)=>{ try{ localStorage.setItem(SEEN_KEY(slug),String(st.at)); }catch{ /* no storage: the result may show once more */ } };
@@ -50,7 +54,7 @@ const PAPublish=(()=>{
   async function check(slug){
     const b=$('#pubItem');
     let j; try{ const r=await api(url(slug)); j=await r.json(); }catch{ return; /* offline: the next ⋯ open looks again */ }
-    showState(b,j&&j.repo);
+    showState(b,j&&j.repo,j);
     const st=j&&j.status; if(!st) return;
     if(TERMINAL.has(st.state)){ if(seenAt(slug)!==String(st.at)){ notice(st); markSeen(slug,st); } }
     else watch(slug);
@@ -94,12 +98,12 @@ const PAPublish=(()=>{
     if(!j.preview) return sheet(`<p id="pubFail">${esc(j.error||'发布失败 · Publish failed')}</p>`);
     const p=j.preview;
     if(p.hits.length) return sheet(hitsHtml(p.hits));
-    const s=sheet(`<p id="pubWhat">${WHAT_TEXT}</p><p><b>将公开以下文件 · These files will be public</b></p><ul id="pubFiles">${p.files.map(f=>`<li><code>${esc(f.path)}</code> (${f.bytes} B)</li>`).join('')}</ul>`
+    const s=sheet((p.copyOf?`<p id="pubCopy"><b>${esc(copyText(p.copyOf))}</b></p>`:'')+`<p id="pubWhat">${WHAT_TEXT}</p><p><b>将公开以下文件 · These files will be public</b></p><ul id="pubFiles">${p.files.map(f=>`<li><code>${esc(f.path)}</code> (${f.bytes} B)</li>`).join('')}</ul>`
       +(p.refused.length?`<p>不发布 · Not published: ${p.refused.map(x=>esc(x.file)).join(', ')}</p>`:'')
       +`<p id="pubRepo">目标仓库 · Repository: <code>${esc(p.repo||'')}</code></p>`
       +'<p>隐私检查通过；CI 通过后自动合并并发版 · Privacy scan clean; merges and releases when CI is green.</p>',true);
     // ONE handler, replaced on every sheet (sheet() resets onclick): a stale preview can never publish.
     const close=s.onclick; s.onclick=(e)=>{ if(e.target.closest('[data-pub="go"]')){ s.onclick=null; go(slug,p.hash); } else close(e); };
   }
-  return { item, armTip, open, stateText, WAIT_TEXT, WHAT_TEXT };
+  return { item, armTip, open, stateText, copyText, WAIT_TEXT, WHAT_TEXT, MEMBER_FORK_LINE };
 })();
