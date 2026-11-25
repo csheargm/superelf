@@ -40,9 +40,10 @@ before(async () => {
   port = await freePort();
   root = mkWebRoot({ port, extraConfig: { task_timeout_minutes: 1, ollama_url: `http://127.0.0.1:${model.address().port}`, users: [
     { id: 'owner', name: 'Owner', role: 'owner', token: OWNER_TOKEN, workspace: 'workspace', passHash: hashPassword('owner-pass-123') }] } });
-  const app = path.join(root, 'workspace', 'apps', 'redflags'); fs.mkdirSync(app, { recursive: true });
-  fs.writeFileSync(path.join(app, 'index.html'), PAGE);
-  fs.writeFileSync(path.join(app, 'meta.json'), JSON.stringify({ title: 'Red Flags 危险信号' }));
+  for (const slug of ['redflags', 'redflags-pwa']) {   // one app per case: no chat history to replay into the other
+    const app = path.join(root, 'workspace', 'apps', slug); fs.mkdirSync(app, { recursive: true });
+    fs.writeFileSync(path.join(app, 'index.html'), PAGE);
+    fs.writeFileSync(path.join(app, 'meta.json'), JSON.stringify({ title: 'Red Flags 危险信号' })); }
   web = startWeb(root); await waitReady(port);
   if (!skip) browser = await engine.launch();
 });
@@ -59,10 +60,11 @@ for (const pwa of [false, true]) test(`iPhone${pwa ? ' home-screen PWA' : ''}: a
     await page.fill('#luser', 'owner'); await page.fill('#lpin', 'owner-pass-123'); await page.click('#loginBtn');
     await page.waitForFunction(() => !document.querySelector('#login[open]'));
     assert.ok(await page.evaluate(() => { const t = document.getElementById('hTip'); return !!t && getComputedStyle(t).display !== 'none'; }), 'CONTROL: the home tip shows on the home');
-    await page.tap('.ecard[data-es="redflags"]');
+    const slug = pwa ? 'redflags-pwa' : 'redflags';
+    await page.tap(`.ecard[data-es="${slug}"]`);
     const app = page.frameLocator('#fr'); await app.locator('.pac-fs.on .pac-inp').waitFor();
-    const fr = page.frame({ url: /\/app\/owner\/redflags\// });
-    n = 0;   // each case starts at the short reply; the server may replay the earlier case's chat, so wait on THIS turn
+    const fr = page.frame({ url: new RegExp(`/app/owner/${slug}/`) });
+    n = 0;   // each case starts at the short reply (the fake model answers in ONE chunk, so .pac-md means finished)
     for (const [ask, , mark] of TURNS) {
       const k = await app.locator('.pac-fs.on .pac-m.me').count();
       await app.locator('.pac-fs.on .pac-inp').tap(); await app.locator('.pac-fs.on .pac-inp').fill(ask);
