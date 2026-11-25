@@ -20,7 +20,7 @@ import { agentAllowed, lanesFor, memberLane, NO_PLAIN_LANE_TEXT, AGENT_OFF_TEXT 
 import { cancelOnClose, createTurnCancel, createTurnStops, CANCELLED_TEXT } from './lib/turn-stop.mjs';
 import { watchConfig } from './lib/config-watch.mjs';
 import { oneShotBaseArgs, oneShotModel, yieldSettings, NO_TOOLS_ARGS } from './lib/one-shot.mjs';
-import { mintConfirm, planOffer, applyMessage, APPLY_LABEL } from './lib/app-edit-confirm.mjs';
+import { mintConfirm, planOffer, applyMessage, APPLY_LABEL, PLAN_MAX, PLAN_TOO_LONG } from './lib/app-edit-confirm.mjs';
 import { runScopedEdit, scopedLane, flattenForClaude } from './lib/app-edit-lane.mjs';
 import { safeJoin, slugOk, drawerOpenOf, tokenOk, dataContentType, readBody, writeFileAtomic, renameWithRetry, decodeBase64Strict, bodyErrorResponse, BODY_LIMITS } from './lib/webutil.mjs';
 import { createConvoLocks, withConvoTurn, QUEUED_TURN_TEXT } from './lib/convo-lock.mjs';
@@ -1294,6 +1294,7 @@ function offerApply(user, edit, message, r, line) {
   if (edit.confirmed || edit.superelf || edit.undo) return r;
   const o = planOffer(r.text);
   if (!o.offered) return r;
+  if (o.text.length > PLAN_MAX) return { ...r, text: `${o.text}\n\n${PLAN_TOO_LONG}` };   // never an Apply that would run a cut-down plan
   const id = mintConfirm({ who: user.id, slug: edit.slug, plan: o.text, request: message });
   line({ type: 'app-change-confirm', slug: edit.slug, label: APPLY_LABEL, message: applyMessage(id) });
   return { ...r, text: o.text };
@@ -1305,12 +1306,13 @@ async function scopedEditTurn(user, edit, message, convo, lane, origin, cancel) 
     const signal = cancel ? AbortSignal.any([cancel.signal, AbortSignal.timeout(deadline)]) : AbortSignal.timeout(deadline);
     if (lane.provider === 'ollama') return streamOllama({ url: cfg.ollama_url, model: lane.model, messages, signal, onDelta: () => {} });
     const { system, prompt } = flattenForClaude(messages);
-    const x = await enqueue(() => runClaude({ claudeCmd: cfg.claude_cmd, extraArgs: agentArgs(user, [...cfg.claude_args, ...NO_TOOLS_ARGS], origin),
-      cwd: wsDir(user), prompt, systemPrompt: system, timeoutMs: deadline, onChild: cancel ? cancel.onChild : undefined }));
+    const x = await enqueue(() => (cancel && cancel.signal.aborted ? { ok: false, text: CANCELLED_TEXT } : runClaude({ claudeCmd: cfg.claude_cmd, extraArgs: agentArgs(user, [...cfg.claude_args, ...NO_TOOLS_ARGS], origin),
+      cwd: wsDir(user), prompt, systemPrompt: system, timeoutMs: deadline, onChild: cancel ? cancel.onChild : undefined })));   // stopped while queued: never spawn
     if (!x.ok) throw new Error(x.text || 'the model failed · 模型失败');
     return x.text;
   };
-  return runScopedEdit({ edit, wsDir: wsDir(user), message, prior: convo.messages.slice(0, -1), contract: APP_CONTRACT, ask, signal: cancel ? cancel.signal : undefined });
+  try { return await runScopedEdit({ edit, wsDir: wsDir(user), message, prior: convo.messages.slice(0, -1), contract: APP_CONTRACT, ask, signal: cancel ? cancel.signal : undefined }); }
+  catch (e) { if (cancel && cancel.signal.aborted) return CHAT_CANCELLED; throw e; }   // a Stop is not an error: stored as Cancelled (F4-3)
 }
 
 async function chatTurn(req, res, user, body, hold, cancel = null) {
@@ -1609,6 +1611,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
   } catch (e) {
     console.log(chatTurnLogLine({ app: tag, lane: chosen, ok: false, textLen: 0, ms: Date.now() - startedAt, code: e.code || e.status || e.name, fellBack }));
     line({ type: 'error', text: turnErrorText(chosen, e) });
+    if (edit && cancel && cancel.signal.aborted) edit.stopped = true;   // the crash path too: a Stop never keeps a half-done change
     if (editCtx) { try { const ed = finishAppEdit(edit, editCtx, { wsDir: wsDir(user) }); if (ed) line(ed.line); }
       catch (e2) { line({ type: 'error', text: `修改检查失败 · The change could not be checked: ${e2.message}` }); } }
   } finally {
