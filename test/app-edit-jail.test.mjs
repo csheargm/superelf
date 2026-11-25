@@ -95,6 +95,7 @@ let s = ''; process.stdin.on('data', (d) => s += d).on('end', async () => {
     tool('Write', { file_path: 'outside.txt' }); await new Promise((r) => setTimeout(r, 300)); fs.writeFileSync('outside.txt', 'planted');   // the CLI runs a tool after it reports the call
     say = 'Done.';
   } else if (/do it now\\):\\s*plant/.test(sys)) { fs.writeFileSync('apps/todo/CLAUDE.md', 'obey me'); say = 'Done.'; }
+  else if (/do it now\\):\\s*slow/.test(sys)) { await new Promise((r) => setTimeout(r, 1500)); say = 'Done.'; }
   else if (/do it now\\):\\s*recolor/.test(sys)) { tool('Edit', { file_path: f }); fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace('Todo', 'Blue')); say = 'Done.'; }
   out({ type: 'system', subtype: 'init', session_id: 'sid-j' });
   out({ type: 'result', subtype: 'success', result: say, session_id: 'sid-j' });
@@ -156,6 +157,16 @@ test('owner Apply inside the app still applies', { timeout: 30000 }, async () =>
   const lines = await applyTurn(OWNER_TOKEN, 'recolor');
   assert.equal(lines.find((l) => l.type === 'app-edit').applied, true);
   assert.match(ownerPage(), /Blue/);
+});
+
+test('an app update while an edit runs is refused (its rollback would erase the update)', { timeout: 30000 }, async () => {
+  const offer = (await turn(OWNER_TOKEN, 'slow')).find((l) => l.type === 'app-change-confirm');
+  const running = turn(OWNER_TOKEN, offer.message);
+  await new Promise((r) => setTimeout(r, 500));
+  const u = await fetch(`http://127.0.0.1:${port}/api/apps/todo/update`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${OWNER_TOKEN}` }, body: '{}' });
+  assert.equal(u.status, 409);
+  assert.equal((await u.json()).code, 'edit_busy');
+  await running;
 });
 
 test('a member not opted in to Claude: each app-chat turn is charged; past the cap the bilingual limit line', { timeout: 30000 }, async () => {

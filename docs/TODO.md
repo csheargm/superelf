@@ -735,5 +735,6 @@ Without it they now FAIL (R14), not pass as `# pass 0 / # fail 0`. To run them:
 - A confirm id is bound to the slug, not the app instance: delete + re-create within 10 minutes reuses it (same user only).
 - Text inside an app page can make the planner print [[apply]] on a question; the user still has to tap Apply.
 - App-chat jail (ADR 0042 addendum): an outside file that existed and was changed despite the CLI's wall cannot be restored (only named); a file system with no birth time names new outside files instead of moving them aside.
+- App-chat jail rollback: a file another request creates at the exact path the agent was denied, during the turn, is moved aside (kept in .app-versions/<slug>/.outside-*, which app delete removes). Rare race; GPT review cap r3.
 - Any app-edit rollback (restoreVersion) drops symlinks the app folder had: the snapshot copy skips links (lib/app-versions.mjs copyNoLinks). (GPT review r2, pre-existing)
 - test/member-plain-lane-e2e.test.mjs "owner ticks AI 工具" fails on origin/main 413dd6b9 too (checkbox click does not change state).

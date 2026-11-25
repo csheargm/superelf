@@ -1960,6 +1960,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && p.startsWith('/api/apps/') && p.endsWith('/update')) {
       const slug = p.slice('/api/apps/'.length, -'/update'.length);
       if (!slugOk(slug)) return send(res, 400, 'application/json', '{"error":"bad slug"}');
+      const busyUpd = editBusyBody(wsDir(user), slug); if (busyUpd) return send(res, 409, 'application/json', busyUpd);   // an edit's rollback would erase the update (GPT review r3)
       const dstDir = ownAppDir(user, slug);
       if (!dstDir) return send(res, 400, 'application/json', LINKED_APP);
       let meta = {}; try { meta = JSON.parse(fs.readFileSync(path.join(dstDir, 'meta.json'), 'utf8')) || {}; } catch {}
