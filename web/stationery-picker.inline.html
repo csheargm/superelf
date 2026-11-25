@@ -159,15 +159,15 @@ window.PAStationeryPicker=(function(){
   // ── 🖼 From a picture ────────────────────────────────────────────────────────────────────
   function picPanel(h,o,d){
     const P=mk('div','pst-panel pst-pic'), msg=mk('div','pst-msg'), cv=mk('canvas','pst-prev'), row=mk('div','pst-row');
-    let file=null;
+    let file=null, dec=0;                                      // dec: the live decode; an older one that finishes later writes nothing
     // ONE way a picture becomes "the file": the picker below, or a photo already in a note (use()).
     async function setFile(f){
       // The previous picture is dropped FIRST: a picture that fails to decode must not leave the last one armed.
-      file=null; cv.classList.remove('on'); row.style.display='none';
+      const my=++dec; file=null; cv.classList.remove('on'); row.style.display='none';
       if(/pdf/i.test(f.type||'')||/\.pdf$/i.test(f.name||'')) return say(msg,T.pdf,true);
       say(msg,T.busy);
-      try{ const c=await window.PAPhoto.toCanvas(f,PREV_H*2); cv.width=c.w; cv.height=c.h; cv.getContext('2d').drawImage(c.canvas,0,0); }
-      catch(e){ return say(msg,(e&&e.message)||String(e),true); }
+      try{ const c=await window.PAPhoto.toCanvas(f,PREV_H*2); if(my!==dec) return; cv.width=c.w; cv.height=c.h; cv.getContext('2d').drawImage(c.canvas,0,0); }
+      catch(e){ if(my===dec) say(msg,(e&&e.message)||String(e),true); return; }
       file=f; cv.classList.add('on'); row.style.display=''; say(msg,''); }
     const pick=btn('',T.choose,async()=>{
       const r=await window.PAPhoto.pick({accept:'image/*'}); if(!r.ok) return;

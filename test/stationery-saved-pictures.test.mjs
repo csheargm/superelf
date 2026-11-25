@@ -73,3 +73,15 @@ test('GPT review: a saved picture whose bytes never arrive is still listed (miss
   assert.deepEqual(await st.deletePicture(PIC), { ok: true });
   assert.equal(S.list().some((x) => x.source === 'picture'), false);
 });
+test('GPT review r2: a startup read that answers after a save never replaces the saved list', async () => {
+  const S = withPics(); const io = memIo(); const st = S.store(io);
+  let release; const gate = new Promise((r) => { release = r; }); let first = true;
+  const read = io.read; io.read = async (p) => { if (p === 'templates/pictures.json' && first) { first = false; const out = await read(p); await gate; return out; } return read(p); };
+  const boot = st.loadMine();                                   // startup read: answers late with the empty list
+  await tick();
+  assert.deepEqual(await st.savePicture({ id: PIC, name: 'a' }), { ok: true });
+  release(); await boot;
+  const B = 'uploads/2_photo.jpg';
+  assert.deepEqual(await st.savePicture({ id: B, name: 'b' }), { ok: true });
+  assert.deepEqual(JSON.parse(io.files['templates/pictures.json']).items.map((x) => x.id), [PIC, B]);
+});
