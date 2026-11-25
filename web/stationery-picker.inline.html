@@ -12,6 +12,9 @@
 .pst-del{position:absolute;top:-6px;right:-6px;min-width:20px;height:20px;border-radius:10px;border:1px solid var(--line,#d9dbda);
   background:var(--card,#fff);color:var(--muted,#6b7370);font:inherit;font-size:11px;line-height:18px;padding:0 5px;cursor:pointer}
 .pst-del.arm{color:#fff;background:#c0392b;border-color:#c0392b}
+/* Touch: touch-base grows every button to 44px, which would cover the thumbnail's centre — a tap meant to
+   choose would arm delete. The ✕ moves BELOW the thumbnail instead of over its corner. */
+@media (pointer:coarse){ .pst-cell{flex-direction:column;align-items:center;gap:2px} .pst-del{position:static} }
 .pst-tools,.pst-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;width:100%}
 .pst-btn{font:inherit;font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid var(--line,#d9dbda);
   background:var(--card,#fff);color:var(--text,#1c1e1d);cursor:pointer}
@@ -80,7 +83,7 @@ window.PAStationeryPicker=(function(){
     const c=mk('span','pst-cell'), b=mk('button','pan-tbtn pst-th'), cv=mk('canvas');
     b.type='button'; b.dataset.id=t.id; b.dataset.src=t.source; b.title=t.name; b.setAttribute('aria-label',t.name);
     b.appendChild(cv); c.appendChild(b);
-    paintInto(cv,t,THUMB_W,THUMB_H).then(ok=>{ if(!ok) b.classList.add('pst-bad'); });
+    if(t.missing) b.classList.add('pst-bad'); else paintInto(cv,t,THUMB_W,THUMB_H).then(ok=>{ if(!ok) b.classList.add('pst-bad'); });
     b.addEventListener('click',()=>o.choose({id:t.id,source:t.source}));
     const del=h&&h.store&&(t.source==='mine'?h.store.deleteMine:t.source==='picture'?h.store.deletePicture:null);
     if(del){
@@ -159,7 +162,10 @@ window.PAStationeryPicker=(function(){
     let file=null;
     // ONE way a picture becomes "the file": the picker below, or a photo already in a note (use()).
     async function setFile(f){
+      // The previous picture is dropped FIRST: a picture that fails to decode must not leave the last one armed.
+      file=null; cv.classList.remove('on'); row.style.display='none';
       if(/pdf/i.test(f.type||'')||/\.pdf$/i.test(f.name||'')) return say(msg,T.pdf,true);
+      say(msg,T.busy);
       try{ const c=await window.PAPhoto.toCanvas(f,PREV_H*2); cv.width=c.w; cv.height=c.h; cv.getContext('2d').drawImage(c.canvas,0,0); }
       catch(e){ return say(msg,(e&&e.message)||String(e),true); }
       file=f; cv.classList.add('on'); row.style.display=''; say(msg,''); }

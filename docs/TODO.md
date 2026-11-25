@@ -768,3 +768,8 @@ Without it they now FAIL (R14), not pass as `# pass 0 / # fail 0`. To run them:
 - The full-screen chat (web/chat-ui.inline.html fitKb) and longevity's chat box read the app iframe's own visualViewport. If iOS shrinks only the shell's visual viewport when the keyboard opens, the iframe sees no change and the composer can stay under the keyboard. Seam: the shell posts its visualViewport box to the app frame, and fitKb uses that. Needs a real iPhone with Web Inspector to prove (the keyboard problem was already unsolved after 5 attempts).
 - WebKit does not focus a tapped button, so closing the full-screen chat cannot hand focus back to Ask AI after a tap (only after keyboard use).
 - lib/app-phone-check.mjs strips HTML comments with a regex: a literal "<style>" inside a script string can keep a later commented-out block in the scan, so its width is flagged although the browser never applies it (GPT review r3, cap reached). Seam: drop <script> bodies before the comment pass.
+
+## Stationery from a photo — GPT review leftovers (2026-11-25)
+- Use as background (pre-existing picture panel): a slow upload that finishes after the user switched notes applies the background to the note now open. Needs a notebook identity the picker can check before o.choose().
+- templates/pictures.json across two open tabs: each tab writes from its own cached list, so the last writer wins (same as templates/index.json). Writes in ONE tab are now serialized.
+- Saved-picture ids (like a notebook's stationery id) may name any upload path in the workspace, not only uploads/. The broker rejects `..` and checks containment; narrowing both rules to the uploads prefix is a separate change.

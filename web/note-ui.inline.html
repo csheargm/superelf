@@ -2279,10 +2279,14 @@
     const TPL_TXT={ unavailable:'信纸不可用 · Stationery is not available here',
       tip:'可以把这张图片做成信纸，其他笔记也能用 · Make this picture a page stationery; other notes can use it too' };
     const canStationery=()=>!!(imgHooks&&stPick&&stPick.hasStudio&&stPick.hasStudio()&&window.PAPhoto&&window.PAPhoto.toFile);
+    let tplSeq=0;                                               // the live request; a newer one, or a deselected photo, voids it
     async function stationeryFromImage(im){
       if(!im||!canStationery()){ flash(TPL_TXT.unavailable); return; }
+      const my=++tplSeq;
       try{
+        flash(EDIT_TXT.fetching);
         const url=await opts.imageUrl(im.path);                  // NOT fetch(): connect-src 'none' (see editImage)
+        if(my!==tplSeq||singleImage()!==im) return;              // moved on (another note, another photo): open nothing
         if(!url){ flash(EDIT_TXT.noBytes); return; }
         closePops(); paperPop.classList.add('on'); positionPop(paperPop,paperBtn); syncPopBtns();
         await stPick.usePicture(window.PAPhoto.toFile(url,'photo.jpg'));

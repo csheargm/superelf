@@ -105,6 +105,11 @@ for (const dev of DEVICES) {
     await cell.waitFor({ state: 'attached', timeout: 10000 });
     // ✕ is two-tap (PATwoTap): first arms, second deletes.
     const del = frame.locator('.pst-cell', { has: cell }).locator('.pst-del');
+    // The list lives in Page settings; on a phone ⋯ opens the menu instead, so the popover is shown here directly.
+    await cell.evaluate((b) => { const p = b.closest('.pan-pop'); if (p) p.classList.add('on'); b.scrollIntoView({ block: 'center' }); });
+    // GPT review: the thumbnail's centre is the thumbnail, not the (touch-sized) ✕ — a tap meant to choose never arms delete.
+    const hit = await cell.evaluate((b) => { const r = b.getBoundingClientRect(); const e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!e && b.contains(e); });
+    assert.ok(hit, `${dev.name}: the thumbnail centre hits the thumbnail`);
     await del.evaluate((b) => b.click()); await del.evaluate((b) => b.click());
     await cell.waitFor({ state: 'detached', timeout: 10000 });
     assert.deepEqual(readPics(root), listed, 'deleted from the list on disk');

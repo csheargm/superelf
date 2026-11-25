@@ -56,3 +56,20 @@ test('R3: the saved-picture id rule is the same as PANote\'s notebook stationery
   const rule = /const PIC_ID=(\/\^\[[^\n]*?\$\/);/.exec(STN_HTML)[1];
   assert.ok(NOTE.includes(`!${rule}.test(r.id)`), 'note-ui uses the same id regex');
 });
+test('GPT review: two saves at once both reach pictures.json (writes run one at a time)', async () => {
+  const S = withPics(); const io = memIo(); const st = S.store(io);
+  const slow = io.write.bind(io); io.write = async (p, t) => { await tick(); await tick(); return slow(p, t); };
+  const B = 'uploads/2_photo.jpg';
+  const r = await Promise.all([st.savePicture({ id: PIC, name: 'a' }), st.savePicture({ id: B, name: 'b' })]);
+  assert.deepEqual(r, [{ ok: true }, { ok: true }]);
+  assert.deepEqual(JSON.parse(io.files['templates/pictures.json']).items.map((x) => x.id), [PIC, B]);
+});
+test('GPT review: a saved picture whose bytes never arrive is still listed (missing), so it can be deleted', async () => {
+  const S = loadStationery(); S.pictures(async () => null);
+  const io = memIo({ 'templates/pictures.json': JSON.stringify({ v: 1, items: [{ id: PIC, name: 'gone' }] }) });
+  const st = S.store(io); await st.loadMine(); await tick(); await tick();
+  const t = S.list().find((x) => x.source === 'picture');
+  assert.equal(t && t.id, PIC); assert.equal(t.missing, true);
+  assert.deepEqual(await st.deletePicture(PIC), { ok: true });
+  assert.equal(S.list().some((x) => x.source === 'picture'), false);
+});

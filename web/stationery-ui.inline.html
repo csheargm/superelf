@@ -64,11 +64,14 @@ window.PAStationery=(function(){
     .concat([...REG.mine.values()].map(t=>({...t,source:'mine'})))
     // The registry's OWN object (not a copy): its decoded image is cached on it, and a saved picture is large.
     // Listed once its bytes have arrived; picture() asks for them and the change fires when they do.
-    .concat([...PICNAMES].map(([id,name])=>{ const t=REG.picture.get(id); if(!t) return null; t.name=name; t.source='picture'; return t; }).filter(Boolean));
+    // A saved picture whose bytes never arrive is still listed (missing: greyed), so its ✕ can unlist it.
+    .concat([...PICNAMES].map(([id,name])=>{ const t=REG.picture.get(id); if(!t) return {id,name,source:'picture',missing:true}; t.name=name; t.source='picture'; return t; }));
   // ── Store: "My templates" through the host's own checked read/write (Journal: DATA) ──────
   // io = { read(path) -> Promise<LOAD outcome {status,data,error}>, write(path,text) -> Promise<{ok,error}> }
   function store(io){
     let ids=null, pics=null;                                // the indexes as last read; null = not read
+    // Writes run ONE at a time: two at once would each build on the same list and the second would drop the first's entry.
+    let q=Promise.resolve(); const serial=(fn)=>{ const p=q.then(fn,fn); q=p.then(()=>{},()=>{}); return p; };
     async function loadMine(){
       const r=await io.read(INDEX);
       if(r.status==='failed') return {ok:false,error:r.error};
@@ -85,7 +88,8 @@ window.PAStationery=(function(){
       return {ok:!errors.length,n:REG.mine.size,error:errors.join('; ')};
     }
     // The index is the source of truth: never written over one we could not read, adopted only once written.
-    async function setIndex(next){
+    const setIndex=(next)=>serial(()=>setIndexNow(next));
+    async function setIndexNow(next){
       if(ids===null){ const l=await loadMine(); if(!l.ok&&ids===null) return l; }
       const w=await io.write(INDEX,JSON.stringify({v:1,ids:next(ids)})); if(w.ok) ids=next(ids); return w;
     }
@@ -103,7 +107,8 @@ window.PAStationery=(function(){
     }
     // A picture kept as stationery: the upload's path + a name, listed for every note. Same rule as the index above:
     // never written over a list we could not read.
-    async function writePics(next){
+    const writePics=(next)=>serial(()=>writePicsNow(next));
+    async function writePicsNow(next){
       if(pics===null){ const l=await loadMine(); if(pics===null) return l.ok?{ok:false,error:'pictures list not read'}:l; }
       const w=await io.write(PIC_INDEX,JSON.stringify({v:1,items:next(pics)})); if(w.ok) pics=next(pics); return w;
     }
