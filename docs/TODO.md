@@ -784,6 +784,10 @@ user's app (not in the repo) has no "send my change to its author" path; the lin
 - Shelf copy of a 36–40 character slug that collides locally: fork() names it `<slug>-mine`, over the 40-char slug
   limit, so the app list hides it and Publish rejects the slug (GPT review, copy-back). Fix in lib/sharedapps.mjs fork:
   shorten before the suffix.
+- Copy-back on a git node (GPT review r3, cap reached): the live shelf IS the checkout's shared-apps/, so a shelf app
+  the owner promoted but never committed counts as "in the repo" and copy-back would add it as a new repo shelf app
+  (the sheet lists the files). Docker nodes (the private node) read the image's builtin-apps/ and are not affected.
+  Fix: check `git ls-files shared-apps/<slug>/index.html` on a git node.
 
 - App chat offer, shared app with the same slug as one of the owner's own apps (GPT review, fork-publish-honesty): the broker sends only the slug, so the server offers 改这个应用 and the shell then refuses the click (the frame belongs to another account). Fix: the relay should name the app's account, and the gate should require it to be the owner's own.
 

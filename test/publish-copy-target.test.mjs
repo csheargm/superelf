@@ -45,6 +45,9 @@ test('publishTarget maps a shelf copy (and its -mine rename) to the repo shelf a
     const dock = path.join(root, 'builtin-apps', 'shared-apps', 'tasks'); fs.mkdirSync(dock, { recursive: true }); fs.writeFileSync(path.join(dock, 'index.html'), 'x');
     fs.writeFileSync(path.join(dock, 'meta.json'), JSON.stringify({ title: 'Image copy' }));
     assert.equal(publishTarget({ appDir: mk('t3', { forkedFrom: 'tasks' }), slug: 't3', owner: 'owner', root }).copyOf.title, 'Image copy', 'a Docker node reads the image\'s repo shelf');
+    fs.rmSync(path.join(dock, 'meta.json'));   // the image ships no shelf meta.json: the node's shelf entry stands in
+    const t4 = publishTarget({ appDir: mk('t4', { forkedFrom: 'tasks' }), slug: 't4', owner: 'owner', root });
+    assert.equal(t4.keepMeta.sharedBy, 'owner'); assert.equal(t4.keepMeta.version, '1.2.0');
     const own = publishTarget({ appDir: mk('mine', { title: 'Own' }), slug: 'mine', owner: 'owner', root });
     assert.deepEqual(own, { slug: 'mine', copyOf: null }, 'an own app is unchanged');
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
@@ -119,4 +122,12 @@ test('GPT review: one local app never runs two publishes (the status key is lock
     await assert.rejects(startPublish({ appDir: d, slug: 'other', owner: 'owner', key: 'tasks-mine', options: o, expectHash: 'x' }), (e) => e.code === 'IN_FLIGHT');
     release(); assert.equal((await first).status.code, 'GITHUB_UNREACHABLE');
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('GPT review r3: the top-level page is found by its exact path, never a nested one', async () => {
+  const { topFile } = await import('../lib/publish/collect.mjs');
+  const f = (p) => ({ path: p, content: Buffer.from(p) });
+  const files = [f('shared-apps/tasks/a/tasks/index.html'), f('shared-apps/tasks/index.html')];
+  assert.equal(topFile(files, 'tasks', 'index.html').path, 'shared-apps/tasks/index.html');
+  assert.equal(topFile([f('workspace.example/apps/x/index.html')], 'x', 'index.html').path, 'workspace.example/apps/x/index.html');
 });
