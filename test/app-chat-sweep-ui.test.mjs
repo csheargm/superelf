@@ -36,6 +36,19 @@ test('F1: an unconfirmed turn (a question) never gets the "not changed" note; an
   assert.equal(editUnchangedNote('Done — added the week view.', { changed: false }, true), EDIT_UNCHANGED_NOTE);
 });
 
+test('GPT review r3: a member Apply that returns the same page writes nothing and claims nothing', async () => {
+  const os = await import('node:os'), path = await import('node:path'), { runScopedEdit, SAME_PAGE } = await import('../lib/app-edit-lane.mjs');
+  const w = fs.mkdtempSync(path.join(os.tmpdir(), 'pa-same-')), d = path.join(w, 'apps', 'todo'); fs.mkdirSync(d, { recursive: true });
+  const page = '<!doctype html><html><body><p>x</p></body></html>'; fs.writeFileSync(path.join(d, 'index.html'), page);
+  const before = fs.statSync(path.join(d, 'index.html')).mtimeMs;
+  try {
+    const r = await runScopedEdit({ edit: { slug: 'todo', dir: d, confirmed: true, plan: 'p' }, wsDir: w, message: 'x', prior: [], contract: 'C', ask: async () => 'Now green.\n```html\n' + page + '\n```' });
+    if (r.text !== SAME_PAGE) assert.notEqual(fs.statSync(path.join(d, 'index.html')).mtimeMs, before, 'parse changed the page');
+    else assert.equal(fs.statSync(path.join(d, 'index.html')).mtimeMs, before, 'no write');
+    assert.equal(r.text, SAME_PAGE);
+  } finally { fs.rmSync(w, { recursive: true, force: true }); }
+});
+
 test('F2: the member lane keeps the model\'s plain sentence, never code', () => {
   assert.equal(saidOf('The Add button is now dark green.\n```html\n<html></html>\n```'), 'The Add button is now dark green.');
   assert.equal(saidOf('```html\n<html></html>\n```'), '', 'no sentence: the fallback is used');
