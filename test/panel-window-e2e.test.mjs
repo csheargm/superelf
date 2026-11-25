@@ -4,63 +4,14 @@
 // their preview, the layout kept per device across a reload, a finger / Pencil drag that never flips or inks
 // (iPad), and the phone's full-screen sheet. PA_E2E_ENGINE=webkit runs it in iPad Safari's engine.
 // Without Playwright and its browser the file FAILS, unless PA_E2E_SKIP=1 (test/helpers-note-link.mjs).
-import { test, before, after } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import path from 'node:path';
-import { ROOT } from './helpers-app.mjs';
-import { skip, chromium } from './helpers-note-link.mjs';
-import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, OWNER_TOKEN } from './helpers-web.mjs';
+import { skip, useBibleServer, ctxNew, rootDir, SHOTS, DESK, open, win, vis, drag, barOf, shot } from './helpers-panel-window.mjs';
 
-let port, web, browser, root;
-const SHOTS = process.env.PA_PANEL_SHOTS || '';   // a folder: screenshots for the owner's screen check
-before(async () => {
-  if (skip) return;
-  port = await freePort(); root = mkWebRoot({ port });
-  fs.symlinkSync(path.join(ROOT, 'bible-data'), path.join(root, 'bible-data'));
-  const d = path.join(root, 'workspace', 'apps', 'bible'); fs.mkdirSync(d, { recursive: true });
-  for (const f of ['index.html', 'meta.json']) fs.copyFileSync(path.join(ROOT, 'shared-apps', 'bible', f), path.join(d, f));
-  web = startWeb(root); await waitReady(port);
-  browser = await chromium.launch();
-});
-after(async () => { if (browser) await browser.close(); if (web) await stopWeb(web); });
-
-const DESK = { width: 1230, height: 1056 };
-async function open({ viewport = DESK, touch = false, ctx = null } = {}) {
-  ctx = ctx || await browser.newContext({ viewport, hasTouch: touch, isMobile: touch && viewport.width < 600 });
-  await ctx.addInitScript((t) => { try { localStorage.setItem('pa_session', t); } catch { /* the sandboxed app frame has no storage */ } }, OWNER_TOKEN);
-  const page = await ctx.newPage();
-  await page.goto(`http://127.0.0.1:${port}/`);
-  await page.waitForFunction(() => typeof openApp === 'function' && document.querySelector('#dot.ok'));
-  await page.evaluate(() => openApp(UID, 'bible', 'bible'));
-  let frame = null;
-  for (let i = 0; i < 200 && !frame; i++) { frame = page.frames().find((f) => f.url().includes('/app/owner/bible/')) || null; if (!frame) await page.waitForTimeout(50); }
-  assert.ok(frame, 'bible frame loaded');
-  await frame.waitForFunction(() => document.querySelectorAll('.verse').length > 5);
-  await frame.evaluate(() => goChapter(42, 3));   // John 3
-  await frame.waitForFunction(() => chapter === 3 && document.querySelectorAll('.verse').length > 30);
-  await frame.evaluate(() => { if (window.PATips && PATips.current()) PATips.dismiss(PATips.current()); });
-  const off = await (await frame.frameElement()).boundingBox();
-  return { ctx, page, frame, off };
-}
-// Window state by title key ('chat' | 'note'), read from the page.
-const win = (frame, key) => frame.evaluate((k) => { const w = rail && rail.win(k); if (!w) return null;
-  const el = w.el, r = el.getBoundingClientRect(); return { ...w.state(), on: el.classList.contains('on'), x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) }; }, key);
-const vis = (frame) => frame.evaluate(() => [...document.querySelectorAll('.paw-win.on .paw-t')].map((t) => t.textContent));
-// A mouse drag in page coordinates; `mid` runs while still pressed (preview checks).
-async function drag(page, off, from, to, mid) {
-  await page.mouse.move(off.x + from.x, off.y + from.y); await page.mouse.down();
-  await page.mouse.move(off.x + from.x + 10, off.y + from.y + 10, { steps: 2 });
-  await page.mouse.move(off.x + to.x, off.y + to.y, { steps: 8 });
-  if (mid) await mid();
-  await page.mouse.up();
-}
-const barOf = async (frame, key) => frame.evaluate((k) => { const r = rail.win(k).el.querySelector('.paw-t').getBoundingClientRect(); return { x: r.x + 30, y: r.y + r.height / 2 }; }, key);
-const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: path.join(SHOTS, name + '.png') }); };
-
-// Runs FIRST: tipsSeen lives on this server, and any later test's first tap would dismiss it.
+useBibleServer();
 test('first-use tip: 拖动标题栏可移动或停靠 · Drag the title bar to move or dock, beside a window title', { skip, timeout: 240000 }, async () => {
-  const ctx = await browser.newContext({ viewport: DESK });
+  const ctx = await ctxNew({ viewport: DESK });
   try {
     let got = null;
     // Tips show one per page open, in registration order: earlier unseen tips are dismissed open by open.
@@ -72,7 +23,7 @@ test('first-use tip: 拖动标题栏可移动或停靠 · Drag the title bar to 
       if (cur === 'panel-window-drag') {
         got = await frame.evaluate(() => { const t = document.querySelector('.pat-tip'), b = rail.win('chat').el.querySelector('.paw-bar').getBoundingClientRect(), r = t.getBoundingClientRect();
           return { text: t.textContent, near: Math.abs(r.top - b.bottom) < 60 || Math.abs(r.bottom - b.top) < 60 }; });
-        await page.screenshot({ path: SHOTS ? path.join(SHOTS, 'after-desktop-tip.png') : path.join(root, 'tip.png') });
+        await page.screenshot({ path: SHOTS ? path.join(SHOTS, 'after-desktop-tip.png') : path.join(rootDir(), 'tip.png') });
       } else if (cur) { await frame.evaluate((c) => PATips.dismiss(c), cur); await frame.evaluate(() => PATips.whenIdle()); }
       await page.close();
     }
@@ -198,7 +149,7 @@ test('every snap target shows its preview while dragging and docks on release', 
 });
 
 test('the layout is remembered per device: a reload brings back the same dock, size and float', { skip, timeout: 120000 }, async () => {
-  const ctx = await browser.newContext({ viewport: DESK });
+  const ctx = await ctxNew({ viewport: DESK });
   try {
     let { page, frame } = await open({ ctx });
     await frame.locator('#top-ai').click(); await frame.waitForSelector('.paw-win.on');
@@ -250,53 +201,6 @@ test('iPad 1180x820: a finger or Pencil drag on the title moves the window — n
       await frame.evaluate(() => rail.win('note').dock('bottom'));
     }
     assert.equal(await frame.evaluate(() => getComputedStyle(document.querySelector('.paw-bar')).touchAction), 'none');
-  } finally { await ctx.close(); }
-});
-
-test('GPT review: one pointer owns a drag, a lost pointer never sticks, a cancelled resize is undone, pills sit above a bottom dock, keyboard keeps a dock docked', { skip, timeout: 120000 }, async () => {
-  const { ctx, frame } = await open();
-  try {
-    await frame.locator('#top-ai').click(); await frame.waitForFunction(() => rail.win('chat').isVisible());
-    const r = await frame.evaluate(async () => {
-      rail.win('chat').dock('right');
-      const w = rail.win('chat'), t = w.el.querySelector('.paw-t'), b = t.getBoundingClientRect(), x0 = b.x + 30, y0 = b.y + b.height / 2;
-      const fire = (el, type, id, x, y) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: id, pointerType: id === 1 ? 'pen' : 'touch', clientX: x, clientY: y, buttons: type === 'pointerup' ? 0 : 1 }));
-      const out = {};
-      // Pencil (id 1) drags; a finger (id 2) touches and lifts mid-drag — the Pencil's drag goes on.
-      fire(t, 'pointerdown', 1, x0, y0); fire(t, 'pointermove', 1, x0 - 100, y0 + 200);
-      fire(t, 'pointerdown', 2, x0 + 5, y0); fire(t, 'pointermove', 2, x0 + 400, y0 + 400); fire(t, 'pointerup', 2, x0 + 400, y0 + 400);
-      out.stillMoving = document.documentElement.classList.contains('paw-moving');
-      fire(t, 'pointermove', 1, x0 - 300, y0 + 250); const mid = w.rect();
-      fire(t, 'pointerup', 1, x0 - 300, y0 + 250);
-      out.followedPen = Math.abs(mid.x - (w.rect().x)) < 2 && w.state().mode === 'float' ? true : JSON.stringify([mid, w.rect(), w.state()]);
-      // A lost pointer (capture lost, no pointerup) ends the drag: nothing stays unclickable.
-      const b2 = t.getBoundingClientRect();
-      fire(t, 'pointerdown', 3, b2.x + 30, b2.y + 10); fire(t, 'pointermove', 3, b2.x + 80, b2.y + 60);
-      out.movingBefore = document.documentElement.classList.contains('paw-moving');
-      t.closest('.paw-bar').dispatchEvent(new PointerEvent('lostpointercapture', { bubbles: true, pointerId: 3 }));
-      out.movingAfterLost = document.documentElement.classList.contains('paw-moving');
-      fire(t, 'pointerdown', 4, b2.x + 30, b2.y + 10); fire(t, 'pointermove', 4, b2.x + 80, b2.y + 60);
-      document.querySelector('.paw-bar').dispatchEvent(new FocusEvent('blur')); out.movingAfterElBlur = document.documentElement.classList.contains('paw-moving');
-      window.dispatchEvent(new Event('blur')); out.movingAfterBlur = document.documentElement.classList.contains('paw-moving');
-      // A resize cancelled by Esc is undone (and not saved).
-      w.float({ x: 200, y: 200, w: 400, h: 400 });
-      const r0 = w.rect(), h = w.el.querySelector('.paw-h[data-d=se]'), hb = h.getBoundingClientRect();
-      fire(h, 'pointerdown', 5, hb.x + 5, hb.y + 5); fire(h, 'pointermove', 5, hb.x + 120, hb.y + 90);
-      out.grew = w.rect().w > r0.w;
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-      out.undone = JSON.stringify(w.rect()) === JSON.stringify(r0);
-      // A minimised window's pill paints above a bottom-docked Note.
-      await new Promise((z) => setTimeout(z, 50));
-      return out;
-    });
-    assert.deepEqual(r, { stillMoving: true, followedPen: true, movingBefore: true, movingAfterLost: false, movingAfterElBlur: true, movingAfterBlur: false, grew: true, undone: true });
-    await frame.locator('#top-note').click(); await frame.waitForFunction(() => rail.win('note').isVisible());
-    await frame.evaluate(() => { rail.win('note').dock('bottom'); rail.win('chat').minimize(); });
-    const pillTop = await frame.evaluate(() => { const p = document.querySelector('.paw-pill').getBoundingClientRect(), e = document.elementFromPoint(p.x + p.width / 2, p.y + p.height / 2); return !!(e && e.closest('.paw-pill')); });
-    assert.ok(pillTop, 'the pill is the top element at its centre, over the bottom dock');
-    const k = await frame.evaluate(() => { const w = rail.win('note'), bar = w.el.querySelector('.paw-bar'), ev = (key, shift) => bar.dispatchEvent(new KeyboardEvent('keydown', { key, altKey: true, shiftKey: shift, bubbles: true, cancelable: true }));
-      const h0 = w.rect().h; ev('ArrowUp', true); const h1 = w.rect().h; ev('ArrowLeft', false); return { grew: h1 > h0, mode: w.state().mode, where: w.state().where }; });
-    assert.deepEqual(k, { grew: true, mode: 'dock', where: 'left' }, 'Alt+Shift+Up grows the bottom dock; Alt+Left docks it left — never a float');
   } finally { await ctx.close(); }
 });
 

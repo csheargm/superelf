@@ -12,13 +12,13 @@
      through PAAppPrefs (localStorage throws at the app frame's opaque origin). Phones never get here: PASplit's gate
      keeps them on the full-screen sheet. The pure geometry (PAWin.geo) is driven by test/panel-window.test.mjs. -->
 <style id="paw-style">
-/* z-index LITERAL (test/app-load.test.mjs ladder): windows 46/47 above the page, pills/snap 48 (a bottom dock never covers a pill), maximised 49, all below .pac-fs/.pan-fs (50). */
+/* z-index LITERAL (test/app-load.test.mjs ladder): windows 46/47 above the page, snap 48, maximised 48, pills 49 (no window — docked or maximised — ever covers a pill), all below .pac-fs/.pan-fs (50). */
 .paw-win{position:fixed;z-index:46;display:none;flex-direction:column;box-sizing:border-box;background:var(--card,#fff);
   border:1px solid var(--line,#e2e2de);box-shadow:0 4px 18px rgba(0,0,0,.12)}
 .paw-win.on{display:flex}
 .paw-win.paw-float{border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.22)}
 .paw-win.paw-front{z-index:47}
-.paw-win.paw-max{z-index:49}
+.paw-win.paw-max{z-index:48}
 .paw-bar{display:flex;align-items:center;gap:2px;height:40px;padding:0 4px 0 12px;flex-shrink:0;cursor:grab;touch-action:none;
   border-bottom:1px solid var(--line,#e2e2de);font:600 13px/1 -apple-system,system-ui,"PingFang SC",sans-serif;color:var(--muted,#6b7370);
   -webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
@@ -49,7 +49,7 @@
 html.paw-moving .paw-snap.on,html.paw-moving .paw-tgt{display:block}
 html.paw-moving{-webkit-user-select:none;user-select:none}
 html.paw-moving .paw-body{pointer-events:none}
-.paw-pills{position:fixed;right:12px;bottom:12px;z-index:48;display:flex;gap:6px}
+.paw-pills{position:fixed;right:12px;bottom:12px;z-index:49;display:flex;gap:6px}
 .paw-pill{border:1px solid var(--line,#e2e2de);border-radius:18px;background:var(--card,#fff);color:var(--text,#1d2321);
   font:13px/1 -apple-system,system-ui,sans-serif;padding:0 14px;min-height:36px;box-shadow:0 2px 10px rgba(0,0,0,.15);cursor:pointer}
 /* THE PUSH. Sideways: margin on every body child (a flow column and a fixed surface both narrow — PASplit's
@@ -128,7 +128,7 @@ html.paw-pb>body>:is(.pan-fs,.pac-fs){margin-bottom:var(--paw-b)}
   const cls=()=>{ let c=false; try{ c=window.matchMedia('(any-pointer:coarse)').matches; }catch(_){ /* no matchMedia: a desktop */ } return deviceClass(vp().w,vp().h,c); };
   let stored=null, saveT=0, pills=null, snapEl=null, tgts=null;
   function mk(tag,c,parent){ const e=document.createElement(tag); e.className=c; if(parent) parent.appendChild(e); return e; }
-  function btn(w,c,text,label,fn){ const b=mk('button','paw-btn '+c,null); b.type='button'; b.textContent=text; b.title=label; b.setAttribute('aria-label',label);
+  function btn(c,text,label,fn){ const b=mk('button','paw-btn '+c,null); b.type='button'; b.textContent=text; b.title=label; b.setAttribute('aria-label',label);
     b.onclick=e=>{ e.stopPropagation(); fn(); }; return b; }
   function chrome(){
     if(pills) return; pills=mk('div','paw-pills paw-x',document.body); snapEl=mk('div','paw-snap paw-x',document.body);
@@ -151,12 +151,20 @@ html.paw-pb>body>:is(.pan-fs,.pac-fs){margin-bottom:var(--paw-b)}
   }
   function showErr(text){ wins.forEach(w=>{ w.err.textContent=text||''; }); }
   function entry(s){ const e={mode:s.mode,where:s.where,size:Object.assign({},s.size)}; if(s.rect) e.rect=Object.assign({},s.rect); if(s.max) e.max=true; return e; }
+  // The session's own copy, updated at once: a window rebuilt after a gate crossing (rotation) re-applies
+  // THIS layout, not the page-load one, and a window destroyed inside the save debounce is still written.
+  // The class is taken when the change is made, so a save still pending after a rotation lands in the class it came from.
+  const dirty=new Set();
+  function remember(){ if(active) return; const c=cls(); stored=Object.assign({},stored); stored[c]=Object.assign({},stored[c]);
+    wins.forEach(w=>{ stored[c][w.s.key]=entry(w.s); }); dirty.add(c); }
   function save(){
-    clearTimeout(saveT); saveT=setTimeout(()=>{ const P=window.PAAppPrefs; if(!P) return;
-      if(active){ save(); return; }   // mid-gesture: a transient (maybe cancelled) size is never written   // no prefs on this page: the layout is simply not kept
+    remember(); clearTimeout(saveT); saveT=setTimeout(()=>{ const P=window.PAAppPrefs;
+      if(!P) return;   // no prefs on this page: the layout is simply not kept
+      if(active){ save(); return; }   // mid-gesture: a transient (maybe cancelled) size is never written
+      const cs=[...dirty]; dirty.clear();
       // Re-read first: another device may have saved ITS class since this page loaded; only this class is replaced.
-      P.read().then(rd=>{ if(!(rd&&rd.ok)){ showErr(L.save+' — '+((rd&&rd.error)||'?')); return; }
-        const all=Object.assign({},rd.prefs[KEY]), c=cls(); all[c]=Object.assign({},all[c]); wins.forEach(w=>{ all[c][w.s.key]=entry(w.s); });
+      P.read().then(rd=>{ if(!(rd&&rd.ok)){ cs.forEach(c=>dirty.add(c)); showErr(L.save+' — '+((rd&&rd.error)||'?')); return; }
+        const all=Object.assign({},rd.prefs[KEY]); cs.forEach(c=>{ all[c]=Object.assign({},all[c],stored[c]); });
         return P.patch({[KEY]:all}).then(r=>showErr(r&&r.ok?'':L.save+((r&&r.error)?' — '+r.error:''))); }); },300);
   }
   function apply(w){ const e=stored&&stored[cls()]&&stored[cls()][w.s.key]; if(!e||w.touched) return;
@@ -166,7 +174,8 @@ html.paw-pb>body>:is(.pan-fs,.pac-fs){margin-bottom:var(--paw-b)}
   function load(){
     if(load.p) return load.p; const P=window.PAAppPrefs; if(!P){ load.p=Promise.resolve(); return load.p; }
     load.p=P.read().then(r=>{ if(!(r&&r.ok)){ showErr(L.read+' — '+((r&&r.error)||'?')); return; }
-      stored=r.prefs[KEY]||null;
+      const mine=stored; stored=r.prefs[KEY]||null;
+      if(mine){ stored=Object.assign({},stored); Object.keys(mine).forEach(c=>{ stored[c]=Object.assign({},stored[c],mine[c]); }); }   // a change made before the read answered wins
       if(!stored&&r.prefs[OLD]){ const v=vp(); stored=migrate(r.prefs[OLD],cls(),v.w,v.h); P.patch({[KEY]:stored,[OLD]:null}).then(w=>{ if(!(w&&w.ok)) showErr(L.save+' — '+((w&&w.error)||'?')); }); }
       wins.forEach(apply); render(); });
     return load.p;
@@ -213,18 +222,22 @@ html.paw-pb>body>:is(.pan-fs,.pac-fs){margin-bottom:var(--paw-b)}
       if(cancelled) Object.assign(w.s,JSON.parse(before)); else if(tgt){ w.s.mode='dock'; w.s.where=tgt; }
       render(); save(); });
   }
+  // Windows docked on one edge share it (layout takes the largest), so a dock size is written to every one of them.
+  function peers(w){ const s=w.s; if(s.where==='tr'||s.where==='br') return [w];
+    return wins.filter(x=>x===w||(x.s.open&&!x.s.min&&!x.s.max&&x.s.mode==='dock'&&x.s.where===s.where)); }
+  function setDock(w,k,val){ peers(w).forEach(x=>{ x.s.size[k]=clampSize(k,val); x.touched=true; }); }
   function onHandleDown(w,e,d){
-    const r0=Object.assign({},w.cur), sx=e.clientX, sy=e.clientY, before=JSON.stringify(w.s);
+    const r0=Object.assign({},w.cur), sx=e.clientX, sy=e.clientY, group=peers(w), before=group.map(x=>JSON.stringify(x.s));
     gesture(e,e.currentTarget,()=>{},(x,y)=>{ const v=vp(), s=w.s, dx=x-sx, dy=y-sy;
       if(s.mode==='dock'){ const k=(s.where==='tr'||s.where==='br')?'right':s.where;
-        s.size[k]=clampSize(k,{right:(v.w-x)/v.w,left:x/v.w,top:y/v.h,bottom:(v.h-y)/v.h}[k]); }
+        setDock(w,k,{right:(v.w-x)/v.w,left:x/v.w,top:y/v.h,bottom:(v.h-y)/v.h}[k]); }
       else { const r=Object.assign({},r0);
         if(d.includes('e')) r.w=Math.max(MIN_W,Math.min(r0.w+dx,v.w-r0.x));
         if(d.includes('s')) r.h=Math.max(MIN_H,Math.min(r0.h+dy,v.h-r0.y));
         if(d.includes('w')){ r.w=Math.max(MIN_W,Math.min(r0.w-dx,r0.x+r0.w)); r.x=r0.x+r0.w-r.w; }
         if(d.includes('n')){ r.h=Math.max(MIN_H,Math.min(r0.h-dy,r0.y+r0.h)); r.y=r0.y+r0.h-r.h; }
         setRect(w,r); }
-      render(); },cancelled=>{ if(cancelled){ Object.assign(w.s,JSON.parse(before)); render(); return; } w.touched=true; save(); });
+      render(); },cancelled=>{ if(cancelled){ group.forEach((x,i)=>Object.assign(x.s,JSON.parse(before[i]))); render(); return; } w.touched=true; save(); });
   }
   function onKey(w,e){
     if(e.key==='Escape'&&w.s.max){ w.api.restore(); e.preventDefault(); return; }
@@ -234,7 +247,7 @@ html.paw-pb>body>:is(.pan-fs,.pac-fs){margin-bottom:var(--paw-b)}
     if(w.s.mode==='dock'&&!w.s.max){ const edge={'-1,0':'left','1,0':'right','0,-1':'top','0,1':'bottom'}[d.join()];
       if(!e.shiftKey){ w.api.dock(edge); return; }
       const k=(w.s.where==='tr'||w.s.where==='br')?'right':w.s.where, v=vp(), grow={right:-d[0],left:d[0],top:d[1],bottom:-d[1]}[k];
-      w.s.size[k]=clampSize(k,w.s.size[k]+grow*STEP/((k==='top'||k==='bottom')?v.h:v.w)); w.touched=true; render(); save(); return; }
+      setDock(w,k,w.s.size[k]+grow*STEP/((k==='top'||k==='bottom')?v.h:v.w)); render(); save(); return; }
     const c=Object.assign({},w.cur); w.s.mode='float'; w.s.max=false;
     if(e.shiftKey){ c.w+=d[0]*STEP; c.h+=d[1]*STEP; } else { c.x+=d[0]*STEP; c.y+=d[1]*STEP; }
     setRect(w,c); w.touched=true; render(); save();
@@ -243,9 +256,9 @@ html.paw-pb>body>:is(.pan-fs,.pac-fs){margin-bottom:var(--paw-b)}
     const el=w.el=mk('div','paw-win paw-x',document.body); el.setAttribute('role','dialog'); el.setAttribute('aria-label',w.o.title||w.s.key);
     const bar=w.bar=mk('div','paw-bar',el); bar.tabIndex=0; bar.title=L.tip;
     w.titleEl=mk('span','paw-t',bar); w.titleEl.textContent=w.o.title||w.s.key; w.err=mk('span','paw-err',bar);
-    bar.appendChild(btn(w,'paw-min','—',L.min,()=>w.api.minimize()));
-    bar.appendChild(w.maxB=btn(w,'paw-maxb','□',L.max,()=>{ if(w.s.max) w.api.restore(); else w.api.maximize(); }));
-    bar.appendChild(btn(w,'paw-close','✕',L.close,()=>w.api.userClose()));
+    bar.appendChild(btn('paw-min','—',L.min,()=>w.api.minimize()));
+    bar.appendChild(w.maxB=btn('paw-maxb','□',L.max,()=>{ if(w.s.max) w.api.restore(); else w.api.maximize(); }));
+    bar.appendChild(btn('paw-close','✕',L.close,()=>w.api.userClose()));
     w.body=mk('div','paw-body',el);
     ['n','s','e','w','ne','nw','se','sw'].forEach(d=>{ const h=mk('div','paw-h',el); h.dataset.d=d;
       h.addEventListener('pointerdown',e=>onHandleDown(w,e,d)); h.addEventListener('touchstart',e=>e.stopPropagation(),{passive:true}); });
@@ -267,7 +280,7 @@ html.paw-pb>body>:is(.pan-fs,.pac-fs){margin-bottom:var(--paw-b)}
       open:()=>{ const was=s.open&&!s.min; s.open=true; s.min=false; raise(w); if(!was) vis(true); else render(); showTip(w); },
       close:()=>{ if(!s.open) return; s.open=false; s.min=false; vis(false); },
       // The ✕: the mounted surface's own close path when it has one (it flushes a note first), else a plain close.
-      userClose:()=>{ const inner=o.closeSel&&w.body.querySelector(o.closeSel); if(inner&&inner.onclick) inner.onclick(); else if(inner) inner.click(); else w.api.close(); },
+      userClose:()=>{ const inner=o.closeSel&&w.body.querySelector(o.closeSel); if(inner) inner.click(); else w.api.close(); },
       minimize:()=>{ if(!s.open||s.min) return; s.min=true; vis(false); },
       maximize:()=>{ s.max=true; s.min=false; w.touched=true; render(); save(); },
       restore:()=>{ const was=s.min; s.min=false; s.max=false; w.touched=true; raise(w); if(was) vis(true); else render(); save(); },

@@ -105,7 +105,7 @@
       open:open, close:close, isOpen:function(){ return shown; }, destroy:destroy,
       expand:function(k){ toggle(k,true); }, collapse:function(k){ toggle(k,false); }, toggle:toggle,
       isCollapsed:function(k){ return !(wins[k]&&wins[k].isVisible()); },
-      toggleMax:function(k){ var w=wins[k]; if(w.state().max) w.restore(); else w.maximize(); },
+      toggleMax:function(k){ var w=wins[k]; if(!w) return; if(w.state().max) w.restore(); else w.maximize(); },
       isMaxed:function(k){ return Object.keys(wins).some(function(x){ return (!k||x===k)&&wins[x].state().max; }); },
       dock:function(k,z){ if(wins[k]) wins[k].dock(z); },
       zoneOf:function(k){ return wins[k]&&wins[k].state().where; },
