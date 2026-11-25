@@ -82,7 +82,7 @@ test('text faults: a label under 12px, body text under 16px, a hover-only menu',
   assert.match(phoneTextProblems(page('body{font-size:14px}')).join(), /正文/);
   assert.match(phoneTextProblems(page('p,li{font-size:15px}')).join(), /正文/);
   assert.match(phoneTextProblems(page('.m .menu{display:none} .m:hover .menu{display:block}')).join(), /hover/);
-  assert.match(phoneTextProblems(page('.row:hover > .del{opacity:1}')).join(), /hover/);
+  assert.match(phoneTextProblems(page('.del{opacity:0} .row:hover > .del{opacity:1}')).join(), /hover/);
 });
 
 test('text faults: what is not one (known limits stated in lib/app-phone-check.mjs)', () => {
@@ -121,3 +121,14 @@ test('every app copy (repo and the owner\'s live/overlay copies when present): t
     assert.ok(!phoneTextProblems(html).some((t) => /hover/.test(t)), `no hover-only false hit: ${f}`);
   }
 });
+
+test('GPT review: winning font-size, a min-width media block a phone sees, touch fallbacks', () => {
+  assert.deepEqual(phoneTextProblems(page('.tag{font-size:10px;font-size:12px}')), []);
+  assert.match(phoneTextProblems(page('.tag{font-size:12px !important;font-size:20px} .b{font-size:13px;font-size:9px}')).join(), /12px/);
+  assert.match(phoneTextProblems(page('@media (min-width:320px){p{font-size:14px}}')).join(), /正文/);
+  assert.deepEqual(phoneTextProblems(page('@media (min-width:768px){p{font-size:14px}}')), []);
+  assert.match(phoneProblems(page('@media (min-width:300px){.w{width:900px}}')).join(), /900px/);
+  assert.deepEqual(phoneTextProblems(page('.menu{display:none} .row:hover .menu{display:block} @media (hover:none){.menu{display:block}}')), []);
+  assert.deepEqual(phoneTextProblems(page('.row:hover .tag{display:inline-block}')), []);
+});
+
