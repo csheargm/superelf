@@ -70,7 +70,8 @@ test('demo: the drawer ends with "About superelf" linking to demo.home_url, top-
   await ctx.close();
 });
 
-test('a short screen: the drawer scrolls and the row is still reachable', { skip }, async () => {
+// The drawer's sections scroll together inside .dscroll (548eebda); the footer rows stay pinned below it.
+test('a short screen: the drawer sections scroll and the row is still reachable', { skip }, async () => {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 360 } }); const page = await ctx.newPage();
   await page.goto(`http://127.0.0.1:${demo.port}/`);
   await settled(page);
@@ -78,7 +79,7 @@ test('a short screen: the drawer scrolls and the row is still reachable', { skip
   const row = page.locator('#drawer > a#demoHome');
   await row.waitFor({ state: 'attached' });
   await page.waitForFunction(() => document.querySelectorAll('#dApps > *').length > 2);
-  assert.ok(await page.evaluate(() => { const d = document.getElementById('drawer'); return d.scrollHeight > d.clientHeight; }), 'CONTROL: the content overflows this screen');
+  assert.ok(await page.evaluate(() => { const d = document.querySelector('#drawer > .dscroll'); return d.scrollHeight > d.clientHeight; }), 'CONTROL: the sections overflow this screen');
   assert.ok(await page.evaluate(() => document.getElementById('convos').clientHeight) >= 100, 'the chat list keeps room, not squeezed to zero');
   await row.scrollIntoViewIfNeeded();
   const [top, bottom] = await row.evaluate((e) => { const r = e.getBoundingClientRect(); return [r.top, r.bottom]; });

@@ -315,7 +315,9 @@ test("(d) a Bible chapter with an INLINE draws{} notebook round-trips, and its n
     const A = runApp('bible (live)', h.relay, ['DATA', 'loadAnn', 'annPath', 'get ANN(){return ANN}',
       'setCh:(b,c)=>{bookIdx=b;chapter=c;}', 'setScope:(k)=>{_drawScope=k;_drawPath=annPath();}'], { clampTimers: true });
     A.setCh(42, 3);
-    await A.loadAnn();
+    // The app's own boot load() may start a read while ours is in flight (seen under the full suite):
+    // loadAnn() then returns false and ANN is the boot's half-loaded one. Read again until ours is the newest.
+    for (let i = 0; i < 5 && !(await A.loadAnn()); i++);
     A.setScope('v16');
     const pad = A.captured.pads[0];
     const out = await pad.opts.load();
