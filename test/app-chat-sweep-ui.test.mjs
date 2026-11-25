@@ -39,6 +39,7 @@ test('F1: an unconfirmed turn (a question) never gets the "not changed" note; an
 test('F2: the member lane keeps the model\'s plain sentence, never code', () => {
   assert.equal(saidOf('The Add button is now dark green.\n```html\n<html></html>\n```'), 'The Add button is now dark green.');
   assert.equal(saidOf('```html\n<html></html>\n```'), '', 'no sentence: the fallback is used');
+  assert.equal(saidOf('Now green (\\#2e7d32).\n```html\n<html></html>\n```'), 'Now green (#2e7d32).', 'the real CLI escaped the #');
   assert.ok(CHANGED_FALLBACK.length > 0);
 });
 
