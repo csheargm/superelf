@@ -20,7 +20,7 @@ import { agentAllowed, lanesFor, memberLane, NO_PLAIN_LANE_TEXT, AGENT_OFF_TEXT 
 import { cancelOnClose, createTurnCancel, createTurnStops, CANCELLED_TEXT } from './lib/turn-stop.mjs';
 import { watchConfig } from './lib/config-watch.mjs';
 import { oneShotBaseArgs, oneShotModel, yieldSettings, NO_TOOLS_ARGS } from './lib/one-shot.mjs';
-import { mintConfirm, planOffer, applyMessage, applyNowPrompt, toolTalkReplacement, APPLY_LABEL, PLAN_MAX, PLAN_TOO_LONG } from './lib/app-edit-confirm.mjs';
+import { mintConfirm, planOffer, applyMessage, applyNowPrompt, toolTalkReplacement, retirePending, APPLY_LABEL, PLAN_MAX, PLAN_TOO_LONG } from './lib/app-edit-confirm.mjs';
 import { runScopedEdit, scopedLane, flattenForClaude } from './lib/app-edit-lane.mjs';
 import { safeJoin, slugOk, drawerOpenOf, tokenOk, dataContentType, readBody, writeFileAtomic, renameWithRetry, decodeBase64Strict, bodyErrorResponse, BODY_LIMITS } from './lib/webutil.mjs';
 import { createConvoLocks, withConvoTurn, QUEUED_TURN_TEXT } from './lib/convo-lock.mjs';
@@ -1325,8 +1325,10 @@ function offerApply(user, edit, message, r, line, convoId) {
   if (edit.confirmed || edit.superelf || edit.undo) return r;
   const o0 = planOffer(r.text);
   if (!o0.offered) {   // backstop: tool/session talk never reaches the user; the pending plan and its button do
-    const t = toolTalkReplacement(r.text, { who: user.id, slug: edit.slug, convo: convoId });
+    const key = { who: user.id, slug: edit.slug, convo: convoId };
+    const t = toolTalkReplacement(r.text, key);
     if (t && t.id) line({ type: 'app-change-confirm', slug: edit.slug, label: APPLY_LABEL, message: applyMessage(t.id) });
+    else retirePending(key);   // answered with anything else ("no, leave it"): a later yes applies nothing (GPT review r2)
     return t ? { ...r, text: t.text } : r;
   }
   const o = { ...o0, text: scrubPaths(cleanReply(o0.text).text, wsDir(user)) };   // the plan Apply runs is the plan the user saw (GPT review r1)

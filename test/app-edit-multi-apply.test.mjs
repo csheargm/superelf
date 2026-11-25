@@ -100,6 +100,11 @@ test('one conversation: plan → Apply → plan → typed yes → plan → Apply
   }
   t = await turn({ edit: 'todo', message: 'yes', convoId });
   assert.equal(colour(), 'green', 'a yes with no pending plan changes nothing');
+  t = await turn({ edit: 'todo', message: 'make the title pink', convoId });
+  assert.ok(t.apply);
+  await turn({ edit: 'todo', message: 'no, leave it as is', convoId });
+  await turn({ edit: 'todo', message: 'yes', convoId });
+  assert.equal(colour(), 'green', 'a plan answered with "no" is retired: a later yes applies nothing');
 });
 
 test("an app's own chat: the owner's reply naming the panel carries a working button; a member gets none and no promise", async () => {
