@@ -1,4 +1,12 @@
 {
+  "v5.19.3": {
+    "date": "2026-11-24",
+    "features": [],
+    "fixes": [
+      "菜单随应用栏收起 · Menus close with the app bar"
+    ],
+    "through": "52b42d676eafe48d51974e4e7ca0e265fd8c2bab"
+  },
   "v5.19.2": {
     "date": "2026-11-24",
     "features": [],
