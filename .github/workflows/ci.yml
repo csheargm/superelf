@@ -123,11 +123,12 @@ jobs:
         # 2026-11-25: EVERY OS +9 (ubuntu 218, windows 304): tips-close-e2e (home tip x4 engine/device, blocked storage,
         #   app tips x4), skipped on CI by PA_E2E_SKIP.
         # 2026-11-25: EVERY OS +1 (ubuntu 219, windows 305): app-chat-sweep-ui F6 (PASnap fixed bar in Chromium), skipped on CI by PA_E2E_SKIP.
+        # 2026-11-25: EVERY OS +9 (ubuntu 228, windows 314): phone-friendly-e2e and phone-chat-notes-e2e (WebKit iPhone/iPad), skipped on CI by PA_E2E_SKIP.
         include:
           - os: ubuntu-latest
-            max_skipped: 219
+            max_skipped: 228
           - os: windows-latest
-            max_skipped: 305
+            max_skipped: 314
     env:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED
