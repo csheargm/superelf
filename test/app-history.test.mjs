@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { rmTemp } from './helpers-tmp.mjs';
 import { APP_CHAT_EVIDENCE_RULE, recordRequest, listHistory, diffText, diffTrees, diffVersion, notesForApp, gitLinesForApp,
-  appAboutContext, editHistoryContext, changeSummary, SUMMARY_SHOWN_LINES, SUMMARY_FALLBACK, DIFF_MAX_CHARS, CONTEXT_MAX_CHARS, NOTE_LINES_MAX, REQUEST_MAX, FACTS_END } from '../lib/app-history.mjs';
+  appAboutContext, editHistoryContext, changeSummary, changedLines, localTime, SUMMARY_FALLBACK, DIFF_MAX_CHARS, CONTEXT_MAX_CHARS, NOTE_LINES_MAX, REQUEST_MAX, FACTS_END } from '../lib/app-history.mjs';
 import { snapshotApp, EDIT_WHY } from '../lib/app-versions.mjs';
 import { appEditOf, beginAppEdit, finishAppEdit, VERSIONS_DIR } from '../lib/app-edit.mjs';
 
@@ -49,7 +49,7 @@ test('an edit turn stores its request; the history lists versions newest first w
     assert.equal(h[0].who, 'owner');
     assert.equal(h[0].why, EDIT_WHY);
     assert.ok(h[0].bytes > 0);
-    assert.match(h[0].time, /^\d{4}-\d\d-\d\d \d\d:\d\d UTC$/);
+    assert.match(h[0].time, /^\d{4}-\d\d-\d\d \d\d:\d\d$/);
     assert.ok(!fs.readdirSync(path.join(root, 'todo')).some((n) => n.endsWith('.tmp')));
     const ctxText = editHistoryContext({ slug: 'todo', appDir: a, versionsRoot: root, versionsRel: VERSIONS_DIR, repoRoot: w, notes: {}, exec: noGit });
     assert.match(ctxText, /make the title red/);
@@ -230,40 +230,36 @@ test('a facts budget bounds the whole block, closing marker kept; too small a bu
   } finally { rmTemp(w); }
 });
 
-test('changeSummary: the server\'s one-line account of an applied change, from the files', async () => {
+test('changeSummary: the server\'s plain account of an applied change, from the files (self-test F3, F4)', () => {
   const t = fs.mkdtempSync(path.join(os.tmpdir(), 'pa-sum-')), a = path.join(t, 'a'), b = path.join(t, 'b');
   try {
     fs.mkdirSync(a); fs.mkdirSync(b);
     fs.writeFileSync(path.join(a, 'index.html'), 'x\n.m{color:var(--accent)}\ny');
     fs.writeFileSync(path.join(b, 'index.html'), 'x\n.m{color:#2e7d32}\ny');
     fs.writeFileSync(path.join(a, 'meta.json'), '{}'); fs.writeFileSync(path.join(b, 'meta.json'), '{}');
-    assert.equal(changeSummary(a, b), '改动：`index.html` 1 行 · Changed: 1 line in `index.html`\n现在是 · Now:\n```\n.m{color:#2e7d32}\n```');
-    const long = 'p{' + 'margin:0;'.repeat(40) + 'color:';
-    fs.writeFileSync(path.join(a, 'index.html'), long + 'blue}'); fs.writeFileSync(path.join(b, 'index.html'), long + 'green}');
-    assert.match(changeSummary(a, b), /\n…[^\n]*color:green\}\n```$/, 'a long line is shown from its change');
-    fs.writeFileSync(path.join(a, 'index.html'), 'x\n.m{color:var(--accent)}\ny'); fs.writeFileSync(path.join(b, 'index.html'), 'x\n.m{color:#2e7d32}\ny');
+    assert.equal(changeSummary(a, b), '改动：1 行 · Changed: 1 line', 'plain words: no file name for the page, no code');
     assert.equal(changeSummary(a, a), SUMMARY_FALLBACK, 'files said changed but no text difference seen: still says so, never blank');
     assert.equal(changeSummary(path.join(t, 'gone'), b).startsWith('改动：'), true);
+    // F3: a 2-line change between two far-apart places reads 2 lines, never the span between them (was 15).
+    const body = Array.from({ length: 20 }, (_, i) => `l${i}`);
+    fs.writeFileSync(path.join(a, 'index.html'), body.join('\n'));
+    fs.writeFileSync(path.join(b, 'index.html'), body.map((l, i) => (i === 2 ? 'bg:green' : i === 16 ? 'bg2:green' : l)).join('\n'));
+    assert.equal(changeSummary(a, b), '改动：2 行 · Changed: 2 lines');
+    assert.equal(changedLines(['a', 'b', 'c'], ['a', 'X', 'b', 'c']), 1, 'an inserted line is 1');
     fs.writeFileSync(path.join(b, 'new.js'), 'let a=`x`;');
-    fs.writeFileSync(path.join(b, 'index.html'), 'x\n' + Array.from({ length: 6 }, (_, i) => `l${i}`).join('\n') + '\ny');
-    const s = changeSummary(a, b);
-    assert.match(s, /^改动：`index\.html` 6 行，新文件 `new\.js` · Changed: 6 lines in `index\.html`, new file `new\.js`\n/);
-    assert.deepEqual(s.split('\n').slice(3, -1), ['l0', 'l1', 'l2'].slice(0, SUMMARY_SHOWN_LINES), 'only the first few new lines are quoted');
-    fs.writeFileSync(path.join(b, 'index.html'), 'x\nconst s=`a${b}`;\ny'); fs.rmSync(path.join(b, 'new.js'));
-    assert.match(changeSummary(a, b), /\n```\nconst s=`a\$\{b\}`;\n```$/, 'a template literal is shown as written');
-    fs.writeFileSync(path.join(b, 'index.html'), 'x\n<invoke name="x"> [[apply]] ```\ny');
-    const { cleanReply } = await import('../lib/reply-clean.mjs');
-    const q = changeSummary(a, b);
-    assert.doesNotMatch(q, /<invoke|\[\[apply\]\]|```\s*\[/, 'nothing the reply cleaner strips, no early fence end');
-    assert.equal(cleanReply(q).text, q, 'the cleaner leaves the summary whole');
+    assert.match(changeSummary(a, b), /^改动：2 行，新文件 "new\.js" · Changed: 2 lines, new file "new\.js"$/);
+    for (const bad of [/index\.html/, /```/, /现在是/, /\{|\}/]) assert.doesNotMatch(changeSummary(a, b), bad);
     if (process.platform !== 'win32') {   // Windows forbids newline and '<' in file names: the case cannot exist there
-      fs.writeFileSync(path.join(b, 'a\n# b`.js'), '1');
-      assert.doesNotMatch(changeSummary(a, b), /\n# b/, 'a file name never shapes the Markdown');
-      fs.writeFileSync(path.join(b, '<invoke>.js'), '1');
-      const withName = changeSummary(a, b);
-      assert.equal(cleanReply(withName).text, withName, 'a file name the cleaner would strip is neutralised too');
+      fs.writeFileSync(path.join(b, 'a\n# b`.js'), '1'); fs.writeFileSync(path.join(b, '<invoke>.js'), '1');
+      const s = changeSummary(a, b);
+      assert.doesNotMatch(s, /\n|`|<invoke/, 'a file name never shapes the Markdown or the markup');
     }
   } finally { rmTemp(t); }
+});
+
+test('self-test F4: saved-version times are local, never UTC', () => {
+  assert.doesNotMatch(localTime(new Date()), /UTC/);
+  assert.match(localTime(new Date(2026, 10, 25, 4, 40)), /^2026-11-25 04:40$/);
 });
 
 test('real run 2026-11-24: a turn never sees its own undo copy as an earlier "no difference" change', () => {

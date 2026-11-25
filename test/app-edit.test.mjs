@@ -72,7 +72,7 @@ test('a change that passes the checks is applied and undo puts the old app back'
     fs.writeFileSync(path.join(w, 'apps', 'todo', 'index.html'), PAGE.replace('Hi', 'Hello'));
     const out = finishAppEdit(e, ctx, { wsDir: w });
     assert.deepEqual([out.line.changed, out.line.applied], [true, true]);
-    assert.equal(out.note, '改动：`index.html` 1 行 · Changed: 1 line in `index.html`\n现在是 · Now:\n```\n' + PAGE.replace('Hi', 'Hello') + '\n```', 'the reply ends with the server\'s account from the diff');
+    assert.equal(out.note, '改动：1 行 · Changed: 1 line', 'the reply ends with the server\'s plain account from the diff');
     const u = undoAppEdit(e, { wsDir: w });
     assert.equal(u.line.undone, true);
     assert.equal(fs.readFileSync(path.join(w, 'apps', 'todo', 'index.html'), 'utf8'), PAGE);
