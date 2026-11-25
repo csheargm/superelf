@@ -658,6 +658,7 @@ function sendFile(res, file, { type, extra = {} } = {}) {
 // sandbox CSP forbids <script src> (no 'self'), so serve-time inlining of these single
 // canonical files is the ONLY way to single-source a shared component (see docs/adr).
 const PA_CHAT_MARKER = '<!--PA_CHAT_UI-->';
+const PA_REPLY_CLEAN_MARKER = '/* PA_REPLY_CLEAN_JS */', PA_REPLY_CLEAN_FILE = 'reply-clean.js';
 const PA_NOTE_MARKER = '<!--PA_NOTE_UI-->';
 const PA_SPLIT_MARKER = '<!--PA_SPLIT_UI-->';
 const PA_SETTINGS_MARKER = '<!--PA_SETTINGS_UI-->';
@@ -791,8 +792,6 @@ const PA_COMPONENTS = [
   { marker: '<!--PA_INK_FRAME_UI-->', file: 'ink-frame.inline.html' },
   // PASnap, the app's picture for 改这个应用 · Change this app (ADR 0040): on EVERY app page, after PABusy. Appended last.
   { marker: PA_SNAP_MARKER, file: 'snap.inline.html' },
-  // web/reply-clean.js, what a bubble may show of a reply (lib/reply-clean.mjs runs the same file): chat-ui carries its marker. Appended last.
-  { marker: '/* PA_REPLY_CLEAN_JS */', file: 'reply-clean.js' },
 ];
 // Injected into EVERY served app page, unconditionally. The shell broadcasts the user's A-/A+
 // scale to each app (sendAppPrefs -> pa:'prefs'), but only chat-ui.inline.html ever applied it,
@@ -828,7 +827,7 @@ function appStamp(file) {
   let k;
   try { const st = fs.statSync(file); k = file + ':' + st.mtimeMs + ':' + st.size; }
   catch { return null; }                                  // unreadable: fall through to the live path
-  for (const c of [...PA_COMPONENTS, { file: PA_THEME_FILE }]) {
+  for (const c of [...PA_COMPONENTS, { file: PA_THEME_FILE }, { file: PA_REPLY_CLEAN_FILE }]) {
     try { const st = fs.statSync(path.join(ROOT, 'web', c.file)); k += '|' + c.file + ':' + st.mtimeMs + ':' + st.size; }
     catch { return null; }
   }
@@ -862,6 +861,13 @@ function sendAppHtml(res, file, type, extra) {
       try { snippet = fs.readFileSync(path.join(ROOT, 'web', c.file), 'utf8'); }
       catch (e) { return send(res, 500, 'text/plain', 'component unavailable'); } // fail loud, don't ship a broken marker (R5)
       html = html.split(c.marker).join(snippet);
+    }
+    // web/reply-clean.js, what a bubble may show of a reply (lib/reply-clean.mjs runs the same file): inside chat-ui's
+    // script, so after the components; never a PA_COMPONENTS entry (those pin their order, append-only).
+    if (html.includes(PA_REPLY_CLEAN_MARKER)) {
+      let rc; try { rc = fs.readFileSync(path.join(ROOT, 'web', PA_REPLY_CLEAN_FILE), 'utf8'); }
+      catch { return send(res, 500, 'text/plain', 'component unavailable'); }   // fail loud, as for any component (R5)
+      html = html.split(PA_REPLY_CLEAN_MARKER).join(rc);
     }
     html = html.split(BUILD_MARKER).join(buildId());   // the Pencil recorder's log header names this build
     // The same CSP inside the page, for the shell's srcdoc route (lib/offline.mjs; no header reaches a srcdoc document).

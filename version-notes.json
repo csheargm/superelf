@@ -1,4 +1,12 @@
 {
+  "v5.18.3": {
+    "date": "2026-11-24",
+    "features": [],
+    "fixes": [
+      "修复应用对话：回答、应用改动、撤销 · App chat answers, applies and undoes"
+    ],
+    "through": "8ff22b5c38cdfa01f44f75bbd151ff81d3f69af0"
+  },
   "v5.18.2": {
     "date": "2026-11-24",
     "features": [],

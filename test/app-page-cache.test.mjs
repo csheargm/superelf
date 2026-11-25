@@ -18,7 +18,7 @@ test('the key is every input, by mtime AND size', () => {
   const fn = /function appStamp\(file\) \{[\s\S]*?\n\}/.exec(WEB);
   assert.ok(fn, 'appStamp must be findable');
   assert.match(fn[0], /st\.mtimeMs \+ ':' \+ st\.size/, 'the app file, both facts');
-  assert.match(fn[0], /for \(const c of \[\.\.\.PA_COMPONENTS, \{ file: PA_THEME_FILE \}\]\)/, 'and every component, plus the shared theme tokens');
+  assert.match(fn[0], /for \(const c of \[\.\.\.PA_COMPONENTS, \{ file: PA_THEME_FILE \}, \{ file: PA_REPLY_CLEAN_FILE \}\]\)/, 'and every component, plus the shared theme tokens and the reply cleaner');
   // mtime alone misses two writes inside one millisecond, which a script editing several
   // components does routinely. Size alone misses a same-length edit — the exact hole that made
   // the save-skip guard drop cropped photos.

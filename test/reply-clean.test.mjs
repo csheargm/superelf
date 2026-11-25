@@ -40,7 +40,7 @@ test('PAChat cleans every render path through the same file (live stream, histor
   const ui = fs.readFileSync(new URL('../web/chat-ui.inline.html', import.meta.url), 'utf8');
   const web = fs.readFileSync(new URL('../web.mjs', import.meta.url), 'utf8');
   assert.match(ui, /\/\* PA_REPLY_CLEAN_JS \*\//);
-  assert.match(web, /\{ marker: '\/\* PA_REPLY_CLEAN_JS \*\/', file: 'reply-clean\.js' \}/);
+  assert.match(web, /PA_REPLY_CLEAN_MARKER = '\/\* PA_REPLY_CLEAN_JS \*\/', PA_REPLY_CLEAN_FILE = 'reply-clean\.js'/);
   assert.match(ui, /async function paint\(d,md\)\{\n\s*md=shownAi\(md\);/, 'every painted reply (live final, history)');
   assert.match(ui, /if\(kind==='ai'\) rawText=shownAi\(rawText\);/, 'Copy and Read aloud');
   assert.match(ui, /cur=shownAi\(acc\)/, 'the live stream');
