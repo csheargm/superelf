@@ -42,3 +42,28 @@ export async function checkSurface(target, { skip = '' } = {}) {
 
 // A rect test for tips: the tip must not cover any of the given rects (title bars, header controls).
 export const overlaps = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+
+// Chat reading size（聊天字号）— on a phone every chat bubble reads at >=16px, the reply meta line at >=13px,
+// the header title at >=17px and each message action icon (copy / speak / retry / edit) at >=18px with a 44px tap.
+// Owner 2026-11-25: v5.20.0 raised tap areas but left the text at 14px / 11px. Runs in the page; plain data out.
+export const CHAT_TEXT_MIN_PX = 16, CHAT_META_MIN_PX = 13, CHAT_TITLE_MIN_PX = 17, ACTION_GLYPH_MIN_PX = 18;
+export const CHAT_SEL = { bubble: '.pac-m:not(.status),.msg:not(.status)', meta: '.pa-took', title: '.pac-title', action: '.pac-ab,.mab' };
+export function chatText(sel) {
+  const vis = (e) => e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
+  const px = (s) => [...document.querySelectorAll(s)].filter(vis).map((e) => parseFloat(getComputedStyle(e).fontSize));
+  return { bubble: px(sel.bubble), meta: px(sel.meta), title: px(sel.title),
+    action: [...document.querySelectorAll(sel.action)].filter(vis).map((e) => { const r = e.getBoundingClientRect(), s = getComputedStyle(e);
+      return { glyph: parseFloat(s.fontSize), w: r.width, h: r.height, opacity: +s.opacity }; }) };
+}
+export async function checkChatText(target) { return target.evaluate(chatText, CHAT_SEL); }
+// Judge a chatText result for a phone; returns the failures as text.
+export function chatTextFailures(where, m) {
+  const bad = [];
+  if (!m.bubble.length) bad.push(`${where}: no chat bubble measured`);   // empty is failure, not a pass (R14)
+  if (m.bubble.some((x) => x < CHAT_TEXT_MIN_PX)) bad.push(`${where}: bubble text ${m.bubble.join('/')}px`);
+  if (m.meta.some((x) => x < CHAT_META_MIN_PX)) bad.push(`${where}: meta line ${m.meta.join('/')}px`);
+  if (m.title.some((x) => x < CHAT_TITLE_MIN_PX)) bad.push(`${where}: header title ${m.title.join('/')}px`);
+  for (const a of m.action) if (a.glyph < ACTION_GLYPH_MIN_PX || a.w < TAP_MIN_PX - 0.5 || a.h < TAP_MIN_PX - 0.5 || a.opacity < 0.95)
+    bad.push(`${where}: action icon ${a.glyph}px ${Math.round(a.w)}x${Math.round(a.h)} opacity ${a.opacity}`);
+  return bad;
+}
