@@ -1,4 +1,12 @@
 {
+  "v5.22.2": {
+    "date": "2026-11-25",
+    "features": [],
+    "fixes": [
+      "CI 跳过上限 · CI skip ceiling for chat phone e2e"
+    ],
+    "through": "19e83d779effd873d020867799f1b23563d8b580"
+  },
   "v5.22.1": {
     "date": "2026-11-25",
     "features": [],
