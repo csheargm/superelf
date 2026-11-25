@@ -1,4 +1,12 @@
 {
+  "v5.18.2": {
+    "date": "2026-11-24",
+    "features": [],
+    "fixes": [
+      "改应用只限本应用，成员用量计数 · App changes stay in the app; member usage metered (CI fix)"
+    ],
+    "through": "68ef8cf97e893f19f2afed3e24b8f65cd71fd18a"
+  },
   "v5.18.1": {
     "date": "2026-11-24",
     "features": [],
