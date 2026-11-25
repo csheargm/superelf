@@ -153,6 +153,7 @@ for (const [dev, viewport] of Object.entries(DEVICES)) {
       assert.ok(chip.disabled && chip.opacity < 0.6, `a typed "yes" retires the Apply chip: ${JSON.stringify(chip)}`);
       if (phone) {   // ✕ is the way back to the note
         assert.ok(await fr.evaluate(() => document.querySelector('.pan').closest('[inert]') !== null), 'the note under the full-screen chat is inert (GPT review)');
+        assert.ok(await fr.evaluate(() => { const n = document.getElementById('pa-notice'); return !n || !n.closest('[inert]'); }), 'the notice banner stays tappable over the chat');
         await fr.click('.pac-fs.on .pac-top .pac-close'); await page.waitForTimeout(400);
         assert.ok(await fr.evaluate(() => !document.querySelector('[inert]') && !document.activeElement.closest('.pac-fs')), 'closing lifts inert and leaves no focus in the hidden chat');   // WebKit does not focus a tapped button, so the restored target is not asserted
         assert.ok(!(await fr.$('.pac-fs.on')), '✕ closes the full-screen chat');

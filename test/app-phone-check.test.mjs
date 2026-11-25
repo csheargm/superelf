@@ -29,6 +29,9 @@ test('GPT review: a capped width, a commented-out block and a forced height are 
   assert.deepEqual(phoneProblems(page('.card{width:600px;max-width:100%} button{height:24px !important}')), []);
   assert.deepEqual(phoneProblems(page('', '<!-- <style>.demo{width:800px}</style> -->')), []);
   assert.match(phoneProblems(page('.card{width:600px;max-width:500px}')).join(), /600px/);   // capped above a phone still scrolls
+  assert.match(phoneProblems(page('.a{width:600px;max-width:150%}')).join(), /600px/);   // round 2: over 100% does not cap
+  assert.match(phoneProblems(page('.a{width:600px;max-width:300px;max-width:none}')).join(), /600px/);   // the last max-width wins
+  assert.match(phoneProblems(page('.l::before{content:"<!--"} .wide{width:600px}')).join(), /600px/);   // "<!--" inside CSS is not a comment
 });
 
 test('the gate the edit lane and the demo maker use carries the phone check', () => {
