@@ -126,11 +126,12 @@ jobs:
         # 2026-11-25: EVERY OS +9 (ubuntu 228, windows 314): phone-friendly-e2e and phone-chat-notes-e2e (WebKit iPhone/iPad), skipped on CI by PA_E2E_SKIP.
         # 2026-11-25: EVERY OS +2 (ubuntu 230, windows 316): stationery-from-photo-e2e (Chromium flow + WebKit iPhone/iPad delete-button checks), skipped on CI by PA_E2E_SKIP.
         # 2026-11-25: EVERY OS +2 (ubuntu 232, windows 318): chat-phone-actions-e2e (440x956 and 390x844), skipped on CI by PA_E2E_SKIP.
+        # 2026-11-25: EVERY OS +4 (ubuntu 236, windows 322): fork-publish-honesty-e2e, skipped on CI by PA_E2E_SKIP.
         include:
           - os: ubuntu-latest
-            max_skipped: 232
+            max_skipped: 236
           - os: windows-latest
-            max_skipped: 318
+            max_skipped: 322
     env:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED

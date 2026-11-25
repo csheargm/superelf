@@ -7,8 +7,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const WEB = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'web');
+const WEB = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'web');
 const read = (f) => fs.readFileSync(path.join(WEB, f), 'utf8');
 const PAIcons = vm.runInNewContext(read('icons.js') + ';PAIcons');
 const svgOf = (k) => PAIcons.svg(k).replace(/^<svg[^>]*>|<\/svg>$/g, '');
