@@ -1173,7 +1173,9 @@ async function loadApps(){
   let apps=[]; try{ apps=await (await api('/api/apps')).json(); if(Array.isArray(apps)) PASW.remember(SW_APPS_KEY,apps); }catch{ apps=PASW.recall(SW_APPS_KEY)||[]; /* no node: the list from the last online load (offline-first) */ }
   const ownApps=apps.filter(a=>a.uid===UID);
   LINK_APPS=new Set(ownApps.filter(a=>a.links===true).map(a=>a.name));
+  const wasOwnBar=frameOwnBar();
   OWNBAR_APPS=new Set(ownApps.filter(a=>a.ownBar===true).map(a=>a.name));
+  if(!wasOwnBar&&frameOwnBar()) sendAppPrefs(false);   // an app opened before this list arrived got ownBar:false and drew no bar (F3-02). TODO(R4): moves with the app-frame seam
   FORK_APPS=new Set(ownApps.filter(a=>!!a.forkedFrom).map(a=>a.name));   // PAPublish.item: a copy is not published
   const fresh=noteNewApps(ownApps.map(a=>a.name));
   const own=sortBySavedOrder(ownApps,fresh);

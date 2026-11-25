@@ -438,7 +438,9 @@ function verSheetHtml(vers,notes,cur){
 // Blocked storage (private mode) throws on read: the dots then start unseen; that must not stop the shell script (R5 c).
 const _SEEN=new Set((()=>{ try{ const v=JSON.parse(localStorage.getItem('pa_new_seen')||'[]'); return Array.isArray(v)?v:[]; }catch{ return []; } })());
 function _saveSeen(){ try{localStorage.setItem('pa_new_seen',JSON.stringify([..._SEEN]));}catch{} }
-function markNew(el,key){ if(!el||_SEEN.has(key)) return; el.classList.add('pa-new'); el.addEventListener('pointerdown',()=>{ el.classList.remove('pa-new'); _SEEN.add(key); _saveSeen(); },{once:true,capture:true}); }
+// Cleared on click, not pointerdown: label.pa-new carries a dot gutter, and dropping it between press and
+// release moved the checkbox, so the first tap missed it and never toggled.
+function markNew(el,key){ if(!el||_SEEN.has(key)) return; el.classList.add('pa-new'); el.addEventListener('click',()=>{ el.classList.remove('pa-new'); _SEEN.add(key); _saveSeen(); },{once:true,capture:true}); }
 function markNewSel(sel,key){ markNew($(sel),key); }
 
 // close) the sheet.
