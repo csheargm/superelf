@@ -1,4 +1,12 @@
 {
+  "v5.18.4": {
+    "date": "2026-11-24",
+    "features": [],
+    "fixes": [
+      "应用对话如实说明改了什么 · App chat says exactly what changed"
+    ],
+    "through": "7154373b816d8de61a50c8fcf1a85e10dc49d73e"
+  },
   "v5.18.3": {
     "date": "2026-11-24",
     "features": [],
