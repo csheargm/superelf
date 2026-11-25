@@ -681,6 +681,9 @@ const PA_SNAP_MARKER = '<!--PA_SNAP_UI-->';
 // app's own <style>, so every app that names --bg/--card/--text/--accent… gets the one look (no per-app fork).
 // Kept OUT of PA_COMPONENTS (that list is append-only and its order is pinned); it is in appStamp below.
 const PA_THEME_FILE = 'theme-tokens.css';
+// TODO(R4): web.mjs is over budget — split sendAppHtml's page assembly (theme, components, prefs) into lib/apphtml.mjs.
+// The touch base (web/touch-base.css: 16px inputs, 44px taps on touch screens): shipped in the SAME style tag, after the tokens.
+const PA_TOUCH_FILE = 'touch-base.css';
 // APPEND-ONLY, and order matters: the loop below re-tests the ALREADY-INLINED html on each pass,
 // so a component listed BEFORE another can have that other's marker inlined into it. Adding new
 // entries last keeps an existing component's content out of the substitution path.
@@ -828,7 +831,7 @@ function appStamp(file) {
   let k;
   try { const st = fs.statSync(file); k = file + ':' + st.mtimeMs + ':' + st.size; }
   catch { return null; }                                  // unreadable: fall through to the live path
-  for (const c of [...PA_COMPONENTS, { file: PA_THEME_FILE }, { file: PA_REPLY_CLEAN_FILE }]) {
+  for (const c of [...PA_COMPONENTS, { file: PA_THEME_FILE }, { file: PA_TOUCH_FILE }, { file: PA_REPLY_CLEAN_FILE }]) {
     try { const st = fs.statSync(path.join(ROOT, 'web', c.file)); k += '|' + c.file + ':' + st.mtimeMs + ':' + st.size; }
     catch { return null; }
   }
@@ -845,7 +848,7 @@ function sendAppHtml(res, file, type, extra) {
     // has no script element, so it gets none of PATwoTap, PAStore, PALeave and PA (ADR 0018 known gaps).
     html = html.replace(/<\/head>|<script\b/i, (m) => PA_TWO_TAP_MARKER + PA_STORE_MARKER + PA_LEAVE_MARKER + PA_BROKER_MARKER + PA_BUSY_MARKER + PA_SNAP_MARKER + m);
     let theme = '';
-    try { theme = fs.readFileSync(path.join(ROOT, 'web', PA_THEME_FILE), 'utf8'); }
+    try { theme = [PA_THEME_FILE, PA_TOUCH_FILE].map((f) => fs.readFileSync(path.join(ROOT, 'web', f), 'utf8')).join('\n'); }
     catch (e) { return send(res, 500, 'text/plain', 'component unavailable'); }   // fail loud, like a missing component (R5)
     // After the app's own styles; a page with no </head> (legal HTML) gets it before <body>, else first.
     const themeTag = '<style id="pa-theme">' + theme + '</style>';

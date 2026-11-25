@@ -161,7 +161,7 @@
 
     if(floating) anchor.onPen(show);
     // First-use tip (ADR 0030): beside the round button once it shows, or beside the host's own control.
-    if(window.PATips) window.PATips.register({id:'bible-pen',anchor:floating?()=>btn:(o.tipAnchor||(()=>btn)),text:TIP});
+    if(window.PATips) window.PATips.register({id:'bible-pen',anchor:floating?()=>btn:(o.tipAnchor||(()=>btn)),text:TIP,pen:true});   // Pencil only (phone audit #3)
     if(window.PATips&&floating) window.PATips.register({id:'bible-pen-history',anchor:()=>ub,text:HIST_TIP,when:()=>seen});
     window.addEventListener('message',e=>{ const m=e&&e.data; if(m&&m.pa==='prefs') read(); });
     window.addEventListener('resize',()=>{ if(seen) place(); if(open&&dropFrom) drop(dropFrom); else if(open) besideCluster(); });   // rotation: the dropped sheet follows its control

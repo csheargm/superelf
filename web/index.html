@@ -15,6 +15,7 @@
 /* PA_BAR_HANDLE_CSS */
 :root { --sab-probe: env(safe-area-inset-bottom, 0px); }
 /* PA_THEME_TOKENS_CSS */
+/* PA_TOUCH_BASE_CSS */
 *{ box-sizing:border-box; margin:0; }
 html{ height:100dvh; overflow:hidden; background:var(--bg); }
 /* iOS home-screen apps: dvh can compute short, leaving a bottom band. 100% is reliable there. */
@@ -355,7 +356,7 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
 <main>
   <!-- TODO(R4): index.html is over budget; split seam: this home markup + the header row move into a home-v2 HTML part inlined like settings-dialog.html. -->
   <div id="emptyState" style="display:none">   <!-- the home (web/home-v2.js PAHome.render) -->
-    <div class="home-hello" id="hHello"></div>
+    <div class="home-hello" id="hHello" data-tip-clear></div>
     <div class="home-chips" id="hChips"></div>
     <p class="home-sub" id="hWelcome" hidden>这是演示版 · 点任一应用试试，或在下方让我做一个新应用<span class="en">This is the demo — open any app, or ask below for a new one.</span></p>
     <form class="home-ask" id="homeForm"><span class="ph" id="hPh" aria-hidden="true"></span></form>   <!-- the composer row #frow moves in here while the home shows -->

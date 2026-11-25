@@ -15,7 +15,12 @@ const PAHomeLook=(function(){
   // With the year (owner 2026-11-24), through Intl: 中文 "2026年11月24日 周二", English "Tue, Nov 24, 2026".
   const ZH_DATE=new Intl.DateTimeFormat('zh-CN',{year:'numeric',month:'long',day:'numeric'}), ZH_WD=new Intl.DateTimeFormat('zh-CN',{weekday:'short'});
   const EN_DATE=new Intl.DateTimeFormat('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
-  function dateLine(now){ const d=now||new Date(); return [`${ZH_DATE.format(d)} ${ZH_WD.format(d)}`,EN_DATE.format(d)]; }
+  // short (a phone under SHORT_DATE_PX, audit #13): no year, so greeting + date fit one line — "11月24日 周二", "Tue, Nov 24".
+  const ZH_SHORT=new Intl.DateTimeFormat('zh-CN',{month:'long',day:'numeric'}), EN_SHORT=new Intl.DateTimeFormat('en-US',{weekday:'short',month:'short',day:'numeric'});
+  const SHORT_DATE_PX=480;
+  function dateLine(now,short=narrow()){ const d=now||new Date();
+    return short?[`${ZH_SHORT.format(d)} ${ZH_WD.format(d)}`,EN_SHORT.format(d)]:[`${ZH_DATE.format(d)} ${ZH_WD.format(d)}`,EN_DATE.format(d)]; }
+  const narrow=()=>typeof window!=='undefined'&&(window.innerWidth||0)>0&&window.innerWidth<SHORT_DATE_PX;
   const dayKey=(d)=>`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
   function dayLabel(ms,now){ const d=new Date(ms), n=now||new Date();
     if(dayKey(d)===dayKey(n)) return '今天 · Today';

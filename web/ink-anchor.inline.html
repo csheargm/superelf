@@ -158,7 +158,7 @@
     let ctx=null, cur=null, swallowClick=false, groups=[], scheduled=false, dead=false, fs=1;   // fs: the shell's last fontScale, for the readout
     // First-use tip (ADR 0030), beside the first VERSE (not the list, taller than the screen; not the ink
     // canvas or the orphan bucket, which are also children of the container).
-    if(window.PATips) window.PATips.register({id:'bible-pencil-verses',anchor:()=>container.querySelector('.verse'),text:TIP});
+    if(window.PATips) window.PATips.register({id:'bible-pencil-verses',anchor:()=>container.querySelector('.verse'),text:TIP,pen:true});   // Pencil only (phone audit #3)
     const cs=container.style; if(!cs.position) cs.position='relative';   // the canvas is placed at the list's content origin
 
     // The list's content space: a client rect → px from the list's scrolled content origin.

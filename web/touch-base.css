@@ -1,0 +1,27 @@
+/* PA touch base（触屏基础样式）— the ONE phone/tablet floor for the shell AND every app page (R3), shipped in the
+   same <style id="pa-theme"> as theme-tokens.css (web.mjs sendAppHtml; lib/shellhtml.mjs for the shell).
+   Automatic: it keys on the pointer (pointer:coarse = a finger) and the width, never on a manual switch
+   (owner 2026-11-24, phone audit). Mouse desktops get none of the touch rules.
+   - inputs ≥16px: iOS Safari zooms the whole page when a smaller field takes focus (audit #8);
+   - buttons / [role=button] / summary ≥44px both ways (Apple HIG hit area; audit #5 #10 #11 #14 #15).
+     min-* only, so a wider button keeps its width; !important because an app's own class rule
+     (e.g. .mab{height:26px}) would otherwise win over these element selectors. min-height does not
+     touch inline links inside text (it does not apply to inline boxes);
+   - small text ≥13px (audit #16 #18);
+   - wide content scrolls inside its own box; images never wider than their column (audit #24).
+     These use :where() (no specificity), so any rule an app writes still wins.
+   Safe areas: the --safe-* tokens below; the shared bars use env(safe-area-inset-*) themselves.
+   Pinned by test/touch-base.test.mjs and, in a real browser, test/phone-friendly-e2e.test.mjs. */
+:root{ --safe-top:env(safe-area-inset-top,0px); --safe-bottom:env(safe-area-inset-bottom,0px);
+  --safe-left:env(safe-area-inset-left,0px); --safe-right:env(safe-area-inset-right,0px); --tap-min:44px; }
+:where(pre){ max-width:100%; overflow-x:auto; }
+:where(img,video,canvas,svg){ max-width:100%; }
+:where(img,video){ height:auto; }
+@media (max-width:600px){ :where(table){ display:block; max-width:100%; overflow-x:auto; } }
+@media (pointer:coarse){
+  input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]):not([type=hidden]),
+  textarea,select{ font-size:max(16px,1em) !important; }
+  button,[role=button],summary,input[type=button],input[type=submit],input[type=reset]{
+    min-height:var(--tap-min) !important; min-width:var(--tap-min) !important; }
+  small{ font-size:max(13px,1em); }
+}
