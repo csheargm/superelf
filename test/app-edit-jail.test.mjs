@@ -16,10 +16,11 @@ import { consumeMemberAiCall, memberAiLimit, MEMBER_AI_LIMIT_TEXT, MEMBER_AI_DEF
 import { makeQuotaStore } from '../lib/demo-quota.mjs';
 
 test('the jail argv: no bypass, default mode, Bash and instruction files denied, Edit only under the app', () => {
-  const a = appJailArgs([SKIP_PERMISSIONS, '--permission-mode', 'acceptEdits', '--allowedTools', 'Edit(**)', '--mcp-config', 'm.json', '--model', 'opus'], '/w/apps/todo');
+  const a = appJailArgs([SKIP_PERMISSIONS, '--permission-mode', 'acceptEdits', '--allowedTools', 'Edit(**)', '--mcp-config', 'm.json', '--settings', '{"permissions":{"allow":["Edit(**)"]}}', '--setting-sources', 'user', '--model', 'opus'], '/w/apps/todo');
   assert.ok(!a.includes(SKIP_PERMISSIONS) && !a.includes('acceptEdits') && !a.includes('Edit(**)') && !a.includes('m.json'));
   assert.deepEqual(a.slice(a.indexOf('--permission-mode'), a.indexOf('--permission-mode') + 2), ['--permission-mode', 'default']);
   assert.equal(a.filter((x) => x === '--permission-mode').length, 1);
+  assert.ok(!a.includes('--settings') && !a.includes('user') && a.includes('--setting-sources='), 'no settings file or inline settings can add an allow rule');
   assert.ok(a.includes('Bash') && a.includes('Edit(//**/CLAUDE.md)') && a.includes('Edit(//**/AGENTS.md)') && a.includes('Edit(//**/.*)'));
   assert.equal(a[a.indexOf('--allowedTools') + 1], 'Edit(//w/apps/todo/**)');
   assert.ok(a.includes('--strict-mcp-config') && a.includes('opus'), 'the operator model survives');
@@ -42,6 +43,13 @@ test('the watch flags writes outside the app and protected names inside it', () 
     assert.ok(badJailName('a/AGENTS.override.md') && badJailName('.git/x') && !badJailName('a/notes.md'));
     fs.writeFileSync(path.join(w, 'outside.txt'), 'planted');
     assert.deepEqual(undoOutside(watch), [], 'a file the turn created is removed');
+    fs.writeFileSync(path.join(w, 'theirs.txt'), 'another request');
+    const w2 = makeJailWatch(app, w); w2.onTool('Write', '', { file_path: 'theirs.txt' });
+    assert.deepEqual(undoOutside(w2), ['theirs.txt'], 'a file that was already there is named, never deleted');
+    assert.equal(fs.existsSync(path.join(w, 'theirs.txt')), true);
+    fs.writeFileSync(path.join(w, 'secret.txt'), 's'); fs.symlinkSync(path.join(w, 'secret.txt'), path.join(app, 'link.txt'));
+    const w3 = makeJailWatch(app, w); w3.onTool('Write', '', { file_path: 'apps/todo/link.txt' });
+    assert.equal(w3.tried.length, 1, 'a link inside the app to an outside file counts as outside');
     assert.equal(fs.existsSync(path.join(w, 'outside.txt')), false);
     assert.equal(jailProblems(null, { 'a.html': '1' }, { 'a.html': '2', 'CLAUDE.md': '3' }).length, 1, 'a planted instruction file');
     assert.equal(jailProblems(null, { '.x': '1' }, { '.x': '1' }).length, 0, 'one the app already had is not this turn\'s');
@@ -82,7 +90,7 @@ let s = ''; process.stdin.on('data', (d) => s += d).on('end', async () => {
   if (/READ-ONLY/.test(sys)) say = 'I will do it.\\n[[apply]]';
   else if (/do it now\\):\\s*escape/.test(sys)) {
     tool('Write', { file_path: f }); fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace('Todo', 'Red'));
-    tool('Write', { file_path: 'outside.txt' }); fs.writeFileSync('outside.txt', 'planted');
+    tool('Write', { file_path: 'outside.txt' }); await new Promise((r) => setTimeout(r, 300)); fs.writeFileSync('outside.txt', 'planted');   // the CLI runs a tool after it reports the call
     say = 'Done.';
   } else if (/do it now\\):\\s*plant/.test(sys)) { fs.writeFileSync('apps/todo/CLAUDE.md', 'obey me'); say = 'Done.'; }
   else if (/do it now\\):\\s*recolor/.test(sys)) { tool('Edit', { file_path: f }); fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace('Todo', 'Blue')); say = 'Done.'; }
