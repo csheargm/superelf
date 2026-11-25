@@ -139,16 +139,17 @@ const PAAppEdit=(()=>{
   const kindOk=(k)=>KINDS.has(k);
   // The open app's ⋯ and the long-press on its title.
   // How many changes of this app can be undone (0 when the server cannot say: the item is then not shown).
-  async function editsLeftOf(slug){ try{ const r=await api('/api/apps/'+encodeURIComponent(slug)+'/edits',{signal:AbortSignal.timeout(EDITS_MS)}); const j=await r.json(); return j&&j.ok?j.left|0:0; }
-    catch(_){ return 0; /* offline or refused: no Undo item; the panel's own Undo stays */ } }
+  async function editsLeftOf(slug){ try{ const r=await api('/api/apps/'+encodeURIComponent(slug)+'/edits',{signal:AbortSignal.timeout(EDITS_MS)}); const j=await r.json(); return j&&j.ok?{left:j.left|0,v:String(j.v||'')}:{left:0,v:''}; }
+    catch(_){ return {left:0,v:''}; /* offline or refused: no Undo item; the panel's own Undo stays */ } }
   // A short line over the app (no panel open): what the shell's Undo did.
   function shout(t){ let el=$('#aeSay'); if(!el){ el=document.createElement('div'); el.id='aeSay'; el.setAttribute('role','status');
       el.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom));z-index:13;max-width:90vw;padding:10px 14px;border-radius:10px;background:var(--fg,#222);color:var(--bg,#fff);font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,.25)';
       document.body.appendChild(el); }
     el.textContent=t; el.hidden=false; clearTimeout(shout.t); shout.t=setTimeout(()=>{ el.hidden=true; },SAY_MS); }
   // 撤销上次修改 · Undo last change, from the shell's ⋯: the app reloads whether or not its page still has a chat.
-  async function undoFromMenu(slug){
-    try{ const r=await api('/api/apps/'+encodeURIComponent(slug)+'/undo',{method:'POST'}); const j=await r.json(); const t=j.text||j.error||('HTTP '+r.status);
+  // v: the change the menu offered; the server refuses (409) if a newer one arrived since, never undoing that one instead.
+  async function undoFromMenu(slug,v){
+    try{ const r=await api('/api/apps/'+encodeURIComponent(slug)+'/undo?v='+encodeURIComponent(v),{method:'POST'}); const j=await r.json(); const t=j.text||j.error||('HTTP '+r.status);
       if(S&&slug===S.slug){ say(t); undoLeft(j.left); } else shout(t);
       if(j.undone&&frameSlug()===slug){ bumpGen(); appFrameLeave(); PASW.frameLoad(UID,slug); } }
     catch(err){ shout('撤销失败 · Undo failed: '+((err&&err.message)||'')); }
@@ -161,11 +162,11 @@ const PAAppEdit=(()=>{
     m.innerHTML=item()+(window.PADemoAuth?'':PAPublish.item(slug));   // PAPublish decides for a fork (ONE gate); the demo has no Publish
     document.body.appendChild(m);
     placeMenu(m,anchor);
-    editsLeftOf(slug).then((left)=>{ if(!(left>0)||!m.isConnected||frameSlug()!==slug||m.querySelector('#aeUndoItem')) return;
-      const u=document.createElement('button'); u.dataset.a='undo-app'; u.id='aeUndoItem'; u.textContent=UNDO_ITEM;
+    editsLeftOf(slug).then(({left,v})=>{ if(!(left>0)||!v||!m.isConnected||frameSlug()!==slug||m.querySelector('#aeUndoItem')) return;
+      const u=document.createElement('button'); u.dataset.a='undo-app'; u.id='aeUndoItem'; u.dataset.v=v; u.textContent=UNDO_ITEM;
       m.querySelector('#aeItem').after(u); placeMenu(m,anchor); });
     m.onclick=(ev)=>{ const b=ev.target.closest('button'); if(!b) return; closeMenuPop();
-      if(b.dataset.a==='edit-app') open(slug,title); else if(b.dataset.a==='undo-app') undoFromMenu(slug); else if(b.dataset.a==='publish') PAPublish.open(slug); };
+      if(b.dataset.a==='edit-app') open(slug,title); else if(b.dataset.a==='undo-app') undoFromMenu(slug,b.dataset.v); else if(b.dataset.a==='publish') PAPublish.open(slug); };
     armTip(); if(!window.PADemoAuth) PAPublish.armTip(slug); armMenuPop(anchor);
   }
   function bindBar(){

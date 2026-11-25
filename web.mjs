@@ -13,7 +13,7 @@ import { makeSigninGate, authConfig } from './lib/demo-auth.mjs';
 import { makeDemoRoutes } from './lib/demo-routes.mjs';
 import { handlePublishRoute } from './lib/publish/routes.mjs';
 import { handleAlertsRoute } from './lib/node-alerts.mjs';
-import { handleActivityRoute, refuseStaleUndo } from './lib/activity-view.mjs';
+import { handleActivityRoute, refuseStaleUndo, newestEditVersion } from './lib/activity-view.mjs';
 import { loadConfig, configPath, fastLaneGuard, GUARD_DEFAULT_SURFACE, agentCapabilities, appContract, REPLY_LANGUAGE_RULE, OVERRIDABLE_PROMPT_MAX } from './lib/config.mjs';
 import { runClaude, APPEND_SYSTEM_PROMPT_MAX } from './lib/runner.mjs';
 import { agentAllowed, lanesFor, memberLane, NO_PLAIN_LANE_TEXT, AGENT_OFF_TEXT, PLAIN_LANE_STATUS } from './lib/member-lanes.mjs';
@@ -1950,7 +1950,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && /^\/api\/apps\/[^/]+\/edits$/.test(p)) {
       try {
         const edit = appEditOf({ user, body: { edit: decodeURIComponent(p.split('/')[3]), message: 'undo' }, headers: req.headers, appsDir: appsDir(user), members: true });
-        return send(res, 200, 'application/json', JSON.stringify({ ok: true, left: editsLeft(path.join(wsDir(user), VERSIONS_DIR), edit.slug) }));
+        return send(res, 200, 'application/json', JSON.stringify({ ok: true, left: editsLeft(path.join(wsDir(user), VERSIONS_DIR), edit.slug), v: newestEditVersion(wsDir(user), edit.slug) }));
       } catch (e) { if (!e.status) throw e; return send(res, e.status, 'application/json', JSON.stringify({ error: e.message, code: e.code })); }
     }
     if (req.method === 'POST' && /^\/api\/apps\/[^/]+\/undo$/.test(p)) {

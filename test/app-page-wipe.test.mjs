@@ -23,6 +23,23 @@ test('rendering into your own element, a comparison, a comment, markup text or a
     page('/* document.write(1) */'), '<p>document.body.innerHTML = 1</p>', '<script src="x.js">document.write(1)</script>', page('var u = "http://x"; app.innerHTML = u'), ensureAskAi(page('go()'), 'T')])
     assert.deepEqual(pageWipeProblems(html), [], html);
 });
+test('a page that only SHOWS the code (a string, a non-running script) is not refused; a template with ${} still is', () => {
+  for (const html of [page('el.textContent = "document.write(1)"'), page("help.textContent = 'document.body.innerHTML = x'"),
+    '<script type="text/plain">document.write(1)</script>', '<script type="application/json">{"a":"document.open()"}</script>'])
+    assert.deepEqual(pageWipeProblems(html), [], html);
+  for (const html of [page('x = `${document.body.innerHTML = 1}`'), '<script type="module">document.write(1)</script>', '<script type="text/javascript">document.open()</script>'])
+    assert.deepEqual(pageWipeProblems(html), [PAGE_WIPE_TEXT], html);
+});
+test('the shell Undo names the change it offered: a newer change since is refused, never undone instead', async () => {
+  const { refuseStaleUndo, newestEditVersion } = await import('../lib/activity-view.mjs');
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'wipe-'));
+  try {
+    assert.equal(newestEditVersion(ws, 'a'), '');
+    assert.throws(() => refuseStaleUndo(ws, 'a', ''), { status: 409 });
+    assert.throws(() => refuseStaleUndo(ws, 'a', 'old-version'), { status: 409 });
+    assert.doesNotThrow(() => refuseStaleUndo(ws, 'a', null));
+  } finally { fs.rmSync(ws, { recursive: true, force: true }); }
+});
 test('the same rule is in the shared gate: the demo maker and every edit lane (owner, member, guest) refuse it', () => {
   assert.ok(appHtmlProblems(page('document.body.innerHTML="x"')).includes(PAGE_WIPE_TEXT));
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'wipe-')), dir = path.join(ws, 'apps', 'a');
@@ -58,4 +75,10 @@ test('the demo lets the shell reach the panel, the change count and Undo — not
   const { demoRouteAllowed } = await import('../lib/demo.mjs');
   assert.ok(demoRouteAllowed('GET', '/api/app-edit/panel') && demoRouteAllowed('GET', '/api/apps/calendar-planner/edits') && demoRouteAllowed('POST', '/api/apps/calendar-planner/undo'));
   for (const [m, p] of [['PATCH', '/api/apps/a/share'], ['POST', '/api/apps/a/edits'], ['POST', '/api/apps/../undo'], ['DELETE', '/api/apps/a'], ['POST', '/api/apps/a/undo/x']]) assert.equal(demoRouteAllowed(m, p), false, `${m} ${p}`);
+});
+test('the demo shell Undo is refused while the visitor\'s app build runs (it could rewrite the restored page)', async () => {
+  const { DEMO_UNDO_RE } = await import('../lib/demo.mjs');
+  assert.ok(DEMO_UNDO_RE.test('/api/apps/calendar-planner/undo') && !DEMO_UNDO_RE.test('/api/apps/a/undo/x'));
+  const src = fs.readFileSync(new URL('../lib/demo-routes.mjs', import.meta.url), 'utf8');
+  assert.match(src, /DEMO_UNDO_RE\.test\(p\)\) \{\s*const user = d\.userFor\(req\);\s*if \(user && jobs\.running\(user\.id\)\) \{ json\(res, 409/);
 });
