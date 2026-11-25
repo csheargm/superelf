@@ -1,4 +1,12 @@
 {
+  "v5.16.0": {
+    "date": "2026-11-24",
+    "features": [
+      "日期带年份 · Date line shows the year"
+    ],
+    "fixes": [],
+    "through": "7ad2538c59334af9786a3954a18f7a86baffc202"
+  },
   "v5.15.0": {
     "date": "2026-11-24",
     "features": [
