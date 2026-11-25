@@ -326,7 +326,7 @@ Each broke a generated app once.
    confirm its handler exists, is wired to its control, and saves via PAStore if it must persist.
    Where feasible run a node smoke check (`node --check` on the script, plus the pure logic on
    one real input). Report what you verified per requirement and one thing the user should try.
-4. **Phone first:** works 390px wide, no sideways scroll (no fixed width over 390px); checked.
+4. {{PHONE_FIRST_RULE}}
 
 ## Broker API — the ONLY way out of the sandbox
 Apps are sandboxed: opaque origin, `connect-src 'none'`, no token. `fetch`, XHR, CDNs and
@@ -398,17 +398,11 @@ live in THIS app's prefs (`app-settings` / `set-app-settings`: `noteSort`, `note
 the drawer merges into the object the shell answered, so an app that writes its own prefs must do the
 same (docs/plans/note-features.md H; web/drawer-groups.inline.html, web/drawer-tags.inline.html).
 With `important`, each record also carries `inkImportant` (true when a marked line is handwriting).
-`note-page-image` `{path, scope?, page}` renders ONE page's ink of THIS app's notebook to a PNG on the
-node (`GET /api/note-page-image`, lib/note-page-image.mjs; same renderer geometry as the OCR bitmap) and
-answers `{ok, path, bytes, width, height, cached}` — `path` workspace-relative under `uploads/pages/`,
-what a `chat` attachment carries. `{ok:false, code}` (this kind's own codes, not the app data read's `not-found`): `bad_path` (400), `not_found` (404), `no_ink` /
-`render_failed` (422). Apps do not call it: a period summary does (PASummaryImages, ADR 0027).
-`summary-followup` `{text}` posts a summary's answer text (`POST /api/summary-followup`,
-lib/summary-followup.mjs): the node extracts the list under `Open to-dos · 待办`, researches the
-questions about the world (lib/research.mjs, both keys needed, at most 5) and asks the fast lane one
-line for the personal ones → `{ok, heading, text, items:[{item, kind, ok}], partial, researched, suggested}`.
-ONLY the to-do lines reach the search engine. Apps do not call it: PASummaryFollowup does after a
-summary is saved (ADR 0027).
+`note-page-image` `{path, scope?, page}` → one page's ink as a PNG (`{ok, path}` under `uploads/pages/`;
+`{ok:false, code}` with this kind's own codes, e.g. `not_found`, not the app data read's `not-found`) and
+`summary-followup` `{text}` (research for a summary's open to-dos) exist for period summaries only:
+apps do not call them (PASummaryImages, PASummaryFollowup; lib/note-page-image.mjs,
+lib/summary-followup.mjs, ADR 0027).
 
 Contracts that have bitten before:
 - A `'message'` listener receives the EVENT; the reply is `e.data`. `m => m.pa === 'res'` on the
@@ -452,9 +446,6 @@ Contracts that have bitten before:
   auto-save the component asks the node for a follow-up on the summary's open to-dos and calls
   `saveNote` once more, with that run's `id` and `quiet:true`, the block appended under `Follow-up · 跟进`; a status line under the
   answer says researching → added / partial / none / failed.
-
-Use the raw broker for a genuinely custom UI. If you are about to write a chat log, a
-markdown renderer, a model picker or a notepad canvas, stop — that component exists.
 
 ## Versions and self-update（版本与自动更新）— ADR 0026
 - **Version scheme.** `v<package.json version>+<N>`, N = merge commits on main since the newest
