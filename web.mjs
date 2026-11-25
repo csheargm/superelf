@@ -1645,8 +1645,10 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
     // No-write lanes (an app's chat on any lane, a fast lane anywhere): never a false "Done" (lib/app-chat-honesty.mjs).
     // TODO(R4 seam): with the post-turn checks above.
     if (!blank && r.ok !== false && !edit && (origin.fromApp || ml.blocked || (chosen && (chosen.provider === 'ollama' || chosen.provider === 'research')))) {
-      r = { ...r, text: finishHonest({ reply: r.text || '', message, prior: convo.messages.slice(0, -1), inApp: origin.fromApp, line,
-        canEdit: user.role === 'owner' && origin.fromApp && typeof app === 'string' && slugOk(app) }) };
+      // canEdit = the shell's canEdit (web/app-edit.js): the owner, in the chat of an app in their OWN apps folder.
+      const h = finishHonest({ reply: r.text || '', message, prior: convo.messages.slice(0, -1), inApp: origin.fromApp, line,
+        canEdit: user.role === 'owner' && origin.fromApp && typeof app === 'string' && slugOk(app) && !!ownAppDir(user, app) && fs.existsSync(path.join(appsDir(user), app, 'index.html')) });
+      r = { ...r, text: h.text, offer: h.offer };
     }
     if (edit && !blank && r.ok !== false) r = offerApply(user, edit, message, r, line, convo.id);   // a plan → the 改 · Apply button (lib/app-edit-confirm.mjs)
     // Never shown: tool-call markup printed as text, the plan marker, the node's own paths (lib/reply-clean.mjs).
@@ -1668,7 +1670,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
     // by: the lane that ACTUALLY answered (a confined turn's GPT pick runs on Claude), shown under the answer.
     const by = ml.blocked && !(edit && edit.scoped) ? '' : chosen ? (chosen.label || 'Claude') : 'Claude';   // the scoped lane's Claude has no label (self-test F8)
     // ms only on an answer: a refusal (a cap, a failure) shows no "took" (self-test F11).
-    const mdMsg = { role: 'md', text: r.text || '', ...(r.ok === false ? {} : { ms: turnMs }), by, ...(blank || unreadable ? { failed: true } : {}) };
+    const mdMsg = { role: 'md', text: r.text || '', ...(r.ok === false ? {} : { ms: turnMs }), by, ...(blank || unreadable ? { failed: true } : {}), ...(r.offer ? { offer: { type: 'app-change', label: r.offer.label } } : {}) };   // the button again on reopen (no request: the panel opens empty)
     convo.messages.push(mdMsg);
     // Over the cap the oldest turns are ARCHIVED beside the conversation, never
     // erased (lib/convo-archive.mjs). What this replaces — `convo.messages =

@@ -836,6 +836,7 @@ const frameUid=()=>decodeURIComponent((frameRef().match(/\/app\/([^/]+)\//)||[])
 // The own apps that may ask the broker for 'open-url', as /api/apps marks them (`links`, web.mjs
 // openUrlApps): the Journal and the Bible notes. Empty until the list loads: refused closed till then.
 let LINK_APPS=new Set();
+let FORK_APPS=new Set();   // own apps copied from another (meta.json forkedFrom): web/publish.js item()
 let OWNBAR_APPS=new Set();   // own apps whose page draws its own Home + A-/A+ (meta.json ownBar, ADR 0032)
 const NO_APP_TEXT='未打开应用 · no app in view';   // every refusal of a request that names no app (R3)
 // ME is the profile fetched at boot (settings.js loadProfile, which sets ME={} if the fetch
@@ -1165,6 +1166,7 @@ async function loadApps(){
   const ownApps=apps.filter(a=>a.uid===UID);
   LINK_APPS=new Set(ownApps.filter(a=>a.links===true).map(a=>a.name));
   OWNBAR_APPS=new Set(ownApps.filter(a=>a.ownBar===true).map(a=>a.name));
+  FORK_APPS=new Set(ownApps.filter(a=>!!a.forkedFrom).map(a=>a.name));   // PAPublish.item: a copy is not published
   const fresh=noteNewApps(ownApps.map(a=>a.name));
   const own=sortBySavedOrder(ownApps,fresh);
   const shelf=apps.filter(a=>a.uid!==UID); // promoted (uid='shared') + family-shared (uid=owner id)
@@ -1209,7 +1211,7 @@ function appMenu(name, anchor){
     +(first?'':'<button data-a="up">Move up</button>')
     +(last?'':'<button data-a="dn">Move down</button>')
     +`<button data-a="share">${shared?'Unshare from family':'Share to family'}</button>`
-    +(ROLE==='owner'&&!forked?PAPublish.item():'')
+    +(ROLE==='owner'?PAPublish.item(name):'')   // PAPublish decides for a fork (ONE gate)
     +(shared&&!forked?`<button data-a="bump">发布更新 ${nextVer} · Publish update ${nextVer}</button>`:'')
     +'<button data-a="delete" class="del">Delete</button>';
   document.body.appendChild(m);

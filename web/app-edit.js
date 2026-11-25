@@ -140,7 +140,7 @@ const PAAppEdit=(()=>{
     closeMenuPop();
     const slug=frameSlug(), title=$('#ftitle').textContent;
     const m=document.createElement('div'); m.id='frameMenu'; m.className='cmenu-pop';
-    m.innerHTML=item()+PAPublish.item();
+    m.innerHTML=item()+PAPublish.item(slug);   // PAPublish decides for a fork (ONE gate)
     document.body.appendChild(m);
     const r=anchor.getBoundingClientRect(); m.style.top=(r.bottom+4)+'px'; m.style.right=Math.max(6,innerWidth-r.right)+'px';
     m.onclick=(ev)=>{ const b=ev.target.closest('button'); if(!b) return; closeMenuPop();
@@ -166,9 +166,10 @@ const PAAppEdit=(()=>{
   function fromApp(e){
     const m=e.data, fr=$('#fr');
     if(!fr||e.source!==fr.contentWindow||e.origin!=='null'||!canEdit()) return;
-    if(typeof m.request!=='string'||!(offers.get(fr)||new Set()).has(m.request)) return;
+    // '' = the button of a reopened reply (stored without its request): the panel opens empty.
+    if(typeof m.request!=='string'||(m.request!==''&&!(offers.get(fr)||new Set()).has(m.request))) return;
     if(!(navigator.userActivation&&navigator.userActivation.isActive)) return;
-    open(frameSlug(),$('#ftitle').textContent,typeof m.request==='string'?m.request:'');
+    open(frameSlug(),$('#ftitle').textContent,m.request);
   }
   // An app's own Ask AI asked for the one app chat ({pa:'shell',type:'app-chat'}): the page open in #fr, on a real tap.
   function fromAppChat(e){ const fr=$('#fr'); if(!fr||e.source!==fr.contentWindow||e.origin!=='null'||!canEdit()) return;
