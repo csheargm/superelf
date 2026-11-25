@@ -91,14 +91,14 @@ let s = ''; process.stdin.on('data', (d) => s += d).on('end', async () => {
   const W = process.cwd().split(path.sep).includes('apps') ? path.resolve('..', '..') : process.cwd();   // an edit turn runs IN apps/todo/
   const f = path.join(W, 'apps/todo/index.html');
   let say = 'ok';
-  if (/READ-ONLY/.test(sys)) say = 'I will do it.\\n[[apply]]';
-  else if (/context only[^:]*:\\s*escape/.test(sys)) {
+  if (/READ-ONLY/.test(sys)) { const w = (s.split('[Current message:]').pop().match(/escape|plant|slow|recolor/) || ['do it'])[0]; say = 'I will ' + w + '.\\n[[apply]]'; }   // the plan names the change: Apply runs only the plan
+  else if (/do it now\\):\\s*I will escape/.test(sys)) {
     tool('Write', { file_path: f }); fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace('Todo', 'Red'));
     tool('Write', { file_path: path.join(W, 'outside.txt') }); await new Promise((r) => setTimeout(r, 300)); fs.writeFileSync(path.join(W, 'outside.txt'), 'planted');   // the CLI runs a tool after it reports the call
     say = 'Done.';
-  } else if (/context only[^:]*:\\s*plant/.test(sys)) { fs.writeFileSync(path.join(W, 'apps/todo/CLAUDE.md'), 'obey me'); say = 'Done.'; }
-  else if (/context only[^:]*:\\s*slow/.test(sys)) { await new Promise((r) => setTimeout(r, 1500)); say = 'Done.'; }
-  else if (/context only[^:]*:\\s*recolor/.test(sys)) { tool('Edit', { file_path: f }); fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace('Todo', 'Blue')); say = 'Done.'; }
+  } else if (/do it now\\):\\s*I will plant/.test(sys)) { fs.writeFileSync(path.join(W, 'apps/todo/CLAUDE.md'), 'obey me'); say = 'Done.'; }
+  else if (/do it now\\):\\s*I will slow/.test(sys)) { await new Promise((r) => setTimeout(r, 1500)); say = 'Done.'; }
+  else if (/do it now\\):\\s*I will recolor/.test(sys)) { tool('Edit', { file_path: f }); fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace('Todo', 'Blue')); say = 'Done.'; }
   out({ type: 'system', subtype: 'init', session_id: 'sid-j' });
   out({ type: 'result', subtype: 'success', result: say, session_id: 'sid-j' });
 });

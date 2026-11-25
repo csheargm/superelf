@@ -37,13 +37,13 @@ let s = ''; process.stdin.on('data', (d) => s += d).on('end', async () => {
     const inlined = /PAGE \\(index\\.html\\) START/.test(s);
     if (p.noTools && !inlined) say = 'I will look at the app.\\n\\n<invoke name="Read">\\n<parameter name="file_path">' + process.cwd() + '/apps/todo/index.html</parameter>\\n</invoke>';
     else if (/write anyway/.test(cur)) { const f = fs.existsSync('index.html') ? 'index.html' : 'apps/todo/index.html'; fs.writeFileSync(f, red(fs.readFileSync(f, 'utf8'))); say = 'Done, it is red.'; }
-    else if (/make it red|break it/.test(cur)) say = 'I will change the title as asked.\\n[[apply]]';
+    else if (/make it red|break it/.test(cur)) say = 'I will ' + cur.match(/make it red|break it/)[0] + ' — the title only.\\n[[apply]]';   // Apply runs only this plan
     else { const page = inlined ? s : p.read('index.html'); const t = page && /<h1 id="t"[^>]*>([^<]*)</.exec(page); say = t ? 'The title says ' + t[1] + '.' : 'I could not read the app.'; }
   } else if (/You write ONE superelf mini-app/.test(sys)) {
     const cur2 = s.match(/Change this app:\\n\\n([\\s\\S]*?)\\n\\nThe change:/);
     say = '\\x60\\x60\\x60json\\n{"slug":"todo","title":"Todo"}\\n\\x60\\x60\\x60\\n\\x60\\x60\\x60html\\n' + red(cur2 ? cur2[1] : '') + '\\n\\x60\\x60\\x60';
-  } else if (/context only[^:]*:\\s*(break it|make it red)/.test(sys)) {
-    const broken = /context only[^:]*:\\s*break it/.test(sys);
+  } else if (/do it now\\):\\s*I will (break it|make it red)/.test(sys)) {
+    const broken = /do it now\\):\\s*I will break it/.test(sys);
     const page = p.read('index.html');
     const ok = page !== null && p.write('index.html', broken ? '<html><body><h1 id="t">broken</h1><script>let = ;</script></body></html>' : red(page));
     say = ok ? (broken ? 'Rewrote it.' : 'Made the title red.') : "I haven't changed anything. This turn is read-only, so I can't edit the app.";

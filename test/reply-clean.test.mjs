@@ -99,7 +99,8 @@ test('GPT review r2: the marker must be its own last line after a plan; Apply ru
   const e = confirmEdit({ applyId: id, who: 'o', slug: 'cal' });
   assert.equal(e.plan, 'Make the heading red.');
   assert.match(e.asked, /footer/);
-  assert.match(editSystemPrompt({ ...e, dir: '/nowhere/apps/cal' }), /do it now\):\nMake the heading red\.\nTheir own words, for context only \(do nothing beyond the change above\)/);
+  const sp = editSystemPrompt({ ...e, dir: '/nowhere/apps/cal' });
+  assert.match(sp, /do it now\):\nMake the heading red\.\n/); assert.doesNotMatch(sp, /footer/, 'the unapproved request never reaches the executor (r3)');
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'rc-'));
   try {
     const dir = path.join(ws, 'apps', 'cal'); fs.mkdirSync(dir, { recursive: true });
