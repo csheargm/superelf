@@ -1881,6 +1881,7 @@
     // convenience (R3).
     // `pw` is the paper width in the context's units: print draws the WHOLE sheet under its one
     // content transform, so a shrunk note still gets paper and rules out to the sheet's edge.
+    // Stationery keeps the pad width W so its art stays registered with the ink (GPT review).
     function drawPaper(ctx,h,bg,fit,pw){
       const live=!ctx||ctx===bgCtx; ctx=ctx||bgCtx; h=h||H; pw=pw||W;
       ctx.clearRect(0,0,pw,h);
@@ -1891,7 +1892,7 @@
       // Stationery FIRST, over the ground and under every line — and on paper too, even on white:
       // it is part of the page, not a tint. `fit` is print's content transform, so the design
       // shrinks WITH the ink and stays aligned. Unknown or still decoding: nothing (plain paper).
-      if(STN&&NB.stationery) STN.paint(ctx,NB.stationery,{w:pw,h,sheets:live&&seamless?0:1,fit,
+      if(STN&&NB.stationery) STN.paint(ctx,NB.stationery,{w:W,h,sheets:live&&seamless?0:1,fit,
         onReady:live?()=>{ if(bgCtx) drawPaper(); }:null});
       if(live) syncPaperPickers();                              // picker chrome is screen-only; a print render must not touch the DOM
       const t=NB.template||DEFAULT_TPL;

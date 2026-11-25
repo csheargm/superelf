@@ -322,7 +322,7 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
   html.pa-printing .pr-sheet:last-child{page-break-after:auto;break-after:auto}
   html.pa-printing .pr-sheet img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;
     -webkit-print-color-adjust:exact;print-color-adjust:exact}
-  @page{margin:0}
+  @page{margin:10mm}               /* the ordinary shell; a note print injects #prPageSize (margin 0) and removes it on teardown */
 }
 /* PA_SHELL_LOOK_CSS */
 /* PA_HOME_V2_CSS */
@@ -2291,6 +2291,7 @@ window.addEventListener('message',async(e)=>{
       if(root._paHold) clearTimeout(root._paHold);          // a previous print's timer must not fire into this one
       const teardown=()=>{ root._paHold=0;
         document.documentElement.classList.remove('pa-printing');
+        const pps=document.getElementById('prPageSize'); if(pps) pps.remove();   // a later Ctrl+P must not inherit this note's paper and zero margin
         root.innerHTML=''; };                               // release ~1MB per page
       root._paHold=setTimeout(teardown,HOLD_MS);
       const t0=Date.now();

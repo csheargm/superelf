@@ -55,10 +55,18 @@ test('every printed page is the pad sheet, a Letter page', () => {
 
 test('one scale for the whole note, from content alone', () => {
   const info = (exts) => ({ width: 816, sheetH: 1056, pages: exts.map((extent) => ({ extent })) });
-  assert.equal(API.noteFit(info([0.3, 1.2, 1.29])).k, 1, 'content inside the sheet is never scaled');
+  assert.equal(API.noteFit(info([0.3, 1.2, 1.25])).k, 1, 'content inside the sheet is never scaled');
   const k = API.noteFit(info([0.4, 1.37])).k;
   assert.ok(k < 1 && 1.37 * 816 * k <= 1056, 'the deepest page decides and lands inside the sheet');
   assert.equal(API.noteFit(info([0.4, 1.37, 0.2])).k, k, 'and every page gets that same k');
+  // GPT review: a stroke centred just above the sheet foot still has a thick edge below it.
+  const edge = API.noteFit(info([1.29])).k;
+  assert.ok(edge < 1 && (1.29 + 0.04) * 816 * edge <= 1056 + 1e-9, 'padding counts even when the centreline fits');
+});
+
+test('stationery stays registered with the ink when the note is scaled', () => {
+  const N = fs.readFileSync(path.join(ROOT, 'web', 'note-ui.inline.html'), 'utf8');
+  assert.match(N, /STN\.paint\(ctx,NB\.stationery,\{w:W,h,/, 'stationery uses the pad width, not the stretched paper width');
 });
 
 test('the same strokes print the same from a 12.9in and an 11in iPad', () => {
@@ -245,7 +253,8 @@ test('the shell prints the pages and nothing else', () => {
   assert.match(S, /\.pr-sheet\{display:flex;align-items:center;justify-content:center/, 'the sheet centres its page');
   assert.match(S, /height:calc\(var\(--pr-paper-h,279\.4mm\) - 12mm\);margin-top:6mm;padding:0 6mm/, 'even inner margin in mm');
   assert.match(S, /object-fit:contain/, 'the image fits, never crops');
-  assert.match(S, /@page\{margin:0\}/, 'no room for a browser header/footer');
+  assert.match(br[0], /getElementById\('prPageSize'\); if\(pps\) pps\.remove\(\)/, 'teardown drops the note paper rule, so a later Ctrl+P is the ordinary shell');
+  assert.match(S, /@page\{margin:10mm\}/, 'the ordinary shell keeps its margin; only a note print is zero-margin');
   assert.match(br[0], /@page\{size:'\+pz\.w\+' '\+pz\.h\+';margin:0\}/, 'page size from the chosen paper');
   assert.match(S, /\.pr-sheet\{[^}]*page-break-after:always/, 'one page per sheet');
 });

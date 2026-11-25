@@ -85,7 +85,8 @@ window.PAPrint = (function(){
   function noteFit(info,paper){
     const w=info.width||816, sheet=pageHeight(info,paper);
     let need=0; for(const pg of info.pages||[]) need=Math.max(need,(pg.extent||0)*w);
-    return { k: need<=sheet ? 1 : sheet/(need+w*PAD_RATIO) };
+    need+=w*PAD_RATIO;                    // padding always counts: a thick stroke's edge sits below its centreline
+    return { k: need<=sheet ? 1 : sheet/need };
   }
   // Render every page to a PNG data URL by asking the PAD to draw. PAPrint deliberately owns no
   // renderer of its own: a second one would drift from the on-screen note and the printout would

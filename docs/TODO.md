@@ -786,3 +786,5 @@ repo folder; the `<slug>-mine` rename; copies of another user's app (not in the 
 and LOCAL_META stripping re-checked. Only the owner's copy of a repo shelf app is safe to start with.
 
 - App chat offer, shared app with the same slug as one of the owner's own apps (GPT review, fork-publish-honesty): the broker sends only the slug, so the server offers 改这个应用 and the shell then refuses the click (the frame belongs to another account). Fix: the relay should name the app's account, and the gate should require it to be the owner's own.
+
+- Journal print, paper changed in the dialog (GPT review, journal-print): the sheet box height comes from the locale-chosen paper (A4 box 291mm incl. top margin). If a user on an A4 locale picks Letter in the dialog and the browser does not scale the CSS layout, the sheet can clip at the foot or spill a blank sheet. Chrome scales to the chosen paper; iOS Safari unverified. Fix if seen: size the box from the smaller of Letter/A4, or a paper toggle beside 打印.
