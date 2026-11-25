@@ -14,6 +14,7 @@ import { previewSelf, startSelf, liveStatus, sameVersion, securityRelevant } fro
 import { handleSelfpubRoute } from '../lib/selfpub/routes.mjs';
 import { getChange, putChange } from '../lib/selfpub/state.mjs';
 import { discardBranch } from '../lib/selfpub/checkout.mjs';
+const POSIX_ONLY = process.platform === 'win32' && 'the core lane runs on Linux/macOS nodes; its jail rule paths, fake CLI permissions and checkout are POSIX (docs/adr/0044)';
 
 const OWNER = { id: 'owner', role: 'owner' };
 // The PR's parent is the commit the change was made on (bare main): the fake GitHub must know it.
@@ -27,7 +28,7 @@ async function change(fx, runAgent = cssAgent, extra = {}) {
     cfg: {}, ...extra });
 }
 
-test('owner change → "Ready to publish" (server template) → nothing on GitHub → Publish → PR → merged → release → live', async () => {
+test('owner change → "Ready to publish" (server template) → nothing on GitHub → Publish → PR → merged → release → live', { skip: POSIX_ONLY }, async () => {
   const fx = selfpubFixture();
   const served = path.join(fx.d, 'served'); fs.mkdirSync(served); fs.writeFileSync(path.join(served, 'index.html'), 'live');
   const gh = await startFakeGitHub({ onMerge: (pr) => fx.doMerge(pr) });
@@ -71,7 +72,7 @@ const okRender = async () => ({ ok: true, shots: ['x.png'] });
 const libAgent = agent((cwd) => fs.writeFileSync(path.join(cwd, 'notes.md'), 'a note\n'));
 const codeAgent = agent((cwd) => { fs.mkdirSync(path.join(cwd, 'lib'), { recursive: true }); fs.writeFileSync(path.join(cwd, 'lib', 'x.mjs'), 'export const x = 1;\n'); });
 
-test('a failing test → Checks failed, the change cannot be published', async () => {
+test('a failing test → Checks failed, the change cannot be published', { skip: POSIX_ONLY }, async () => {
   const fx = selfpubFixture(); const gh = await startFakeGitHub();
   try {
     const bad = agent((cwd) => fs.writeFileSync(path.join(cwd, 'web', 'home.css'), 'body{content:"BOOM"}\n'));
@@ -83,7 +84,7 @@ test('a failing test → Checks failed, the change cannot be published', async (
   } finally { await gh.close(); rmTemp(fx.d); }
 });
 
-test('red CI: PR stays open, nothing released, the change can be tried again', async () => {
+test('red CI: PR stays open, nothing released, the change can be tried again', { skip: POSIX_ONLY }, async () => {
   const fx = selfpubFixture(); const gh = await startFakeGitHub();
   try {
     gh.st.checks = 'failure';
@@ -97,7 +98,7 @@ test('red CI: PR stays open, nothing released, the change can be tried again', a
   } finally { await gh.close(); rmTemp(fx.d); }
 });
 
-test('scan hit blocks; a changed checkout after preview refuses; token missing refuses; a write outside undoes the turn', async () => {
+test('scan hit blocks; a changed checkout after preview refuses; token missing refuses; a write outside undoes the turn', { skip: POSIX_ONLY }, async () => {
   const fx = selfpubFixture(); const gh = await startFakeGitHub();
   try {
     const leak = agent((cwd) => fs.writeFileSync(path.join(cwd, 'notes.md'), 'hello Zorblax\n'));
@@ -127,7 +128,7 @@ test('members, guests and app turns never reach the lane', async () => {
   } finally { rmTemp(fx.d); }
 });
 
-test('route: 403 for a member and the demo; 404 for another user\'s change; owner GET status; discard', async () => {
+test('route: 403 for a member and the demo; 404 for another user\'s change; owner GET status; discard', { skip: POSIX_ONLY }, async () => {
   const fx = selfpubFixture();
   try {
     const r = await change(fx, libAgent);
@@ -144,7 +145,7 @@ test('route: 403 for a member and the demo; 404 for another user\'s change; owne
   } finally { rmTemp(fx.d); }
 });
 
-test('a code change is never run by the node: ready, "CI will test this", 0 tests run; the PR body says CI', async () => {
+test('a code change is never run by the node: ready, "CI will test this", 0 tests run; the PR body says CI', { skip: POSIX_ONLY }, async () => {
   const fx = selfpubFixture(); const gh = await startFakeGitHub({ onMerge: (pr) => fx.doMerge(pr) });
   try {
     const mark = path.join(fx.d, 'ran');
@@ -161,7 +162,7 @@ test('a code change is never run by the node: ready, "CI will test this", 0 test
   } finally { await gh.close(); rmTemp(fx.d); }
 });
 
-test('an edit after the checks refuses Publish; a stale discard never wipes a newer change; an API key cannot publish', async () => {
+test('an edit after the checks refuses Publish; a stale discard never wipes a newer change; an API key cannot publish', { skip: POSIX_ONLY }, async () => {
   const fx = selfpubFixture(); const gh = await startFakeGitHub();
   try {
     const r = await change(fx, codeAgent);
@@ -180,7 +181,7 @@ test('an edit after the checks refuses Publish; a stale discard never wipes a ne
   } finally { await gh.close(); rmTemp(fx.d); }
 });
 
-test('preview shows a NEW file\'s content; a turn that throws leaves no dirty branch', async () => {
+test('preview shows a NEW file\'s content; a turn that throws leaves no dirty branch', { skip: POSIX_ONLY }, async () => {
   const fx = selfpubFixture(); const gh = await startFakeGitHub();
   try {
     const r = await change(fx, agent((cwd) => fs.writeFileSync(path.join(cwd, 'notes.md'), 'a quiet new line\n')), { render: okRender });
@@ -209,7 +210,7 @@ test('round 2: no sandbox → a new or ignored test file is never run; odd names
   } finally { await gh.close(); rmTemp(fx.d); }
 });
 
-test('round 2: a dirty self/* branch no saved change owns (a crash leftover) is thrown away, not CHANGE_OPEN', async () => {
+test('round 2: a dirty self/* branch no saved change owns (a crash leftover) is thrown away, not CHANGE_OPEN', { skip: POSIX_ONLY }, async () => {
   const fx = selfpubFixture();
   try {
     const crash = async ({ cwd }) => { fs.writeFileSync(path.join(cwd, 'web', 'home.css'), 'half\n'); return { reply: '', toolCalls: [] }; };
@@ -220,7 +221,7 @@ test('round 2: a dirty self/* branch no saved change owns (a crash leftover) is 
   } finally { rmTemp(fx.d); }
 });
 
-test('GPT review: merged but no new version cut is never "deploying" or "Live"; an edited test is flagged', async () => {
+test('GPT review: merged but no new version cut is never "deploying" or "Live"; an edited test is flagged', { skip: POSIX_ONLY }, async () => {
   const fx = selfpubFixture(); const gh = await startFakeGitHub();   // no onMerge: main gets nothing new to release
   try {
     const r = await change(fx, libAgent);

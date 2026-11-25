@@ -7,6 +7,7 @@ import path from 'node:path';
 import { selfpubFixture, tgit } from './helpers-selfpub.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
 import { ensureCheckout, startBranch, collectChange, acquireLock, deniedPath, discardBranch, git } from '../lib/selfpub/checkout.mjs';
+const POSIX_ONLY = process.platform === 'win32' && 'the core lane runs on Linux/macOS nodes; its jail rule paths, fake CLI permissions and checkout are POSIX (docs/adr/0044)';
 
 const setup = () => { const fx = selfpubFixture(); const dir = ensureCheckout({ root: fx.root, cloneUrl: fx.bare }); return { fx, dir }; };
 
@@ -22,7 +23,7 @@ test('clone once, branch self/<date>-<id> off origin/main, no token in .git/conf
   } finally { rmTemp(fx.d); }
 });
 
-test('dirty checkout: a foreign change is refused; an open self/* change is refused, never thrown away', () => {
+test('dirty checkout: a foreign change is refused; an open self/* change is refused, never thrown away', { skip: POSIX_ONLY }, () => {
   const { fx, dir } = setup();
   try {
     fs.writeFileSync(path.join(dir, 'web', 'home.css'), 'x');

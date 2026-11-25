@@ -17,6 +17,7 @@ import { startFakeGitHub, FAKE_TOKEN } from './helpers-fake-github.mjs';
 import { selfpubFixture, tgit } from './helpers-selfpub.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
 import { hashPassword } from '../lib/auth.mjs';
+const POSIX_ONLY = process.platform === 'win32' && 'the core lane runs on Linux/macOS nodes; its jail rule paths, fake CLI permissions and checkout are POSIX (docs/adr/0044)';
 
 const SHOTS = process.env.PA_SHOTS || '';
 const KID = 'kid-token-abcdefghijkl';
@@ -76,7 +77,7 @@ test('a member typing "change superelf:" is refused plainly; no checkout is made
   assert.ok(!fs.existsSync(path.join(fx.d, 'src', 'repo')), 'no checkout');
 });
 
-test('the main agent cannot write served code: its args deny it and the file is unchanged', async () => {
+test('the main agent cannot write served code: its args deny it and the file is unchanged', { skip: POSIX_ONLY }, async () => {
   const before = fs.readFileSync(path.join(root, 'superelf.md'), 'utf8');
   const ev = await chat(OWNER_TOKEN, 'please edit the served file superelf.md directly');
   const done = ev.find((e) => e.type === 'done');
@@ -85,7 +86,7 @@ test('the main agent cannot write served code: its args deny it and the file is 
 });
 
 for (const [name, vp] of [['iPhone', { width: 390, height: 844 }], ['desktop', { width: 1280, height: 860 }]]) {
-  test(`${name}: home title request → ready + Publish → preview → PR → CI → merged and released; again; typed publish`, { skip, timeout: 240000 }, async () => {
+  test(`${name}: home title request → ready + Publish → preview → PR → CI → merged and released; again; typed publish`, { skip, timeout: 420000 }, async () => {
     gh.st.commits.set(tgit(fx.bare, 'rev-parse', 'main').trim(), { tree: { sha: 'basetree' }, parents: [] });   // the PR's parent: main as it is now
     const sent = gh.st.requests.length;
     const ctx = await browser.newContext({ viewport: vp }); const page = await ctx.newPage();
@@ -94,7 +95,10 @@ for (const [name, vp] of [['iPhone', { width: 390, height: 844 }], ['desktop', {
     await page.waitForFunction(() => !document.querySelector('#login[open]'));
     const ask = async (q) => { await page.fill('#box', q); await page.click('#send'); };
     await ask('make the home title a bit larger');
-    const go = page.locator('.sp-row .sp-go').last(); await go.waitFor({ timeout: 90000 });
+    // The turn's answer first (under a full parallel suite a render can take long): then the button, with the reply in any failure.
+    await page.waitForFunction(() => document.querySelectorAll('#log .msg-actions').length >= 2 && !document.querySelector('#log .pa-think'), null, { timeout: 180000 });
+    const go = page.locator('.sp-row .sp-go').last();
+    assert.equal(await go.count(), 1, `Publish under the reply; the reply was: ${await page.locator('#log .msg').last().textContent()}`);
     const reply = await page.locator('#log .msg').last().textContent();
     assert.match(reply, /可以发布 · Ready to publish — 改了 1 个文件 · 1 file\(s\) changed; 测试 1\/1 通过/);
     assert.match(reply, /Rendered at iPhone width \(390\)/); assert.match(reply, /merges only on green CI/);
