@@ -1,4 +1,12 @@
 {
+  "v5.19.6": {
+    "date": "2026-11-24",
+    "features": [],
+    "fixes": [
+      "应用对话自测修复 · App chat self-test fixes"
+    ],
+    "through": "2f1312d11c88936f164a8204bc31e321cb68157f"
+  },
   "v5.19.5": {
     "date": "2026-11-24",
     "features": [],
