@@ -738,3 +738,5 @@ Without it they now FAIL (R14), not pass as `# pass 0 / # fail 0`. To run them:
 - App-chat jail rollback: a file another request creates at the exact path the agent was denied, during the turn, is moved aside (kept in .app-versions/<slug>/.outside-*, which app delete removes). Rare race; GPT review cap r3.
 - Any app-edit rollback (restoreVersion) drops symlinks the app folder had: the snapshot copy skips links (lib/app-versions.mjs copyNoLinks). (GPT review r2, pre-existing)
 - test/member-plain-lane-e2e.test.mjs "owner ticks AI 工具" fails on origin/main 413dd6b9 too (checkbox click does not change state).
+
+- Demo sign-in (lib/demo-boot.mjs): two tabs asking for a link at once — the slower OTP reply stores its verifier last, so the newer link fails in that browser (GPT r2, 2026-11-24; rare race, deferred). Fix idea: keep a small verifier list keyed by request time.
