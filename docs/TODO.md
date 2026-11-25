@@ -793,3 +793,9 @@ and LOCAL_META stripping re-checked. Only the owner's copy of a repo shelf app i
 ## Browser Back (web/app-frame.js) — deferred GPT review edge cases
 - An app opened in the instant between Home's `history.back()` and its popstate replaces the entry being left; the ignored popstate then leaves that app open over the Home entry. Rare (needs a tap within one traversal).
 - Forward into an app entry after the browser recreated the shell document (no bfcache) shows Home: boot reopens from the update record and the hash, not from `history.state.paApp`.
+
+## Panel windows (ADR 0043) — GPT review edge cases deferred
+- A maximised panel window is not modal: Tab can reach the page under it. Consider `inert` on the page while maximised.
+- A floating window has no keyboard path back to a dock (Alt+arrow moves it; docking is by drag or the snap targets).
+- With both side docks capped (left+right > 60%), dragging a divider outward can first narrow that dock (the cap rescales both).
+- PAAppPrefs: if a patch fails during its own re-read, its local overlay stays; a later layout save may carry a stale copy of another device class.

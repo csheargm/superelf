@@ -784,9 +784,9 @@ const PA_COMPONENTS = [
   { marker: '<!--PA_SETTINGS_ROWS-->', file: 'settings-rows.inline.html' },
   // PATips, first-use tips (ADR 0030): chat-ui carries its marker AFTER PA_APP_PREFS_UI (it writes tipsSeen through PAAppPrefs). Appended last.
   { marker: '<!--PA_TIPS_UI-->', file: 'tips.inline.html' },
-  // PAPaneChrome, the pane header's Float / Close and the float window (ADR 0031): split-ui carries its marker after its script. Appended last.
-  { marker: '<!--PA_PANE_CHROME_UI-->', file: 'pane-chrome.inline.html' },
-  // PAAppBar, the app's own bar (← Home, A-/A+, auto-hide; ADR 0032): the Bible and Journal pages carry its marker. Appended last.
+  // PAWin, the side panels as windows — dock, float, resize, minimise, maximise (ADR 0043): split-ui carries its marker after its script.
+  { marker: '<!--PA_PANEL_WINDOW_UI-->', file: 'panel-window.inline.html' },
+  // PAAppBar, the app's own bar (← Home, A-/A+, auto-hide; ADR 0043): the Bible and Journal pages carry its marker. Appended last.
   { marker: '<!--PA_APP_BAR_UI-->', file: 'app-bar.inline.html' },
   // The top-centre handle's size (web/bar-handle.css), shared with the shell's #barpeek (R3): app-bar carries its marker. Appended last.
   { marker: '/* PA_BAR_HANDLE_CSS */', file: 'bar-handle.css' },

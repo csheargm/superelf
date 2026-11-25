@@ -17,7 +17,9 @@ import { ROOT, mediaMatches, stripComments } from './helpers-app.mjs';
 
 const SRC = fs.readFileSync(path.join(ROOT, 'web', 'split-ui.inline.html'), 'utf8');
 const JS = /<script>([\s\S]*)<\/script>/.exec(SRC)[1];
-const CSS = /<style id="pas-style">([\s\S]*?)<\/style>/.exec(SRC)[1];
+// The push and the window CSS live in PAWin since ADR 0043; PASplit itself has no stylesheet.
+const PAW = fs.readFileSync(path.join(ROOT, 'web', 'panel-window.inline.html'), 'utf8');
+const CSS = /<style id="paw-style">([\s\S]*?)<\/style>/.exec(PAW)[1];
 
 // ── a DOM just real enough to run the component ──────────────────────────────────────────────
 function mkDom({ width = 1366, height = 768 } = {}) {
@@ -125,8 +127,24 @@ function mkDom({ width = 1366, height = 768 } = {}) {
   };
 }
 
+// A PAWin stand-in that records what the rail asks of each window (the real windows are driven in
+// test/panel-window.test.mjs and test/panel-window-e2e.test.mjs).
+function fakePAWin(dom) {
+  const made = [];
+  return { made, create(o) {
+    const s = { open: false, min: false, max: false, where: o.dock, title: o.title };
+    const w = { o, s, body: dom.sandbox.document.createElement('div'),
+      open() { const was = s.open && !s.min; s.open = true; s.min = false; if (!was && o.onVisible) o.onVisible(true); },
+      close() { if (!s.open) return; s.open = false; if (o.onVisible) o.onVisible(false); },
+      minimize() { s.min = true; if (o.onVisible) o.onVisible(false); },
+      maximize() { s.max = true; }, restore() { s.max = false; s.min = false; },
+      dock(z) { s.where = z; }, setTitle(t) { s.title = String(t || ''); },
+      isVisible: () => s.open && !s.min, state: () => ({ ...s }), destroy() { w.destroyed = true; } };
+    made.push(w); return w; } };
+}
+
 function loadSplit(dom) {
-  const scope = { ...dom.sandbox };
+  if (!dom.win.PAWin) dom.win.PAWin = fakePAWin(dom);
   // `window.PASplit` is how the component publishes itself; give it a real object to attach to.
   new Function('window', 'document', 'matchMedia', JS)(dom.win, dom.sandbox.document, dom.win.matchMedia);
   return dom.win.PASplit;
@@ -221,44 +239,6 @@ test('a throwing gate subscriber does not strand the ones after it, and is not s
     'but every later subscriber ran first: a rail that never hears "closed" keeps pushing the app aside');
 });
 
-test('destroy() ENDS a rail — no DOM, no resize, no gate subscription left behind', () => {
-  // close() hides the split; a gate crossing REPLACES it. A closed-but-live rail keeps both its
-  // subscriptions and, on the next rotation, toggles pas-open on the root underneath whatever took
-  // its place — the app is then pushed aside by a panel that no longer exists.
-  const dom = mkDom({ width: 1366, height: 768 });
-  const PASplit = loadSplit(dom);
-  let resizes = 0;
-  const rail = PASplit.open({ slots: [{ key: 'a', mount: () => ({ resize: () => { resizes++; } }) }] });
-  rail.open();
-  assert.ok(dom.body.children.some((n) => n.classList.contains('pas-rail')), 'the rail is in the document');
-  assert.equal(dom.winListeners('resize'), 1, 'and it is listening for resizes');
-  rail.destroy();
-  assert.equal(dom.winListeners('resize'), 0,
-    'the resize listener is REMOVED, not merely made inert — otherwise every rotation leaks one');
-  assert.equal(rail.isOpen(), false, 'it is closed');
-  assert.equal(dom.docEl.classList.contains('pas-open'), false, 'and releases the push');
-  assert.equal(dom.docEl.style._p['--pa-split'], undefined, 'and clears the width variable');
-  assert.ok(!dom.body.children.some((n) => n.classList.contains('pas-rail')), 'the rail element is GONE');
-  assert.ok(!dom.body.children.some((n) => n.classList.contains('pas-dockb')), 'and so is the bottom zone');
-  const at = resizes;
-  dom.fire('resize');
-  assert.equal(resizes, at, 'a destroyed rail does not answer window resizes any more');
-  dom.rotate(768, 1024); dom.rotate(1366, 768);
-  assert.equal(dom.docEl.style._p['--pa-split'], undefined,
-    'nor gate crossings — it never re-applies its width over the surface that replaced it');
-  assert.equal(dom.docEl.classList.contains('pas-open'), false, 'and never re-asserts the push');
-});
-
-test('destroy() clears the push even for a rail that was built and never opened', () => {
-  // applyWidth() runs at construction, so --pa-split is set before anyone calls open(). close()
-  // returns early when !shown and would leave it behind.
-  const dom = mkDom({ width: 1366, height: 768 });
-  const rail = loadSplit(dom).open({ slots: [{ key: 'a', mount: () => ({}) }] });
-  assert.ok(dom.docEl.style._p['--pa-split'], 'construction alone sets the width variable');
-  rail.destroy();
-  assert.equal(dom.docEl.style._p['--pa-split'], undefined, 'destroy clears it regardless');
-});
-
 test("the rail's gate is its OWN, not the drawer dock's 640px", () => {
   // 640 admits iPhone landscape (852 wide) — reusing it would silently put the rail on the phone,
   // which is the one thing this feature must not do. Pinned so a later "simplification" that
@@ -270,65 +250,6 @@ test("the rail's gate is its OWN, not the drawer dock's 640px", () => {
 });
 
 // ── 3. the re-measure contract ───────────────────────────────────────────────────────────────
-test('expanding a collapsed slot RE-MEASURES it, even back to an identical width', () => {
-  // The scar this guards: note-ui.inline.html:2272 returns early on the zero reading BEFORE
-  // updating lastW/lastH, so an expand back to a previously-seen width is scored "no real change"
-  // and the canvas keeps a stale backing store — ink then lands right of the nib.
-  const dom = mkDom();
-  let resizes = 0, remeasures = 0;
-  const rail = loadSplit(dom).open({
-    slots: [
-      { key: 'chat', mount: () => ({ remeasure: () => { remeasures++; } }) },
-      { key: 'note', collapsed: true, mount: () => ({ resize: () => { resizes++; } }) },
-    ],
-  });
-  rail.open();
-  assert.equal(resizes, 0, 'a COLLAPSED slot must not be measured while it is collapsed (it measures 0)');
-  rail.expand('note');
-  assert.equal(resizes, 1, 'expanding must re-measure');
-  rail.collapse('note'); rail.expand('note');
-  assert.equal(resizes, 2, 'and again after a collapse/expand cycle at the SAME width');
-  // A redundant expand still re-measures: the cheap no-op guard is exactly how the stale canvas
-  // would survive.
-  rail.expand('note');
-  assert.equal(resizes, 3, 'an expand of an already-open slot must still re-measure');
-  assert.ok(remeasures >= 1, 'the open chat slot re-measures when the rail opens');
-});
-
-test('resizing the rail re-measures every OPEN slot and persists a RATIO, not a pixel width', () => {
-  const dom = mkDom({ width: 1000, height: 800 });
-  let noteResizes = 0; const saved = [];
-  const rail = loadSplit(dom).open({
-    persist: { save: (g) => saved.push(g) },
-    slots: [
-      { key: 'chat', mount: () => ({ remeasure: () => {} }) },
-      { key: 'note', collapsed: true, mount: () => ({ resize: () => { noteResizes++; } }) },
-    ],
-  });
-  rail.open();
-  rail.setRatio(0.5);
-  assert.equal(dom.docEl.style._p['--pa-split'], '500px', 'the px width is DERIVED from the ratio and the viewport');
-  assert.equal(noteResizes, 0, 'a collapsed slot is still not measured on resize');
-  assert.equal(saved.at(-1).ratio, 0.5, 'a RATIO is persisted');
-  assert.ok(!('width' in saved.at(-1)), 'a pixel width must not be persisted — it would not survive rotation');
-  // Out-of-range input is clamped, never trusted: a corrupt stored value must not yield a
-  // zero-width or screen-filling rail.
-  rail.setRatio(99); assert.ok(rail.ratio() <= 0.6, 'clamped high');
-  rail.setRatio(-5); assert.ok(rail.ratio() >= 0.24, 'clamped low');
-  rail.setRatio('nonsense'); assert.ok(rail.ratio() >= 0.24 && rail.ratio() <= 0.6, 'garbage falls back into range');
-});
-
-test('rotation re-derives the width from the ratio', () => {
-  // Why a ratio is stored: an iPad rotated to portrait re-clamps for free. A stored px width
-  // would leave a 700px rail on a 768px screen.
-  const dom = mkDom({ width: 1024, height: 768 });
-  const rail = loadSplit(dom).open({ ratio: 0.4, slots: [{ key: 'chat', mount: () => ({}) }] });
-  rail.open();
-  assert.equal(dom.docEl.style._p['--pa-split'], '410px');
-  dom.win.innerWidth = 1366; dom.fire('resize');
-  assert.equal(dom.docEl.style._p['--pa-split'], '546px', 'the same ratio, re-derived for the new viewport');
-});
-
 // ── 4. structural guarantees the serve path depends on ───────────────────────────────────────
 test('no client-side storage anywhere — it all throws at an opaque origin', () => {
   const code = JS + CSS;
@@ -369,47 +290,6 @@ test('web.mjs serves the component, and appends it LAST', () => {
   // ways). Any future component that another component references must obey the same rule.
   assert.ok(order.indexOf('photo-ui.inline.html') > order.indexOf('chat-ui.inline.html'),
     'photo-ui must come AFTER chat-ui, which carries its marker');
-});
-
-test('z-index is a literal below the notice ceiling, in a real <style> block', () => {
-  // app-load.test.mjs reads <style> blocks statically: a var()-valued z-index reads as unresolved,
-  // scores 0, and sails under every ladder check — a vacuous pass.
-  const z = [...CSS.matchAll(/z-index:\s*([^;}]+)/g)].map((m) => m[1].trim());
-  assert.ok(z.length >= 1, 'the rail must declare a z-index');
-  for (const v of z) {
-    assert.ok(/^\d+$/.test(v), `z-index must be a literal number, got ${v}`);
-    assert.ok(Number(v) < 2000, `z-index ${v} must stay under the notice ceiling (--pa-notice-z:2000)`);
-  }
-  assert.match(CSS, /\.pas-rail\{[^}]*position:fixed/, 'the rail is fixed, so the ladder check can resolve it');
-});
-
-test('the push uses margin-right, and never pushes the rail, drawer or lightbox', () => {
-  // margin-right is the only property that narrows BOTH a normal-flow flex child (the Bible's
-  // reading view, which ignores `left`/`right`) and a position:fixed one — and unlike overriding
-  // `right:` it preserves an existing inset, so #fab keeps its 10px gap.
-  assert.match(CSS, /html\.pas-open>body>\*[^{]*\{margin-right:var\(--pa-split/);
-  const rule = /html\.pas-open>body>\*([^{]*)\{/.exec(CSS)[1];
-  for (const skip of ['.pas-rail', '.pac-drawerhost', '.pac-lb']) {
-    assert.ok(rule.includes(`:not(${skip})`), `${skip} must never be pushed`);
-  }
-  assert.ok(!/html\.pas-open>body\{[^}]*padding-right/.test(CSS),
-    'body padding would double-inset flow children that also carry the margin rule');
-});
-
-test('the drag divider is keyboard-operable — this feature is desktop/iPad only, i.e. keyboards', () => {
-  assert.match(JS, /role','separator'/);
-  assert.match(JS, /aria-valuenow/);
-  assert.match(JS, /ArrowLeft|ArrowRight/);
-  const dom = mkDom({ width: 1000, height: 800 });
-  const rail = loadSplit(dom).open({ slots: [{ key: 'chat', mount: () => ({}) }] });
-  rail.open();
-  const before = rail.ratio();
-  const vdiv = dom.made.find((n) => n.className === 'pas-vdiv');
-  assert.ok(vdiv, 'the vertical divider exists');
-  vdiv.fire('keydown', { key: 'ArrowLeft' });
-  assert.ok(rail.ratio() > before, 'ArrowLeft widens the rail');
-  assert.equal(vdiv.getAttribute('aria-valuenow'), String(Math.round(rail.ratio() * 100)),
-    'aria-valuenow and the width come from ONE computation, so they cannot disagree');
 });
 
 test('an empty rail is refused rather than pushing the app aside for nothing', () => {
@@ -511,39 +391,6 @@ test('panel() sits OUTSIDE the window chat-pill-reserve slices and evaluates', (
   assert.ok(!CHAT_SRC.slice(from, to).includes('panel:(opts)=>{'),
     'panel() must not be inside the fullscreen slice window');
   assert.ok(CHAT_SRC.indexOf('    panel:(opts)=>{') > to, 'panel() belongs after the listDrawer block');
-});
-
-test('the LEFT dock never pushes the right rail', () => {
-  // The dock narrows every direct <body> child with `left:var(--pac-dock)!important`. The rail is
-  // anchored to the RIGHT edge, so that rule would drag it inward and leave a strip of bare page
-  // down the right-hand side — with both open, which is the normal state once the drawer is used.
-  const excl = /const PAC_DOCK_EXCL=([^;]+);/.exec(CHAT_SRC);
-  assert.ok(excl, 'PAC_DOCK_EXCL is the ONE constant driving both the push and its transition');
-  assert.match(excl[1], /:not\(\.pas-rail\)/, 'the rail must be excluded from the left dock push');
-  // And it really is the selector used by both rules, not a lookalike string.
-  assert.match(CHAT_SRC, /html\.pac-docked>body>\*'\+PAC_DOCK_EXCL\+'\{margin-left:var\(--pac-dock\)!important\}/,
-    'the dock pushes with margin-left');
-  // Comments stripped: the file explains WHY the class was removed, and names it while doing so.
-  assert.ok(!/pac-dock-ready/.test(stripComments(CHAT_SRC)), 'and the class that only gated its transition went with it (R1)');
-});
-
-test('the two pushes use different properties, so they compose instead of fighting', () => {
-  // Left dock moves `left`; the rail shrinks with `margin-right`. Both can apply to the same
-  // element at once — which is exactly what happens with the drawer open and the rail open.
-  // Both are margins now, on OPPOSITE sides, so they ADD rather than fight: with the drawer open
-  // and the rail open the reading column is inset from both edges. `left` was the old mechanism and
-  // moved only positioned children, which is why the drawer covered the Bible's text.
-  assert.match(CHAT_SRC, /PAC_DOCK_EXCL\+'\{margin-left:var\(--pac-dock\)!important\}/, 'dock pushes with margin-LEFT');
-  assert.ok(!/transition:margin/.test(stripComments(CHAT_SRC)), 'and neither transitions its margin — that leaves it computing to 0 on flow children');
-  const push = /html\.pas-open>body>\*[^{]*\{([^}]*)\}/.exec(CSS);
-  assert.ok(push, 'the rail declares a push rule');
-  assert.match(push[1], /margin-right:var\(--pa-split/, 'rail pushes with margin-right');
-  // The PUSH RULE specifically must not touch left/right — those are the dock's property and the
-  // element's own anchoring. (A `left:auto` on .pas-rail itself is harmless and not what this
-  // guards; an earlier version of this assertion scanned the whole stylesheet and so tested
-  // nothing.) Overriding `right` would also destroy an existing inset, e.g. the Bible's #fab.
-  assert.ok(!/(?:^|;)\s*left\s*:/.test(push[1]), 'the push must not drive `left` — that is the dock\'s property');
-  assert.ok(!/(?:^|;)\s*right\s*:/.test(push[1]), 'the push must not drive `right` — it would flatten an existing inset');
 });
 
 // ── the Bible's wiring ───────────────────────────────────────────────────────────────────────
@@ -846,26 +693,6 @@ test('a closed rail reopens, and reopening does not stack Escape listeners', () 
   assert.equal(rail.isOpen(), true);
 });
 
-test('a single-slot rail hides the collapse header — the mounted surface titles itself', () => {
-  const dom = mkDom();
-  loadSplit(dom).open({ slots: [{ key: 'chat', mount: () => ({}) }] }).open();
-  const railEl = dom.made.find((n) => n.classList.contains('pas-rail'));
-  assert.ok(railEl.classList.contains('pas-single'), 'one slot is marked');
-  assert.match(CSS, /\.pas-rail\.pas-single \.pas-head\{display:none\}/, 'and its caret header is hidden');
-  const two = mkDom();
-  const r2 = loadSplit(two).open({ slots: [{ key: 'a', mount: () => ({}) }, { key: 'b', mount: () => ({}) }] });
-  r2.open();
-  const railEl2 = two.made.find((n) => n.classList.contains('pas-rail'));
-  assert.ok(!railEl2.classList.contains('pas-single'), 'two slots keep their collapse headers');
-});
-
-test('Escape closes the rail — but not when something is in front of it', () => {
-  assert.match(JS, /e\.key!=='Escape'/, 'Escape is handled');
-  assert.match(JS, /document\.querySelector\('\.pac-lb\.on, dialog\[open\]'\)/,
-    'a lightbox or open dialog owns Escape first — closing the panel behind it is the wrong surface');
-  assert.match(JS, /document\.removeEventListener\('keydown',onEsc\)/, 'and the listener is removed on close');
-});
-
 test('long-press on a verse asks about THAT verse, replacing the selection', () => {
   const fn = /function longPressVerse\(n,el\)\{([\s\S]*?)\n\}/.exec(BIBLE);
   assert.ok(fn, 'longPressVerse exists as a named unit');
@@ -959,100 +786,7 @@ test('a legacy text note is carried INTO the notebook, never dropped', () => {
     'a text-only verse synthesises a notebook instead of reporting absent');
 });
 
-test('a slot can be maximised for handwriting and retracted to exactly what it was', () => {
-  const dom = mkDom({ width: 1000, height: 800 });
-  let resizes = 0;
-  const rail = loadSplit(dom).open({
-    ratio: 0.3,
-    slots: [
-      { key: 'chat', mount: () => ({ remeasure: () => {} }) },
-      { key: 'note', collapsed: true, mount: () => ({ resize: () => { resizes++; } }) },
-    ],
-  });
-  rail.open(); rail.expand('note');
-  const before = { ratio: rail.ratio(), chatOpen: !rail.isCollapsed('chat') };
-  rail.toggleMax('note');
-  assert.equal(rail.isMaxed('note'), true, 'the note fills the screen');
-  assert.equal(dom.docEl.style._p['--pa-split'], '100vw', 'through the SAME variable a drag uses — no second hide mechanism');
-  assert.equal(rail.isCollapsed('chat'), true, 'and the other slot steps aside');
-  // Rotating while maximised must not shrink it back to a ratio of the new width.
-  dom.win.innerWidth = 1400; dom.fire('resize');
-  assert.equal(dom.docEl.style._p['--pa-split'], '100vw', 'a resize does not un-maximise it');
-  rail.toggleMax('note');
-  assert.equal(rail.isMaxed(), false, 'and it retracts');
-  assert.equal(rail.ratio(), before.ratio, 'to the SAME width as before');
-  assert.equal(!rail.isCollapsed('chat'), before.chatOpen, 'with the other slot back as it was');
-  assert.ok(resizes >= 2, 'both transitions re-measure the canvas');
-});
-
-test('maximise is a button the user presses, never automatic', () => {
-  assert.match(JS, /zoom\.onclick=function\(e\)\{ e\.stopPropagation\(\); toggleMax\(sl\.key\); \}/,
-    'it is bound to a control');
-  assert.match(JS, /e\.stopPropagation\(\)/, 'and does not also collapse the slot it just enlarged');
-  // Exactly two call sites, and neither ENTERS maximise on the user's behalf: the zoom button
-  // (which the user pressed) and dock(), which EXITS it so a maximised slot is never left behind
-  // in a zone it just moved out of.
-  const calls = [...JS.matchAll(/^.*toggleMax\(/gm)].map((m) => m[0].trim());
-  // The third, PAPaneChrome's ctx.max (ADR 0031), only RE-APPLIES a maximise the user pressed
-  // earlier (the remembered layout) or exits one before floating/closing; test/pane-chrome.test.mjs
-  // pins that it never maximises a pane that was not left maximised.
-  const entries = calls.filter((c) => !/function toggleMax/.test(c) && !/if\(maxed\) toggleMax/.test(c)
-    && !/^max:function\(\)\{ toggleMax\($/.test(c));
-  assert.deepEqual(entries.map((c) => /zoom\.onclick/.test(c)), entries.map(() => true),
-    `maximise must only ever be entered by the user pressing the control; found: ${entries.join(' | ')}`);
-  assert.match(JS, /if\(maxed\) toggleMax\(maxed\.key\);/, 'docking a maximised slot exits maximise first');
-});
-
 // ── dock zones ───────────────────────────────────────────────────────────────────────────────
-test('a slot can be docked between the right rail and the bottom, and re-measures on arrival', () => {
-  const dom = mkDom({ width: 1280, height: 800 });
-  let noteResizes = 0;
-  const rail = loadSplit(dom).open({
-    slots: [
-      { key: 'chat', zone: 'right', mount: () => ({ remeasure: () => {} }) },
-      { key: 'note', zone: 'bottom', mount: () => ({ resize: () => { noteResizes++; } }) },
-    ],
-  });
-  rail.open();
-  assert.equal(rail.zoneOf('chat'), 'right');
-  assert.equal(rail.zoneOf('note'), 'bottom', 'the note starts under the text, not stacked under the chat');
-  const at = noteResizes;
-  rail.dock('note', 'right');
-  assert.equal(rail.zoneOf('note'), 'right', 'it moves');
-  assert.ok(noteResizes > at, 're-parenting changes the box it lives in, so it MUST re-measure');
-  rail.dock('note', 'bottom');
-  assert.equal(rail.zoneOf('note'), 'bottom', 'and moves back');
-  rail.dock('note', 'nowhere');
-  assert.equal(rail.zoneOf('note'), 'bottom', 'an unknown zone is ignored rather than hiding the panel');
-});
-
-test('an empty zone stops pushing the app aside', () => {
-  // Docking the only slot out of a zone used to leave an empty strip that still narrowed the page.
-  const dom = mkDom({ width: 1280, height: 800 });
-  const rail = loadSplit(dom).open({
-    slots: [{ key: 'note', zone: 'bottom', mount: () => ({ resize: () => {} }) }],
-  });
-  rail.open();
-  assert.equal(dom.docEl.classList.contains('pas-bopen'), true, 'the bottom zone is in use');
-  assert.equal(dom.docEl.classList.contains('pas-open'), false, 'and the right rail is not, so it must not push');
-  rail.dock('note', 'right');
-  assert.equal(dom.docEl.classList.contains('pas-open'), true, 'now the rail is in use');
-  assert.equal(dom.docEl.classList.contains('pas-bopen'), false, 'and the bottom zone stops pushing');
-});
-
-test('the bottom pane takes its space in the FLOW — it does not overlay the text', () => {
-  // Measured in a browser: as position:fixed with a `margin-bottom` push, an app's own `#id` rule
-  // outranked the push selector and the pane sat ON TOP of the text it should have made room for.
-  // As a flow child of the host's flex column it simply takes its height and the reading column
-  // shrinks — no push rule to lose a cascade fight.
-  assert.match(CSS, /\.pas-dockb\{position:relative;flex:0 0 auto;height:var\(--pa-dockb/,
-    'the bottom pane is a normal flow child, not a fixed overlay');
-  assert.ok(!/pas-bopen>body>\*[^{]*\{margin-bottom/.test(CSS), 'and there is no bottom push rule at all');
-  // It is NOT excluded from the RIGHT push, so it still stops where the rail begins.
-  const push = /html\.pas-open>body>\*([^{]*)\{/.exec(CSS);
-  assert.ok(!push[1].includes(':not(.pas-dockb)'), 'the bottom pane still narrows when the rail opens');
-});
-
 test('no transition on the push — it left the margin computing to 0', () => {
   // The regression this pins: `transition:margin-right .2s` on the pushed children left
   // #verses/#nav at margin-right 0 while the identical rule resolved on a display:none sibling,
@@ -1107,22 +841,6 @@ test('a note that becomes real shows up in the ☰ list', () => {
     'refreshList is a no-op while the drawer is closed');
 });
 
-test('the rail can retitle a slot, and the header is where it lands', () => {
-  const dom = mkDom({ width: 1280, height: 800 });
-  const rail = loadSplit(dom).open({
-    slots: [{ key: 'note', zone: 'bottom', title: '笔记 · Note', mount: () => ({ resize: () => {} }) }],
-  });
-  rail.open();
-  const head = dom.made.find((n) => n.classList.contains('pas-head-t'));
-  assert.ok(head, 'the slot header has a title element');
-  assert.equal(head.textContent, '笔记 · Note', 'starting with the slot label');
-  rail.setTitle('note', 'Nicodemus came at night');
-  assert.equal(head.textContent, 'Nicodemus came at night', 'which the host can replace');
-  rail.setTitle('nope', 'x');            // unknown slot must not throw
-  rail.setTitle('note', null);
-  assert.equal(head.textContent, '', 'and a cleared title is empty, not "null"');
-});
-
 test('list operations go to the chat that is ON SCREEN, not a hidden twin', () => {
   if (!LIVE_BIBLE) return;
   // The Bible builds TWO Chat instances — the full-screen one and the rail panel — and each
@@ -1164,4 +882,69 @@ test('tapping a chat row in the ☰ list reveals the chat panel', () => {
   }
   // Measured in a browser: chat collapsed + rail not rendered → click a row → rail rendered,
   // chat expanded.
+});
+
+// ── ADR 0043: every slot is its OWN PAWin window ─────────────────────────────────────────────
+test('each slot is an independent window: expanding one never shows another', () => {
+  const dom = mkDom(); const PASplit = loadSplit(dom);
+  const toggles = [];
+  const rail = PASplit.open({ onToggle: (k, v) => toggles.push(k + ':' + v), slots: [
+    { key: 'chat', title: '问一问 · Ask AI', mount: () => ({}) }, { key: 'note', title: '笔记 · Note', zone: 'bottom', mount: () => ({}) }] });
+  const [chat, note] = dom.win.PAWin.made;
+  assert.equal(chat.o.dock, 'right'); assert.equal(note.o.dock, 'bottom', 'a bottom-zone slot starts docked at the bottom');
+  assert.ok(rail.isCollapsed('chat') && rail.isCollapsed('note'), 'both start closed');
+  rail.open(); rail.expand('chat');
+  assert.equal(rail.isCollapsed('chat'), false); assert.equal(rail.isCollapsed('note'), true, 'Ask AI opens ONLY Ask AI');
+  rail.expand('note'); assert.equal(rail.isCollapsed('note'), false, 'Note opens on its own');
+  rail.collapse('chat'); assert.equal(rail.isCollapsed('chat'), true); assert.equal(rail.isCollapsed('note'), false, 'closing one leaves the other');
+  note.minimize(); assert.equal(rail.isCollapsed('note'), true, 'a minimised window counts as not on screen');
+  rail.expand('note'); assert.equal(note.s.min, false, 'expand restores a minimised window');
+  assert.deepEqual(toggles.slice(0, 3), ['chat:true', 'note:true', 'chat:false'], 'the host hears every visibility change');
+});
+
+test('expanding a window RE-MEASURES its surface, even when it was already open', () => {
+  const dom = mkDom(); let resizes = 0;
+  const rail = loadSplit(dom).open({ slots: [{ key: 'note', mount: () => ({ resize: () => { resizes++; } }) }] });
+  assert.equal(resizes, 0, 'a closed window is not measured');
+  rail.expand('note'); assert.equal(resizes, 1);
+  rail.expand('note'); assert.equal(resizes, 2, 'a redundant expand still re-measures (note-ui:2272 stale-canvas scar)');
+  dom.win.PAWin.made[0].o.onResize(); assert.equal(resizes, 3, 'a window resize re-measures too');
+});
+
+test('the window ✕ runs the surface\'s own close (PAChat / PANote ✕), and the rail forwards title and maximise', () => {
+  const dom = mkDom(); const rail = loadSplit(dom).open({ slots: [{ key: 'chat', mount: () => ({}) }] });
+  const w = dom.win.PAWin.made[0];
+  assert.equal(w.o.closeSel, '.pac-top .pac-close,.pan-hx');
+  rail.setTitle('chat', 'John 3'); assert.equal(w.s.title, 'John 3');
+  rail.toggleMax('chat'); assert.ok(rail.isMaxed('chat')); rail.toggleMax('chat'); assert.ok(!rail.isMaxed('chat'));
+});
+
+test('destroy() ENDS a rail — windows gone, gate unsubscribed', () => {
+  const dom = mkDom({ width: 1366, height: 768 }); const rail = loadSplit(dom).open({ slots: [{ key: 'a', mount: () => ({}) }] });
+  rail.open(); rail.expand('a'); rail.destroy();
+  assert.ok(dom.win.PAWin.made[0].destroyed, 'the window is destroyed');
+  assert.equal(rail.isOpen(), false);
+  dom.rotate(768, 1024); dom.rotate(1366, 768);
+  assert.equal(dom.win.PAWin.made[0].s.open, false, 'a gate crossing never reopens it');
+});
+
+test('crossing the gate closes every window (a rotation to a narrow screen hands over to the sheet)', () => {
+  const dom = mkDom({ width: 1366, height: 768 }); let gone = 0;
+  const rail = loadSplit(dom).open({ onGateClose: () => { gone++; }, slots: [{ key: 'a', mount: () => ({}) }] });
+  rail.open(); rail.expand('a'); dom.rotate(390, 844);
+  assert.equal(rail.isCollapsed('a'), true); assert.equal(gone, 1);
+});
+
+test('panel-window CSS: literal z-index under the ceilings, fixed windows, pushes never move windows, drawer or lightbox', () => {
+  const z = [...CSS.matchAll(/z-index:\s*([^;}]+)/g)].map((m) => m[1].trim());
+  assert.ok(z.length >= 3);
+  for (const v of z) { assert.ok(/^\d+$/.test(v), `literal z-index, got ${v}`); assert.ok(Number(v) < 50, `${v} stays below .pac-fs/.pan-fs (50)`); }
+  assert.match(CSS, /\.paw-win\{[^}]*position:fixed/);
+  for (const side of ['right', 'left']) {
+    const rule = new RegExp(`html\\.paw-p${side[0]}>body>\\*([^{]*)\\{margin-${side}:var\\(--paw-${side[0]}\\)\\}`).exec(CSS);
+    assert.ok(rule, `the ${side} push is a margin`);
+    for (const skip of ['.paw-x', '.pac-drawerhost', '.pac-lb']) assert.ok(rule[1].includes(`:not(${skip})`), `${skip} is never pushed`);
+  }
+  const excl = /const PAC_DOCK_EXCL=([^;]+);/.exec(CHAT_SRC);
+  assert.match(excl[1], /:not\(\.paw-x\)/, 'the drawer\'s left push never moves a panel window');
 });

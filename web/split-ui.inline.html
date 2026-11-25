@@ -1,134 +1,32 @@
 <!-- ─────────────────────────────────────────────────────────────────────────────────────────
-     PASplit — a right-hand rail that SPLITS an app rather than covering it.
+     PASplit — the GATE for side panels, and the rail API apps already call, backed by PAWin windows.
      Inlined at serve time by web.mjs into any app page carrying the marker
 
        PA_SPLIT_UI                          (the HTML-comment marker, once in <body>)
 
-     written here WITHOUT the comment delimiters on purpose: the literal form would close this
-     header early AND be replaced by this file's own content at serve time (web.mjs:507 replaces
-     every occurrence). The same rule is why chat-ui/note-ui write theirs bare.
+     written here WITHOUT the comment delimiters on purpose: the literal form would be replaced by
+     this file's own content at serve time (web.mjs replaces every occurrence).
 
-     WHY A COMPONENT AND NOT PER-APP CSS
-     Apps are sandboxed (allow-scripts, no allow-same-origin) and the CSP has no 'self', so there
-     are no shared script files — serve-time inlining is the only way to single-source this (R3).
+     WHAT IT IS NOW (2026-11-25, ADR docs/adr/0043-panel-windows.md). The old right-hand rail —
+     collapse headers, ⤓/⤒, ⤢, a bottom zone, stacked-slot dividers — is deleted (R1). Every slot
+     is its OWN window (web/panel-window.inline.html, PAWin): opening Ask AI shows only Ask AI.
+     PASplit keeps two jobs:
+       1. the gate: ONE matchMedia(GATE) for the page (gateOpen / onGate), so phones never get a
+          window and an app learns when a rotation crosses it;
+       2. PASplit.open({slots}) → the same rail handle apps call (open / expand / collapse /
+          isCollapsed / setTitle / destroy …), each slot mapped onto a PAWin window.
 
-     WHAT IT IS NOT
-     It does not know about chat or notes. A slot says how to mount itself; PASplit owns geometry,
-     collapse state and the push, nothing else.
-
-     THE PUSH
-     ONE rule, `margin-right`, deliberately: it is the only property that narrows BOTH a
-     normal-flow child (the Bible's flex-column reading view) and a `position:fixed` one, and
-     unlike overriding `right:` it PRESERVES an existing inset — the Bible's #fab is
-     `left:10px;right:10px` and keeps its 10px gap instead of going flush against the rail.
-
-     NO CLIENT-SIDE STORAGE
-     localStorage/sessionStorage/IndexedDB/cookie ALL throw SecurityError at an opaque origin
-     (verified 2026-09-02, see note-ui.inline.html:2284-2290). Geometry is handed to the host
-     through opts.persist, which reaches the broker. Nothing here touches a storage API.
+     NO CLIENT-SIDE STORAGE: localStorage & co. throw at an opaque origin (verified 2026-09-02).
+     Window layout is kept by PAWin through PAAppPrefs.
 ────────────────────────────────────────────────────────────────────────────────────────── -->
-<style id="pas-style">
-/* z-index is LITERAL, never var(): test/app-load.test.mjs reads these rules statically and a
-   var() reads as "unresolved", which its ladder check scores as 0 and passes vacuously.
-   45 sits above the Bible's own surfaces (#panel 10, #back-chat 12, #search-overlay 30) and
-   below .pac-fs/.pan-fs (50), .pac-drawerhost (60), .pac-lb (1000) and .pa-notice (2000). */
-.pas-rail{position:fixed;right:0;top:0;bottom:0;width:var(--pa-split,380px);z-index:45;
-  display:none;flex-direction:column;background:var(--card,#fff);
-  border-left:1px solid var(--line,#e2e2de);box-shadow:-2px 0 12px rgba(0,0,0,.06)}
-.pas-rail.on{display:flex}
-/* The BOTTOM zone: a pane under the reading column, the width of whatever the right rail left.
-   It is NOT excluded from the right rail's push, so it narrows when the rail opens — a note
-   docked at the bottom stays under the text it belongs to rather than sliding under the chat. */
-/* A NORMAL FLOW CHILD, not a fixed overlay. The host body is a flex column, so a block placed
-   last simply takes its height and the flex:1 reading column shrinks to fit — no push rule, no
-   margin, nothing to lose a specificity fight with. The first version was position:fixed with a
-   `margin-bottom` push, and `#verses{...}` outranked the push selector: the pane sat ON TOP of
-   the text it was supposed to make room for. Adding !important then broke the right-hand push
-   too. Working WITH the host's layout removes the whole class of problem.
-   It is not excluded from the right rail's push, so it still narrows when the rail opens. */
-.pas-dockb{position:relative;flex:0 0 auto;height:var(--pa-dockb,300px);min-height:0;z-index:1;
-  display:none;flex-direction:column;background:var(--card,#fff);
-  border-top:1px solid var(--line,#e2e2de);box-shadow:0 -2px 12px rgba(0,0,0,.06)}
-.pas-dockb.on{display:flex}
-html.pas-dragging-y{cursor:row-resize}
-/* No bottom push rule: the pane takes its own space in the flow. */
-/* NO title bar here, deliberately. A rail-level bar showing the panel's name is a full-width
-   strip that repeats what the mounted surface already says — PAChat's own header carries the
-   conversation title, ☰ and ＋, and reveals a ✕ the moment a host supplies onClose. The rail
-   therefore exposes close() and lets whatever is mounted own the chrome (R1: the bar this
-   replaced was a wasted horizontal band).
-   One slot also needs no collapse header: the mounted surface titles itself, and a caret that
-   hides the only content reads as a broken close button. */
-.pas-rail.pas-single .pas-head{display:none}
-.pas-slot{position:relative;display:flex;flex-direction:column;min-height:0;overflow:hidden}
-.pas-slot.pas-grow{flex:1 1 auto}
-.pas-slot.pas-shut{flex:0 0 auto}
-.pas-body{flex:1 1 auto;min-height:0;position:relative;overflow:hidden}
-.pas-slot.pas-shut>.pas-body{display:none}
-/* Collapsed slots keep a full-width header bar — that IS the "recall to open" affordance. */
-.pas-head{display:flex;align-items:center;gap:6px;padding:6px 10px;cursor:pointer;
-  border-bottom:1px solid var(--line,#e2e2de);background:var(--card,#fff);flex-shrink:0;
-  font:inherit;font-size:12px;font-weight:600;color:var(--muted,#6b7370);
-  -webkit-user-select:none;user-select:none}
-.pas-head:focus-visible{outline:2px solid var(--accent,#0f6355);outline-offset:-2px}
-.pas-caret{transition:transform .18s ease}
-.pas-slot.pas-shut>.pas-head>.pas-caret{transform:rotate(-90deg)}
-.pas-head-t{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-/* Maximise: a slot fills the screen for real handwriting, then retracts to reading width.
-   It drives the SAME --pa-split variable as a drag, so the existing push rule hides the content
-   behind it with no second mechanism — and a restore is just the old ratio again. */
-/* ⤓/⤒ and ⤢ are one button in two jobs — ONE rule, or they drift apart in size (R3). */
-.pas-dock,.pas-zoom{background:none;border:0;font:inherit;font-size:13px;line-height:1;cursor:pointer;
-  color:var(--muted,#6b7370);padding:3px 6px;border-radius:6px;flex-shrink:0}
-.pas-dock:hover,.pas-zoom:hover{background:var(--line,#e2e2de)}
-.pas-dock:focus-visible,.pas-zoom:focus-visible{outline:2px solid var(--accent,#0f6355);outline-offset:1px}
-/* Dividers, all three sharing ONE set of rules (R3): vertical resizes the rail, bottom resizes
-   the dock zone, horizontal splits two open slots. 14px hit area, 2px visible line — a 2px target
-   is unusable with a trackpad. The hover/focus rule has an extra pseudo-class, so it outranks the
-   ::after base it sits ABOVE and the source order between them does not matter. */
-.pas-vdiv,.pas-bdiv,.pas-hdiv{background:transparent;border:0;padding:0;touch-action:none}
-.pas-vdiv:focus-visible,.pas-bdiv:focus-visible,.pas-hdiv:focus-visible{outline:none}
-.pas-vdiv:hover::after,.pas-vdiv:focus-visible::after,.pas-bdiv:hover::after,
-.pas-bdiv:focus-visible::after,.pas-hdiv:hover::after,.pas-hdiv:focus-visible::after{background:var(--accent,#0f6355)}
-.pas-vdiv{position:absolute;left:-7px;top:0;bottom:0;width:14px;cursor:col-resize;z-index:1}
-.pas-vdiv::after{content:"";position:absolute;left:6px;top:0;bottom:0;width:2px;background:transparent}
-.pas-bdiv{position:absolute;left:0;right:0;top:-7px;height:14px;cursor:row-resize;z-index:1}
-.pas-bdiv::after{content:"";position:absolute;left:0;right:0;top:6px;height:2px;background:transparent}
-.pas-hdiv{height:10px;cursor:row-resize;flex-shrink:0}
-.pas-hdiv::after{content:"";display:block;margin:4px auto 0;width:36px;height:2px;border-radius:2px;
-  background:var(--line,#e2e2de)}
-/* While dragging, kill text selection and pointer events inside the slots so the drag cannot be
-   stolen by an iframe-less canvas or a contenteditable. */
-html.pas-dragging{cursor:col-resize;-webkit-user-select:none;user-select:none}
-html.pas-dragging .pas-body{pointer-events:none}
-/* THE PUSH — see the header. .pas-rail itself, the left drawer host and the full-screen
-   lightbox are never pushed. */
-/* ONE transition rule naming BOTH properties: two rules each setting `transition` is the same
-   shorthand twice, so the second silently replaced the first and only one axis animated.
-   `!important` matches the left dock's precedent — an app's own `#id` rule outranks this selector,
-   and a push that loses the cascade leaves a panel sitting ON TOP of the content it should have
-   made room for. */
-html.pas-open>body>*:not(.pas-rail):not(.pac-drawerhost):not(.pac-lb){margin-right:var(--pa-split,380px)}
-@media(prefers-reduced-motion:reduce){ .pas-caret{transition:none} }
-</style>
 <script>
 (function(){
   if(window.PASplit) return;                       // idempotent: safe if the marker appears twice
 
-  // The rail's gate is its OWN, deliberately not the dock's `(min-width:640px)`: 640 admits
-  // iPhone landscape (852x393), and a rail there is exactly what this must never do. 820x600
-  // admits desktop and iPad landscape (1024x768) and excludes iPad portrait (768 wide), where a
-  // 380px rail would leave under 390px of reading text.
+  // The gate is its OWN, deliberately not the dock's `(min-width:640px)`: 640 admits iPhone
+  // landscape (852x393), where a side window must never appear. 820x600 admits desktop and iPad
+  // (landscape, and 820 portrait) and keeps phones on the full-screen sheet.
   var GATE='(min-width:820px) and (min-height:600px)';
-  var MIN_R=0.24, MAX_R=0.60, DEF_R=0.32;          // rail width as a fraction of the viewport
-  var DEF_SPLIT=0.62;                              // share of the rail the FIRST open slot takes
-  var STEP_R=0.02;                                 // keyboard resize step
-  var MIN_SLOT=90;                                 // px; a slot narrower than this is unusable
-  var MIN_BH=0.18, MAX_BH=0.70, DEF_BH=0.38;       // bottom-zone height, as a fraction of the viewport
-  var ZONES={right:1,bottom:1};
-  function clampB(r){ r=Number(r); if(!isFinite(r)) return DEF_BH; return Math.min(MAX_BH,Math.max(MIN_BH,r)); }
-
-  function clampR(r){ r=Number(r); if(!isFinite(r)) return DEF_R; return Math.min(MAX_R,Math.max(MIN_R,r)); }
   function gateOpen(){ try{ return window.matchMedia(GATE).matches; }catch(e){ return false; } }
 
   /* ══ THE GATE, WATCHED ONCE ═══════════════════════════════════════════════════════════════
@@ -165,17 +63,8 @@ html.pas-open>body>*:not(.pas-rail):not(.pac-drawerhost):not(.pac-lb){margin-rig
     return function(){ var i=gateSubs.indexOf(fn); if(i>=0) gateSubs.splice(i,1); };
   }
 
-  // ONE builder for all three dividers — three hand-written copies of the same
-  // button + role/orientation/label trio were three chances to drift (R3).
-  function mkDiv(cls,orient,label){
-    var d=document.createElement('button'); d.className=cls; d.type='button';
-    d.setAttribute('role','separator'); d.setAttribute('aria-orientation',orient);
-    d.setAttribute('aria-label',label); return d;
-  }
-
   window.PASplit={
-    GATE:GATE, MIN_RATIO:MIN_R, MAX_RATIO:MAX_R, DEFAULT_RATIO:DEF_R,
-    available:true,
+    GATE:GATE, available:true,
     gateOpen:gateOpen,
     // Subscribe to gate crossings WITHOUT owning a rail. fn(open) runs on every crossing; the
     // return value unsubscribes. This is how an app rebuilds the surface it chose at boot.
@@ -183,361 +72,59 @@ html.pas-open>body>*:not(.pas-rail):not(.pac-drawerhost):not(.pac-lb){margin-rig
     open:function(opts){ return Rail(opts||{}); }
   };
 
+  // The rail handle, over one PAWin window per slot. slot = {key, title, zone:'right'|'bottom', mount(host, rail)}.
+  // A slot's window starts closed; expand() opens it (restoring it if minimised), collapse() closes it.
   function Rail(o){
     var slots=(o.slots||[]).filter(Boolean);
     if(!slots.length) throw new Error('PASplit.open: no slots — an empty rail would push the app aside for nothing');
-    var ratio=clampR(o.ratio!=null?o.ratio:DEF_R);
-    var root=document.documentElement;
-    var rail=document.createElement('div'); rail.className='pas-rail';
-    rail.setAttribute('role','complementary');
-    if(o.label) rail.setAttribute('aria-label',o.label);
-
-    var vdiv=mkDiv('pas-vdiv','vertical','调整面板宽度 · Resize panel'); rail.appendChild(vdiv);
-
-    var chrome={}, shut={}, host={}, api={}, headEl={}, slotEl={}, zoomEl={}, dockEl={}, titleEl={}, zone={}, hdivs=[], maxed=null;
-    // Both zone containers are built BEFORE the slot loop, because that loop appends each slot
-    // into its zone. Declared after it, `var zoneEl` hoists as undefined and every slot fails with
-    // "cannot read properties of undefined (reading 'right')" — the rail then never exists at all.
-    // The bottom zone stays hidden until something is docked into it, so an app that never uses it
-    // pays nothing and pushes nothing.
-    var dockb=document.createElement('div'); dockb.className='pas-dockb';
-    dockb.setAttribute('role','complementary');
-    var bdiv=mkDiv('pas-bdiv','horizontal','调整面板高度 · Resize panel'); dockb.appendChild(bdiv);
-    var zoneEl={right:rail, bottom:dockb};
-    var bh=clampB(o.bottomHeight!=null?o.bottomHeight:DEF_BH);
-    // DELETED HERE (R1): an inline first-divider build guarded on `zone[sl.key]==='right'`, read
-    // one line BEFORE zone[sl.key] is assigned — always undefined, so it never ran. rebuildHDivs()
-    // is what builds them. Proved dead by mutation: a throw in that branch left all 98 tests green.
-    slots.forEach(function(sl){
-      zone[sl.key]=ZONES[sl.zone]?sl.zone:'right';
-      var el=document.createElement('div'); el.className='pas-slot';
-      // Built node-by-node rather than with innerHTML + querySelector: the title is app-supplied
-      // (so innerHTML would be an injection seam), and querySelector-on-a-just-built-node is the
-      // one thing this repo's DOM-free harness cannot answer — which would make the whole rail
-      // untestable here and push its only coverage to source-grepping.
-      var head=document.createElement('button'); head.className='pas-head'; head.type='button';
-      var caret=document.createElement('span'); caret.className='pas-caret'; caret.textContent='▾';
-      var htxt=document.createElement('span'); htxt.className='pas-head-t';
-      htxt.textContent=sl.title||sl.key;
-      var zoom=document.createElement('button'); zoom.className='pas-zoom'; zoom.type='button';
-      zoom.textContent='⤢'; zoom.setAttribute('aria-label',sl.zoomLabel||'全屏 · Full screen');
-      // stopPropagation: the header itself toggles collapse, and a maximise that also collapsed
-      // the thing it just enlarged would be a button that appears to do nothing.
-      zoom.onclick=function(e){ e.stopPropagation(); toggleMax(sl.key); };
-      var dk=document.createElement('button'); dk.className='pas-dock'; dk.type='button';
-      dk.onclick=function(e){ e.stopPropagation(); dock(sl.key, zone[sl.key]==='right'?'bottom':'right'); };
-      dockEl[sl.key]=dk;
-      titleEl[sl.key]=htxt;
-      head.appendChild(caret); head.appendChild(htxt); head.appendChild(dk); head.appendChild(zoom);
-      head.setAttribute('aria-expanded','true');
-      zoomEl[sl.key]=zoom;
-      // TODO(R4 seam): pane chrome (Float / Close, float window, remembered layout) lives in
-      // web/pane-chrome.inline.html; these PAPaneChrome hooks are the whole coupling (ADR 0031).
-      chrome[sl.key]=window.PAPaneChrome?window.PAPaneChrome.attach({key:sl.key,slot:el,head:head,
-        title:function(){ return htxt.textContent; }, home:function(){ return zoneEl[zone[sl.key]]; },
-        isOpen:function(){ return shown&&!shut[sl.key]; }, close:function(){ toggle(sl.key,false); },
-        max:function(){ toggleMax(sl.key); }, isMaxed:function(){ return !!(maxed&&maxed.key===sl.key); },
-        relayout:function(){ rebuildHDivs(); applyLayout(); remeasure(sl.key); }}):null;
-      head.onclick=function(){ toggle(sl.key); };
-      var body=document.createElement('div'); body.className='pas-body';
-      el.appendChild(head); el.appendChild(body); zoneEl[zone[sl.key]].appendChild(el);
-      host[sl.key]=body; headEl[sl.key]=head; slotEl[sl.key]=el;
-      shut[sl.key]=!!sl.collapsed;
-    });
-    document.body.appendChild(rail);
-    document.body.appendChild(dockb);
-
-    function mkHDiv(key){
-      var d=mkDiv('pas-hdiv','horizontal','调整区域高度 · Resize section'); d.dataset.for=key; return d;
-    }
-
-    var floating=function(k){ return !!(chrome[k]&&chrome[k].isFloating()); };   // a floating slot is in no zone
-    var inZone=function(z){ return slots.filter(function(s){ return zone[s.key]===z&&!floating(s.key); }); };
-    var openIn=function(z){ return inZone(z).filter(function(s){ return !shut[s.key]; }); };
-
-    function applyLayout(){
-      ['right','bottom'].forEach(function(z){
-        var list=inZone(z), open=openIn(z);
-        list.forEach(function(s,i){
-          var el=slotEl[s.key];
-          el.classList.toggle('pas-shut',!!shut[s.key]);
-          el.classList.toggle('pas-grow',!shut[s.key]);
-          headEl[s.key].setAttribute('aria-expanded',shut[s.key]?'false':'true');
-          // Two open slots in one zone share the space; one open slot takes it all.
-          el.style.flex=shut[s.key]?'0 0 auto':(open.length>1&&i>0?'1 1 '+Math.round(100*(1-(o.split||DEF_SPLIT)))+'%':'1 1 auto');
-          el.style.minHeight=shut[s.key]?'':(MIN_SLOT+'px');
-        });
-      });
-      // A zone with nothing to show is hidden and stops pushing. Without this, docking the only
-      // slot out of the rail would leave an empty strip that still narrowed the page.
-      var rOpen=openIn('right').length>0, bOpen=openIn('bottom').length>0;
-      rail.classList.toggle('on', !!(shown&&rOpen));
-      dockb.classList.toggle('on', !!(shown&&bOpen));
-      root.classList.toggle('pas-open', !!(shown&&rOpen));
-      root.classList.toggle('pas-bopen', !!(shown&&bOpen));   // no push any more; kept as a state hook
-      rail.classList.toggle('pas-single', inZone('right').length===1);
-    }
-
-    // ONE place computes the width, so the CSS var and aria-valuenow can never disagree.
-    function applyWidth(){
-      if(maxed){
-        // The maximised slot fills whichever axis its zone owns.
-        if(zone[maxed.key]==='bottom'){ root.style.setProperty('--pa-dockb','100vh'); }
-        else { root.style.setProperty('--pa-split','100vw'); }
-        return;                                    // a rotation must not shrink a maximised slot
-      }
-      root.style.setProperty('--pa-split',Math.round(ratio*window.innerWidth)+'px');
-      root.style.setProperty('--pa-dockb',Math.round(bh*window.innerHeight)+'px');
-      vdiv.setAttribute('aria-valuemin',String(Math.round(MIN_R*100)));
-      vdiv.setAttribute('aria-valuemax',String(Math.round(MAX_R*100)));
-      vdiv.setAttribute('aria-valuenow',String(Math.round(ratio*100)));
-      bdiv.setAttribute('aria-valuemin',String(Math.round(MIN_BH*100)));
-      bdiv.setAttribute('aria-valuemax',String(Math.round(MAX_BH*100)));
-      bdiv.setAttribute('aria-valuenow',String(Math.round(bh*100)));
-    }
-
-    // UNCONDITIONAL. note-ui.inline.html:2272 returns early on a zero reading BEFORE updating
-    // lastW/lastH, so collapsing a slot and expanding it back to the SAME width is scored as
-    // "no real change" and re-measures nothing — leaving a canvas sized for a stale width, which
-    // is the 2026-09-02 ink-drift scar. Never rely on the observer for an expand.
+    if(!window.PAWin) throw new Error('PASplit.open: PAWin is missing — the page lacks the panel-window component');
+    var wins={}, api={}, shown=false, offGate=null;
     function remeasure(key){
-      var keys=key?[key]:Object.keys(api);
-      keys.forEach(function(k){
-        var a=api[k]; if(!a||shut[k]) return;
+      (key?[key]:Object.keys(api)).forEach(function(k){
+        var a=api[k]; if(!a||!wins[k].isVisible()) return;
         try{ if(a.resize) a.resize(); if(a.remeasure) a.remeasure(); }
-        catch(e){ /* a slot that cannot re-measure must not take the rail down with it; its own
-                     surface reports its failure (R5 — this is the documented-silence case). */ }
+        catch(e){ /* a surface that cannot re-measure must not take the others down; its own
+                     surface reports its failure (R5 — the documented-silence case). */ }
       });
     }
-
-    // Maximise fills the viewport with ONE slot; restore puts back both the width and whichever
-    // slots were open before — remembered here rather than recomputed, so retracting returns to
-    // exactly what the user had rather than to the defaults.
-    function toggleMax(key){
-      if(maxed){
-        var was=maxed; maxed=null;
-        Object.keys(was.shut).forEach(function(k){ shut[k]=was.shut[k]; });
-        ratio=was.ratio; rail.classList.remove('pas-maxed');
-        Object.keys(zoomEl).forEach(function(k){ zoomEl[k].textContent='⤢'; });
-        applyLayout(); applyWidth(); remeasure(); persist();
-        if(chrome[was.key]) chrome[was.key].onMax(false);
-        return;
-      }
-      if(chrome[key]) chrome[key].onMax(true);
-      maxed={key:key, ratio:ratio, shut:Object.assign({},shut)};
-      slots.forEach(function(sl){ shut[sl.key]=(sl.key!==key); });
-      rail.classList.add('pas-maxed');
-      if(zoomEl[key]) zoomEl[key].textContent='⤡';
-      applyLayout();
-      // 100vw through the SAME variable a drag uses: the push rule then slides the content fully
-      // aside, so there is no second "hide the app" mechanism to keep in step.
-      root.style.setProperty('--pa-split','100vw');
-      remeasure();                                   // the slot just changed size: canvases must re-measure
-    }
-
     function toggle(key,want){
-      var next=want===undefined?!shut[key]:!want;
-      if(next===shut[key]) { if(!next) remeasure(key); return; }   // re-measure even on a no-op expand
-      shut[key]=next; applyLayout();
-      if(!next) remeasure(key);
-      if(chrome[key]) chrome[key].onToggle(!next);
-      if(o.onToggle) o.onToggle(key,!next);
+      var w=wins[key]; if(!w) return;
+      var next=want===undefined?!w.isVisible():!!want;
+      if(next){ shown=true; w.open(); remeasure(key); } else w.close();
     }
-
-    /* ══ PA_SPLIT_DRAG_BEGIN ═══════════════════════════════════════════════════════════════
-       Pointer routing for both dividers. Extracted and driven directly by
-       test/split-view.test.mjs — the same technique test/note-palm.test.mjs uses on note-ui's
-       pointer block, because a drag cannot be exercised through this repo's DOM-free harness. */
-    function onDragStart(e,axis,forKey){
-      var t=e.currentTarget;
-      try{ t.setPointerCapture(e.pointerId); }catch(_){ /* no capture in a test DOM; the move
-                                                            handlers below still run */ }
-      root.classList.add('pas-dragging');
-      var startX=e.clientX, startY=e.clientY, startRatio=ratio, startSplit=(o.split||DEF_SPLIT), startBh=bh;
-      root.classList.toggle('pas-dragging-y',axis!=='x');
-      function move(ev){
-        if(axis==='b'){
-          // The bottom zone grows as the pointer moves UP, hence the negation.
-          bh=clampB(startBh-((ev.clientY-startY)/window.innerHeight));
-          applyWidth();
-        } else if(axis==='x'){
-          // Rail grows as the pointer moves LEFT, hence the negation.
-          ratio=clampR(startRatio-((ev.clientX-startX)/window.innerWidth));
-          applyWidth();
-        } else {
-          var h=rail.getBoundingClientRect().height||1;
-          o.split=Math.min(0.85,Math.max(0.15,startSplit+((ev.clientY-startY)/h)));
-          applyLayout();
-        }
-      }
-      function up(){
-        root.classList.remove('pas-dragging'); root.classList.remove('pas-dragging-y');
-        t.removeEventListener('pointermove',move); t.removeEventListener('pointerup',up);
-        t.removeEventListener('pointercancel',up);
-        remeasure();                       // geometry settled — every open slot re-measures
-        persist();
-      }
-      t.addEventListener('pointermove',move); t.addEventListener('pointerup',up);
-      t.addEventListener('pointercancel',up);
-      e.preventDefault();
-    }
-    /* ══ PA_SPLIT_DRAG_END ══════════════════════════════════════════════════════════════ */
-
-    // ONE settle path, not four copies of applyWidth/remeasure/persist/preventDefault (R3).
-    // `hit` means the key was consumed; anything else falls through so the browser keeps it.
-    function onDivKey(e,axis){
-      var k=e.key, b=(axis==='b'), hit=true;
-      if(b){
-        if(k==='ArrowUp') bh=clampB(bh+STEP_R); else if(k==='ArrowDown') bh=clampB(bh-STEP_R);
-        else if(k==='Home') bh=MAX_BH; else if(k==='End') bh=MIN_BH; else hit=false;
-      }
-      else if(k==='Home') ratio=MAX_R;
-      else if(k==='End') ratio=MIN_R;
-      else if(axis==='x'&&k==='ArrowLeft') ratio=clampR(ratio+STEP_R);
-      else if(axis==='x'&&k==='ArrowRight') ratio=clampR(ratio-STEP_R);
-      else hit=false;
-      if(!hit) return;
-      applyWidth(); remeasure(); persist(); e.preventDefault();
-    }
-    bdiv.addEventListener('pointerdown',function(e){ onDragStart(e,'b'); });
-    bdiv.addEventListener('keydown',function(e){ onDivKey(e,'b'); });
-    vdiv.addEventListener('pointerdown',function(e){ onDragStart(e,'x'); });
-    vdiv.addEventListener('keydown',function(e){ onDivKey(e,'x'); });
-    // No hdiv wiring here: hdivs is empty until rebuildHDivs(), which binds each as it creates it.
-
-    // Geometry goes to the HOST, which owns the broker call. A failed write must not break the
-    // rail, but it must not be silent either — the host reports it (R5).
-    function persist(){ if(o.persist&&o.persist.save){
-      try{ o.persist.save({ratio:ratio,split:o.split||DEF_SPLIT,bottomHeight:bh,zones:Object.assign({},zone)}); }catch(e){} } }
-
-    var offGate=null;                     // set at the end of Rail(); destroy() calls it
-    // Rotation/resize re-derives the px width from the RATIO, which is why a ratio is stored and
-    // a pixel width is not: an iPad rotated to portrait re-clamps for free.
-    // Both axes are stored as RATIOS, so a rotation re-derives them and a pane can never end up
-    // taller or wider than the screen it moved to.
-    // NAMED, not an inline function: destroy() has to be able to take it off again.
-    function onResize(){ if(!isOpen()) return; applyWidth(); remeasure(); }
-    window.addEventListener('resize',onResize);
-
-    var shown=false;                      // the WHOLE split is revealed; applyLayout decides which zones
-    function isOpen(){ return shown; }
-    // Escape closes, but ONLY when the rail is the thing in front: a lightbox or a modal opened
-    // over it owns Escape first, and stealing it would close the panel behind whatever the user
-    // was actually trying to dismiss.
-    function onEsc(e){
-      if(e.key!=='Escape'||!isOpen()) return;
-      if(document.querySelector('.pac-lb.on, dialog[open]')) return;
-      close();
-    }
-    function close(){
-      if(!shown) return;
-      // GPT review 2026-11-13: a floating pane lives outside the rail, so hiding the rail left it up
-      // while the app's top-bar button already showed closed. Its remembered mode is kept for open().
-      Object.keys(chrome).forEach(function(k){ if(chrome[k]) chrome[k].onToggle(false); });
-      shown=false; applyLayout();
-      root.style.removeProperty('--pa-split'); root.style.removeProperty('--pa-dockb');
-      document.removeEventListener('keydown',onEsc);
-      if(o.onClose) o.onClose();
-    }
-    // close() hides the split; destroy() ENDS it. An app crossing the gate hands the screen to a
-    // different host, and the rail it is replacing must stop existing — not merely stop showing.
-    // A closed-but-live rail keeps its resize and gate subscriptions, and the next rotation has it
-    // toggling pas-open on the root underneath whatever took its place.
-    // It does NOT flush or destroy what is mounted: the rail never knew what that was (see the
-    // header). The app owns its slots' durability and must settle them BEFORE calling this.
+    function open(){ if(!gateOpen()) return false; shown=true; return true; }
+    function close(){ if(!shown) return; Object.keys(wins).forEach(function(k){ wins[k].close(); }); shown=false; if(o.onClose) o.onClose(); }
     function destroy(){
       close();
       if(offGate){ offGate(); offGate=null; }
-      Object.keys(chrome).forEach(function(k){ if(chrome[k]) chrome[k].destroy(); });
-      window.removeEventListener('resize',onResize);
-      // Unconditional, not inside close(): applyWidth() sets these at construction, so a rail that
-      // was built and never opened still has a --pa-split on the root.
-      root.style.removeProperty('--pa-split'); root.style.removeProperty('--pa-dockb');
-      root.classList.remove('pas-ready');
-      if(rail.parentNode) rail.parentNode.removeChild(rail);
-      if(dockb.parentNode) dockb.parentNode.removeChild(dockb);
+      Object.keys(wins).forEach(function(k){ wins[k].destroy(); });
     }
-    function open(){
-      if(!gateOpen()) return false;
-      if(shown) return true;                       // idempotent: re-opening must not stack listeners
-      shown=true;
-      root.classList.add('pas-ready');
-      applyLayout(); applyWidth();
-      Object.keys(chrome).forEach(function(k){ if(chrome[k]&&!shut[k]) chrome[k].onToggle(true); });
-      document.addEventListener('keydown',onEsc);
-      remeasure();
-      return true;
-    }
-
-    // Move a slot between zones. Re-parenting a mounted surface keeps its state (and a canvas keeps
-    // its bitmap), but the box it lives in has just changed size — and note-ui's observer skips a
-    // reading it has seen before, so the re-measure here is mandatory, not belt-and-braces.
-    function dock(key,z){
-      if(!ZONES[z]||zone[key]===z||!slotEl[key]) return;
-      if(maxed) toggleMax(maxed.key);              // never leave a maximised slot behind in a zone it left
-      zone[key]=z;
-      zoneEl[z].appendChild(slotEl[key]);
-      rebuildHDivs();
-      if(dockEl[key]) setDockLabel(key);
-      applyLayout(); applyWidth(); remeasure(key); persist();
-    }
-    // Dividers belong between two slots of the SAME zone, so the set changes on every dock.
-    function rebuildHDivs(){
-      hdivs.forEach(function(d){ if(d.parentNode) d.parentNode.removeChild(d); });
-      hdivs=[];
-      var list=inZone('right');
-      list.forEach(function(sl,i){
-        if(i===0) return;
-        var hd=mkHDiv(sl.key); hdivs.push(hd);
-        rail.insertBefore(hd,slotEl[sl.key]);
-        hd.addEventListener('pointerdown',function(e){ onDragStart(e,'y',sl.key); });
-        hd.addEventListener('keydown',function(e){ onDivKey(e,'y'); });
-      });
-    }
-    function setDockLabel(key){
-      var toBottom=zone[key]==='right';
-      dockEl[key].textContent=toBottom?'⤓':'⤒';
-      dockEl[key].setAttribute('aria-label',toBottom?'移到下方 · Move to bottom':'移到右侧 · Move to side');
-    }
-
-    // Declared BEFORE the mount loop on purpose: a slot's mount() receives this handle, and with
-    // the object literal below the loop `var` hoisting would hand every slot `undefined` — a
-    // failure that looks like "the slot just didn't wire itself up".
     var railApi={
-      el:rail, hostFor:function(k){ return host[k]; },
+      hostFor:function(k){ return wins[k]&&wins[k].body; },
       register:function(k,a){ api[k]=a; },
-      open:open, close:close, isOpen:isOpen, destroy:destroy,
-      expand:function(k){ toggle(k,true); }, collapse:function(k){ toggle(k,false); },
-      toggle:toggle, isCollapsed:function(k){ return !!shut[k]; },
-      toggleMax:toggleMax, isMaxed:function(k){ return !!(maxed&&(!k||maxed.key===k)); },
-      dock:dock, zoneOf:function(k){ return zone[k]; },
-      // A slot's title is not static: a note's header should read as the note, the way the drawer
-      // row does. The host owns what it says; the rail only renders it.
-      setTitle:function(k,t){ if(titleEl[k]) titleEl[k].textContent=String(t||''); },
+      open:open, close:close, isOpen:function(){ return shown; }, destroy:destroy,
+      expand:function(k){ toggle(k,true); }, collapse:function(k){ toggle(k,false); }, toggle:toggle,
+      isCollapsed:function(k){ return !(wins[k]&&wins[k].isVisible()); },
+      toggleMax:function(k){ var w=wins[k]; if(!w) return; if(w.state().max) w.restore(); else w.maximize(); },
+      isMaxed:function(k){ return Object.keys(wins).some(function(x){ return (!k||x===k)&&wins[x].state().max; }); },
+      dock:function(k,z){ if(wins[k]) wins[k].dock(z); },
+      zoneOf:function(k){ return wins[k]&&wins[k].state().where; },
+      setTitle:function(k,t){ if(wins[k]) wins[k].setTitle(t); },
+      win:function(k){ return wins[k]; },
       remeasure:remeasure,
-      ratio:function(){ return ratio; },
-      setRatio:function(r){ ratio=clampR(r); applyWidth(); remeasure(); persist(); },
     };
-
-    // A slot may return its api here, or call rail.register(key, api) later if it mounts async.
-    slots.forEach(function(sl){ if(sl.mount) api[sl.key]=sl.mount(host[sl.key],railApi)||null; });
-    // Saved zones are applied AFTER mounting, so a restored layout goes through the same dock()
-    // path a click does — including its re-measure. A stored zone this build no longer has falls
-    // back to the slot's own default rather than hiding the panel in a zone that does not exist.
-    if(o.zones&&typeof o.zones==='object'){
-      slots.forEach(function(sl){ var z=o.zones[sl.key]; if(ZONES[z]&&z!==zone[sl.key]) dock(sl.key,z); });
-    }
-    Object.keys(dockEl).forEach(setDockLabel);
-    rebuildHDivs();
-    applyLayout(); applyWidth();
-    if(window.PAPaneChrome) window.PAPaneChrome.restore(Object.keys(chrome).map(function(k){ return chrome[k]; }));
-    // The rail's OWN gate subscription, through the same single listener the app uses (R3).
-    offGate=watchGate(function(on){
-      if(!on){ close(); if(o.onGateClose) o.onGateClose(); }
-      else { applyWidth(); remeasure(); }
+    slots.forEach(function(sl){
+      wins[sl.key]=window.PAWin.create({ key:sl.key, title:sl.title||sl.key, dock:sl.zone==='bottom'?'bottom':'right', size:o.ratio,
+        // The window ✕ runs the surface's own close (PAChat's ✕, PANote's ✕ — which flushes first), so
+        // closing from the window and from the surface are ONE path (R3).
+        closeSel:'.pac-top .pac-close,.pan-hx',
+        onResize:function(){ remeasure(sl.key); },
+        onVisible:function(v){ if(o.onToggle) o.onToggle(sl.key,v); } });
     });
+    slots.forEach(function(sl){ if(sl.mount) api[sl.key]=sl.mount(wins[sl.key].body,railApi)||null; });
+    offGate=watchGate(function(on){ if(!on){ close(); if(o.onGateClose) o.onGateClose(); } else remeasure(); });
     return railApi;
   }
 })();
 </script>
-<!--PA_PANE_CHROME_UI-->
+<!--PA_PANEL_WINDOW_UI-->
