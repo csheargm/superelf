@@ -21,7 +21,9 @@ export function phoneCheck(opts) {
     .filter(vis).filter((e) => !skipped(e));
   out.inputs = inputs.length;
   out.smallInputs = inputs.filter((e) => parseFloat(getComputedStyle(e).fontSize) < inputMin).map((e) => name(e) + ' ' + getComputedStyle(e).fontSize);
-  const ctl = [...document.querySelectorAll('button,[role=button],summary,input[type=button],input[type=submit]')].filter(vis).filter((e) => !skipped(e));
+  // A drag strip (role=separator, the split view's resize bars) is a full-length edge, not a tap target: left out.
+  // What it must not do is cover a control, and that control's own centre test below catches it.
+  const ctl = [...document.querySelectorAll('button:not([role=separator]),[role=button],summary,input[type=button],input[type=submit]')].filter(vis).filter((e) => !skipped(e));
   out.controls = ctl.length;
   out.smallTaps = ctl.map((e) => [e, e.getBoundingClientRect()]).filter(([, b]) => b.width < tapMin - 0.5 || b.height < tapMin - 0.5)
     .map(([e, b]) => name(e) + ' ' + Math.round(b.width) + 'x' + Math.round(b.height));

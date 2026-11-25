@@ -631,8 +631,8 @@ const askData={
 
 // ── Ask AI · 问一问 ───────────────────────────────────────────────────────────────────────
 // A chat BESIDE the page, not over it: the whole point is to read the note and the answer at
-// once — which is why this is a PASplit rail and not PAChat.fullscreen. The rail's own gate keeps
-// it off phones, where there is no room for two panes and the full-screen chat is right.
+// once — which is why this is a PASplit rail. The rail's own gate keeps it off phones, where there is
+// no room for two panes: there ensureAsk() opens the same chat with PAChat.fullscreen instead.
 let rail=null, railChat=null, askOpen=false;   // askOpen: is the chat slot expanded right now
 const splitOn=()=>!!(window.PASplit&&PASplit.available&&PASplit.gateOpen());
 // The thread is bound to the NOTE, so follow-up questions continue the same conversation and a
@@ -659,9 +659,18 @@ function ensureRail(){
 
 // Open the chat for this note. Returns false when there is no room for a rail — the caller says
 // so rather than appearing to do nothing.
+// NO ROOM FOR A RAIL (a phone, phone audit #1): the SAME chat opens FULL SCREEN, with ✕ back to the note —
+// never a refusal. PAChat.fullscreen sits over the pad (z-index 50, later in the page), so the note's own
+// header is out of the way while the chat is up.
+function ensureAsk(){
+  if(ensureRail()&&railChat) return railChat;
+  if(!railChat&&window.PAChat) railChat=PAChat.fullscreen(Object.assign({}, askData, { onClose:()=>{ askOpen=false; } }));
+  return railChat;
+}
+
 async function openAsk(scope){                     // scope: a thread other than this note's (a period summary)
-  if(!ensureRail()||!railChat){ paNotice('问一问需要更宽的屏幕 · Ask AI needs a wider screen','','ask'); return false; }
-  rail.open(); rail.expand('chat'); askOpen=true;
+  if(!ensureAsk()){ paNotice('问一问暂不可用 · Ask AI is not available','','ask'); return false; }
+  if(rail){ rail.open(); rail.expand('chat'); } askOpen=true;
   const s=scope||chatScope();
   if(await railChat.open(s)===false||(!scope&&chatScope()!==s)) return false;   // AWAITED: a send before this lands in the wrong thread; false = superseded or the note changed meanwhile
   return true;
@@ -675,7 +684,7 @@ async function openAsk(scope){                     // scope: a thread other than
 // No notice when there is no rail: on a phone the user opened a NOTE, they did not ask for a
 // chat, and a warning about screen width would be an answer to a question nobody asked.
 function syncAsk(){
-  if(!ensureRail()||!railChat) return;
+  if(!ensureRail()||!railChat){ if(railChat&&railChat.isOpen()){ railChat.hide(); askOpen=false; } return; }   // a phone's full-screen chat belongs to the note it was opened on
   const e=curId?entryById(curId):null;
   // PANote.prefs().openAi (app pref in ⚙ Settings, default off): a note with a conversation opens ALONE unless
   // asked for; ✨ (onAsk → openAsk) still reopens the bound thread. Read per open, so a toggle applies next time.

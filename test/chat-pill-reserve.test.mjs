@@ -358,7 +358,7 @@ test('MUTATION 1: restore the flat 84px fallback → the un-measured iPhone surf
 });
 
 test('MUTATION 2: drop show()\'s re-measure → a revealed surface is never measured', () => {
-  const noHook = CHAT.replace('const show=()=>{ ov.classList.add(\'on\'); if(chatApi) chatApi.remeasure(); }', 'const show=()=>ov.classList.add(\'on\')');
+  const noHook = CHAT.replace('const show=()=>{ ov.classList.add(\'on\'); fitKb(); if(chatApi) chatApi.remeasure(); }', 'const show=()=>{ ov.classList.add(\'on\'); fitKb(); }');
   assert.notEqual(noHook, CHAT, 'the mutation matched nothing');
   const f = mkFullscreen({ rowPx: () => rowHeight(IPHONE, {}), src: noHook });
   f.api.show();

@@ -35,8 +35,8 @@ const SUPERELF = fs.readFileSync(path.join(ROOT, 'superelf.md'), 'utf8');
 // ── the four clauses of superelf.md, as detectors ──────────────────────────────────────────
 // Each takes {html, code, meta} and answers true when the app SATISFIES the clause.
 const CLAUSES = {
-  // (a) an (ask) AI feature, mounted from PAChat. listDrawer is NOT a conversation — the
-  // Journal mounts the component for its notes drawer alone and has no way to ask anything.
+  // (a) an (ask) AI feature, mounted from PAChat. listDrawer is NOT a conversation — an app that
+  // mounts the component for a list drawer alone has no way to ask anything.
   // A one-shot kind:'ask' errand is not an AI feature either: no transcript, no model chooser.
   a: {
     what: 'an (ask) AI feature mounted from PAChat',
@@ -95,7 +95,7 @@ const PENDING = {
   family: ['a', 'b', 'd'],
   longevity: ['b', 'd'],
   'math-algebra': ['b', 'd'],
-  notes: ['a', 'b', 'd'],             // PAChat is mounted for listDrawer only — nothing to ask
+  notes: ['b', 'd'],                  // (a) met: Ask AI is PAChat.panel in the rail, PAChat.fullscreen on a phone
   'productivity-hub': ['a', 'b', 'd'],
   'rental-hunt': ['b', 'd'],
   research: ['b', 'd'],

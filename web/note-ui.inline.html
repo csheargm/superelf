@@ -133,6 +133,14 @@
 /* Below 900px (iPad portrait beside the docked list, the app bar's Home · A- · A+ in the row) the header wraps
    onto a 2nd line instead of pushing Print off the right edge (F3-02); barClearance reads its height. */
 @media (max-width:900px){ .pan-top{flex-wrap:wrap;row-gap:4px} }   /* TODO(R4 seam): the header CSS → its own part */   /* on a phone the glyph carries it */
+/* PHONE HEADER · 手机标题栏 (phone audit #4): under 600px Photo and Print fold into the ⋯ menu (.pan-ovf, which also
+   holds Page settings), so ☰ · title · ✨ · Draw · Text · ⋯ fit ONE row and the title keeps its room. A docked tool
+   bar still takes the 2nd row (the wrap rule above). Automatic by width — no phone/desktop switch. */
+@media (max-width:600px){ .pan-top{column-gap:4px;padding-left:6px;padding-right:6px} .pan-top .pan-hphoto,.pan-top .pan-hprint{display:none} }
+.pan-ovf{gap:2px;padding:6px;width:max-content}
+.pan-ovf button{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 12px;border:none;background:none;border-radius:9px;
+  font:inherit;font-size:15px;color:var(--text,#111);text-align:left;cursor:pointer;white-space:nowrap}
+.pan-ovf button .pan-i{color:var(--muted,#888)}
 /* A control row that its tab has not asked for. !important because the dock/drag machinery
    writes inline styles onto these bars and would otherwise win. */
 .pan-bar.pan-off{display:none!important}
@@ -239,6 +247,10 @@
 .pan-sw.on{box-shadow:0 0 0 2px var(--accent,#0f6355);transform:scale(1.14)}
 /* Rich colour grid (grayscale + hue rows), like the reference app. */
 .pan-swgrid{display:grid;grid-template-columns:repeat(6,22px);gap:8px;justify-content:center}
+/* A finger (pointer:coarse) gets the 44px hit area web/touch-base.css asks for: the column is 44px and a
+   transparent border keeps the visible dot small, so the swatches no longer overlap (phone audit #5 #6). */
+@media (pointer:coarse){ .pan-swgrid{grid-template-columns:repeat(6,44px);gap:2px}
+  .pan-sw{border:9px solid transparent;background-clip:padding-box!important;box-shadow:inset 0 0 0 1px var(--line,#e6e6e6)} .pan-sw.on{transform:none;box-shadow:0 0 0 2px var(--accent,#0f6355)} }
 .pan-customlbl{font-size:12px;font-weight:600;color:var(--muted,#6b7370)}
 /* Paper-template picker rows (Basic / Notepads), reusing the .pan-tbtn button + .on states. */
 .pan-tplrow{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
@@ -3372,6 +3384,7 @@
     //   · only for a contact whose pointerdown — seen on WINDOW, before any handler could swallow
     //     it — landed in the writing area with no popover open, or never arrived at all; never for
     //     one already lifted or cancelled.
+    const OVF_MQ='(max-width:600px)', POP_MIN_ROOM=120;   // the phone header's ⋯ menu (audit #4); a popover's least height (px)
     const POPS_OPEN='.pan-pop.on,.pan-hlpop.on';   // "a popover is open" — onPopOutside's too (R3)
     const popsOpen=()=>!!host.querySelector(POPS_OPEN);
     let penContact=null;   // {id,ok}: the last pen pointerdown / lift seen, and whether that contact may still start ink
@@ -3978,13 +3991,22 @@
     // is the "this icon opened this panel" indication), and the panel opens NEXT TO its button —
     // below it when the toolbar is docked/moved to the top half, else the classic bottom anchor.
     const syncPopBtns=()=>{ inkBtn.classList.toggle('on',inkPop.classList.contains('on')); paperBtn.classList.toggle('on',paperPop.classList.contains('on')); if(photoBtn&&photoPop) photoBtn.classList.toggle('on',photoPop.classList.contains('on')); };
-    const positionPop=(pop,btn)=>{ const hr=host.getBoundingClientRect(), br=btn.getBoundingClientRect();
+    // A control folded into the phone header's ⋯ (audit #4) has no box: its popover anchors at that ⋯.
+    // NEVER UNDER THE HEADER (audit #6 #7): the header (z-index 12) paints over a popover (7), so a popover
+    // opens below the header's bottom — not just below its button, which may sit on the header's 1st row —
+    // and its height is capped to the room it has, so its top row and buttons stay reachable.
+    const positionPop=(pop,btn)=>{ if(!btn.getClientRects().length&&q('.pan-hmore')) btn=q('.pan-hmore');
+      const hr=host.getBoundingClientRect(), br=btn.getBoundingClientRect();
+      const head=topBar?topBar.getBoundingClientRect().bottom:hr.top;
       const left=Math.max(8, Math.min(br.left-hr.left + br.width/2 - pop.offsetWidth/2, hr.width-pop.offsetWidth-8));
-      pop.style.left=left+'px'; pop.style.transform='none';
-      if(br.top-hr.top < hr.height/2){ pop.style.top=(br.bottom-hr.top+8)+'px'; pop.style.bottom='auto'; }
-      else { pop.style.top=''; pop.style.bottom=''; } };        // bottom half → the CSS bottom anchor
+      pop.style.left=left+'px'; pop.style.transform='none'; pop.style.maxHeight='';
+      const below=br.top-hr.top < hr.height/2;
+      if(below){ pop.style.top=(Math.max(br.bottom,head)-hr.top+8)+'px'; pop.style.bottom='auto'; }
+      else { pop.style.top=''; pop.style.bottom=''; }           // bottom half → the CSS bottom anchor
+      const pr=pop.getBoundingClientRect(), room=Math.floor(below?hr.bottom-8-pr.top:pr.bottom-head-8);
+      if(pr.height>room) pop.style.maxHeight=Math.max(POP_MIN_ROOM,room)+'px'; };
     const closePops=()=>{ inkPop.classList.remove('on'); paperPop.classList.remove('on'); if(photoPop) photoPop.classList.remove('on');
-      for(const sel of ['.pan-stylepop','.pan-tablepop']){ const el=q(sel); if(el) el.classList.remove('on'); }
+      for(const sel of ['.pan-stylepop','.pan-tablepop','.pan-ovf']){ const el=q(sel); if(el) el.classList.remove('on'); }
       for(const s2 of ['.pan-imgpop','.pan-selpop']){ const el=q(s2); if(el) el.classList.remove('on'); }
       syncPopBtns(); };   // only one popover open at a time
     // A tap OUTSIDE an open popover closes it and is SWALLOWED — it must never fall through and
@@ -4162,6 +4184,22 @@
       if(willOpen) positionPop(pop,btn); syncPopBtns(); };
     inkBtn.addEventListener('click',()=>togglePop(inkPop,inkBtn));
     paperBtn.addEventListener('click',()=>togglePop(paperPop,paperBtn));
+    // TODO(R4 seam): the phone ⋯ menu → the header part, with the header CSS.
+    // PHONE ⋯ · 手机⋯菜单 (audit #4): under OVF_MQ the header's ⋯ opens a short menu — Page settings, Photo,
+    // Print — instead of Page settings alone; each row runs the SAME handler its hidden button runs.
+    if(topBar&&paperBtn.classList.contains('pan-hmore')){
+      const ovf=document.createElement('div'); ovf.className='pan-pop pan-ovf'; ovf.setAttribute('role','menu');
+      ovf.innerHTML='<button type="button" data-ovf="paper">'+ico('more')+'页面设置 · Page settings</button>'+
+        (photoBtn&&photoBtn.classList.contains('pan-hphoto')?'<button type="button" data-ovf="photo">'+ico('photo')+'插入图片 · Insert photo</button>':'')+
+        (q('.pan-hprint')?'<button type="button" data-ovf="print">'+ico('print')+'打印 · Print</button>':'');
+      host.appendChild(ovf);
+      // Capture on the header runs before the ⋯'s own listener, so on a phone the menu replaces Page settings.
+      topBar.addEventListener('click',(e)=>{ if(!e.target.closest('.pan-hmore')||!window.matchMedia(OVF_MQ).matches) return;
+        e.stopImmediatePropagation(); togglePop(ovf,paperBtn); },true);
+      ovf.addEventListener('click',(e)=>{ const b=e.target.closest('[data-ovf]'); if(!b) return; closePops();
+        const k=b.dataset.ovf;
+        if(k==='paper') togglePop(paperPop,paperBtn); else if(k==='photo') photoBtn.click(); else q('.pan-hprint').click(); });
+    }
     undoBtn.addEventListener('click',undo);
     redoBtn.addEventListener('click',redo);
     prevBtn.addEventListener('click',async()=>{ await flipTo(cur-1); });

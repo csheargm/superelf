@@ -12,7 +12,7 @@ import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, OWNER_TOKEN } from '
 import { writeFakeCli } from './helpers-platform.mjs';
 import { appJailArgs, rulePath, SKIP_PERMISSIONS } from '../lib/agent-origin.mjs';
 import { makeJailWatch, jailProblems, undoOutside, badJailName } from '../lib/app-edit-jail.mjs';
-import { consumeMemberAiCall, memberAiLimit, MEMBER_AI_LIMIT_TEXT, MEMBER_AI_DEFAULT } from '../lib/member-quota.mjs';
+import { consumeMemberAiCall, memberAiLimit, MEMBER_AI_LIMIT_TEXT, MEMBER_AI_DEFAULT, MEMBER_QUOTA_BROKEN_TEXT } from '../lib/member-quota.mjs';
 import { makeQuotaStore } from '../lib/demo-quota.mjs';
 
 test('the jail argv: no bypass, default mode, Bash and instruction files denied, Edit only under the app', () => {
@@ -74,6 +74,17 @@ test('the member counter: per user per day, limit from config, bilingual refusal
     assert.match(r.error, /今日/); assert.match(r.error, /Daily AI limit/);
     assert.equal(consumeMemberAiCall({ cfg, store, userId: 'mom', now: t }).ok, true, 'per user');
     assert.equal(consumeMemberAiCall({ cfg, store, userId: 'kid', now: t + 86400000 }).ok, true, 'a new day');
+  } finally { rmTemp(d); }
+});
+
+// A damaged counter file on a PRIVATE node: still refused (fail closed), and the words never say "demo".
+test('the member counter: a damaged file refuses without naming the demo', () => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'pa-mq-'));
+  try {
+    const f = path.join(d, 'q.json'); fs.writeFileSync(f, '{"salt":"","day":"x","counts":{}}');
+    const r = consumeMemberAiCall({ cfg: {}, store: makeQuotaStore(f), userId: 'kid', now: Date.UTC(2026, 10, 24) });
+    assert.deepEqual([r.ok, r.status, r.error], [false, 503, MEMBER_QUOTA_BROKEN_TEXT]);
+    assert.doesNotMatch(r.error, /demo|演示/i); assert.match(r.error, /^用量/);
   } finally { rmTemp(d); }
 });
 

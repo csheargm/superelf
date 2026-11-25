@@ -6,9 +6,16 @@
    - buttons / [role=button] / summary ≥44px both ways (Apple HIG hit area; audit #5 #10 #11 #14 #15).
      min-* only, so a wider button keeps its width; !important because an app's own class rule
      (e.g. .mab{height:26px}) would otherwise win over these element selectors. min-height does not
-     touch inline links inside text (it does not apply to inline boxes);
+     touch inline links inside text (it does not apply to inline boxes). A drag strip (role=separator, the split
+     view's resize bars, web/split-ui.inline.html) is exempt: it is a full-length edge, and 44px wide it covered
+     the rail chat's ☰ (phone check, phase 2);
    - small text ≥13px (audit #16 #18);
-   - wide content scrolls inside its own box; images never wider than their column (audit #24).
+   - wide content scrolls inside its own box; images never wider than their column (audit #24). A table in a
+     chat answer (.pac-m = PAChat, .msg = the shell's chat) scrolls in its bubble at EVERY width;
+   - the composer's model / Verify chips and a reply's Fast/Deep chips read at 14px on touch (audit #11); !important as
+     above, since each surface's own chip rule comes later in the page. They are
+     the same classes in the shell (web/index.html) and in PAChat (web/chat-ui.inline.html), and this file is the
+     one stylesheet both carry, so the rule lives here once (R3).
      These use :where() (no specificity), so any rule an app writes still wins.
    Safe areas: the --safe-* tokens below; the shared bars use env(safe-area-inset-*) themselves.
    Pinned by test/touch-base.test.mjs and, in a real browser, test/phone-friendly-e2e.test.mjs. */
@@ -18,10 +25,12 @@
 :where(img,video,canvas,svg){ max-width:100%; }
 :where(img,video){ height:auto; }
 @media (max-width:600px){ :where(table){ display:block; max-width:100%; overflow-x:auto; } }
+:where(.pac-m,.msg) :where(table){ display:block; max-width:100%; overflow-x:auto; }
 @media (pointer:coarse){
   input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]):not([type=hidden]),
   textarea,select{ font-size:max(16px,1em) !important; }
-  button,[role=button],summary,input[type=button],input[type=submit],input[type=reset]{
+  button:not([role=separator]),[role=button],summary,input[type=button],input[type=submit],input[type=reset]{
     min-height:var(--tap-min) !important; min-width:var(--tap-min) !important; }
   small{ font-size:max(13px,1em); }
+  .pac-model,.pac-vfy,.pac-vchip{ font-size:14px !important; }
 }
