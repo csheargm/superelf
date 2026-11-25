@@ -92,13 +92,15 @@
 .pac-chips{display:flex;flex-wrap:wrap;gap:6px}.pac-chips:not(:empty){padding:0 2px 6px}
 .pac-chip{position:relative;width:50px;height:50px;border-radius:8px;overflow:hidden;border:1px solid var(--line,#e6e6e6)}
 .pac-chip img{width:100%;height:100%;object-fit:cover}
+.pac-chip .pac-ctime{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);color:#fff;font-size:9px;line-height:12px;text-align:center;pointer-events:none}
 .pac-chip button{position:absolute;top:0;right:0;background:rgba(0,0,0,.55);color:#fff;border:none;width:18px;height:18px;font-size:11px;cursor:pointer}
 /* Floating composer: transparent container fixed at the bottom, the pill carries the
    surface, and the log flows underneath to the physical bottom — no dead white bar. */
 .pac-row{position:absolute;left:0;right:0;bottom:0;display:flex;flex-direction:column;gap:6px;padding:8px 12px calc(10px + env(safe-area-inset-bottom,0px));background:transparent;pointer-events:none;z-index:4}
 .pac-row>*{pointer-events:auto}
 .pac-frow{display:flex;align-items:flex-end;gap:4px;background:var(--bg,#f4f4f5);border:1px solid var(--line,#e6e6e6);border-radius:20px;padding:2px 4px;box-shadow:0 2px 12px rgba(0,0,0,.22)}
-.pac-plus{background:none;border:none;color:var(--muted,#888);font-size:20px;width:30px;height:34px;cursor:pointer;flex-shrink:0}
+.pac-plus,.pac-tool{background:none;border:none;color:var(--muted,#888);font-size:20px;width:30px;height:34px;cursor:pointer;flex-shrink:0;padding:0}
+.pac-tool svg{width:20px;height:20px;vertical-align:middle}
 .pac-inp{flex:1;font:inherit;font-size:var(--pac-fs,14px);padding:7px 8px;border:none;background:transparent;color:var(--text,#111);outline:none;resize:none;max-height:120px;line-height:1.4;overflow-y:auto}
 .pac-go{background:var(--accent,#0a7a5a);color:#fff;border:none;border-radius:50%;width:34px;height:34px;padding:0;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;flex-shrink:0}
 .pac-go:disabled{opacity:.4;cursor:default}
@@ -859,7 +861,7 @@
       '<div class="pac-log"></div>'+
       '<button class="pac-scroll" title="Scroll to bottom">↓</button>'+
       '<div class="pac-row"><div class="pac-chips"></div><div class="pac-pills"><button class="pac-model" style="display:none"></button><button class="pac-vfy" title="多模型校验 · Verify with multiple models">校验 · ☐ Verify</button></div><div class="pac-frow">'+
-        '<button class="pac-plus" title="Attach a photo">＋</button>'+
+        '<button class="pac-plus" title="Attach a photo">＋</button><span class="pac-tools"></span>'+
         '<textarea class="pac-inp" rows="1" autocomplete="off"></textarea>'+
         '<button class="pac-go" title="Send">↑</button>'+
       '</div><input type="file" class="pac-file" accept="image/*" style="display:none"></div>';
@@ -867,7 +869,7 @@
     // buildDrawer() instance (body-appended), so there is ONE drawer renderer (R3).
     const q=s=>host.querySelector(s);
     return { log:q('.pac-log'),scroll:q('.pac-scroll'),chips:q('.pac-chips'),row:q('.pac-row'),model:q('.pac-model'),vfy:q('.pac-vfy'),
-             plus:q('.pac-plus'),inp:q('.pac-inp'),go:q('.pac-go'),file:q('.pac-file'),
+             plus:q('.pac-plus'),tools:q('.pac-tools'),inp:q('.pac-inp'),go:q('.pac-go'),file:q('.pac-file'),
              title:q('.pac-top .pac-title'),toList:q('.pac-toList'),newC:q('.pac-newC'),closes:[...host.querySelectorAll('.pac-close')] };
   }
 
@@ -997,6 +999,7 @@
     function renderChips(){ el.chips.innerHTML='';
       atts.forEach((a,i)=>{ const c=document.createElement('div'); c.className='pac-chip';
         const im=document.createElement('img'); im.src=a.thumb; im.alt=''; c.appendChild(im);       // .src, not innerHTML
+        if(a.label){ const t=document.createElement('span'); t.className='pac-ctime'; t.textContent=a.label; c.appendChild(t); }   // e.g. a screenshot's time: a stale picture is never unmarked
         const b=document.createElement('button'); b.dataset.i=i; b.textContent='✕'; c.appendChild(b);
         el.chips.appendChild(c); }); }
 
@@ -1091,6 +1094,12 @@
     // the model said nothing (R5). No existing caller inspects the value, so this is additive.
     async function send(text,o){   // o: {attachments:[{name,path}], model} — a host's own files and lane for THIS turn (the summary's page images); the composer's chips stay
       if(sending) return false;                 // a turn is already streaming
+      // A host's last word on the chips before they are read (the app chat retakes a stale screenshot,
+      // web/app-edit-panel.html). Held as a send, so a second tap cannot slip in while it runs.
+      if(!(o&&Array.isArray(o.attachments))&&typeof opts.beforeSend==='function'){ sending=true;
+        try{ await opts.beforeSend(); }
+        catch(err){ addMsg('status','⚠ '+((err&&err.message)||err)); }   // R5: said in the log; the send goes on with the chips as they are
+        finally{ sending=false; } }
       const ext=!!(o&&Array.isArray(o.attachments)); const q=(typeof text==='string'?text:el.inp.value).trim(); const mine=ext?o.attachments.slice():atts.slice();
       if(!q&&!mine.length) return false;        // nothing to send
       const k=key, myLoad=_loadSeq;           // snapshot: the user may switch threads mid-send (myLoad: the thread shown when this turn began)
@@ -1267,6 +1276,9 @@
     el.inp.addEventListener('input',autosize);
     el.inp.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); send(); } });
     el.plus.onclick=()=>el.file.click();
+    // A host's own composer buttons, beside ＋ (opts.tools: [{id,label,svg,onClick}]; the app chat's camera). svg is the host's own markup.
+    for(const t of (Array.isArray(opts.tools)?opts.tools:[])){ const b=document.createElement('button'); b.className='pac-tool'; if(t.id) b.id=t.id;
+      b.title=t.label; b.setAttribute('aria-label',t.label); b.innerHTML=t.svg||''; b.onclick=()=>t.onClick(); el.tools.appendChild(b); }
     el.chips.onclick=e=>{ const b=e.target.closest('button[data-i]'); if(!b) return; atts.splice(+b.dataset.i,1); renderChips(); };
     // ONE photo path (R1/R3). This handler used to carry its own FileReader, its own 4/3
     // pre-flight against its own copy of the cap, and its own three-deep fallback chain for the
@@ -1366,7 +1378,10 @@
       // and then pushes the same shape; a note's photo is already on the server, so re-uploading
       // it to ask a question about it would cost a second copy of the bytes for nothing.
       attach:(a)=>{ if(!a||!a.path) return false;
-        atts.push({name:a.name||'photo.jpg',path:a.path,thumb:a.thumb||null}); renderChips(); return true; },
+        atts.push({name:a.name||'photo.jpg',path:a.path,thumb:a.thumb||null,label:a.label||''}); renderChips(); return true; },
+      // The chips as they stand (copies), and removing one by its path: a host that replaces its own attachment.
+      attachments:()=>atts.map((a)=>({...a})),
+      detach:(p)=>{ const n=atts.length; atts=atts.filter((a)=>a.path!==p); if(atts.length!==n) renderChips(); return atts.length!==n; },
       // A host's status line (Done, Undone, a note): added like every message, so it is pinned above the
       // floating composer row and never left under its chips (owner report 2026-11-24).
       note:(t,id)=>{ const d=addMsg('status',String(t||'')); if(id) d.id=id; return d; },

@@ -23,32 +23,80 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px 
 #mk .row{display:flex;gap:8px;justify-content:flex-end;padding:8px}
 #mk button{font:inherit;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--text)}
 #mk canvas{flex:1;min-height:0;max-width:100%;object-fit:contain;touch-action:none;margin:auto}
-.pac-chip img{cursor:pointer}
+.pac-chip img{cursor:pointer;object-fit:contain!important;background:#fff}   /* the whole page, not its middle: a cropped calendar read as grid lines only */
 </style></head><body>
 <div id="chat"></div>
 <div id="mk" aria-label="标注截图 · Mark up the screenshot"><div class="row"><span style="flex:1;color:#fff;align-self:center">用笔圈出要改的地方 · Draw on what to change</span><button id="mkClear">清除 · Clear</button><button id="mkCancel">取消 · Cancel</button><button id="mkDone">完成 · Done</button></div><canvas id="mkc"></canvas></div>
 <!--PA_CHAT_UI-->
+<script>
+/* ══ PA_SHOT_FRESH_BEGIN ── which screenshots are stale (unit: test/app-chat-camera.test.mjs) ══
+   A shot is {path,gen,mine}: gen = the app's load count when it was taken (the shell bumps it on every
+   reload, e.g. after Apply/Undo); mine = taken by the camera or the auto-shot (not a user's file/photo). */
+var PAShotFresh={
+  MAX:3,
+  stale:(shots,gen)=>shots.filter((s)=>s.mine&&s.gen!==gen).map((s)=>s.path),
+  // A new camera shot: the stale ones go, then the oldest of ours while there would be more than MAX.
+  makeRoom:(shots,gen,max)=>{ const drop=PAShotFresh.stale(shots,gen), left=shots.filter((s)=>s.mine&&!drop.includes(s.path));
+    while(left.length>=(max||PAShotFresh.MAX)) drop.push(left.shift().path); return drop; },
+  label:(t)=>{ const d=new Date(t), z=(n)=>String(n).padStart(2,'0'); return z(d.getHours())+':'+z(d.getMinutes())+':'+z(d.getSeconds()); },
+};
+/* ══ PA_SHOT_FRESH_END ══ */
+</script>
 <script>
 (function(){
   let chat=null, inited=false;
   const note=(t,id)=>{ if(chat) chat.note(t,id); };   // PAChat's own status line: pinned above the composer row
   const TIP='新：这里可以提问，也可以直接让它改这个应用 · New: ask here, or ask it to change this app';
   const NO_SHOT='未能自动截图，请用 ＋ 添加照片或截屏 · Could not capture the screen — add a photo or a screenshot with ＋';
+  const CAM='截取当前画面 · Capture the app as it looks now';
+  const CAM_TIP='新：点 📷 截取应用当前画面给 AI 看 · New: tap the camera to show the AI the app as it looks now';
+  const CAM_FAIL='这个应用的画面截不下来，请用 ＋ 添加照片或截屏 · This app\'s screen cannot be captured — add a photo or a screenshot with ＋';
+  const RETAKEN='应用已变，已重新截图 · The app changed, so the screenshot was retaken';
+  const DROPPED='应用已变，旧截图已移除（未能重新截图）· The app changed; the old screenshot was removed (it could not be retaken)';
+  const CAM_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+  let gen=0, shots=[], snapSeq=0;   // shots: [{path,gen,mine}] — what PAShotFresh judges
+  const waits=new Map();
+  // The shell takes the picture (it holds the app frame): {pa:'edit-snap',id} → {pa:'edit-snap-res',id,shot}.
+  function snapNow(){ const id='s'+(++snapSeq); return new Promise((res)=>{ waits.set(id,res); parent.postMessage({pa:'edit-snap',id},'*'); }); }
+  function addShot(sh,why){
+    chat.attach({name:sh.name||'screen.png',path:sh.path,thumb:sh.thumb,label:PAShotFresh.label(Date.now())});
+    shots.push({path:sh.path,gen:typeof sh.gen==='number'?sh.gen:gen,mine:true});
+  }
+  function drop(paths){ for(const p of paths){ chat.detach(p); } shots=shots.filter((s)=>!paths.includes(s.path)); }
+  async function camera(){
+    const sh=await snapNow();
+    if(!(sh&&sh.path)){ note(CAM_FAIL); return; }
+    drop(PAShotFresh.makeRoom(shots.filter((s)=>chat.attachments().some((a)=>a.path===s.path)),gen));
+    addShot(sh);
+  }
+  // Before a message goes: a shot of ours taken before the app last reloaded is retaken, or removed and said — never sent stale.
+  async function beforeSend(){
+    shots=shots.filter((s)=>chat.attachments().some((a)=>a.path===s.path));   // the user's ✕ removed some
+    const old=PAShotFresh.stale(shots,gen); if(!old.length) return;
+    drop(old);
+    const sh=await snapNow();
+    if(sh&&sh.path){ addShot(sh); note(RETAKEN); } else note(DROPPED);
+  }
   function mount(m){
     chat=PAChat.mount(document.getElementById('chat'),{
       placeholder:'提问，或说说想怎么改 · Ask, or say what to change',
+      beforeSend, tools:m.snap?[{id:'aeCam',label:CAM,svg:CAM_SVG,onClick:camera}]:[],
       greeting:'「'+m.title+'」：可以提问，也可以让它改这个应用；它先说明要怎么改，点「改 · Apply」才动手 · “'+m.title+'”: ask a question or ask for a change — it says the plan first and changes nothing until you tap Apply.',
     });
     chat.open('edit');
     if(typeof m.prefill==='string'&&m.prefill.trim()) chat.prefill(m.prefill);   // the request the app's chat could not carry out
-    if(m.shot&&m.shot.path) chat.attach({name:m.shot.name||'screen.png',path:m.shot.path,thumb:m.shot.thumb});
+    if(typeof m.gen==='number') gen=m.gen;
+    if(m.shot&&m.shot.path) addShot(m.shot);
     else setTimeout(()=>note(NO_SHOT,'noShot'),0);
     if(m.tip) setTimeout(()=>note(TIP,'aeTip'),0);   // first-use tip, once (the shell remembers it)
+    if(m.snap&&m.camTip) setTimeout(()=>note(CAM_TIP,'aeCamTip'),0);   // the camera's own tip, once
   }
   addEventListener('message',(e)=>{
     const m=e.data; if(!m||e.source!==parent) return;
     if(m.pa==='edit-init'&&!inited){ inited=true; mount(m); }
     else if(m.pa==='edit-note'&&typeof m.text==='string') note(m.text);   // the shell's Undo result, said in the log
+    else if(m.pa==='edit-gen'&&typeof m.gen==='number') gen=m.gen;   // the app reloaded: shots taken before are stale
+    else if(m.pa==='edit-snap-res'&&waits.has(m.id)){ const r=waits.get(m.id); waits.delete(m.id); r(m.shot||null); }
   });
   // ── Mark up · 标注: tap the screenshot chip, draw, Done → the marked picture replaces it. ──
   const mk=document.getElementById('mk'), cv=document.getElementById('mkc'), g=cv.getContext('2d');
@@ -71,7 +119,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px 
     const r=await PA.req('upload',{name:'screen-marked.png',data:url.split(',')[1],what:'photo'});
     if(!(r&&r.ok)){ note((r&&r.text)||'上传失败 · Upload failed'); return; }   // no alert(): the sandbox has no allow-modals
     const x=chip&&chip.querySelector('button'); if(x) x.click();   // the old chip's own ✕: PAChat removes it
-    chat.attach({name:'screen-marked.png',path:r.path,thumb:url});
+    chat.attach({name:'screen-marked.png',path:r.path,thumb:url,label:PAShotFresh.label(Date.now())});   // the user's own drawing: kept as drawn, never retaken
   };
 })();
 </script>

@@ -31,10 +31,16 @@ var PASnap = PASnap || (function(){
         for(const k of d.children) k.style.transform='translate('+(-s.scrollLeft)+'px,'+(-s.scrollTop)+'px)'; }
     }
   }
+  function stripComments(root){
+    const it=document.createNodeIterator(root,NodeFilter.SHOW_COMMENT), dead=[];
+    for(let n=it.nextNode();n;n=it.nextNode()) dead.push(n);
+    dead.forEach((n)=>n.remove());
+  }
   function svgOf(w,h){
     const root=document.documentElement, clone=root.cloneNode(true);
     copyLive(root,clone);
     clone.querySelectorAll('script,iframe,noscript').forEach((n)=>n.remove());
+    stripComments(clone);   // an HTML comment holding "--" is fine in HTML and fatal in XML: the whole picture failed (Sunday Study, Bible)
     clone.style.transform='translate('+(-scrollX)+'px,'+(-scrollY)+'px)';
     const xml=new XMLSerializer().serializeToString(clone);
     return '<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'"><foreignObject x="0" y="0" width="100%" height="100%">'+xml+'</foreignObject></svg>';
