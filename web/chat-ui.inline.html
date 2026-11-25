@@ -87,8 +87,16 @@
 .pac-ab{background:none;border:none;color:var(--muted,#888);font-size:13px;cursor:pointer;padding:3px 6px;border-radius:6px;line-height:1;opacity:.7}
 .pac-ab:active{background:color-mix(in srgb,var(--accent,#0a7a5a) 14%,transparent)}
 .pac-ab.on{color:var(--accent,#0a7a5a);opacity:1}
+.pac-ab svg{width:18px;height:18px;display:block}
 .pac-scroll{position:absolute;bottom:var(--pac-pill);left:50%;transform:translateX(-50%);width:34px;height:34px;border-radius:50%;background:var(--card,#fff);border:1px solid var(--line,#e6e6e6);color:var(--text,#111);font-size:16px;cursor:pointer;display:none;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.18);z-index:6}
 .pac-scroll.show{display:flex}
+/* Phone (owner iPhone 2026-11-25): the log ENDS at the composer instead of flowing under it, so no line of a reply
+   ever sits under or below the pill; the jump button moves to the right corner above the composer, off the text
+   column. --pac-pill is the measured composer height (setPill below). */
+@media (pointer:coarse) and (max-width:600px){
+  .pac-log{margin-bottom:var(--pac-pill);padding-bottom:8px;scroll-padding-bottom:8px}
+  .pac-scroll{left:auto;right:10px;transform:none;bottom:calc(var(--pac-pill) + 8px);width:44px;height:44px}
+}
 .pac-chips{display:flex;flex-wrap:wrap;gap:6px}.pac-chips:not(:empty){padding:0 2px 6px}
 .pac-chip{position:relative;width:50px;height:50px;border-radius:8px;overflow:hidden;border:1px solid var(--line,#e6e6e6)}
 .pac-chip img{width:100%;height:100%;object-fit:cover}
@@ -328,12 +336,21 @@
 
   // ── per-message actions (copy / read-aloud / retry / edit) — the standard chatbox toolkit ──
   const stripMd=t=>String(t||'').replace(/```[\s\S]*?```/g,' ').replace(/\[([^\]]*)\]\([^)]*\)/g,'$1').replace(/[#*`_>~]/g,'').replace(/\n{2,}/g,'. ').trim();
-  function mkab(icon,title){ const b=document.createElement('button'); b.className='pac-ab'; b.type='button'; b.title=title; b.textContent=icon; return b; }
-  function flash(b,icon){ const old=b.textContent; b.textContent=icon; setTimeout(()=>{ if(b.isConnected) b.textContent=old; },1200); }
+  // Message action icons as SVG line icons, never text glyphs: iOS has no font with ⎘/✎, so they fell back to a
+  // tiny faint symbol (owner iPhone 2026-11-25). Mirror of PAIcons copy/speaker/refresh/pen in web/icons.js (this
+  // page cannot load it); test/chat-action-icons.test.mjs pins them equal (R3). TODO(R4 seam): reply-row helpers → own part.
+  const PAC_ICON={copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a1 1 0 0 1 1-1h10"/>',
+    speaker:'<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>',
+    refresh:'<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>',
+    pen:'<path d="M15 4l5 5L9 20H4v-5z"/><path d="M13 6l5 5"/>',
+    check:'<path d="M5 12l5 5 9-10"/>'};
+  const pacSvg=(k)=>'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+PAC_ICON[k]+'</svg>';
+  function mkab(icon,title){ const b=document.createElement('button'); b.className='pac-ab'; b.type='button'; b.title=title; b.setAttribute('aria-label',title); b.innerHTML=pacSvg(icon); return b; }
+  function flash(b,icon){ const old=b.innerHTML; b.innerHTML=pacSvg(icon); setTimeout(()=>{ if(b.isConnected) b.innerHTML=old; },1200); }
   function fallbackCopy(t){ try{ const ta=document.createElement('textarea'); ta.value=t; ta.style.cssText='position:fixed;opacity:0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); return true; }catch{ return false; } }
   function copyText(t,btn){ // clipboard API where allowed, execCommand fallback for the sandbox
-    if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(()=>flash(btn,'✓')).catch(()=>{ if(fallbackCopy(t)) flash(btn,'✓'); });
-    else if(fallbackCopy(t)) flash(btn,'✓'); }
+    if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(()=>flash(btn,'check')).catch(()=>{ if(fallbackCopy(t)) flash(btn,'check'); });
+    else if(fallbackCopy(t)) flash(btn,'check'); }
   // Mixed EN/中文 read-aloud: ONE utterance per script run, each with its own lang/voice —
   // a single-language utterance silently skips (or mangles) the other script on iOS/macOS.
   // Neutral chars (digits, punctuation, spaces) attach to the current run to avoid choppy
@@ -938,18 +955,18 @@
     function addActions(bubble,kind,rawText,prompt,scopeKey){   // scopeKey: the thread this bubble was rendered in (send() passes its snapshot); default = the thread shown now
       if(kind==='ai') rawText=shownAi(rawText);
       const bar=document.createElement('div'); bar.className='pac-acts '+kind;
-      const copyBtn=mkab('⎘','Copy'); copyBtn.onclick=()=>copyText(rawText,copyBtn); bar.appendChild(copyBtn);
+      const copyBtn=mkab('copy','Copy'); copyBtn.onclick=()=>copyText(rawText,copyBtn); bar.appendChild(copyBtn);
       if(kind==='ai'){
-        const speakBtn=mkab('🔊','Read aloud');
+        const speakBtn=mkab('speaker','Read aloud');
         speakBtn.onclick=()=>{ const ss=window.speechSynthesis;
           if(ss&&ss.speaking){ ss.cancel(); speakBtn.classList.remove('on'); return; }
           speakBtn.classList.add('on'); speak(stripMd(rawText),()=>speakBtn.classList.remove('on')); };
-        const retryBtn=mkab('↺','Ask again'); retryBtn.onclick=()=>{ const p=(prompt!=null?prompt:lastUser); if(p!=null) send(p); };  // re-ask THIS reply's question
+        const retryBtn=mkab('refresh','Ask again'); retryBtn.onclick=()=>{ const p=(prompt!=null?prompt:lastUser); if(p!=null) send(p); };  // re-ask THIS reply's question
         bar.append(speakBtn,retryBtn);
         // Save as note · 存为笔记 under a summary answer (plan E, web/drawer-summary.inline.html). TODO(R4 seam): the actions bar → its own inlined part.
         if(window.PADrawerSummary) window.PADrawerSummary.decorate(bar,rawText,{el:bubble,key:scopeKey===undefined?key:scopeKey,convo:(c=>()=>c)(curConvo),hooks:opts.summary||null,fresh:scopeKey!==undefined,prompt});   // both snapshots + the bubble + the prompt: it binds the thread, the refs it was rendered with and the turn; fresh = send()'s own answer (openConvo replays pass no scopeKey), which a summary saves as a note at once
       } else {
-        const editBtn=mkab('✎','Edit'); editBtn.onclick=()=>{ el.inp.value=rawText; autosize(); el.inp.focus(); };
+        const editBtn=mkab('pen','Edit'); editBtn.onclick=()=>{ el.inp.value=rawText; autosize(); el.inp.focus(); };
         bar.appendChild(editBtn);
       }
       el.log.appendChild(bar); pin(); updateScroll();

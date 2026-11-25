@@ -18,6 +18,10 @@ const PAIcons=(function(){
     more:'<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>',
     close:'<path d="M6 6l12 12M18 6L6 18"/>',
     chat:'<path d="M4 5h16v11H9l-5 4z"/>',
+    // message actions (copy / read aloud; ask again = refresh, edit = pen). web/chat-ui.inline.html mirrors these four
+    // (an app page cannot load this file); test/chat-action-icons.test.mjs pins the copies equal (R3).
+    copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a1 1 0 0 1 1-1h10"/>',
+    speaker:'<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>',
     // app glyphs
     book:'<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M12 7v6M9 10h6"/>',
     users:'<circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0M16 4a3 3 0 0 1 0 6M21 20a5 5 0 0 0-4-5"/>',

@@ -110,7 +110,7 @@ for (const pwa of [false, true]) test(`iPhone${pwa ? ' home-screen PWA' : ''}: a
       const log = document.querySelector('.pac-fs.on .pac-log'); log.scrollTop = log.scrollHeight;
       return { sizes: [...new Set(ms.map((x) => x.className.split(' ')[1] + ':' + getComputedStyle(x).fontSize))],
         last: ms[ms.length - 1].getBoundingClientRect().bottom, comp: row.getBoundingClientRect().top }; });
-    assert.deepEqual(m.sizes.sort(), ['ai:14px', 'me:14px'], 'one size per bubble kind');
+    assert.deepEqual(m.sizes.sort(), ['ai:17px', 'me:17px'], 'one size per bubble kind (17px: the phone reading size, web/touch-base.css v5.20.2)');
     await page.waitForTimeout(300);
     const last = await fr.evaluate(() => { const ms = document.querySelectorAll('.pac-fs.on .pac-m'); return ms[ms.length - 1].getBoundingClientRect().bottom; });
     assert.ok(last <= m.comp, `the composer (top ${m.comp}) covers the last bubble (bottom ${last})`);

@@ -269,6 +269,7 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
 .mab{background:none;border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:13px;cursor:pointer;color:var(--muted);line-height:1.4;transition:color .15s,border-color .15s;}
 .mab:hover{color:var(--text);border-color:var(--muted);}
 .mab.active{color:var(--accent);border-color:var(--accent);}
+.mab svg{width:16px;height:16px;display:block}
 .msg.me .mab{border-color:rgba(255,255,255,.3);color:rgba(255,255,255,.75);}
 .msg.me .mab:hover{color:#fff;border-color:#fff;}
 #scrollBtn{position:fixed;bottom:68px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--line);border-radius:50%;width:36px;height:36px;font-size:16px;cursor:pointer;display:none;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.18);color:var(--text);z-index:5;transition:opacity .15s;}
@@ -2308,8 +2309,9 @@ function add(cls,text,html){
 
 let lastPromptText='';
 
-function mkab(icon,title){ const b=document.createElement('button'); b.className='mab'; b.type='button'; b.title=title; b.textContent=icon; return b; }
-function flashBtn(b,icon){ const old=b.textContent; b.textContent=icon; setTimeout(()=>{ b.textContent=old; },1200); }
+// Action icons are PAIcons SVGs (web/icons.js), never text glyphs: iOS has no font with ⎘/✎ (owner iPhone 2026-11-25).
+function mkab(icon,title){ const b=document.createElement('button'); b.className='mab'; b.type='button'; b.title=title; b.setAttribute('aria-label',title); b.innerHTML=PAIcons.svg(icon); return b; }
+function flashBtn(b,icon){ const old=b.innerHTML; b.textContent=icon; setTimeout(()=>{ b.innerHTML=old; },1200); }
 // Copy that works on plain HTTP too: navigator.clipboard is undefined outside secure
 // contexts (LAN http://), so fall back to a hidden-textarea execCommand('copy').
 function fallbackCopy(t){ try{ const ta=document.createElement('textarea'); ta.value=t; ta.style.cssText='position:fixed;top:0;left:0;opacity:0'; document.body.appendChild(ta); ta.focus(); ta.select(); const ok=document.execCommand('copy'); ta.remove(); return ok; }catch{ return false; } }
@@ -2317,21 +2319,21 @@ function doCopy(t,btn){ if(navigator.clipboard&&navigator.clipboard.writeText){ 
 
 function addActions(el,kind,rawText,prompt){
   const bar=document.createElement('div'); bar.className='msg-actions';
-  const copyBtn=mkab('⎘','Copy');
+  const copyBtn=mkab('copy','Copy');
   copyBtn.onclick=()=>doCopy(rawText,copyBtn);
   if(kind==='response'){
-    const voiceBtn=mkab('🔊','Read aloud');
+    const voiceBtn=mkab('speaker','Read aloud');
     voiceBtn.onclick=()=>{
       if(window.speechSynthesis?.speaking){ window.speechSynthesis.cancel(); voiceBtn.classList.remove('active'); return; }
       voiceBtn.classList.add('active');
       speak(stripMd(rawText),()=>voiceBtn.classList.remove('active'));
     };
-    const retryBtn=mkab('↺','Ask again');
+    const retryBtn=mkab('refresh','Ask again');
     // re-ask the question that produced THIS reply (passed in), not a global that's empty on loaded chats
     retryBtn.onclick=()=>{ const p=prompt||lastPromptText; if(!p) return; $('#box').value=p; submitSend(); };
     bar.append(copyBtn,voiceBtn,retryBtn);
   } else {
-    const editBtn=mkab('✎','Edit');
+    const editBtn=mkab('pen','Edit');
     editBtn.onclick=()=>{ $('#box').value=rawText; $('#box').focus(); };
     bar.append(copyBtn,editBtn);
   }
