@@ -11,11 +11,12 @@ window.PAStationery=(function(){
   const SAN=window.PAStationerySanitize, sanitize=SAN.sanitize, PAGE_W=SAN.PAGE_W, PAGE_H=SAN.PAGE_H;
   const MAX_RASTERS=4;                          // bitmaps kept per page; each screen one is ~3-7M px
   const PRIME_MS=4000;                          // how long print waits for a design to decode
-  const DIR='templates/', INDEX=DIR+'index.json';   // "My templates" in the HOST's data namespace
+  const DIR='templates/', INDEX=DIR+'index.json', PIC_INDEX=DIR+'pictures.json';   // "My templates" in the HOST's data namespace
   // A table looked up by a template file's or a notebook's own value has NO prototype, so a value
   // such as 'constructor', 'toString' or '__proto__' is not an entry. The value must also be a string:
   // a lookup turns ["any"] into "any" (ADR 0003, Follow-up — prototype lookups).
   const AUDIENCES=Object.assign(Object.create(null),{spouse:1,teen:1,any:1});
+  const PIC_ID=/^[A-Za-z0-9_./-]{1,200}$/;      // an upload path; the same rule a notebook's stationery id passes
   const err=(reason)=>({ok:false,reason});
   const num=(v,lo,hi)=>typeof v==='number'&&isFinite(v)&&v>=lo&&v<=hi;
   // A whole template (the shared contract). Returns {ok, tpl, reason}; tpl is a FRESH object.
@@ -48,7 +49,9 @@ window.PAStationery=(function(){
   // A PICTURE is the host's own uploaded image (id = its upload path), fetched ONCE through the
   // host's image IO (pictures(fn): path -> data:image URL | null) and drawn by the same raster path.
   // The host's loader reports its own failure; here a failure is plain paper, retried next paint.
-  let picIO=null; const PICS=new Map();
+  // SAVED pictures (a photo kept as reusable stationery): id (upload path) -> name. Only these are LISTED;
+  // any picture a note names still resolves, listed or not. Filled by store().loadMine / savePicture.
+  let picIO=null; const PICS=new Map(), PICNAMES=new Map();
   function picture(id){
     if(!picIO) return null;
     if(!PICS.has(id)) PICS.set(id,Promise.resolve(picIO(id)).then(url=>{
@@ -58,25 +61,41 @@ window.PAStationery=(function(){
   }
   const fadeOf=(ref)=>Math.min(0.9,Math.max(0,+ref.fade||0));
   const list=()=>[...REG.bundled.values()].map(t=>({...t,source:'bundled'}))
-    .concat([...REG.mine.values()].map(t=>({...t,source:'mine'})));
+    .concat([...REG.mine.values()].map(t=>({...t,source:'mine'})))
+    // The registry's OWN object (not a copy): its decoded image is cached on it, and a saved picture is large.
+    // Listed once its bytes have arrived; picture() asks for them and the change fires when they do.
+    // A saved picture whose bytes never arrive is still listed (missing: greyed), so its ✕ can unlist it.
+    .concat([...PICNAMES].map(([id,name])=>{ const t=REG.picture.get(id); if(!t) return {id,name,source:'picture',missing:true}; t.name=name; t.source='picture'; return t; }));
   // ── Store: "My templates" through the host's own checked read/write (Journal: DATA) ──────
   // io = { read(path) -> Promise<LOAD outcome {status,data,error}>, write(path,text) -> Promise<{ok,error}> }
   function store(io){
-    let ids=null;                                           // the index as last read; null = not read
+    let ids=null, pics=null;                                // the indexes as last read; null = not read
+    // Writes run ONE at a time: two at once would each build on the same list and the second would drop the first's entry.
+    let q=Promise.resolve(); const serial=(fn)=>{ const p=q.then(fn,fn); q=p.then(()=>{},()=>{}); return p; };
+    let wroteI=0, wroteP=0;                                 // bumped on each write: a read that started before one never replaces its result
     async function loadMine(){
-      const r=await io.read(INDEX);
+      const gI=wroteI, gP=wroteP, r=await io.read(INDEX);
       if(r.status==='failed') return {ok:false,error:r.error};
-      ids=r.status==='loaded'&&r.data&&Array.isArray(r.data.ids)?r.data.ids.filter(x=>typeof x==='string'):[];
-      const errors=[], got=[]; for(const id of ids){ const f=await io.read(DIR+id+'.json');
+      const readIds=r.status==='loaded'&&r.data&&Array.isArray(r.data.ids)?r.data.ids.filter(x=>typeof x==='string'):[];
+      if(gI===wroteI) ids=readIds;
+      const errors=[], got=[]; for(const id of readIds){ const f=await io.read(DIR+id+'.json');
         if(f.status==='loaded') got.push(f.data); else errors.push(id+': '+(f.error||'missing')); }
       const before=rejected.length; add('mine',got);
       for(const x of rejected.slice(before)) errors.push(x.id+': '+x.reason);
+      const pr=await io.read(PIC_INDEX);                    // saved pictures: its own file, so an older app never meets it
+      if(pr.status==='failed') errors.push('pictures: '+pr.error);
+      else{ const readPics=pr.status==='loaded'&&pr.data&&Array.isArray(pr.data.items)
+          ?pr.data.items.filter(x=>x&&typeof x.id==='string'&&PIC_ID.test(x.id)).map(x=>({id:x.id,name:String(x.name||'').slice(0,80)})):[];
+        if(gP!==wroteP) return {ok:!errors.length,n:REG.mine.size,error:errors.join('; ')};   // a write landed meanwhile: its list is newer
+        pics=readPics;
+        for(const x of pics){ PICNAMES.set(x.id,x.name||x.id); picture(x.id); } changed(); }
       return {ok:!errors.length,n:REG.mine.size,error:errors.join('; ')};
     }
     // The index is the source of truth: never written over one we could not read, adopted only once written.
-    async function setIndex(next){
+    const setIndex=(next)=>serial(()=>setIndexNow(next));
+    async function setIndexNow(next){
       if(ids===null){ const l=await loadMine(); if(!l.ok&&ids===null) return l; }
-      const w=await io.write(INDEX,JSON.stringify({v:1,ids:next(ids)})); if(w.ok) ids=next(ids); return w;
+      const w=await io.write(INDEX,JSON.stringify({v:1,ids:next(ids)})); if(w.ok){ ids=next(ids); wroteI++; } return w;
     }
     async function saveMine(t){
       const v=validTemplate(t); if(!v.ok) return {ok:false,error:v.reason};
@@ -90,7 +109,24 @@ window.PAStationery=(function(){
       const wi=await setIndex(x=>x.filter(y=>y!==id)); if(!wi.ok) return wi;
       REG.mine.delete(id); changed(); return {ok:true};
     }
-    return {loadMine,saveMine,deleteMine,DIR,INDEX};
+    // A picture kept as stationery: the upload's path + a name, listed for every note. Same rule as the index above:
+    // never written over a list we could not read.
+    const writePics=(next)=>serial(()=>writePicsNow(next));
+    async function writePicsNow(next){
+      if(pics===null){ const l=await loadMine(); if(pics===null) return l.ok?{ok:false,error:'pictures list not read'}:l; }
+      const w=await io.write(PIC_INDEX,JSON.stringify({v:1,items:next(pics)})); if(w.ok){ pics=next(pics); wroteP++; } return w;
+    }
+    async function savePicture(p){
+      if(!p||typeof p.id!=='string'||!PIC_ID.test(p.id)) return {ok:false,error:'bad picture'};
+      const name=String(p.name||'').trim().slice(0,80)||p.id, w=await writePics(x=>x.filter(y=>y.id!==p.id).concat({id:p.id,name}));
+      if(!w.ok) return w;
+      PICNAMES.set(p.id,name); await picture(p.id); changed(); return {ok:true};
+    }
+    async function deletePicture(id){
+      const w=await writePics(x=>x.filter(y=>y.id!==id)); if(!w.ok) return w;
+      PICNAMES.delete(id); changed(); return {ok:true};       // the file stays: a note that uses it still draws it
+    }
+    return {loadMine,saveMine,deleteMine,savePicture,deletePicture,DIR,INDEX,PIC_INDEX};
   }
   // ── Renderer: sanitized SVG -> data: URL -> Image -> canvas, cached per (template, size) ─
   const IMGS=new WeakMap(), RASTERS=new Map();          // WeakMap: a discarded AI draft takes its decoded image with it

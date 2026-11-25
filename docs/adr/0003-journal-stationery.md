@@ -1658,3 +1658,21 @@ all six simplify suites.
   charges. One `sanitize()` re-check (up to about 35 ms at 300 KB here) runs to its end, and the
   prediction keeps that inside the deadline in the usual case.
 - Units are still not time (round 4's trade-off). The deadline now bounds what that can cost.
+
+## Follow-up (2026-11-25): a photo in a note as stationery · 用笔记里的图片做信纸
+
+**What.** A photo's ⋯ menu gains 做成信纸 · Make stationery. It opens Page settings with the photo loaded in the
+picture panel (作为背景 · Use as background, or AI 重绘 · Recreate with AI). A picture used as background is also
+KEPT: `templates/pictures.json` (`{v:1, items:[{id, name}]}`, id = the upload path) lists it in every note's
+stationery list, with the same two-tap ✕ as My templates.
+
+**Why its own file.** `templates/index.json` holds design ids, each loaded from its own templates/<id>.json; a
+picture id there would be reported as a missing template. A separate file is never read by an older build.
+
+**Rules kept.** Same as the index: never written over a list that could not be read; a refused write is shown in
+the panel (未保存到列表 · Not added to the list) while the page keeps its background. Deleting unlists only: the
+upload stays, so a note that uses it still draws it. The id rule (`PIC_ID`) equals PANote's notebook stationery id
+rule; test/stationery-saved-pictures.test.mjs pins that the two copies agree.
+
+**Origin.** Written live on the owner's node by its agent (deployed base 94114845), then brought into the repo
+with review fixes so the next deploy does not overwrite it.

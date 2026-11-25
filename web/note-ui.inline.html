@@ -1603,6 +1603,7 @@
          aim at on a photo the size of a thumb. */
       '<div class="pan-pop pan-imgpop" style="min-width:200px">'+
         '<button class="pan-photoopt" data-img="ask">'+ico('ask')+'<span class="pan-optlbl">问一问 · Ask AI</span></button>'+
+        (STN&&opts.stationery&&typeof opts.stationery==='object'&&imgHooks?'<button class="pan-photoopt" data-img="tpl">'+ico('paper')+'<span class="pan-optlbl">做成信纸 · Make stationery</span></button>':'')+
         '<button class="pan-photoopt" data-img="crop">'+ico('crop')+'<span class="pan-optlbl">裁剪 · Crop</span></button>'+
         '<button class="pan-photoopt" data-img="copy">'+ico('copy')+'<span class="pan-optlbl">复制 · Copy</span></button>'+
         '<button class="pan-photoopt" data-img="cut">'+ico('cut')+'<span class="pan-optlbl">剪切 · Cut</span></button>'+
@@ -2272,6 +2273,25 @@
       fetching:'正在打开图片… · Opening the photo',
       noBytes:'无法读取该图片 · Could not read this photo',
     };
+    // TODO(R4 seam): "make stationery from a photo" belongs with the image menu in its own file (image-menu split).
+    // Make stationery · 做成信纸: the photo's stored bytes go to the Stationery picture panel (page settings), where
+    // "Use as background" and "Recreate with AI" already live — and, once kept, every note can pick it.
+    const TPL_TXT={ unavailable:'信纸不可用 · Stationery is not available here',
+      tip:'可以把这张图片做成信纸，其他笔记也能用 · Make this picture a page stationery; other notes can use it too' };
+    const canStationery=()=>!!(imgHooks&&stPick&&stPick.hasStudio&&stPick.hasStudio()&&window.PAPhoto&&window.PAPhoto.toFile);
+    let tplSeq=0;                                               // the live request; a newer one, or a deselected photo, voids it
+    async function stationeryFromImage(im){
+      if(!im||!canStationery()){ flash(TPL_TXT.unavailable); return; }
+      const my=++tplSeq;
+      try{
+        flash(EDIT_TXT.fetching);
+        const url=await opts.imageUrl(im.path);                  // NOT fetch(): connect-src 'none' (see editImage)
+        if(my!==tplSeq||singleImage()!==im) return;              // moved on (another note, another photo): open nothing
+        if(!url){ flash(EDIT_TXT.noBytes); return; }
+        closePops(); paperPop.classList.add('on'); positionPop(paperPop,paperBtn); syncPopBtns();
+        await stPick.usePicture(window.PAPhoto.toFile(url,'photo.jpg'));
+      }catch(err){ flash(PHOTO_TXT.broken+' — '+String((err&&err.message)||err)); }   // R5: shown, not swallowed
+    }
     async function editImage(im){
       if(!im||!imgHooks) return;
       if(!window.PAScan){ flash(EDIT_TXT.unavailable); return; }
@@ -2345,7 +2365,10 @@
       // it hands over the image and the host decides where the answer appears.
       const askBtn=pop.querySelector('[data-img="ask"]');
       showRow(askBtn, !!opts.onAskImage);
+      const tplBtn=pop.querySelector('[data-img="tpl"]'); showRow(tplBtn, canStationery());
       closePops(); pop.classList.add('on');
+      // first-use tip (ADR 0030) beside the new menu item; TODO(R4 seam): image-menu split.
+      if(tplBtn&&canStationery()&&window.PATips){ window.PATips.register({id:'note-photo-stationery',anchor:()=>tplBtn,text:TPL_TXT.tip}); window.PATips.check(); }
       // Anchored to the handle itself rather than a toolbar button, so it opens beside the picture
       // it acts on. positionPop() takes an element; this menu's anchor is a canvas coordinate.
       // SCREEN px, not page px. (im.x+im.w)*W is a PAGE coordinate and r.left is a SCREEN one;
@@ -4262,6 +4285,7 @@
         const im=singleImage(); closePops(); if(!im) return;
         const act=b.dataset.img;
         if(act==='ask'){ if(opts.onAskImage) opts.onAskImage({path:im.path,x:im.x,y:im.y,w:im.w,h:im.h}); }
+        else if(act==='tpl') stationeryFromImage(im);
         else if(act==='crop') editImage(im);
         else if(act==='copy') copyImage(im);
         // Cut copies FIRST: deleteSel clears the selection, and reading the image after that

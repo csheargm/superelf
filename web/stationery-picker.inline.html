@@ -12,6 +12,9 @@
 .pst-del{position:absolute;top:-6px;right:-6px;min-width:20px;height:20px;border-radius:10px;border:1px solid var(--line,#d9dbda);
   background:var(--card,#fff);color:var(--muted,#6b7370);font:inherit;font-size:11px;line-height:18px;padding:0 5px;cursor:pointer}
 .pst-del.arm{color:#fff;background:#c0392b;border-color:#c0392b}
+/* Touch: touch-base grows every button to 44px, which would cover the thumbnail's centre — a tap meant to
+   choose would arm delete. The ✕ moves BELOW the thumbnail instead of over its corner. */
+@media (pointer:coarse){ .pst-cell{flex-direction:column;align-items:center;gap:2px} .pst-del{position:static} }
 .pst-tools,.pst-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;width:100%}
 .pst-btn{font:inherit;font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid var(--line,#d9dbda);
   background:var(--card,#fff);color:var(--text,#1c1e1d);cursor:pointer}
@@ -46,6 +49,7 @@ window.PAStationeryPicker=(function(){
     go:'设计 · Design', busy:working(), tweak:'调整 · Tweak', how:'想怎么调整… · What to change…', keep:'保存 · Keep', cancel:'取消 · Cancel',
     again:'重试 · Try again', name:'名称 · Name', kept:'已保存到我的模板 · Saved to My templates', choose:'选择图片 · Choose a picture',
     bg:'作为背景 · Use as background', redo:'AI 重绘 · Recreate with AI', fade:'淡化 · Fade', zoom:'点按放大 · Tap to enlarge',
+    picname:'图片 · Picture', saved:'已保存，其他笔记也能用 · Saved: other notes can use it too', notListed:'未保存到列表 · Not added to the list',
     stays:'导入的图片只保存在你自己的笔记里。 · Pictures you import stay in your own notes',
     pdf:'不支持 PDF：请先截图再导入。 · PDFs are not supported: screenshot a PDF page instead' };
   const mk=(tag,cls,txt)=>{ const e=document.createElement(tag); if(cls) e.className=cls; if(txt!=null) e.textContent=txt; return e; };
@@ -79,13 +83,14 @@ window.PAStationeryPicker=(function(){
     const c=mk('span','pst-cell'), b=mk('button','pan-tbtn pst-th'), cv=mk('canvas');
     b.type='button'; b.dataset.id=t.id; b.dataset.src=t.source; b.title=t.name; b.setAttribute('aria-label',t.name);
     b.appendChild(cv); c.appendChild(b);
-    paintInto(cv,t,THUMB_W,THUMB_H).then(ok=>{ if(!ok) b.classList.add('pst-bad'); });
+    if(t.missing) b.classList.add('pst-bad'); else paintInto(cv,t,THUMB_W,THUMB_H).then(ok=>{ if(!ok) b.classList.add('pst-bad'); });
     b.addEventListener('click',()=>o.choose({id:t.id,source:t.source}));
-    if(t.source==='mine'&&h&&h.store&&h.store.deleteMine){
+    const del=h&&h.store&&(t.source==='mine'?h.store.deleteMine:t.source==='picture'?h.store.deletePicture:null);
+    if(del){
       const x=mk('button','pst-del','✕'); x.type='button'; x.title=window.PATwoTap.LABEL;
       x.addEventListener('click',async()=>{
         if(!window.PATwoTap.press(x)) return;
-        const r=await h.store.deleteMine(t.id);
+        let r; try{ r=await del(t.id); }catch(e){ r={ok:false,error:(e&&e.message)||String(e)}; }   // R5: shown below
         if(!r.ok) say(msg,(r.error||'未删除 · Not deleted'),true); });   // success: the list rebuilds without it
       c.appendChild(x); }
     return c;
@@ -154,20 +159,32 @@ window.PAStationeryPicker=(function(){
   // ── 🖼 From a picture ────────────────────────────────────────────────────────────────────
   function picPanel(h,o,d){
     const P=mk('div','pst-panel pst-pic'), msg=mk('div','pst-msg'), cv=mk('canvas','pst-prev'), row=mk('div','pst-row');
-    let file=null;
+    let file=null, dec=0;                                      // dec: the live decode; an older one that finishes later writes nothing
+    // ONE way a picture becomes "the file": the picker below, or a photo already in a note (use()).
+    async function setFile(f){
+      // The previous picture is dropped FIRST: a picture that fails to decode must not leave the last one armed.
+      const my=++dec; file=null; cv.classList.remove('on'); row.style.display='none';
+      if(/pdf/i.test(f.type||'')||/\.pdf$/i.test(f.name||'')) return say(msg,T.pdf,true);
+      say(msg,T.busy);
+      try{ const c=await window.PAPhoto.toCanvas(f,PREV_H*2); if(my!==dec) return; cv.width=c.w; cv.height=c.h; cv.getContext('2d').drawImage(c.canvas,0,0); }
+      catch(e){ if(my===dec) say(msg,(e&&e.message)||String(e),true); return; }
+      file=f; cv.classList.add('on'); row.style.display=''; say(msg,''); }
     const pick=btn('',T.choose,async()=>{
       const r=await window.PAPhoto.pick({accept:'image/*'}); if(!r.ok) return;
-      const f=r.files[0]; if(/pdf/i.test(f.type||'')||/\.pdf$/i.test(f.name||'')) return say(msg,T.pdf,true);
-      try{ const c=await window.PAPhoto.toCanvas(f,PREV_H*2); cv.width=c.w; cv.height=c.h; cv.getContext('2d').drawImage(c.canvas,0,0); }
-      catch(e){ return say(msg,(e&&e.message)||String(e),true); }
-      file=f; cv.classList.add('on'); row.style.display=''; say(msg,''); });
+      await setFile(r.files[0]); });
     const bg=btn('',T.bg,async()=>{ if(!file) return; bg.disabled=true; say(msg,T.busy);
       const r=await ST().importPicture(h.upload,file); bg.disabled=false;
       if(!r.ok) return say(msg,r.reason,true);
-      say(msg,''); o.choose({id:r.path,source:'picture',fade:ST().DEFAULT_FADE}); });
+      o.choose({id:r.path,source:'picture',fade:ST().DEFAULT_FADE});
+      // Kept in the list too, so ANY note can pick it later. The page already has it either way: a refused save says so.
+      let k={ok:true};
+      if(h.store&&h.store.savePicture){
+        try{ k=await h.store.savePicture({id:r.path,name:T.picname+' '+new Date().toLocaleDateString()}); }
+        catch(e){ k={ok:false,error:(e&&e.message)||String(e)}; } }   // R5: shown below, not swallowed
+      say(msg,k.ok?T.saved:(T.notListed+(k.error?' — '+k.error:'')),!k.ok); });
     const redo=btn('',T.redo,()=>{ if(!file) return; d.reset(); d.run((signal)=>ST().recreate(h.ai,h.upload,file,'',{signal})); });
     row.append(bg,redo); row.style.display='none';
-    P.append(pick,cv,row,mk('div','pst-msg',T.stays),mk('div','pst-msg',T.pdf),msg); return P;
+    P.append(pick,cv,row,mk('div','pst-msg',T.stays),mk('div','pst-msg',T.pdf),msg); P.use=setFile; return P;
   }
   // The studio exists only when the host handed over its IO; a host that just opted in gets thumbnails.
   function studio(wrap,h,o){
@@ -177,20 +194,23 @@ window.PAStationeryPicker=(function(){
     const aiB=btn('',T.ai,null), picB=btn('',T.pic,null);
     aiB.addEventListener('click',toggle(ai,aiB,pic,picB)); picB.addEventListener('click',toggle(pic,picB,ai,aiB));
     tools.append(aiB,picB); wrap.append(tools,ai,pic,d.box); d.guard(tools,ai,pic);
+    // A photo that is already in a note: open the picture panel with it loaded, ready for "background" or "recreate".
+    return {use(f){ d.reset(); ai.classList.remove('on'); aiB.classList.remove('on'); pic.classList.add('on'); picB.classList.add('on');
+      pic.scrollIntoView&&pic.scrollIntoView({block:'nearest'}); return pic.use(f); }};
   }
   // mount(listEl, {current, choose, changed, studio, paper}) -> {sync}. note-ui calls sync on every paper redraw;
   // paper() is the page's ground colour, which an enlarged draft sits on.
   function mount(el,o){
-    if(!el) return {sync(){}};
+    if(!el) return {sync(){},usePicture(){ return false; },hasStudio:()=>false};
     const h=o.studio&&typeof o.studio==='object'?o.studio:null, msg=mk('div','pst-msg'), fade=fadeRow(o);
     const sync=()=>{ const cur=o.current();
       el.querySelectorAll('.pst-th').forEach(b=>b.classList.toggle('on',!!cur&&cur.id===b.dataset.id&&cur.source===b.dataset.src));
       fade.sync(); };
     function build(){ el.textContent=''; for(const t of S.list()) el.appendChild(cell(t,o,h,msg)); sync(); }
     el.after(fade.row,msg);
-    if(h&&ST()) studio(msg.parentNode,h,o);
+    const st=(h&&ST())?studio(msg.parentNode,h,o):null;
     S.onChange(()=>{ build(); if(o.changed) o.changed(); });
-    build(); return {sync};
+    build(); return {sync,usePicture:(f)=>st?st.use(f):false,hasStudio:()=>!!st};
   }
   return {mount};
 })();
