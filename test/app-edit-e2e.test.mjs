@@ -83,6 +83,11 @@ async function showBar(page) {
   await page.waitForFunction(() => document.querySelector('#ftitle').getBoundingClientRect().top >= 0);
 }
 // WebKit sometimes drops the first synthetic long-press (flaky on origin/main too, 2 of 3 runs): one retry.
+// The bar can slide away again between showBar and the click (phone width): retry once.
+async function openMore(page) {
+  for (let i = 0; i < 3; i++) { await showBar(page); try { await page.click('#fmore', { timeout: 5000 }); return; } catch { /* slid away: show it again */ } }
+  await page.click('#fmore');
+}
 async function longPressTitle(page) {
   for (let i = 0; i < 2 && !(await page.locator('#aePanel').count()); i++) {
     await showBar(page);
@@ -167,8 +172,7 @@ test('long-press the title → panel docks beside the app with its picture; a ch
 
 test('⋯ on the open app lists 改这个应用 first with a one-time tip; phone gets a bottom sheet', { skip, timeout: 60000 }, async () => {
   const { ctx, page } = await signIn({ width: 390, height: 844 });
-  await showBar(page);
-  await page.click('#fmore');
+  await openMore(page);
   const first = page.locator('#frameMenu button').first();
   assert.match(await first.textContent(), /^改这个应用 · Change this app/);
   assert.match(await first.textContent(), /长按标题可修改此应用/, 'the tip shows the first time');
@@ -181,8 +185,7 @@ test('⋯ on the open app lists 改这个应用 first with a one-time tip; phone
   await page.frameLocator('#aefr').locator('.pac-inp').waitFor();
   await shot(page, 'cta-sheet-phone');
   await page.click('#aeClose');
-  await showBar(page);
-  await page.click('#fmore');
+  await openMore(page);
   assert.doesNotMatch(await page.locator('#frameMenu button').first().textContent(), /长按标题/, 'the tip is shown once');
   await ctx.close();
 });
@@ -190,8 +193,7 @@ test('⋯ on the open app lists 改这个应用 first with a one-time tip; phone
 test('a member changes their OWN copy through the same chat: plan → Apply → reload → Done → Undo (no-tools lane)', { skip, timeout: 90000 }, async () => {
   const kidPage = path.join(root, 'ws-kid', 'apps', 'todo', 'index.html');
   const { ctx, page } = await signIn({ width: 820, height: 1180 }, 'kid', 'kid-pass-12345');   // iPad width
-  await showBar(page);
-  await page.click('#fmore');   // ⋯ → 改这个应用 opens the same one chat
+  await openMore(page);   // ⋯ → 改这个应用 opens the same one chat
   await page.locator('#frameMenu button').first().click();
   await page.locator('#aePanel').waitFor();
   const p = page.frameLocator('#aefr');

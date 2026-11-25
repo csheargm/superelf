@@ -90,7 +90,9 @@ const PAAppEdit=(()=>{
   }
   // The next load of the app frame that is not the blank placeholder (appFrameLeave loads about:blank first).
   function loaded(){ const fr=$('#fr'); return new Promise((res)=>{ const t=setTimeout(()=>{ fr.removeEventListener('load',on); res(false); },LOAD_MS);
-    const on=()=>{ const u=fr.getAttribute('src'); if(!fr.hasAttribute('srcdoc')&&(!u||u==='about:blank')) return; clearTimeout(t); fr.removeEventListener('load',on); res(true); }; fr.addEventListener('load',on); }); }
+    const on=()=>{ const u=fr.getAttribute('src'), sd=fr.getAttribute('srcdoc'); if(sd===null&&(!u||u==='about:blank')) return; clearTimeout(t); fr.removeEventListener('load',on);
+      res(!(sd&&sd.includes(SW_OPEN_FAILED_TXT))); };   // the srcdoc route's error page is a failed reload, never Done (GPT review)
+    fr.addEventListener('load',on); }); }
   function close(){
     openSeq++;
     if(!S) return;

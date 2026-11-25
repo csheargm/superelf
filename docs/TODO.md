@@ -32,6 +32,9 @@ Follow-ups:
 - Shelf app → fork first inside the panel (members today copy the app, then open their copy).
 - Demo guests: the panel stays off on the demo; they change their own apps through the app maker (caps charged).
 - The Apply turn shows as 「改 · Apply (<id>)」 in the user bubble; a nicer label needs a PAChat display hook.
+- GPT review leftovers: a Stop during a member's Apply does not cancel the model call (the page may still be
+  written; Undo restores it); the member lane writes index.html only, so a rename in meta.json is dropped; the
+  stored plan puts the user's request before the shown plan, and a very long request can crowd the plan out.
 - Pending plans are in memory: a node restart forgets them (re-ask, tap Apply again).
 
 ## Verse ink: handwriting frame leftovers (GPT review 2026-11-22, web/ink-frame.inline.html)

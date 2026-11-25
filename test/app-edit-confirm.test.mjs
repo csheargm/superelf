@@ -136,3 +136,10 @@ test('flattenForClaude keeps the system line apart', () => {
   const f = flattenForClaude([{ role: 'system', content: 'S' }, { role: 'user', content: 'U' }, { role: 'assistant', content: 'A' }]);
   assert.equal(f.system, 'S'); assert.match(f.prompt, /User: U[\s\S]*Assistant: A/);
 });
+
+test('GPT review pins: unconfirmed edit turns plan with no tools, Verify never runs on an edit turn, a blocked member keeps the app chat', () => {
+  const web = fs.readFileSync(new URL('../web.mjs', import.meta.url), 'utf8');
+  assert.match(web, /edit && !edit\.confirmed && !edit\.superelf \? \[\.\.\.baseArgs, \.\.\.NO_TOOLS_ARGS\]/);
+  assert.match(web, /if \(assess && !edit && agentAllowed\(user\)\)/);
+  assert.match(web, /if \(ml\.blocked && !\(edit && edit\.scoped\)\)/);
+});

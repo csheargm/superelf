@@ -1433,7 +1433,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
     editCtx = edit ? beginAppEdit(edit, { wsDir: wsDir(user) }) : null;   // before the agent runs
     // TODO(R4 seam): the retry loop and the lane dispatch inside it leave chat() together (see the seam named below).
     for (;;) {
-    if (ml.blocked) r = { ok: false, text: NO_PLAIN_LANE_TEXT };   // no plain lane for this member: said, never the agent
+    if (ml.blocked && !(edit && edit.scoped)) r = { ok: false, text: NO_PLAIN_LANE_TEXT };   // a member's app chat has its own no-tools lane (GPT review)   // no plain lane for this member: said, never the agent
     else if (edit && edit.undo) { r = undoAppEdit(edit, { wsDir: wsDir(user) }); line(r.line); audit('app-edit-undo', { who: user.id, app: edit.slug, undone: !!r.line.undone }); }   // a typed "undo": no model
     else if (edit && edit.scoped) r = await scopedEditTurn(user, edit, message, convo, chosen, origin);   // a member's app chat: no tools, the server writes (lib/app-edit-lane.mjs)
     else if (chosen && chosen.provider === 'ollama') {
@@ -1491,7 +1491,8 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
       // Before agentArgs, so a confined lane carries it too (it is not a permission flag). Read from the
       // LIVE cfg on every turn, so a config.json edit applies to the next one (docs/adr/0011).
       const baseArgs = oneShot ? oneShotBaseArgs(tierArgs, cfg.one_shot_args, memberArgsOf(user, origin)) : tierArgs;
-      const extraArgs = agentArgs(user, baseArgs, origin);   // owner's own chat: unrestricted. an app's turn or a member's: no skip-permissions.
+      // An unconfirmed edit turn plans with NO tools: nothing can write before 改 · Apply (GPT review 2026-11-24).
+      const extraArgs = agentArgs(user, edit && !edit.confirmed && !edit.superelf ? [...baseArgs, ...NO_TOOLS_ARGS] : baseArgs, origin);   // owner's own chat: unrestricted. an app's turn or a member's: no skip-permissions.
       const cancelled = () => !!cancel && cancel.signal.aborted;   // a oneShot caller that left, or the composer's explicit Stop (lib/turn-stop.mjs)
         // The SAME resolved skill the fast lanes get (profile override → config → built-in).
         // It was resolved only inside the ollama branch, so an app's directive applied on one
@@ -1599,7 +1600,8 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
     }
     // Multi-LLM assessment ("Verify · 校验"): detached — the stream ends now, results
     // attach to this turn (mdMsg.assess) and the app polls the existing convo GET.
-    if (assess && agentAllowed(user)) line({ type: 'assess', ...startAssess(user, convo, mdMsg, message, chosen ? chosen.id : 'claude', app, system, origin) });
+    if (assess && !edit && agentAllowed(user)) line(   // never on an edit turn: Verify runs agents outside the Apply gate (GPT review)
+      { type: 'assess', ...startAssess(user, convo, mdMsg, message, chosen ? chosen.id : 'claude', app, system, origin) });
     line({ type: 'done', ok: r.ok, text: blank ? '' : (r.text || ''), by });
   } catch (e) {
     console.log(chatTurnLogLine({ app: tag, lane: chosen, ok: false, textLen: 0, ms: Date.now() - startedAt, code: e.code || e.status || e.name, fellBack }));
