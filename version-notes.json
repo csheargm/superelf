@@ -1,4 +1,12 @@
 {
+  "v5.20.2": {
+    "date": "2026-11-25",
+    "features": [],
+    "fixes": [
+      "手机聊天字体加大 · Bigger chat text on phones"
+    ],
+    "through": "d4f78d39d62d1e2d8697f525e94719376cba4ef5"
+  },
   "v5.20.1": {
     "date": "2026-11-25",
     "features": [],
