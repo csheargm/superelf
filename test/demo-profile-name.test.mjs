@@ -14,9 +14,11 @@ test('nameFromMeta: full_name first, then name, trimmed', () => {
 test('nameFromMeta: missing, empty, non-string and email-shaped give empty', () => {
   for (const m of [null, undefined, {}, { full_name: '   ' }, { full_name: 42 }, { name: 'a@b.com' }, 'str']) assert.equal(nameFromMeta(m), '');
 });
-test('nameFromMeta: very long is capped by code point', () => {
+test('nameFromMeta: very long fits the 60-unit profile cut and never splits an emoji', () => {
   const n = nameFromMeta({ full_name: '😀'.repeat(200) });
-  assert.equal([...n].length, PROFILE_NAME_MAX);
+  assert.equal(n.length, PROFILE_NAME_MAX);
+  assert.equal(n.slice(0, 60), n);   // PUT /api/profile's own cut changes nothing
+  assert.equal(nameFromMeta({ full_name: 'a' + '😀'.repeat(40) }), 'a' + '😀'.repeat(29));
 });
 test('nameFromMeta: HTML and control chars become plain text', () => {
   const n = nameFromMeta({ full_name: '<img src=x onerror=alert(1)>Bob\u0000\n' });
@@ -48,5 +50,13 @@ test('applyAccountName: never overwrites a typed name; no metadata writes nothin
     assert.equal(applyAccountName(user(w2), {}), false);
     assert.equal(loadProfile(w2), null);
     fs.rmSync(w2, { recursive: true, force: true });
+  } finally { fs.rmSync(w, { recursive: true, force: true }); }
+});
+test('applyAccountName: an unreadable profile.json is left alone and does not throw', () => {
+  const w = ws();
+  try {
+    fs.writeFileSync(path.join(w, 'profile.json'), '{not json');
+    assert.equal(applyAccountName(user(w), { full_name: 'Ada' }), false);
+    assert.equal(fs.readFileSync(path.join(w, 'profile.json'), 'utf8'), '{not json');
   } finally { fs.rmSync(w, { recursive: true, force: true }); }
 });
