@@ -71,6 +71,7 @@ const OPEN_LINK_RE=/^#open=([\w.-]{1,80})\/([a-z0-9][a-z0-9-]{0,39})$/;   // a u
 function openFromLink(){
   const m=OPEN_LINK_RE.exec(location.hash||''); if(!m) return false;
   try{ history.replaceState(null,'',location.pathname+location.search); }catch(_){ /* no history API: the hash stays, and reopens the same app once more */ }
+  appHistReplaceNext=true;   // a link's app: Back leaves for the page before (web/app-frame.js)
   openApp(m[1],m[2],m[2]); return true;
 }
 const PAUpdate=makeUpdate({

@@ -79,3 +79,28 @@ window.addEventListener('message',(e)=>{
   if(r&&r.held&&e.data&&e.data.pa==='left') appFrameLeft(r);
 });
 /* ══ APP_FRAME_END ══ */
+// BROWSER BACK · 浏览器返回 (owner report v5.22.4: mouse Back from an app left an empty grey page).
+// Opening an app is one history entry of the shell's own: {paApp:{uid,slug,title}} at the same URL.
+// Back from it (mouse Back, Alt+Left, the iOS edge swipe) is goHome, Forward reopens the app. An app
+// opened over another app, or by a direct link, REPLACES the entry: Back from a link's app leaves the
+// shell for the page before, as any link's Back does. Home's own controls step back off the entry,
+// so a later Back never lands on an app that is no longer open.
+const APP_HIST_KEY='paApp';
+let appHistReplaceNext=false;   // set by a direct-link open (web/update.js openFromLink, the demo #app= link)
+let appHistPopsToIgnore=0;      // Back steps the shell took itself (appHistoryLeft): not the user's
+function appHistoryOpened(uid,slug,title){
+  const st={[APP_HIST_KEY]:{uid,slug,title}};
+  const replace=appHistReplaceNext||!!(history.state&&history.state[APP_HIST_KEY]);
+  appHistReplaceNext=false;
+  try{ if(replace) history.replaceState(st,''); else history.pushState(st,''); }catch(_){ /* no history API (sandboxed test page): Back then leaves the shell, as before */ }
+}
+function appHistoryLeft(){
+  if(!(history.state&&history.state[APP_HIST_KEY])) return;
+  appHistPopsToIgnore++; history.back();
+}
+window.addEventListener('popstate',(e)=>{
+  if(appHistPopsToIgnore>0){ appHistPopsToIgnore--; return; }
+  const a=e.state&&e.state[APP_HIST_KEY];
+  if(a) openApp(a.uid,a.slug,a.title);          // Forward: the app again (the entry is already its own: replaced, not pushed)
+  else if(frameOpen()) goHome();                // Back: Home, fully drawn, with every menu and panel closed
+});
