@@ -82,3 +82,9 @@ test('the demo shell Undo is refused while the visitor\'s app build runs (it cou
   const src = fs.readFileSync(new URL('../lib/demo-routes.mjs', import.meta.url), 'utf8');
   assert.match(src, /DEMO_UNDO_RE\.test\(p\)\) \{\s*const user = d\.userFor\(req\);\s*if \(user && jobs\.running\(user\.id\)\) \{ json\(res, 409/);
 });
+test('one Undo at a time: the panel and the ⋯ Undo share an in-flight guard', () => {
+  const src = fs.readFileSync(new URL('../web/app-edit.js', import.meta.url), 'utf8');
+  assert.match(src, /async function undo\(\)\{\s*if\(!S\|\|undoing\) return;/);
+  assert.match(src, /async function undoFromMenu\(slug,v\)\{\s*if\(undoing\) return; undoing=true;/);
+  assert.equal((src.match(/finally\{ undoing=false; \}/g) || []).length, 2);
+});

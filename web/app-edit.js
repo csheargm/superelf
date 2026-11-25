@@ -120,12 +120,15 @@ const PAAppEdit=(()=>{
   async function reloadThenDone(){ const me=S; const ok=await reloadApp(); if(!me||S!==me) return;
     say(ok?DONE:RELOAD_FAILED); me.el.querySelector('#aeUndo').style.display=''; }
   function say(t){ if(S&&S.fr.contentWindow) S.fr.contentWindow.postMessage({pa:'edit-note',text:t},'*'); }
+  // One Undo at a time (panel or ⋯): a double tap must not take back two changes (GPT review r3).
+  let undoing=false;
   async function undo(){
-    if(!S) return; const me=S;
+    if(!S||undoing) return; const me=S; undoing=true;
     try{ const r=await api('/api/apps/'+encodeURIComponent(S.slug)+'/undo',{method:'POST'}); const j=await r.json();
       if(S!==me) return;   // another app's panel opened meanwhile: never its Undo (GPT review)
       say(j.text||j.error||('HTTP '+r.status)); if(j.undone) reloadApp(); undoLeft(j.left); }
     catch(err){ say('撤销失败 · Undo failed: '+((err&&err.message)||'')); }
+    finally{ undoing=false; }
   }
   // Nothing left to undo: 撤销 · Undo goes (self-test F11: it stayed after both changes were undone).
   function undoLeft(n){ if(S&&n===0) S.el.querySelector('#aeUndo').style.display='none'; }
@@ -149,10 +152,12 @@ const PAAppEdit=(()=>{
   // 撤销上次修改 · Undo last change, from the shell's ⋯: the app reloads whether or not its page still has a chat.
   // v: the change the menu offered; the server refuses (409) if a newer one arrived since, never undoing that one instead.
   async function undoFromMenu(slug,v){
+    if(undoing) return; undoing=true;
     try{ const r=await api('/api/apps/'+encodeURIComponent(slug)+'/undo?v='+encodeURIComponent(v),{method:'POST'}); const j=await r.json(); const t=j.text||j.error||('HTTP '+r.status);
       if(S&&slug===S.slug){ say(t); undoLeft(j.left); } else shout(t);
       if(j.undone&&frameSlug()===slug&&frameUid()===UID){ bumpGen(); appFrameLeave(); PASW.frameLoad(UID,slug); } }
     catch(err){ shout('撤销失败 · Undo failed: '+((err&&err.message)||'')); }
+    finally{ undoing=false; }
   }
   // The menu opens at once; 撤销上次修改 · Undo last change joins it (after Change this app) when the server says one exists.
   function frameMenu(anchor){
