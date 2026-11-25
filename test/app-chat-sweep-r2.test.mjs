@@ -17,7 +17,7 @@ const src = (f) => fs.readFileSync(path.join(REPO, f), 'utf8');
 
 test('R2-1: a kept status is its own log line, not the reply bubble', () => {
   const ui = src('web/chat-ui.inline.html');
-  assert.match(ui, /ev\.type==='status'&&ev\.keep\)\{ const d=addMsg\('status',ev\.text\); thinking\.parentNode\.insertBefore\(d,thinking\)/);
+  assert.match(ui, /ev\.type==='status'&&ev\.keep\)\{ if\(!thinking\.isConnected\) return; const d=addMsg\('status',ev\.text\); thinking\.parentNode\.insertBefore\(d,thinking\)/);
   assert.match(src('web.mjs'), /line\(\{ type: 'status', text: laneStatus, keep: true \}\)/);
 });
 
