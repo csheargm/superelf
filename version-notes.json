@@ -1,4 +1,12 @@
 {
+  "v5.19.0": {
+    "date": "2026-11-24",
+    "features": [
+      "应用对话一键截图 · One-tap screenshot in app chat"
+    ],
+    "fixes": [],
+    "through": "9f6be6a13e4b9649c314d7b70fa9fe4569692542"
+  },
   "v5.18.5": {
     "date": "2026-11-24",
     "features": [],
