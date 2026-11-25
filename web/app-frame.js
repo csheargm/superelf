@@ -23,6 +23,7 @@
 // removed at once, as about:blank cancelled its load: on a page PALeave runs on, none of its own code has run.
 const APP_LEAVE_ACK_MS=2000;     // no {pa:'left'} by then: the page cannot answer (it has no script, or it hangs)
 const APP_LEAVE_QUIET_MS=500;    // after the answer, this long with nothing in flight ends the hold
+const APPLIED_RELOAD_MS=4000;   // an app chat that changed its own app: the reply stays readable this long, then the new page loads (web/index.html relay)
 const APP_LEAVE_MAX_MS=20000;    // = PANote's SAVE_TIMEOUT_MS: a save that is still waiting for its reply is given up on by then anyway
 const APP_FRAME_HANDLERS=['onload','onfocus'];   // what the shell binds on #fr; the fresh frame carries them
 const appFrameRecs=new WeakMap();   // iframe element → what the broker knows about the page in it

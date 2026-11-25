@@ -20,7 +20,8 @@ import { agentAllowed, lanesFor, memberLane, NO_PLAIN_LANE_TEXT, AGENT_OFF_TEXT,
 import { cancelOnClose, createTurnCancel, createTurnStops, CANCELLED_TEXT } from './lib/turn-stop.mjs';
 import { watchConfig } from './lib/config-watch.mjs';
 import { oneShotBaseArgs, oneShotModel, yieldSettings, NO_TOOLS_ARGS } from './lib/one-shot.mjs';
-import { mintConfirm, planOffer, applyMessage, applyNowPrompt, toolTalkReplacement, retirePending, saysNo, APPLY_LABEL, PLAN_MAX, PLAN_TOO_LONG } from './lib/app-edit-confirm.mjs';
+import { applyNowPrompt } from './lib/app-edit-confirm.mjs';
+import { offerApply } from './lib/app-edit-offer.mjs';
 import { runScopedEdit, scopedLane, flattenForClaude } from './lib/app-edit-lane.mjs';
 import { tipsSeenOf } from './lib/tips-seen.mjs';
 import { safeJoin, slugOk, drawerOpenOf, tokenOk, dataContentType, readBody, writeFileAtomic, renameWithRetry, decodeBase64Strict, bodyErrorResponse, BODY_LIMITS } from './lib/webutil.mjs';
@@ -1323,26 +1324,7 @@ function agentSystemPrompt(head, caps, facts) {
   return [...head, f, caps].filter(Boolean).join('\n\n');
 }
 
-// TODO(R4 seam): these two edit-turn helpers leave web.mjs with the edit-turn wiring (the seam named in chatTurn).
-// An unconfirmed edit turn that planned a change: strip the marker, mint the single-use id, offer the button.
-function offerApply(user, edit, message, r, line, convoId) {
-  if (edit.confirmed || edit.superelf || edit.undo) return r;
-  const o0 = planOffer(r.text);
-  if (!o0.offered) {   // backstop: tool/session talk never reaches the user; the pending plan and its button do
-    const key = { who: user.id, slug: edit.slug, convo: convoId };
-    const t = toolTalkReplacement(r.text, key, !saysNo(message));   // never re-offered never to "no, leave it" (GPT review r3)
-    if (t && t.id) line({ type: 'app-change-confirm', slug: edit.slug, label: APPLY_LABEL, message: applyMessage(t.id) });
-    else retirePending(key);   // answered with anything else ("no, leave it"): a later yes applies nothing (GPT review r2)
-    return t ? { ...r, text: t.text } : r;
-  }
-  const o = { ...o0, text: scrubPaths(cleanReply(o0.text).text, wsDir(user)) };   // the plan Apply runs is the plan the user saw (GPT review r1)
-  if (!o.text.trim()) return { ...r, text: o.text };   // nothing readable left: no plan, no Apply (GPT review r2)
-  if (o.text.length > PLAN_MAX) retirePending({ who: user.id, slug: edit.slug, convo: convoId });   // the shown revision replaces the old plan (GPT review r3)
-  if (o.text.length > PLAN_MAX) return { ...r, text: `${o.text}\n\n${PLAN_TOO_LONG}` };   // never an Apply that would run a cut-down plan
-  const id = mintConfirm({ who: user.id, slug: edit.slug, plan: o.text, request: message, convo: convoId });
-  line({ type: 'app-change-confirm', slug: edit.slug, label: APPLY_LABEL, message: applyMessage(id) });
-  return { ...r, text: o.text };
-}
+// TODO(R4 seam): this edit-turn helper leaves web.mjs with the edit-turn wiring (the seam named in chatTurn).
 // A member's edit turn: one no-tools model call per attempt (Ollama, or Claude with --tools=), never Codex.
 const memberQuota = makeQuotaStore(path.join(ROOT, MEMBER_QUOTA_FILE));   // lib/member-quota.mjs
 async function scopedEditTurn(user, edit, message, convo, lane, origin, cancel) {
@@ -1652,7 +1634,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
         canEdit: origin.fromApp && canEditHere && appEditable(appsDir(user), app) });   // re-checked after the model: a delete mid-turn (GPT review r2)
       r = { ...r, text: h.text, offer: h.offer };
     }
-    if (edit && !blank && r.ok !== false) r = offerApply(user, edit, message, r, line, convo.id);   // a plan → the 改 · Apply button (lib/app-edit-confirm.mjs)
+    if (edit && !blank && r.ok !== false) r = offerApply({ who: user.id, edit, message, r, line, convoId: convo.id, wsDir: wsDir(user) });   // a plan → the 改 · Apply button (lib/app-edit-confirm.mjs)
     // Never shown: tool-call markup printed as text, the plan marker, the node's own paths (lib/reply-clean.mjs).
     let unreadable = false;
     if (!blank) {
