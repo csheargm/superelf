@@ -1,4 +1,12 @@
 {
+  "v5.21.0": {
+    "date": "2026-11-25",
+    "features": [
+      "用照片做信纸 · Stationery from a note photo"
+    ],
+    "fixes": [],
+    "through": "7a93d53abf1d7c892dab749cd6e67e83cd6bd41a"
+  },
   "v5.20.3": {
     "date": "2026-11-25",
     "features": [],
