@@ -58,6 +58,7 @@ for (const pwa of [false, true]) test(`iPhone${pwa ? ' home-screen PWA' : ''}: a
     await page.goto(`http://127.0.0.1:${port}/`); await page.waitForSelector('#login[open]');
     await page.fill('#luser', 'owner'); await page.fill('#lpin', 'owner-pass-123'); await page.click('#loginBtn');
     await page.waitForFunction(() => !document.querySelector('#login[open]'));
+    assert.ok(await page.evaluate(() => { const t = document.getElementById('hTip'); return !!t && getComputedStyle(t).display !== 'none'; }), 'CONTROL: the home tip shows on the home');
     await page.tap('.ecard[data-es="redflags"]');
     const app = page.frameLocator('#fr'); await app.locator('.pac-fs.on .pac-inp').waitFor();
     const fr = page.frame({ url: /\/app\/owner\/redflags\// });
@@ -67,7 +68,9 @@ for (const pwa of [false, true]) test(`iPhone${pwa ? ' home-screen PWA' : ''}: a
       await app.locator('.pac-fs.on .pac-inp').tap(); await app.locator('.pac-fs.on .pac-inp').fill(ask);
       await app.locator('.pac-fs.on .pac-go').tap();
       await fr.waitForFunction(([c, w]) => { const me = document.querySelectorAll('.pac-fs.on .pac-m.me'), ai = document.querySelectorAll('.pac-fs.on .pac-m.ai.pac-md');
-        return me.length > c && ai.length && ai[ai.length - 1].textContent.includes(w); }, [k, mark], { timeout: TURN_WAIT_MS });
+        const q = me.length > c && me[me.length - 1];   // the first finished answer AFTER this question
+        const after = q && [...ai].find((a) => q.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING);
+        return !!after && after.textContent.includes(w); }, [k, mark], { timeout: TURN_WAIT_MS });
     }
     await page.waitForTimeout(SETTLE_MS);
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `iphone${pwa ? '-pwa' : ''}-after-two-replies.png`) });
@@ -98,7 +101,7 @@ for (const pwa of [false, true]) test(`iPhone${pwa ? ' home-screen PWA' : ''}: a
       assert.ok((await fr.evaluate(() => window.__taps.splice(0))).some((t) => String(t).includes(c.c.split(' ').pop())), `${c.c}: the tap arrived`);
       await page.keyboard.press('Escape'); await page.waitForTimeout(200);
     }
-    assert.ok(await fr.evaluate(() => !!document.querySelector('.pac-list.on')), 'the ☰ tap opened the list');
+    await fr.waitForSelector('.pac-list.on', { timeout: TURN_WAIT_MS });   // the ☰ tap opened the list (it refreshes first)
     const m = await fr.evaluate(() => { const ms = [...document.querySelectorAll('.pac-fs.on .pac-m.ai,.pac-fs.on .pac-m.me')];
       const row = document.querySelector('.pac-fs.on .pac-inp').closest('.pac-row') || document.querySelector('.pac-fs.on .pac-inp').parentElement;
       const log = document.querySelector('.pac-fs.on .pac-log'); log.scrollTop = log.scrollHeight;
