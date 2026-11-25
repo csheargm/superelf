@@ -26,14 +26,19 @@ function anchorGone(a){
 function menuKey(e){ if(e.key==='Escape'&&menuOpen()){ e.preventDefault(); e.stopImmediatePropagation(); closeMenuPop(true); } }   // one Escape closes one layer
 function menuBlur(){ closeMenuPop(); }
 // The click that follows the closing pointerdown is swallowed, so it never reaches what is underneath (the drawer
-// backdrop's close, a row that would open): the first outside tap only closes the menu. A tap that sends no
-// click (iOS, plain element) leaves the swallower to expire after SWALLOW_MS, or the next click elsewhere ends it.
-const SWALLOW_MS=700;
+// backdrop's close, a row that would open): the first outside tap only closes the menu. The swallower lives until
+// that press's click, or — for a tap that sends no click (iOS, plain element) — until the next press begins, a
+// click elsewhere, or SWALLOW_MAX_MS as a last bound (a press held longer than that is a deliberate one).
+const SWALLOW_MAX_MS=5000;
 function swallowClick(at){
-  // Only the click of THAT press (same element): a later tap elsewhere, inside SWALLOW_MS, still works.
-  const eat=(ev)=>{ if(!(ev.target===at||at.contains(ev.target)||ev.target.contains(at))) return done(); ev.stopPropagation(); ev.preventDefault(); done(); };
-  const done=()=>{ clearTimeout(t); document.removeEventListener('click',eat,true); };
-  const t=setTimeout(done,SWALLOW_MS); document.addEventListener('click',eat,true);
+  let t=0;
+  const eat=(ev)=>{ if(ev.target===at||at.contains(ev.target)||ev.target.contains(at)){ ev.stopPropagation(); ev.preventDefault(); } done(); };
+  const next=()=>done();
+  const done=()=>{ clearTimeout(t); document.removeEventListener('click',eat,true); removeEventListener('pointerup',arm,true); };
+  // A new press ends it, but only after this press is over (its pointerup), so the press itself never does.
+  const arm=()=>{ removeEventListener('pointerup',arm,true); document.addEventListener('pointerdown',next,{capture:true,once:true}); };
+  document.addEventListener('click',eat,true); addEventListener('pointerup',arm,true);
+  t=setTimeout(done,SWALLOW_MAX_MS);
 }
 function closeMenuPop(refocus){
   document.querySelectorAll(MENU_SEL).forEach((m)=>m.remove());
@@ -47,7 +52,7 @@ function closeMenuPop(refocus){
 function armMenuPop(anchor){
   _menuAnchor=anchor||null;
   // iOS Safari fires no click for a tap on a plain element (a title, text): the outside tap is seen at pointerdown.
-  _menuOutside=(ev)=>{ if(ev.target.closest('.cmenu-pop')) return; ev.stopPropagation(); closeMenuPop(); swallowClick(ev.target); };
+  _menuOutside=(ev)=>{ if(ev.button>0||ev.target.closest('.cmenu-pop')) return; ev.stopPropagation(); closeMenuPop(); swallowClick(ev.target); };   // primary button / touch / pen only
   setTimeout(()=>{ if(_menuOutside) document.addEventListener('pointerdown',_menuOutside,true); },0);
   addEventListener('keydown',menuKey,true); addEventListener('blur',menuBlur);
   if(_menuAnchor) _menuWatch=setInterval(()=>{ if(_menuAnchor&&anchorGone(_menuAnchor)) closeMenuPop(); },MENU_WATCH_MS);
@@ -55,7 +60,9 @@ function armMenuPop(anchor){
 // A menu that would run off the bottom opens ABOVE its ⋯ instead (its rows are 44px tall now).
 function flipMenuUp(m,r){ const h=m.getBoundingClientRect().height; if(r.bottom+4+h>innerHeight-6) m.style.top=Math.max(6,r.top-4-h)+'px'; }
 // Leaving or changing the app (goHome, openApp) closes every popover AND the Publish sheet: neither belongs to the next page.
-function closeAllPops(){ closeMenuPop(); const s=document.getElementById('pubSheet'); if(s) s.remove(); }
+// _popGen: a reply that arrives after the user moved on (a slow Publish preview) must not open a sheet then.
+let _popGen=0; function popGen(){ return _popGen; }
+function closeAllPops(){ _popGen++; closeMenuPop(); const s=document.getElementById('pubSheet'); if(s) s.remove(); }
 // The Publish sheet (web/publish.js) has ✕ · Close; Escape closes it too.
 addEventListener('keydown',(e)=>{ const s=document.getElementById('pubSheet'); if(e.key==='Escape'&&s&&!menuOpen()) s.remove(); });
 // The app bar's own popovers: a ⋯ menu anchored in it, and its Aa (web/home-look.js). barHide() closes them;

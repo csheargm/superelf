@@ -80,7 +80,9 @@ const PAPublish=(()=>{
     notice(j.status); if(TERMINAL.has(j.status.state)) markSeen(slug,j.status); else watch(slug);
   }
   async function open(slug){
+    const gen=typeof popGen==='function'?popGen():0;   // web/popover.js: the user left the app meanwhile → no stale sheet
     const r=await post(slug,{preview:true}); const j=await r.json().catch(()=>({error:'回复无效 · Bad answer'}));
+    if(typeof popGen==='function'&&gen!==popGen()) return;
     if(j.code==='TOKEN_MISSING') return tokenNeeded(j);
     if(!j.preview) return sheet(`<p id="pubFail">${esc(j.error||'发布失败 · Publish failed')}</p>`);
     const p=j.preview;

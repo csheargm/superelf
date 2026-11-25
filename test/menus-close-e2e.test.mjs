@@ -16,7 +16,10 @@ import { hashPassword } from '../lib/auth.mjs';
 
 const SHOTS = process.env.PA_SHOTS || '';
 const ENGINE = process.env.PA_E2E_ENGINE || 'chromium';
-const PAGE = '<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;height:100vh"><h1 id="t">Todo</h1></body></html>';
+// The page cancels its presses the way the Journal pad does: no focus moves into the frame, so only the
+// app's {pa:'shell',type:'tap'} message can tell the shell (the frame-tap path must not pass by focus / blur).
+const PAGE = '<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;height:100vh"><h1 id="t">Todo</h1>'
+  + '<script>for(const ev of ["mousedown","touchstart"]) addEventListener(ev,(e)=>e.preventDefault(),{passive:false});</script></body></html>';
 const IDLE_PAST_MS = 3500;   // past the shell bar's BAR_IDLE_MS (2.5 s)
 const DEVICES = [
   { name: 'desktop', viewport: { width: 1280, height: 800 }, touch: false },
@@ -141,3 +144,15 @@ for (const dev of DEVICES) {
     } finally { await ctx.close(); }
   });
 }
+
+test('a Publish preview that answers after the user left opens no sheet', { skip }, async () => {
+  const dev = DEVICES[0]; const { ctx, page } = await signIn(dev);
+  try {
+    await page.route('**/publish**', async (r) => { await new Promise((res) => setTimeout(res, 1500)); await r.continue(); });
+    await openFrameMenu(page, dev);
+    await page.locator('#frameMenu [data-a="publish"]').click();
+    await page.evaluate(() => goHome());
+    await page.waitForTimeout(2500);
+    assert.equal(await page.locator('#pubSheet').count(), 0, 'no stale sheet over Home');
+  } finally { await ctx.close(); }
+});
