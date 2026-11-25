@@ -503,7 +503,7 @@ function renderJobDraft(d){
 }
 const schedText=(s)=> !s||!s.time ? '—' : (s.day===undefined ? '每日 · daily '+s.time
   : ['Sun 周日','Mon 周一','Tue 周二','Wed 周三','Thu 周四','Fri 周五','Sat 周六'][s.day]+' '+s.time);
-function renderMsgs(msgs){ $('#log').innerHTML=''; let lastU=''; for(const m of (msgs||[])){ if(m.role==='md'){ const el=add('','',renderMd(m.text)); addActions(el,'response',m.text,lastU); addTook(el,m.ms,m.by); /* the stored duration — reopening a chat keeps it */ } else { const el=add(m.role,m.text); if(m.role==='me'){ lastU=m.text; addActions(el,'prompt',m.text); renderAtts(el,m.attachments); } } } }
+function renderMsgs(msgs){ $('#log').innerHTML=''; let lastU=''; for(const m of (msgs||[])){ if(m.role==='md'){ const el=add('','',renderMd(m.text)); addActions(el,'response',m.text,lastU); addTook(el,m.ms,m.by); /* the stored duration — reopening a chat keeps it */ if(m.selfpub) PASelfPub.attach(el,m.selfpub); /* 发布 · Publish again on reopen (docs/adr/0044) */ } else { const el=add(m.role,m.text); if(m.role==='me'){ lastU=m.text; addActions(el,'prompt',m.text); renderAtts(el,m.attachments); } } } }
 let allConvos=[];
 async function loadConvos(){
   let list=[]; try{ list=await (await api('/api/convos')).json(); }catch{}
@@ -2545,7 +2545,7 @@ async function sendTurn(q){
   $('#box').value=''; paintSendBtn();   // emptied by code, no input event: Stop shows now
   const shown=q||(attachments.length?`[${attachments.length} file(s)]`:'');
   const userEl=add('me',shown); if(q) addActions(userEl,'prompt',q); renderAtts(userEl,fileAtts);
-  const status=add('status',''); let out=null, acc='', rlast=0;
+  const status=add('status',''); let out=null, acc='', rlast=0, spEv=null;
   status.innerHTML='<span class="pa-think"><i></i><i></i><i></i></span><span class="pa-lbl"></span><b class="pa-el"></b>';
   const setLbl=(t)=>{ const e=status.querySelector('.pa-lbl'); if(e) e.textContent=t||''; };
   const sendTime=Date.now();
@@ -2598,12 +2598,14 @@ async function sendTurn(q){
         // press Create — the same review-before-it-can-message-you rule the editor follows.
         if(j.type==='app-made') openApp(j.uid,j.slug,j.title);   // demo: the app the server just built (lib/demo-app.mjs)
         if(j.type==='job-draft'){ stopEl(); status.remove(); renderJobDraft(j); }
+        if(j.type==='selfpub') spEv=j;   // 改 superelf (docs/adr/0044): 发布 · Publish under this reply, or a typed publish's preview
         if(j.type==='error'){ stopEl(); status.remove(); add('err','⚠ '+j.text); }
         if(j.type==='done'){
           stopEl(); status.remove(); if(!out) out=add('','');
           const txt=j.text||acc; out.className='msg';
           out.innerHTML=renderMd(txt); addActions(out,'response',txt,lastPromptText);
           addTook(out,Date.now()-sendTime,j.by);   // kept with the answer, not just while waiting
+          if(spEv) PASelfPub.handle(out,spEv);
           $('#log').scrollTop=$('#log').scrollHeight; loadApps();
         }
       }
@@ -2676,6 +2678,7 @@ scrollBtn.onclick=()=>{ logEl.scrollTo({top:logEl.scrollHeight,behavior:'smooth'
 // (full reload → new page boot → data loaded). Cleared once the boot loaders settle.
 $('#reload').onclick=()=>{ try{ sessionStorage.setItem('pa_refreshing','1'); }catch{} $('#reload').classList.add('spin'); location.reload(); };
 /* PA_PUBLISH_JS */
+/* PA_SELFPUB_JS */
 /* PA_APP_EDIT_JS */
 PAAppEdit.bindBar();
 /* PA_UPDATE_JS */   /* TODO(R4 seam): the boot block below (reload, loaders, new-feature dots) belongs in web/boot.js like app-frame.js */

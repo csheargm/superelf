@@ -808,3 +808,11 @@ user's app (not in the repo) has no "send my change to its author" path; the lin
 - A floating window has no keyboard path back to a dock (Alt+arrow moves it; docking is by drag or the snap targets).
 - With both side docks capped (left+right > 60%), dragging a divider outward can first narrow that dock (the cap rescales both).
 - PAAppPrefs: if a patch fails during its own re-read, its local overlay stays; a later layout save may carry a stale copy of another device class.
+
+## Core Publish (ADR 0044) — GPT review leftovers (2026-11-25)
+- Retry after a partial publish: ref created but PR failed, or CI timed out, gives BRANCH_EXISTS on the next tap; merged-but-unreleased (`merged`) has no resume-at-release step.
+- "Live" is matched by version string and stays latched: a later release that skipped this one's timer run, or a rollback, is not reflected. Needs the deployed revision from the self-deploy unit.
+- The VM self-deploy timer (ops/private) is outside the public repo: its release-tip CI, revision, health and rollback checks are unreviewed here.
+- The render check draws Home only, with a fake empty owner (lib/selfpub/render.mjs): a change visible only inside an app or with real data is not seen. Seam: render the changed app page too.
+- Stale-lock reclaim is check-then-unlink: two processes that both see the dead pid can both proceed. The node runs one server process; an O_EXCL rename-based reclaim is the fix if that changes.
+- API-key refusal on /api/selfpub follows apiKeyBlocked (accounts with a PIN). An owner with no PIN signs in by that key, so it cannot be refused without locking them out; set a PIN to close it.

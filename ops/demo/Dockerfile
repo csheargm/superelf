@@ -18,6 +18,20 @@ RUN if [ -n "$AGENT_CLIS" ]; then \
            "$b" --version >/dev/null || { echo "$c installed but '$b --version' fails (optional native package missing? disk full?)" >&2; exit 1; }; \
          done; \
     fi
+# RENDER_BROWSER (the private owner node only): a playwright-core version. Installs it and the Chromium
+# headless shell (the smallest Chromium Playwright ships) under /opt/render, so the core lane can render a
+# changed page at iPhone width before it replies (lib/selfpub/render.mjs, docs/adr/0044). Empty for the
+# demo. The launch at the end proves the browser starts in this image.
+ARG RENDER_BROWSER=
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/render/browsers SELFPUB_PLAYWRIGHT=/opt/render/node_modules/playwright-core/index.mjs
+RUN if [ -n "$RENDER_BROWSER" ]; then \
+      case "$RENDER_BROWSER" in *[!0-9.]*) echo "RENDER_BROWSER must be a version like 1.58.2" >&2; exit 1;; esac \
+      && mkdir -p /opt/render && cd /opt/render && echo '{"private":true}' > package.json \
+      && npm install --no-fund --no-audit "playwright-core@$RENDER_BROWSER" \
+      && node node_modules/playwright-core/cli.js install --with-deps --only-shell chromium \
+      && npm cache clean --force && rm -rf /var/lib/apt/lists/* \
+      && node -e 'import(process.env.SELFPUB_PLAYWRIGHT).then(async (m) => { const b = await m.chromium.launch(); await b.close(); })'; \
+    fi
 WORKDIR /opt/superelf
 COPY . /opt/superelf
 # The repo's built-in app pages go to builtin-apps/, NOT workspace/ or shared-apps/: the entrypoint copies the

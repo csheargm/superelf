@@ -55,7 +55,8 @@ test('agentArgs delegates to the ONE lane resolver, with the operator\'s member_
   assert.ok(fn, 'agentArgs exists');
   // WHO is unrestricted, and what a confined lane may do, are decided in ONE place
   // (lib/agent-origin.mjs laneArgs). Pinned end to end in test/app-agent-*.test.mjs.
-  assert.match(fn[1], /^\s*\{\s*return laneArgs\(user, base, cfg\.member_args, origin\);\s*$/, 'agentArgs is only the delegation');
+  // The one addition (docs/adr/0044): the owner's unrestricted lane never edits served code.
+  assert.match(fn[1], /^\s*\{\s*const args = laneArgs\(user, base, cfg\.member_args, origin\);\s*return agentConfined\(user, origin\) \? args : \[\.\.\.args, \.\.\.ownerCodeDenies\(ROOT, selfpubRoot\(cfg\)\)\];[^\n]*\s*$/, 'agentArgs is the delegation plus the served-code denies');
 });
 
 test('laneArgs behaves, driven directly', () => {

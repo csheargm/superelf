@@ -21,8 +21,21 @@ PRIVATE=; [[ "${SUPERELF_PRIVATE:-}" == 1 ]] && PRIVATE=1
 mkdir -p "$NODE_DIR"
 # Code folders are replaced whole, so a file the image no longer has (a removed seed app) is gone
 # too; visitor data lives elsewhere in the folder and is never touched.
-for d in lib web tools workspace.example bible-data ops builtin-apps; do rm -rf "${NODE_DIR:?}/$d"; done
+CODE_DIRS=(lib web tools workspace.example bible-data ops builtin-apps)
+CODE_FILES=(web.mjs superelf.md package.json version-notes.json REVISION backup.sh restore.sh)
+# The private node made them read-only last start (below): writable again so they can be replaced.
+for d in "${CODE_DIRS[@]}"; do [[ -e "$NODE_DIR/$d" ]] && chmod -R u+w "$NODE_DIR/$d"; done
+for f in "${CODE_FILES[@]}"; do [[ -e "$NODE_DIR/$f" ]] && chmod u+w "$NODE_DIR/$f"; done
+for d in "${CODE_DIRS[@]}"; do rm -rf "${NODE_DIR:?}/$d"; done
 tar -C /opt/superelf -cf - . | tar -C "$NODE_DIR" -xf -
+# Private: the served code is read-only on disk (superelf docs/adr/0044, owner decision 2026-11-25): the owner's
+# main-chat agent changes superelf only through the core lane + Publish. Node data and config stay writable.
+# Same uid, so this stops edits by mistake (and every shell write the agent tries), not a deliberate chmod;
+# the agent's args deny these paths too (lib/agent-origin.mjs ownerCodeDenies).
+if [[ -n "$PRIVATE" ]]; then
+  for d in "${CODE_DIRS[@]}"; do [[ -e "$NODE_DIR/$d" ]] && chmod -R a-w "$NODE_DIR/$d"; done
+  for f in "${CODE_FILES[@]}"; do [[ -e "$NODE_DIR/$f" ]] && chmod a-w "$NODE_DIR/$f"; done
+fi
 chmod 700 "$NODE_DIR"   # tar's "." entry resets it to the image's 755; visitor data is private
 SEED=/opt/superelf/ops/demo/config.demo.json; [[ -n "$PRIVATE" ]] && SEED=/opt/superelf/ops/private/config.private.json
 [[ -f "$NODE_DIR/config.json" ]] || cp "$SEED" "$NODE_DIR/config.json"

@@ -42,6 +42,7 @@ const PAPublish=(()=>{
     const off=!!(repo&&repo.upToDate); b.disabled=off;   // also turns on the owner's copy item held off in item()
     b.style.opacity=off?'.5':''; b.style.pointerEvents=off?'none':'';   // a tap on the line text must not reach the menu's handler
     // The line arrives after the menu was placed: keep the menu's bottom on screen.
+    const pm=b.closest('.cmenu-pop'); if(pm&&pm._paAnchor&&pm._paAnchor.isConnected) placeMenu(pm,pm._paAnchor);   // wider now: never past the left edge (menu-anchor-e2e, 390)
     const m=b.closest('#appMenu'); if(m&&m.style.top){ const over=m.getBoundingClientRect().bottom-(innerHeight-6); if(over>0) m.style.top=Math.max(6,parseFloat(m.style.top)-over)+'px'; }
   }
   // armTip(slug) runs each time the owner's ⋯ menu opens: it also shows a publish result the owner
@@ -107,5 +108,5 @@ const PAPublish=(()=>{
     // ONE handler, replaced on every sheet (sheet() resets onclick): a stale preview can never publish.
     const close=s.onclick; s.onclick=(e)=>{ if(e.target.closest('[data-pub="go"]')){ s.onclick=null; go(slug,p.hash); } else close(e); };
   }
-  return { item, armTip, open, stateText, copyText, WAIT_TEXT, WHAT_TEXT, MEMBER_FORK_LINE };
+  return { item, armTip, open, stateText, copyText, sheet, hitsHtml, tokenNeeded, WAIT_TEXT, WHAT_TEXT, MEMBER_FORK_LINE };   // sheet/hitsHtml/tokenNeeded: also core Publish (web/selfpub.js, R3)
 })();
