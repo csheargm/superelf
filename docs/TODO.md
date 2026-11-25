@@ -760,3 +760,6 @@ Without it they now FAIL (R14), not pass as `# pass 0 / # fail 0`. To run them:
 - The member build prompt's contract says "exactly two blocks" while the turn asks for a sentence first; a model that obeys the contract gets the generic "Changed" line.
 - PASnap pins fixed bars in page coordinates; a fixed bar inside a positioned wrapper is shifted by the wrapper's offset.
 - The change count is max(removed, added) after an LCS: changes at two places that balance can read lower.
+
+## App chat self-test round 2 · known limits (GPT review r3, cap reached)
+- The kept lane-routing status (web.mjs laneStatus, `keep: true`) stays in the log even when that lane returns blank and the one retry falls back to the agent lane; the fallback's own notice is transient. Seam: emit the fallback notice with `keep: true` too, or retract the first one.

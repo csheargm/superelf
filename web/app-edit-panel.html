@@ -94,7 +94,7 @@ var PAShotFresh={
     if(typeof m.prefill==='string'&&m.prefill.trim()) chat.prefill(m.prefill);   // the request the app's chat could not carry out
     if(typeof m.gen==='number') gen=m.gen;
     if(m.shot&&m.shot.path) addShot(m.shot);
-    else setTimeout(()=>note(NO_SHOT,'noShot'),0);
+    else if(m.snap) setTimeout(()=>note(NO_SHOT,'noShot'),0);   // a lane that cannot see pictures was given none on purpose
     if(m.tip) setTimeout(()=>note(TIP,'aeTip'),0);   // first-use tip, once (the shell remembers it)
     if(m.snap&&m.camTip) setTimeout(()=>note(CAM_TIP,'aeCamTip'),0);   // the camera's own tip, once
   }

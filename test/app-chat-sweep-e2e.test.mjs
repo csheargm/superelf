@@ -60,7 +60,7 @@ test('F1 + F8: a member\'s question is answered (streamed, no "not changed" note
   convo = ev.find((e) => e.convoId)?.convoId || ev.find((e) => e.type === 'convo')?.id;
   assert.match(streamed(ev), /记待办/, `the answer reaches the bubble: ${JSON.stringify(ev)}`);
   assert.ok(!streamed(ev).includes(EDIT_UNCHANGED_NOTE) && !done(ev).text.includes(EDIT_UNCHANGED_NOTE), 'a question is not a false change claim');
-  assert.ok(ev.some((e) => e.type === 'status' && e.text.startsWith(PLAIN_LANE_STATUS)), 'F8: the plain-lane status');
+  assert.ok(ev.some((e) => e.type === 'status' && e.text.startsWith(PLAIN_LANE_STATUS) && e.keep === true), 'F8: the plain-lane status, kept in the log (round 2)');
   assert.equal(done(ev).by, 'Claude', 'F8: the model under the reply');
 });
 

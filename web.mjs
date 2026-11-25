@@ -1476,7 +1476,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
   if (ml.status) laneStatus = ml.status;
   chosen = edit ? (edit.scoped ? scopedLane(model ? ml.lane : null) : null) : ml.lane;   // the owner's edit turn needs tools (the agent lane, null); a member's is the no-tools lane (Claude; an Ollama model only when the user picked one)
   if (edit) laneStatus = edit.scoped && !agentAllowed(user) ? `${PLAIN_LANE_STATUS} — ${chosen.label || 'Claude'}` : '';   // a member's app chat says its lane too (self-test F8)
-  if (laneStatus) line({ type: 'status', text: laneStatus });
+  if (laneStatus) line({ type: 'status', text: laneStatus, keep: true });   // keep: the panel leaves it in the log, the answer does not overwrite it (self-test round 2)
   let fellBack = false;   // lib/chat-outcome.mjs: ONE retry on the agent lane for an app turn a fast lane left blank
   let editCtx = null;   // the undo copy of an edit turn; checked in the catch too, so a crashed turn never leaves a broken app
   try {

@@ -80,15 +80,16 @@ const PAAppEdit=(()=>{
     if(frameSlug()!==slug||frameUid()!==UID){ openApp(UID,slug,title); await loaded(); }
     if(!canEdit()) return;
     close(); const my=++openSeq;
-    const g0=gen, at0=Date.now(), shot=await upload(slug,await snap(),g0,at0);
+    const sees=ROLE==='owner';   // a member's lane cannot see pictures (lib/app-edit-lane.mjs): no auto-shot, no camera, no camera tip (self-test round 2)
+    const g0=gen, at0=Date.now(), shot=sees?await upload(slug,await snap(),g0,at0):null;
     if(my!==openSeq||!canEdit()||frameSlug()!==slug) return;   // Home, another app or another open came first
     S=build(slug,title||$('#ftitle').textContent||slug); layout(); addEventListener('resize',layout);
     const me=S;
     try{ const r=await api('/api/app-edit/panel'); if(!r.ok) throw new Error('HTTP '+r.status); const html=await r.text(); if(S!==me) return; me.fr.srcdoc=html; }
     catch(err){ if(S===me) me.el.querySelector('#aeTitle').textContent='面板加载失败 · The panel did not load: '+((err&&err.message)||''); return; }
     if(S!==me) return;
-    S.fr.addEventListener('load',()=>{ if(S!==me) return; const tip=onceTip(CHAT_TIP_KEY), camTip=onceTip(CAM_TIP_KEY);   // the one-time tips, shown in the panel
-      me.fr.contentWindow.postMessage({pa:'edit-init',slug,title:me.title,shot,tip,camTip,snap:true,gen,prefill:typeof prefill==='string'?prefill.slice(0,2000):''},'*'); },{once:true});
+    S.fr.addEventListener('load',()=>{ if(S!==me) return; const tip=onceTip(CHAT_TIP_KEY), camTip=sees&&onceTip(CAM_TIP_KEY);   // the one-time tips, shown in the panel
+      me.fr.contentWindow.postMessage({pa:'edit-init',slug,title:me.title,shot,tip,camTip,snap:sees,gen,prefill:typeof prefill==='string'?prefill.slice(0,2000):''},'*'); },{once:true});
   }
   // Any new document in #fr (the app reloading or navigating itself, not only Apply/Undo) makes earlier shots stale.
   document.addEventListener('load',(e)=>{ if(e.target&&e.target.id==='fr') bumpGen(); },true);
