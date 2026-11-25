@@ -31,7 +31,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px 
 <script>
 (function(){
   let chat=null, inited=false;
-  const note=(t,id)=>{ const log=document.querySelector('.pac-log'); if(!log) return; const d=document.createElement('div'); d.className='pac-m status'; if(id) d.id=id; d.textContent=t; log.appendChild(d); };
+  const note=(t,id)=>{ if(chat) chat.note(t,id); };   // PAChat's own status line: pinned above the composer row
   const TIP='新：这里可以提问，也可以直接让它改这个应用 · New: ask here, or ask it to change this app';
   const NO_SHOT='未能自动截图，请用 ＋ 添加照片或截屏 · Could not capture the screen — add a photo or a screenshot with ＋';
   function mount(m){

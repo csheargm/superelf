@@ -115,8 +115,23 @@ async function sendInPanel(page, text) {
   await p.locator('.pac-inp').fill(text); await p.locator('.pac-go').click();
 }
 
+// A status line (Done, Undone) is never under the composer row's chips/pills (owner report 2026-11-24).
+async function assertStatusClear(p, text) {
+  const st = p.locator('.pac-m.status', { hasText: text }).last();
+  await st.waitFor({ timeout: 15000 });
+  const r = await st.evaluate((el) => {
+    const a = el.getBoundingClientRect(), log = el.closest('.pac-log').getBoundingClientRect();
+    const hits = [...document.querySelectorAll('.pac-row .pac-vfy, .pac-row .pac-model, .pac-row .pac-chip, .pac-row .pac-frow')]
+      .filter((b) => b.offsetParent !== null).map((b) => ({ c: b.className, r: b.getBoundingClientRect() }))
+      .filter(({ r: b }) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom).map((h) => h.c);
+    return { hits, inLog: a.top >= log.top - 1 && a.bottom <= log.bottom + 1, w: document.documentElement.clientWidth };
+  });
+  assert.deepEqual(r.hits, [], `the "${text}" status line is not overlapped (panel width ${r.w}px)`);
+  assert.ok(r.inLog, `the "${text}" status line is inside the visible log`);
+}
+
 test('long-press the title → panel docks beside the app with its picture; a change reloads the app; Undo restores it', { skip, timeout: 90000 }, async () => {
-  const { ctx, page } = await signIn({ width: 1280, height: 800 });
+  const { ctx, page } = await signIn({ width: 1568, height: 721 });   // the owner's live report: desktop Chrome
   await longPressTitle(page);
   assert.equal(await page.locator('#aePanel').getAttribute('class'), 'side');
   const fr = await page.locator('#frame').boundingBox(), pn = await page.locator('#aePanel').boundingBox();
@@ -160,6 +175,9 @@ test('long-press the title → panel docks beside the app with its picture; a ch
   await page.locator('#aeUndo').waitFor({ state: 'visible', timeout: 20000 });
   assert.deepEqual(await p.locator('.pac-m.me').evaluateAll((els) => els.map((e) => e.textContent.trim()).filter((t) => t.startsWith('改'))), ['改 · Apply'], 'the tap shows as 改 · Apply, never its confirm id');
   await p.locator('text=已完成 · Done').waitFor({ timeout: 15000 });   // said only after the reload loaded
+  await p.locator('text=改动：index.html 1 行 · Changed: 1 line in index.html').waitFor();   // the server's account, from the diff
+  assert.match(await p.locator('.pac-log').innerText(), /现在是 · Now:\s*.*color:rgb\(200, 0, 0\)/, 'the summary quotes the line as it now reads');
+  await assertStatusClear(p, '已完成 · Done');
   await page.frameLocator('#fr').locator('#t').waitFor();
   for (let i = 0; i < 50 && (await titleColor(page)) !== 'rgb(200, 0, 0)'; i++) await page.waitForTimeout(200);
   assert.equal(await titleColor(page), 'rgb(200, 0, 0)', 'the app reloaded in place with the change');
@@ -168,7 +186,8 @@ test('long-press the title → panel docks beside the app with its picture; a ch
   await page.click('#aeUndo');
   for (let i = 0; i < 50 && (await titleColor(page)) === 'rgb(200, 0, 0)'; i++) await page.waitForTimeout(200);
   assert.notEqual(await titleColor(page), 'rgb(200, 0, 0)', 'undo put the old app back');
-  await p.locator('text=已撤销').waitFor();
+  await assertStatusClear(p, '已撤销');
+  await shot(page, 'cta-undone-desktop');
   // A change that breaks the app is not applied, and the reply says so.
   await sendInPanel(page, 'break it');
   await p.locator('.pac-change-app:not([disabled])', { hasText: '改 · Apply' }).waitFor({ timeout: 20000 });
@@ -206,7 +225,8 @@ test('⋯ on the open app lists 改这个应用 first with a one-time tip; phone
 
 test('a member changes their OWN copy through the same chat: plan → Apply → reload → Done → Undo (no-tools lane)', { skip, timeout: 90000 }, async () => {
   const kidPage = path.join(root, 'ws-kid', 'apps', 'todo', 'index.html');
-  const { ctx, page } = await signIn({ width: 820, height: 1180 }, 'kid', 'kid-pass-12345');   // iPad width
+  for (const vp of [{ width: 820, height: 1180 }, { width: 390, height: 844 }]) {   // iPad, then phone (a bottom sheet)
+  const { ctx, page } = await signIn(vp, 'kid', 'kid-pass-12345');
   await openMore(page);   // ⋯ → 改这个应用 opens the same one chat
   await page.locator('#frameMenu button').first().click();
   await page.locator('#aePanel').waitFor();
@@ -220,11 +240,14 @@ test('a member changes their OWN copy through the same chat: plan → Apply → 
   for (let i = 0; i < 50 && (await titleColor(page)) !== 'rgb(200, 0, 0)'; i++) await page.waitForTimeout(200);
   assert.equal(await titleColor(page), 'rgb(200, 0, 0)', "the member's own app reloaded with the change");
   assert.equal(fs.readFileSync(path.join(root, 'workspace', 'apps', 'todo', 'index.html'), 'utf8'), PAGE, "the owner's app of the same name is untouched");
-  await shot(page, 'uac-member-ipad');
+  await shot(page, `uac-member-${vp.width}`);
   await page.click('#aeUndo');
   for (let i = 0; i < 50 && (await titleColor(page)) === 'rgb(200, 0, 0)'; i++) await page.waitForTimeout(200);
   assert.notEqual(await titleColor(page), 'rgb(200, 0, 0)', 'undo works for members too');
+  await assertStatusClear(p, '已撤销');
+  await shot(page, `uac-member-undone-${vp.width}`);
   await ctx.close();
+  }
 });
 
 test('the server refuses: an edit turn from an app, another\'s app, "change superelf" from a member, a forged Apply', { skip: false }, async () => {
