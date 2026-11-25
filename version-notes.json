@@ -1,4 +1,12 @@
 {
+  "v5.22.7": {
+    "date": "2026-11-25",
+    "features": [],
+    "fixes": [
+      "全量测试全部通过 · Full test suite green"
+    ],
+    "through": "78713447c7e60581806efc24a71a53faa8e26d2f"
+  },
   "v5.22.6": {
     "date": "2026-11-25",
     "features": [],
