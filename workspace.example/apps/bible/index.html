@@ -12,7 +12,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 html{font-size:calc(17px * var(--fs,1))}   /* A-/A+ scale, broadcast by the shell (pa:'prefs' fontScale) */
 body{display:flex;flex-direction:column}
 /* Nav */
-#nav{display:flex;align-items:center;gap:6px;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--card);flex-shrink:0}
+#nav{display:flex;align-items:center;gap:6px;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--card);flex-shrink:0;flex-wrap:wrap;row-gap:6px}   /* wraps when the 44px touch buttons do not fit (iPad 820) */
 #search-overlay{position:fixed;inset:0;background:var(--bg);z-index:30;display:none;flex-direction:column}
 #search-overlay.on{display:flex}
 #search-bar{display:flex;gap:6px;padding:calc(10px + env(safe-area-inset-top)) 12px 10px;border-bottom:1px solid var(--line);background:var(--card)}
@@ -24,7 +24,7 @@ body{display:flex;flex-direction:column}
 .sr-txt{font-size:14px;line-height:1.45}
 .sr mark,.sr b{background:color-mix(in srgb,var(--accent) 22%,transparent);border-radius:3px;padding:0 2px}
 .sl-hint{padding:24px 18px;color:var(--muted);font-size:14px;text-align:center}
-#book-sel{flex:1;min-width:0;font:inherit;font-size:14px;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+#book-sel{flex:1;min-width:96px;font:inherit;font-size:14px;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
 .ch-btn{background:var(--card);border:1px solid var(--line);border-radius:8px;width:36px;height:36px;font-size:20px;cursor:pointer;color:var(--text);display:flex;align-items:center;justify-content:center;flex-shrink:0}
 #ch-end{display:flex;gap:10px;justify-content:center;padding:18px 12px 28px}
 .ch-step{font:inherit;font-size:14px;font-weight:600;background:var(--bg);color:var(--accent);border:1px solid var(--line);border-radius:10px;padding:10px 16px;min-height:44px;cursor:pointer}

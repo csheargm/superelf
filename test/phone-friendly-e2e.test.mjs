@@ -59,6 +59,11 @@ function judge(where, m, bad) {
   for (const c of m.covered) if (/under div\.pat-tip/.test(c)) bad.push(`${where}: a tip covers ${c}`);
   if (m.smallTaps.length) bad.push(`${where}: taps under 44px ${m.smallTaps.slice(0, 6).join(', ')}${m.smallTaps.length > 6 ? ` (+${m.smallTaps.length - 6})` : ''}`);
 }
+// Round 2 (iPad 820 Bible): the 44px floor widened the nav, so the book picker shrank to 2px and A+ ran past the edge.
+const squeezed = (t) => t.evaluate(() => [...document.querySelectorAll('button,select,input,a[href],[role=button]')].filter((e) => {
+  const r = e.getBoundingClientRect(), s = getComputedStyle(e);
+  return r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden' && r.top < innerHeight && (r.right > innerWidth + 1 || (r.width > 0 && r.width < 12));
+}).map((e) => (e.id || e.className || e.tagName) + ' ' + Math.round(e.getBoundingClientRect().width) + 'px'));
 async function tipsClear(where, t, bad) {
   const [h, tips] = [await heads(t), await tipRects(t)];
   for (const tip of tips) for (const r of h) if (overlaps(tip, r)) bad.push(`${where}: tip ${tip.id} covers a title/header`);
@@ -88,6 +93,7 @@ for (const [dev, viewport] of Object.entries(DEVICES)) test(`${dev}: shell + eve
       if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `${dev}-${slug}.png`) });
       assert.ok(m.controls + m.inputs > 0, `${slug}: the scan saw controls (R14)`);
       judge(`${dev} ${slug}`, m, bad); await tipsClear(`${dev} ${slug}`, fr, bad);
+      for (const c of await squeezed(fr)) bad.push(`${dev} ${slug}: control squeezed or past the edge ${c}`);
       // A SHELL tip over the open app (audit #2: the home ⋯ tip sat on every app's title bar): measured in the
       // app's own coordinates, against the app's titles and controls.
       const box = await page.locator('#fr').boundingBox(), shellTips = await tipRects(page);
