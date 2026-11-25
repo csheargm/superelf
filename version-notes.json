@@ -1,4 +1,12 @@
 {
+  "v5.18.1": {
+    "date": "2026-11-24",
+    "features": [],
+    "fixes": [
+      "登录链接说清楚 · Sign-in link explains itself"
+    ],
+    "through": "cad19a388f5364dba6dd2c4347f1a7586f5161c6"
+  },
   "v5.18.0": {
     "date": "2026-11-24",
     "features": [
