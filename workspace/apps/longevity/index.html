@@ -382,7 +382,20 @@ function goTab(name){
   document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   document.querySelector(`nav button[data-tab="${name}"]`).classList.add('active');
+  if(name==='ask') fitChat();
 }
+// Phone: the chat box ends at the bottom of the visible area (keyboard included), so its
+// composer is in view instead of sitting under a fixed 70vh box (phone audit #22). Measured, not
+// hard-coded: the nav and title above it vary with font size.
+const PHONE_MAX_W=600, CHAT_GAP=12, CHAT_MIN_H=320;
+function fitChat(){
+  const el=document.getElementById('lv-chat');
+  if(innerWidth>PHONE_MAX_W||!el.offsetParent){ el.style.height=''; return; }
+  const vh=(window.visualViewport&&visualViewport.height)||innerHeight;
+  el.style.height=Math.max(CHAT_MIN_H, vh-el.getBoundingClientRect().top-CHAT_GAP)+'px';
+}
+addEventListener('resize',fitChat);
+if(window.visualViewport) visualViewport.addEventListener('resize',fitChat);
 document.querySelectorAll('nav button').forEach(btn=>{
   btn.addEventListener('click',()=>goTab(btn.dataset.tab));
 });
