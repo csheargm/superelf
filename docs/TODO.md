@@ -3,6 +3,12 @@
 Problems found while doing an asked-for task, not needed for that task. One line each; the task
 that found it in brackets. Pick from here; do not open a side session per item.
 
+## Ink on other fonts · 换字体后的手写 (fix/ink-reflow GPT review r1, 2026-11-25)
+- A font-size preference change on an open chapter now re-measures (memo keyed by font) and an enclosure accepts a font ratio up to 0.6, but an e2e at +20% to +40% still leaves some ovals at today's placement on some widths (the row breaks differ beyond the +/-3% tries); the font-independent anchor (character under each corner of the box) is the real fix.
+- MIN_LINE_S (0.6) lets a wide iPad line's writing run past a phone column; the canvas width is the text's scrollWidth, so the overflow is clipped, not scrollable.
+- Cost: a memo miss lays up to 7 hidden copies per candidate width; runNow measures each enclosed character on every reflow. Not yet measured on an ink-heavy long chapter.
+- Untagged old ink and the 中文-first line order (11-24) is not handled; the shared old-ink line choice may put verse 6's writing over the 中文 line.
+
 ## The way back to an app's chat · 回去的路 (fix/askai-survives, 2026-11-25)
 - lib/app-postcheck.mjs pageWipeProblems is a text heuristic: an alias (`const b = document.body; b.innerHTML = …`) or a runtime error on load is not seen; a headless load check on the node would catch both (the shell ⋯ and the <html>-hung Ask AI button are the backstop meanwhile).
 - Ask AI mount upgrade (GPT review r2, 2026-11-25): a page saved with the older body-hung mount keeps it, even after an edit (ensureAskAi leaves an existing mount alone), so its own body redraw still removes that button; the shell ⋯ (Change this app / Undo) is the way back there.

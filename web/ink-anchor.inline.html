@@ -103,6 +103,7 @@
 
   // ── Text measurement: a Range over the line's text nodes, global offset → (node, offset) ─────
   function textNodes(el,out){ for(const c of el.childNodes||[]){ if(c.nodeType===3) out.push(c); else if(c.nodeType===1) textNodes(c,out); } return out; }
+  // TODO(R4): over 300 lines; split the DOM measurer (measurer/textNodes/trimRange) into its own file.
   function measurer(line){
     const nodes=textNodes(line,[]), text=nodes.map(n=>n.data||n.nodeValue||'').join('');
     const at=i=>{ let k=i; for(const n of nodes){ const len=(n.data||n.nodeValue||'').length; if(k<=len&&(k<len||n===nodes[nodes.length-1])) return [n,k]; k-=len; } return [nodes[nodes.length-1],0]; };
@@ -114,7 +115,9 @@
     // A stored group's anchor: the run, or the union box when that is what its width `w` was measured on
     // (records written before the run, on a range that wrapped then too — a bracket down a long verse).
     const anchorRect=(s,e,w)=>{ const run=runRect(s,e), u=rangeRect(s,e); return !(w>0)||!run||!u||Math.abs(run.width-w)<=Math.abs(u.width-w)?run:u; };
-    return {text,rangeRect,runRect,anchorRect,charRect:i=>rangeRect(i,i+1)};
+    // Each character's own row (its box's top): a range's rects also hold a sliver at the next row's start.
+    const rowTops=(s,e)=>{ const out=[]; for(let i=s;i<e;i++){ const q=rangeRect(i,i+1); if(q&&q.width>0) out.push(q.top); } return out; };
+    return {text,rangeRect,runRect,anchorRect,rowTops,charRect:i=>rangeRect(i,i+1)};
   }
 
   // ── Store shape (the chapter file, beside the host's marks): one key per verse, as the host's

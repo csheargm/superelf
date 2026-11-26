@@ -39,14 +39,18 @@ test('handwriting goes on the line frame and moves as one block: same shape at e
   assert.ok(gs.every((g) => g.frame === 'line' && g.verse === 6 && g.lang === 'en'), 'every piece of the writing is on the line frame');
   const shape = rel(I), at0 = I.placements()[0].at;
   assert.deepEqual(at0, { ox: PADL + 4, oy: v.en.top + 6, s: 1 }, 'drawn where the pen went');
-  // a phone-width column (176px): the 316px-wide sentence is shrunk to fit, every piece by the same factor
-  setWidth(dom, 200);
+  // a phone-width column (206px): the 316px-wide sentence is shrunk to fit, every piece by the same factor
+  setWidth(dom, 230);
   const ps = I.placements().map((p) => p.at), s = ps[0].s;
   assert.ok(s < 1 && ps.every((a) => a.s === s), 'one scale for the whole block');
   assert.deepEqual(rel(I), shape, 'the shape of the writing is unchanged');
   const right = Math.max(...I.placements().map((p) => p.at.ox + 10 * p.at.s + p.g.strokes[0].w * p.at.s));
-  assert.ok(right <= 200 - PADL + 0.01, `fits the column (right edge ${right})`);
+  assert.ok(right <= 230 - PADL + 0.01, `fits the column (right edge ${right})`);
   assert.equal(ps[0].ox, PADL + 4 * s, 'anchored at the line\'s left');
+  // owner, iPhone 2026-11-25: never below MIN_LINE_S (readable), the writing runs past the column instead
+  setWidth(dom, 120);
+  assert.ok(I.placements().every((p) => p.at.s === dom.window.PAInkFrame.MIN_LINE_S), 'held at the floor scale');
+  assert.deepEqual(rel(I), shape, 'the shape still unchanged');
   // CONTROL: a wider screen never enlarges it
   setWidth(dom, 900);
   assert.deepEqual(I.placements()[0].at, at0, 'scale 1 and the same place on the line');
@@ -120,7 +124,8 @@ test('old records (one per stroke, pinned to words) are READ as one block: a let
 test('pure: placeLine shares one scale and never enlarges; joinsBurst needs time, the same line, small pieces, side by side', () => {
   const Fr = makeDom().window.PAInkFrame;
   const items = [{ fx: 0, fy: 0, ext: { w: 100, h: 10 } }, { fx: 300, fy: 5, ext: { w: 100, h: 10 } }];
-  assert.deepEqual(Fr.placeLine({ left: 10, top: 50 }, 200, items), [{ ox: 10, oy: 50, s: 0.5 }, { ox: 160, oy: 52.5, s: 0.5 }]);
+  assert.deepEqual(Fr.placeLine({ left: 10, top: 50 }, 320, items), [{ ox: 10, oy: 50, s: 0.8 }, { ox: 250, oy: 54, s: 0.8 }]);
+  assert.equal(Fr.placeLine({ left: 10, top: 50 }, 100, items)[0].s, Fr.MIN_LINE_S, 'never below the floor');
   assert.deepEqual(Fr.placeLine({ left: 10, top: 50 }, 2000, items)[1], { ox: 310, oy: 55, s: 1 }, 'never enlarged');
   const g = { verse: 1, lang: 'en' }, ext = { w: 10, h: 10 }, box = { l: 0, t: 0, r: 10, b: 10 };
   const prev = { g, t: 1000, ext, box: { l: 12, t: 0, r: 22, b: 10 } };

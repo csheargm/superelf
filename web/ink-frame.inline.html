@@ -74,11 +74,14 @@
     let w=0; for(const x of groups) if(sameLine(x,g)&&!isLine(x)&&wholeOf(x)&&x.w>w) w=x.w;
     return w>0?w:null;
   }
+  // A line's writing is never shrunk below this to fit a narrow column (owner, iPhone, 2026-11-25: ink
+  // written across a 1146px iPad line drew at 0.29x, too small to read); past it, it runs off the column.
+  const MIN_LINE_S=0.6;
   // Every line-frame item of ONE line placed: {fx,fy,ext} in, {ox,oy,s} out, all sharing one scale.
   // `line`: the line's top-left now; `colW`: the column's width now.
   function placeLine(line,colW,items){
     let right=0; for(const it of items) right=Math.max(right,it.fx+it.ext.w);
-    const s=right>0&&colW>0?Math.min(1,colW/right):1;
+    const s=right>0&&colW>0?Math.max(MIN_LINE_S,Math.min(1,colW/right)):1;
     return items.map(it=>({ox:line.left+it.fx*s,oy:line.top+it.fy*s,s}));
   }
   // A new stroke joins the writing in progress: same line, started soon after, both pieces small, and
@@ -131,6 +134,10 @@
   //    TAGGED when written — {bid, rel:[rx,ry,rk], ww} added, nothing else changed — and only moved on a
   //    column that is not the one it was written on (ww): there it keeps its written offset from the
   //    cluster's anchor (the record with this bid and no rel). Never re-measured, never guessed (fc2940c).
+  const FONT_EPS=0.003;   // a font ratio this close to 1 is the same font (sub-px rounding between engines)
+  const FONT_MAX=0.15;   // fonts differ by less than this; a bigger gap is another kind of record
+  const FONT_MAX_CHECKED=0.6;   // an enclosure re-verifies its run, so a font-size preference change may pass
+  const FONT_TRY=3;   // copies tried each side of W x font ratio
   const EPS_W=1;   // px: a column this close to the written one IS the written one (the drawing is untouched)
   function clusterOf(prev,now,g,ext,box){
     if(!(prev&&prev.g&&now-prev.t<=BURST_MS&&isSmall(prev.ext)&&isSmall(ext)&&gap(prev.box,box)<=NEAR)) return null;
@@ -207,7 +214,7 @@
   }
   function nowEncloses(g,el,env,w,key){
     const k=key+'@'+Math.round(w), m=env.nowMemo.get(g); if(m&&m.k===k) return m.v;
-    const v=!!env.enclosedAt(el,w,g); env.nowMemo.set(g,{k,v}); return v;
+    const v=!!env.enclosedAt(el,w,g,true); env.nowMemo.set(g,{k,v}); return v;
   }
   // placed: [{g,at,orphan}] after shiftClusters. Returns the SAME array unless an enclosure moved.
   function followEnclosures(placed,groups,env){
@@ -215,9 +222,9 @@
     for(const a of placed){
       if(!a.at||a.orphan||moved.has(a)||!isEnclosure(a.g)) continue;
       const el=env.lineEl(a.g.verse,a.g.lang); if(!el) continue;
-      const lr=env.local(el.getBoundingClientRect()), key=widthsOf(a.g,groups).join(','), memo=env.encMemo.get(a.g);   // keyed by the widths: new ink re-measures
+      const lr=env.local(el.getBoundingClientRect()), key=widthsOf(a.g,groups).join(',')+'|'+(env.fontKey?env.fontKey(el):''), memo=env.encMemo.get(a.g);   // keyed by the widths and font: new ink or a font change re-measures
       const enc=memo&&memo.key===key?memo.enc:encWritten(a.g,groups,el,env); if(!memo||memo.key!==key) env.encMemo.set(a.g,{key,enc});
-      if(!enc||Math.abs(env.colW(lr)-enc.W)<=EPS_W) continue;   // the written width: drawn exactly as stored
+      if(!enc||(enc.k===1&&Math.abs(env.colW(lr)-enc.W)<=EPS_W)) continue;   // the written width and fonts: drawn exactly as stored
       // No ww: W is a guess from other ink. If the record already encloses its words here, this may be the
       // written width (a one-row run measures the same at any width), so it is drawn as stored.
       if(a.g.ww==null&&nowEncloses(a.g,el,env,env.colW(lr),key)) continue;
@@ -238,28 +245,51 @@
   function env(o){
     const colW=lr=>Math.max(1,(o.container.clientWidth||o.container.getBoundingClientRect().width)-2*lr.left);
     const wholeOf=(g,el)=>{ const t=o.measurer(el).text, r=o.trimRange(t,{start:0,end:t.length}); return g.charStart===r.start&&g.charEnd===r.end; };
+    // This device's font against the one the ink was written in: a run's SUMMED width (runRect) does not
+    // depend on wrapping, only on the font. Owner, 2026-11-25: iPad ink re-laid at the iPad's width on a
+    // laptop with other fonts wrapped elsewhere, so the repair refused and the oval sat on the wrong words.
+    // The copy is laid at w x ratio, which wraps as the iPad did. ~1 (same fonts): exactly 1 (identity).
+    function fontRatio(el,s,e,gw,max){
+      const r=gw>0&&o.measurer(el).runRect(s,e), k=r&&r.width>0?r.width/gw:1;
+      return Math.abs(k-1)<=FONT_EPS||Math.abs(k-1)>(max||FONT_MAX)?1:k;   // past FONT_MAX: w was not a run (an old union box), not a font
+    }
     function measureAt(el,w,s,e,gw){
-      const c=w?el.cloneNode(true):el; if(w){ c.style.cssText='position:absolute;visibility:hidden;left:0;top:0;width:'+w+'px'; el.parentNode.appendChild(c); }
-      try{ const r=o.measurer(c).anchorRect(s,e,gw), cr=c.getBoundingClientRect(); return r&&r.width>0?{left:r.left-cr.left,top:r.top-cr.top}:null; }
+      const k=w?fontRatio(el,s,e,gw):1;
+      const c=w?el.cloneNode(true):el; if(w){ c.style.cssText='position:absolute;visibility:hidden;left:0;top:0;width:'+(w*k)+'px'; el.parentNode.appendChild(c); }
+      try{ const r=o.measurer(c).anchorRect(s,e,gw), cr=c.getBoundingClientRect(); return r&&r.width>0?{left:(r.left-cr.left)/k,top:(r.top-cr.top)/k}:null; }   // written units, as the stored dx/dy
       finally{ if(w) c.parentNode.removeChild(c); }
     }
     // An enclosure on a hidden copy of the line at width W: null unless its stored run measures g.w there
     // (W is not the written width) or no character's middle lies inside its box (none: an underline, a tick).
-    function enclosedAt(el,W,g){
-      const c=el.cloneNode(true); c.style.cssText='position:absolute;visibility:hidden;left:0;top:0;width:'+W+'px'; el.parentNode.appendChild(c);
+    // Returned in WRITTEN units (the stored strokes' px): {s,e,dx,dy,w,box,k}; k: the font ratio. raw: no
+    // font ratio (asks whether today's own layout at W is the written one).
+    // The ratio is a summed width, so a row's break can sit a few px either way: on another font the copy
+    // tries widths near W x ratio (FONT_TRY steps of 1%) and takes the first that reproduces the run.
+    function enclosedAt(el,W,g,raw){
+      const k=raw?1:fontRatio(el,g.charStart,g.charEnd,g.w,FONT_MAX_CHECKED);
+      if(k===1) return enclosedAtW(el,W,g,1);
+      for(let i=0;i<=FONT_TRY*2;i++){ const d=(i%2?1:-1)*Math.ceil(i/2)*0.01, r=enclosedAtW(el,W*(1+d),g,k); if(r) return r; }
+      return null;
+    }
+    function enclosedAtW(el,cw,g,k){
+      const c=el.cloneNode(true); c.style.cssText='position:absolute;visibility:hidden;left:0;top:0;width:'+(cw*k)+'px'; el.parentNode.appendChild(c);
       try{ const m=o.measurer(c), cr=c.getBoundingClientRect(); if(m.text.slice(g.charStart,g.charEnd)!==g.quote) return null;
-        const run=m.anchorRect(g.charStart,g.charEnd,g.w); if(!run||Math.abs(run.width-g.w)>EPS_W) return null;
-        const e=extentOf({strokes:g.strokes.map(st=>Object.assign({},st,{w:0}))}), l=run.left+g.dx, t=run.top+g.dy, box={l,t,r:l+e.w,b:t+e.h};
+        const run=m.anchorRect(g.charStart,g.charEnd,g.w*k); if(!run||Math.abs(run.width-g.w*k)>EPS_W*Math.max(1,k)) return null;
+        const e=extentOf({strokes:g.strokes.map(st=>Object.assign({},st,{w:0}))}), l=run.left+g.dx*k, t=run.top+g.dy*k, box={l,t,r:l+e.w*k,b:t+e.h*k};
         let s=-1,f=-1; for(let i=g.charStart;i<g.charEnd;i++){ const q=m.charRect(i); if(!q||!(q.width>0)) continue; const cx=q.left+q.width/2, cy=q.top+q.height/2;
           if(cy>=box.t&&cy<=box.b&&cx>=box.l&&cx<=box.r){ if(s<0) s=i; f=i+1; } }
         if(s<0) return null; const r=o.trimRange(m.text,{start:s,end:f}), nr=m.runRect(r.start,r.end); if(!nr) return null;
-        return {s:r.start,e:r.end,dx:l-nr.left,dy:t-nr.top,w:nr.width,box:{l:l-cr.left,t:t-cr.top,r:box.r-cr.left,b:box.b-cr.top}};
+        return {s:r.start,e:r.end,dx:(l-nr.left)/k,dy:(t-nr.top)/k,w:nr.width/k,k,box:{l:(l-cr.left)/k,t:(t-cr.top)/k,r:(box.r-cr.left)/k,b:(box.b-cr.top)/k}};
       }finally{ c.parentNode.removeChild(c); }
     }
     // The words on ONE row now, else null: one oval cannot ring two rows (it keeps today's placement).
-    const runNow=(el,s,e)=>{ const m=o.measurer(el), r=m.runRect(s,e), u=m.rangeRect(s,e); return r&&r.width>0&&u&&u.height<=r.height*1.5?o.local(r):null; };
-    return {lineEl:o.lineEl,local:o.local,colW,measureAt,wholeOf,extentOf,enclosedAt,runNow,memo:new WeakMap(),encMemo:new WeakMap(),nowMemo:new WeakMap()};
+    // Rows are the characters' own: a word ending a row also reports a sliver at the next row's start,
+    // which the union box (rangeRect) counts as a second row.
+    const runNow=(el,s,e)=>{ const m=o.measurer(el), r=m.runRect(s,e); if(!(r&&r.width>0)) return null;
+      const tops=m.rowTops(s,e); return tops.length&&Math.max(...tops)-Math.min(...tops)<=r.height*0.5?o.local(r):null; };
+    const fontKey=el=>{ const cs=getComputedStyle(el); return [cs.fontFamily,cs.fontSize,cs.letterSpacing,cs.lineHeight].join(';'); };
+    return {lineEl:o.lineEl,local:o.local,colW,fontKey,measureAt,wholeOf,extentOf,enclosedAt,runNow,memo:new WeakMap(),encMemo:new WeakMap(),nowMemo:new WeakMap()};
   }
-  window.PAInkFrame={env,NEAR,isSmall,bboxOf,isScrub,hitGroups,extentOf,SCRUB,ERASE_HIT,BURST_MS,SMALL,NEIGHBOR,isLine,sameLine,handwriting,writtenWidth,placeLine,joinsBurst,frameOf,places,toLine,EPS_W,clusterOf,relOf,widthChanged,shiftClusters,ENC_GAP,isEnclosure,followEnclosures};
+  window.PAInkFrame={env,NEAR,isSmall,bboxOf,isScrub,hitGroups,extentOf,SCRUB,ERASE_HIT,BURST_MS,SMALL,NEIGHBOR,isLine,sameLine,handwriting,writtenWidth,placeLine,joinsBurst,frameOf,places,toLine,EPS_W,MIN_LINE_S,clusterOf,relOf,widthChanged,shiftClusters,ENC_GAP,isEnclosure,followEnclosures};
 })();
 </script>
