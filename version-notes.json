@@ -1,4 +1,13 @@
 {
+  "v5.33.3": {
+    "date": "2026-11-26",
+    "time": "2026-11-26T20:40:02.369Z",
+    "features": [],
+    "fixes": [
+      "合并：分享/发布窗口更醒目（变暗背景、点背景关闭） · Merge: the Share/Publish sheet stands out (dimming scrim, tap outside closes)"
+    ],
+    "through": "d9c1f8e65a2c8b0e80e70bd111e8b296a033326f"
+  },
   "v5.33.2": {
     "date": "2026-11-26",
     "time": "2026-11-26T20:21:25.582Z",
