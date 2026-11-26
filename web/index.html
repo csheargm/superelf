@@ -382,6 +382,7 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
   <div class="pac-pills"><button class="pac-model" id="shellModel" type="button" style="display:none"></button><button class="pac-vfy" id="shellVfy" type="button" style="display:none">校验 · ☐ Verify</button></div>
   <div id="frow">
     <button class="ibtn" id="plus" type="button" title="附件 · Attach" aria-label="附件 · Attach" data-icon="plus"></button>
+    <button class="ibtn" id="cam" type="button"></button>   <!-- 📷 the main chat's camera (web/shell-cam.js) -->
     <input id="box" placeholder="提问，或：创建一个应用… · Ask, or: create an app that…" autocomplete="off">
     <button class="primary" id="send" type="button" title="发送 · Send" aria-label="发送 · Send" data-icon="up"></button>
   </div>
@@ -441,7 +442,7 @@ const esc=(s)=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt
 
 /* ── Conversations (server-backed, cross-device) ── */
 let convoId=localStorage.getItem('pa_convo')||null;
-function setConvo(id){ convoId=id; if(id) localStorage.setItem('pa_convo',id); else localStorage.removeItem('pa_convo'); }
+function setConvo(id){ convoId=id; if(window.PAShellCam) PAShellCam.cancel(); /* a capture in flight never lands in another chat */ if(id) localStorage.setItem('pa_convo',id); else localStorage.removeItem('pa_convo'); }
 let briefId=null;
 // Render uploaded-file attachments onto a message element. Images are fetched
 // with the auth header and shown via a blob URL (never a token in an <img src>).
@@ -2401,7 +2402,7 @@ function addActions(el,kind,rawText,prompt){
 let attachments=[]; // [{name, text?} | {name, path}]
 
 function renderChips(){
-  $('#chips').innerHTML=attachments.map((a,i)=>
+  $('#chips').innerHTML=attachments.map((a,i)=>a.thumb?PAShellCam.chipHtml(a,i,esc):
     `<div class="chip"><span>📎 ${esc(a.name)}</span><button onclick="removeChip(${i})">×</button></div>`
   ).join('');
 }
@@ -2715,6 +2716,9 @@ $('#reload').onclick=()=>{ try{ sessionStorage.setItem('pa_refreshing','1'); }ca
 /* PA_SELFPUB_JS */
 /* PA_APP_EDIT_JS */
 PAAppEdit.bindBar();
+/* PA_SHELL_CAM_JS */
+PAShellCam.bind({atts:()=>attachments,render:renderChips,say:(t)=>PAShellCam.say('⚠ '+t),
+  upload:(b)=>relayCall('/api/upload',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(b)},'raw')});
 /* PA_UPDATE_JS */   /* TODO(R4 seam): the boot block below (reload, loaders, new-feature dots) belongs in web/boot.js like app-frame.js */
 /* PA_SW_CLIENT_JS */
 /* PA_OFFLINE_JS */
@@ -2792,6 +2796,8 @@ const LOG_COMPOSER_GAP_PX=8;   // space between the last message and the compose
 // Must be a window property — a top-level const is NOT reachable as window._VER_NOTES.
 try{ window._VER_NOTES=JSON.parse(`<!--APP_NOTES-->`); }catch{ /* R5: raw file or bad embed → sheet shows its in-page empty message */ }
 </script>
+<script>var PASnapNoAnswer=true;</script>   <!-- the shell never answers a snap request: a page that frames it must not get a picture of it (GPT review) -->
+<!--PA_SNAP_UI-->   <!-- PASnap + PAShotFresh (web/snap.inline.html): the main chat camera draws with the app chat's engine -->
 <!--PA_TIPS_UI-->   <!-- PATips (web/tips.inline.html): after the shell script, before DOMContentLoaded registers the first tip -->
 </body>
 </html>
