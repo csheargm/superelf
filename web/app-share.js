@@ -13,7 +13,7 @@ const PAShare=(()=>{
     wait:'正在检查隐私并生成链接… · Checking for private data and making the link…',
     title:'分享链接 · Share link',
     how:'打开链接的人登录后会得到自己的一份副本，数据各自独立；以后你再分享，新来的人会拿到新版本 · Whoever opens it signs in and gets their own copy with their own data; share again later and newcomers get the new version',
-    copy:'复制 · Copy', copied:'已复制 · Copied', send:'发送 · Send', sent:'已发送 · Sent', email:'对方邮箱 · Their email',
+    copy:'复制 · Copy', copied:'已复制 · Copied', send:'发送 · Send', sent:'已发送 · Sent', email:'对方邮箱 · Their email', note:'附言（可不填）· Note (optional)',
     demoCopy:'演示版只能复制链接 · On the demo you can copy the link only',
     fail:'分享失败 · Share failed', joining:'正在为你复制应用… · Making your own copy…',
   };
@@ -31,15 +31,27 @@ const PAShare=(()=>{
     if(mine!==seq||!$('#shWait')) return;   // a newer Share, or the wait sheet was dismissed / the app switched: never reopen it
     if(!j||!j.ok) return PAPublish.sheet('<p id="shFail"><b>'+esc((j&&j.error)||L.fail)+'</b></p>'+(j&&j.hits?hitsLine(j.hits):''));
     const s=PAPublish.sheet('<p><b>'+L.title+'</b></p><div style="display:flex;gap:6px"><input id="shUrl" readonly style="flex:1;min-width:0;width:auto" value="'+esc(j.url)+'"><button type="button" id="shCopy" class="primary" style="flex:none;width:auto">'+L.copy+'</button></div>'
-      +(j.mail?'<form id="shMail" style="display:flex;gap:6px;margin-top:8px"><input id="shTo" type="email" required autocomplete="email" style="flex:1;min-width:0;width:auto" placeholder="'+L.email+'"><button type="submit" id="shSend" style="flex:none;width:auto">'+L.send+'</button></form><p id="shMailNote" style="font-size:12px;opacity:.7"></p>'
+      +(j.mail?'<form id="shMail" style="margin-top:8px"><textarea id="shNote" rows="2" maxlength="300" style="width:100%;box-sizing:border-box" placeholder="'+L.note+'"></textarea><div style="display:flex;gap:6px;margin-top:6px"><input id="shTo" type="email" required autocomplete="email" style="flex:1;min-width:0;width:auto" placeholder="'+L.email+'"><button type="submit" id="shSend" style="flex:none;width:auto">'+L.send+'</button></div></form><p id="shMailNote" style="font-size:12px;opacity:.7"></p>'
         :(demo()?'<p id="shDemoNote" style="font-size:12px;opacity:.7">'+L.demoCopy+'</p>':''))
       +'<p id="shHow" style="font-size:12px;opacity:.7">'+L.how+'</p>');
     const u=s.querySelector('#shUrl'), c=s.querySelector('#shCopy');
     c.onclick=async()=>{ try{ await navigator.clipboard.writeText(j.url); }catch(_){ u.select(); document.execCommand('copy'); /* no clipboard API (an old WebView): the selected text is copied */ } c.textContent=L.copied; };
-    const f=s.querySelector('#shMail'); if(f) f.onsubmit=async(ev)=>{ ev.preventDefault(); const n=s.querySelector('#shMailNote'), b=s.querySelector('#shSend'); b.disabled=true;
-      try{ const r=await post('/api/share/email',{id:j.id,to:s.querySelector('#shTo').value,name:j.name}); const k=await r.json(); n.textContent=k.ok?L.sent:(k.error||L.fail); }
+    const f=s.querySelector('#shMail'); if(f) mailForm(s,f,j);
+  }
+  // One tap = one email (owner report 2026-11-26: two identical emails): the button stays off while
+  // the send runs AND after it worked (its label says 已发送 · Sent); a new address or note is a new
+  // send with a new key. The key also makes the server send once (lib/app-share-mail.mjs sendOnce).
+  const newKey=()=>{ const a=new Uint8Array(16); crypto.getRandomValues(a); return Array.from(a,(x)=>x.toString(16).padStart(2,'0')).join(''); };
+  function mailForm(s,f,j){
+    const n=s.querySelector('#shMailNote'), b=s.querySelector('#shSend'), to=s.querySelector('#shTo'), note=s.querySelector('#shNote');
+    let key=newKey(), busy=false;
+    const fresh=()=>{ if(busy) return; key=newKey(); b.disabled=false; b.textContent=L.send; };
+    to.addEventListener('input',fresh); note.addEventListener('input',fresh);
+    f.onsubmit=async(ev)=>{ ev.preventDefault(); if(busy||b.disabled) return; busy=true; b.disabled=true;
+      let ok=false;
+      try{ const r=await post('/api/share/email',{id:j.id,to:to.value,name:j.name,note:note.value,key}); const k=await r.json(); ok=!!k.ok; n.textContent=ok?L.sent:(k.error||L.fail); }
       catch(e){ n.textContent=L.fail+': '+((e&&e.message)||''); }
-      b.disabled=false; };
+      busy=false; if(ok) b.textContent=L.sent; else b.disabled=false; };
   }
   // ---- the demo's receiving end -----------------------------------------------------------------
   function keep(){ try{ const q=new URLSearchParams(location.search), id=q.get('share'); if(id&&ID_RE.test(id)){ localStorage.setItem(PENDING,id); q.delete('share'); history.replaceState(null,'',location.pathname+(q.toString()?'?'+q:'')+location.hash); } return localStorage.getItem(PENDING); }
