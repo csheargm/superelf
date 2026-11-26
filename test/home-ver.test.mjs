@@ -114,6 +114,7 @@ function assertFooter(r, what) {
   assert.equal(r.lines, 1, `${what}: one line ${JSON.stringify(r)}`); assert.equal(r.overflowing, false, `${what}: not cut off`);
   assert.ok(r.h < r.lh * 2, `${what}: height ≈ one line`);
   assert.deepEqual(r.covered, [], `${what}: covers no control`); assert.ok(r.top >= r.listBottom - 1, `${what}: below the scrolling list`);
+  assert.ok(r.top - r.listBottom <= 8, `${what}: the list reaches down to the footer, no empty band (owner iPhone 2026-11-26) ${JSON.stringify(r)}`);
   assert.equal(r.hScroll, false); assert.doesNotMatch(r.text, /[\u4e00-\u9fff]/, 'English only');
 }
 async function owner(viewport, colorScheme) {
@@ -124,7 +125,7 @@ async function owner(viewport, colorScheme) {
   await page.goto(`http://127.0.0.1:${port}/`);
   return { c, page, errs };
 }
-for (const [name, viewport] of [['iPhone 390x844', { width: 390, height: 844 }], ['desktop 1280x800', { width: 1280, height: 800 }]]) {
+for (const [name, viewport] of [['iPhone 390x844', { width: 390, height: 844 }], ['iPhone 393x852', { width: 393, height: 852 }], ['iPhone 430x932', { width: 430, height: 932 }], ['desktop 1280x800', { width: 1280, height: 800 }]]) {
   for (const scheme of ['light', 'dark']) {
     test(`USER FLOW owner ${name} ${scheme}: the footer shows the version without scrolling, outside the app list`, { skip, timeout: 60000 }, async () => {
       const { c, page, errs } = await owner(viewport, scheme);

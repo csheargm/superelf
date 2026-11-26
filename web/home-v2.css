@@ -36,7 +36,7 @@ header{ position:relative; }
 #hmenu .aa-set{ right:auto; left:12px; top:100%; }
 .hm-l{ font-weight:400; font-size:15px; letter-spacing:0; }
 body.home-on header .hsub{ display:none; }
-body.home-on form#f{ display:none; }
+body.home-on form#f,body.home-on #log{ display:none; }   /* the hidden chat log kept its composer clearance (--log-clear) and left a band above the version footer (owner iPhone 2026-11-26) */
 
 /* The home column. */
 body.home-on #emptyState{ flex:1 1 auto; flex-direction:column; align-items:center; justify-content:safe center; position:relative; overflow-x:hidden;
