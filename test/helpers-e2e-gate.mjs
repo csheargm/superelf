@@ -1,4 +1,5 @@
 // Fail-closed gate for the real-browser e2e suites (R14) · 端到端测试的失败关闭门
+import { skipBecause } from './helpers-skip.mjs';
 // Pure, so test/helpers-e2e-gate.test.mjs can pin it without a browser.
 export const SETUP = 'set PA_PLAYWRIGHT=/path/to/node_modules/playwright/index.mjs (browser: `npx playwright install chromium`, '
   + 'or PLAYWRIGHT_BROWSERS_PATH to a cache holding the build it expects); or PA_E2E_SKIP=1 to skip on purpose';
@@ -12,6 +13,6 @@ export async function missingReason(pw) {
 // Fail closed unless the owner opted out; the opt-out turns the reason into a visible skip.
 export function resolveSkip(reason, env = process.env) {
   if (!reason) return false;
-  if (env.PA_E2E_SKIP === '1') return reason;
+  if (env.PA_E2E_SKIP === '1') return skipBecause('no-browser', reason);
   throw new Error(`e2e cannot run: ${reason}`);
 }

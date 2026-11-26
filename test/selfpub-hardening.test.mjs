@@ -11,6 +11,7 @@ import { runTests } from '../lib/selfpub/verify.mjs';
 import { acquireLock, scrubbedEnv, deniedPath, treeHash, discardBranch } from '../lib/selfpub/checkout.mjs';
 import { selfpubFixture, tgit } from './helpers-selfpub.mjs';
 import { ensureCheckout } from '../lib/selfpub/checkout.mjs';
+import { skipIf } from './helpers-skip.mjs';
 
 const TOKEN = ['ghp', 'fakeTokenForTests123'].join('_');   // built at run time: a key-shaped literal would trip the repo's own privacy scan
 const basic = Buffer.from(`x-access-token:${TOKEN}`).toString('base64');
@@ -81,7 +82,7 @@ test('round 2: a non-JSON error page cut at 200 chars never shows part of the to
   assert.doesNotMatch(e.message, /ghp_/);
 });
 
-test('round 3: the tree hash sees an executable bit; discard removes ignored leftovers', { skip: process.platform === 'win32' }, () => {
+test('round 3: the tree hash sees an executable bit; discard removes ignored leftovers', { skip: skipIf(process.platform === 'win32', 'posix-only', 'POSIX symlinks, hooks and exec bits') }, () => {
   const fx = selfpubFixture();
   try {
     const dir = ensureCheckout({ root: fx.root, cloneUrl: fx.bare });

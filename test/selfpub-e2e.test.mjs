@@ -14,7 +14,8 @@ import { previewSelf, startSelf, liveStatus, sameVersion, securityRelevant } fro
 import { handleSelfpubRoute } from '../lib/selfpub/routes.mjs';
 import { getChange, putChange } from '../lib/selfpub/state.mjs';
 import { discardBranch } from '../lib/selfpub/checkout.mjs';
-const POSIX_ONLY = process.platform === 'win32' && 'the core lane runs on Linux/macOS nodes; its jail rule paths, fake CLI permissions and checkout are POSIX (docs/adr/0044)';
+import { skipIf } from './helpers-skip.mjs';
+const POSIX_ONLY = skipIf(process.platform === 'win32', 'posix-only', 'the core lane runs on Linux/macOS nodes; its jail rule paths, fake CLI permissions and checkout are POSIX (docs/adr/0044)');
 
 const OWNER = { id: 'owner', role: 'owner' };
 // The PR's parent is the commit the change was made on (bare main): the fake GitHub must know it.
@@ -194,7 +195,7 @@ test('preview shows a NEW file\'s content; a turn that throws leaves no dirty br
   } finally { await gh.close(); rmTemp(fx.d); }
 });
 
-test('round 2: no sandbox → a new or ignored test file is never run; odd names and .gitattributes binary still preview', { skip: process.platform === 'win32' }, async () => {
+test('round 2: no sandbox → a new or ignored test file is never run; odd names and .gitattributes binary still preview', { skip: POSIX_ONLY }, async () => {
   const fx = selfpubFixture(); const gh = await startFakeGitHub();
   try {
     const mark = path.join(fx.d, 'ran');

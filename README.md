@@ -459,8 +459,9 @@ gh workflow run ci.yml --ref <branch>     # Linux + Windows + macOS
 gh run watch                              # follow it
 ```
 
-A run in which fewer than `MIN_TESTS` tests passed, or more than that OS's `max_skipped` were
-skipped (both set in the workflow), fails even if nothing failed (`.github/ci-guard.mjs`): a path
-bug that tests nothing, or a probe that turns tests into skips, is not a green run. Deploy to the
+A run in which fewer than `MIN_TESTS` tests passed (set in the workflow), or any test skipped
+without a reason tag that `test/helpers-skip.mjs` expects on that OS, fails even if nothing failed
+(`.github/ci-guard.mjs`): a path bug that tests nothing, or a probe that turns tests into skips, is
+not a green run. Skip with `skipIf` / `skipBecause` from that file; no ceiling to raise. Deploy to the
 Linux node only commits that are green here — `./deploy.sh` on the node, see
 [docs/vm-node.md](docs/vm-node.md).

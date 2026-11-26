@@ -17,6 +17,7 @@ import { FAKE_PERMS_SRC } from './helpers-fake-claude-perms.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
 import { APP_ORIGIN_HEADER, APP_ORIGIN_VALUE } from '../lib/agent-origin.mjs';
 import { CHANGE_APP_LABEL } from '../lib/app-chat-honesty.mjs';
+import { skipIf } from './helpers-skip.mjs';
 
 const PAGE = '<!doctype html><html><body><h1 id="t" style="color:black">Todo</h1></body></html>';
 const KID_TOKEN = 'kid-token-abcdefghijkl';
@@ -86,7 +87,7 @@ async function turn(body, { token = OWNER_TOKEN, fromApp = false } = {}) {
 const colour = () => /color:(\w+)/.exec(fs.readFileSync(path.join(root, 'workspace', 'apps', 'todo', 'index.html'), 'utf8'))[1];
 
 // The fake's jail models POSIX rule paths (Edit(//abs/**)); on Windows the CLI's own rules differ, so the write half is POSIX-only.
-test('one conversation: plan → Apply → plan → typed yes → plan → Apply, every change applied, no tool talk', { skip: process.platform === 'win32' && 'the fake jail models POSIX rule paths' }, async () => {
+test('one conversation: plan → Apply → plan → typed yes → plan → Apply, every change applied, no tool talk', { skip: skipIf(process.platform === 'win32', 'posix-only', 'the fake jail models POSIX rule paths') }, async () => {
   let t = await turn({ edit: 'todo', message: 'make the title purple' });
   const convoId = t.convoId;
   assert.ok(t.apply, `plan 1 offers Apply: ${t.text}`);

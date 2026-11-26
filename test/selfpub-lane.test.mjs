@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { coreJailArgs, SKIP_PERMISSIONS } from '../lib/agent-origin.mjs';
 import { coreLaneAllowed, lanePathProblems } from '../lib/selfpub/lane.mjs';
+import { skipIf } from './helpers-skip.mjs';
 
 const REPO = '/data/superelf-src/repo';
 
@@ -47,7 +48,7 @@ test('backstop: any file tool call outside the checkout or on a dot-path is a pr
   assert.deepEqual(lanePathProblems(REPO, calls), ['/data/superelf/web/x.js', `${REPO}/../superelf/config.json`, `${REPO}/.git/hooks/pre-commit`, '/etc/passwd'], 'reads outside count too');
 });
 
-test('backstop: a path through a symlink in the checkout that leads outside is a problem', { skip: process.platform === 'win32' }, () => {
+test('backstop: a path through a symlink in the checkout that leads outside is a problem', { skip: skipIf(process.platform === 'win32', 'posix-only', 'POSIX symlinks, hooks and exec bits') }, () => {
   const d = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'lane-link-')));
   try {
     const repo = path.join(d, 'repo'), out = path.join(d, 'outside');
