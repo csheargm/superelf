@@ -52,6 +52,8 @@ test('owner: amber dot on ☰ → card with the problem, its meaning and the tip
   const { ctx, page } = await signIn({}, 'mom', 'owner-pass-123');
   await page.waitForSelector('#menu .oa-dot', { state: 'attached' });
   assert.notEqual(await page.$eval('#menu .oa-dot', (e) => getComputedStyle(e).animationName), 'none', 'it pulses');
+  const camTip = page.locator('.pat-tip[data-tip="tip:main-chat-camera"] .pat-x');   // web/shell-cam.js's priority tip shows first on a fresh account
+  if (await camTip.waitFor({ timeout: 5000 }).then(() => true, () => false)) { await camTip.click(); await page.evaluate(() => window.PATips.whenIdle()); }
   await page.click('#hmore'); await page.click('#menu'); await page.waitForSelector('#oaCard');
   const text = await page.locator('#oaCard').innerText();
   assert.match(text, /需要处理 · Needs attention/);

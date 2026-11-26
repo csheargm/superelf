@@ -36,7 +36,8 @@ before(async () => {
 after(async () => { for (const b of Object.values(browsers)) await b.close(); if (web) await stopWeb(web); if (root) rmTemp(root); });
 
 const put = (body) => fetch(`http://127.0.0.1:${port}/api/profile`, { method: 'PUT', headers: { 'content-type': 'application/json', authorization: `Bearer ${OWNER_TOKEN}` }, body: JSON.stringify(body) });
-const fresh = () => put({ tipsSeen: [], appPrefs: {} });   // a first visit: nothing dismissed on the account
+const CAM_TIP = 'tip:main-chat-camera';   // web/shell-cam.js: a priority tip, so on a first visit it shows ahead of the ⋯ tip under test here
+const fresh = async () => { await put({ tipsSeen: [], appPrefs: {} }); await put({ tipsSeen: [CAM_TIP] }); };   // a first visit past the camera tip: only a literal [] clears (web.mjs unions), so clear, then add it
 async function context(engine, dev, { blockLocal = false } = {}) {
   const ctx = await browsers[engine].newContext(DEVICES[dev]);
   await ctx.addInitScript(({ t, block }) => {
@@ -127,7 +128,7 @@ test('chromium iphone: blocked localStorage AND a refused account write — the 
 
 for (const engine of ['chromium', 'webkit']) for (const dev of ['iphone', 'ipad']) {
   test(`${engine} ${dev}: every app tip (Notes, Bible) closes, covers no control, and stays closed on a second device`, { skip: skip || skipIf(engine === 'webkit' && !webkit, 'no-browser', 'this Playwright has no WebKit'), timeout: 300000 }, async () => {
-    await fresh(); await put({ tipsSeen: ['tip:home-more'] });   // the shell's own tip is tested above
+    await fresh(); await put({ tipsSeen: ['tip:home-more', CAM_TIP] });   // the shell's own tip is tested above
     const found = [];
     for (const slug of ['notes', 'bible']) {
       for (let i = 0; i < OPENS_MAX; i++) {
