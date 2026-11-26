@@ -153,3 +153,11 @@ dialog input, dialog textarea, dialog select{ border-radius:var(--r-ctl); }
 /* The release time after the version line (web/version-time.js): drawn here, not in the text, so
    #ver-lbl's textContent stays the string PAUpdate compares with /api/build. */
 #ver-lbl[data-shown]::after{ content:' · ' attr(data-shown); }
+/* The Publish / Share sheet (web/publish.js) stands out from the page behind it: a dimming scrim over the
+   page and the app frame (a tap on it closes the sheet), a lifted sheet with a clear top edge. */
+#pubScrim{ position:fixed; inset:0; z-index:29; background:rgba(0,0,0,.4); }
+#pubSheet{ z-index:30; border-radius:16px; box-shadow:0 -2px 0 rgba(0,0,0,.04),0 8px 40px rgba(0,0,0,.35); outline:none; }
+@media (prefers-color-scheme: dark){
+  #pubScrim{ background:rgba(0,0,0,.62); }
+  #pubSheet{ box-shadow:0 0 0 1px rgba(255,255,255,.12),0 8px 40px rgba(0,0,0,.7); }
+}

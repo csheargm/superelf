@@ -62,13 +62,29 @@ const PAPublish=(()=>{
     if(TERMINAL.has(st.state)){ if(seenAt(slug)!==String(st.at)){ notice(st); markSeen(slug,st); } }
     else watch(slug);
   }
+  // The sheet stands out from the page (owner report 2026-11-26): a dimming #pubScrim behind it covers the
+  // page and the app frame; a tap on it closes the sheet like 关闭 · Close. It is a modal dialog: focus stays
+  // in it (Tab wraps). Whoever removes #pubSheet (Close, Escape, leaving the app) takes the scrim with it.
   function sheet(html,withGo){
     let s=$('#pubSheet'); if(!s){ s=document.createElement('div'); s.id='pubSheet'; s.className='cmenu-pop';
+      s.setAttribute('role','dialog'); s.setAttribute('aria-modal','true'); s.tabIndex=-1;
       s.style.cssText='left:8px;right:8px;top:auto;bottom:calc(8px + env(safe-area-inset-bottom));max-height:60vh;overflow:auto;padding:12px;font-size:14px'; document.body.appendChild(s); }   // at the bottom: never over the app's header or its chips (owner report 2026-11-25)
+    if(!$('#pubScrim')){ const m=document.createElement('div'); m.id='pubScrim'; m.onclick=()=>s.remove(); document.body.insertBefore(m,s); }
     s.innerHTML=html+'<div class="sheet-acts"><button data-pub="close" class="plain" id="pubClose">关闭 · Close</button>'+(withGo?'<button data-pub="go" id="pubGo" class="primary">发布 · Publish</button>':'')+'</div>';
     s.onclick=(e)=>{ const b=e.target.closest('[data-pub]'); if(b&&b.dataset.pub==='close') s.remove(); };
+    s.onkeydown=trapTab;
+    if(!s.contains(document.activeElement)) s.focus({preventScroll:true});
     return s;
   }
+  function trapTab(e){
+    if(e.key!=='Tab') return;
+    const f=[...e.currentTarget.querySelectorAll('button,input,textarea,select,a[href]')].filter((x)=>!x.disabled&&x.offsetParent);
+    if(!f.length) return;
+    const first=f[0], last=f[f.length-1];
+    if(e.shiftKey&&(document.activeElement===first||document.activeElement===e.currentTarget)){ e.preventDefault(); last.focus(); }
+    else if(!e.shiftKey&&document.activeElement===last){ e.preventDefault(); first.focus(); }
+  }
+  new MutationObserver(()=>{ const m=$('#pubScrim'); if(m&&!$('#pubSheet')) m.remove(); }).observe(document.body,{childList:true});
   const hitsHtml=(hits)=>'<p><b>隐私检查未通过 · Privacy scan found something</b></p><ul>'
     +hits.map(h=>`<li><code>${esc(h.file)}:${h.line}</code> ${esc(h.rule)}<br><small>${esc(h.text||'')}</small></li>`).join('')+'</ul>';
   function tokenNeeded(j){ sheet(`<p id="pubToken"><b>${esc(j.error)}</b></p><ol>${(j.steps||[]).map(s=>`<li>${esc(s)}</li>`).join('')}</ol>`); }
