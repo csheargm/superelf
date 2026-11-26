@@ -1,4 +1,13 @@
 {
+  "v5.34.2": {
+    "date": "2026-11-26",
+    "time": "2026-11-26T20:53:45.292Z",
+    "features": [],
+    "fixes": [
+      "合并：夜间审查邮件不再隐藏中高风险问题 · Merge: nightly review email shows every medium+ finding"
+    ],
+    "through": "80d54893d7e07f020cb432445d25a8644a58e1b8"
+  },
   "v5.34.1": {
     "date": "2026-11-26",
     "time": "2026-11-26T20:48:02.647Z",
