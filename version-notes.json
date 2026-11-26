@@ -1,4 +1,12 @@
 {
+  "v5.27.2": {
+    "date": "2026-11-25",
+    "features": [],
+    "fixes": [
+      "点标题回主页 · Tap the title to go home"
+    ],
+    "through": "81a46a0210e84a2dd8757703cea479c0e908aff6"
+  },
   "v5.27.1": {
     "date": "2026-11-25",
     "features": [],
