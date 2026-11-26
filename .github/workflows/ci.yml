@@ -140,11 +140,12 @@ jobs:
         # 2026-11-25: EVERY OS +1 (ubuntu 274, windows 360): no-debug-overlay-e2e (WebKit triple-tap), skipped on CI by PA_E2E_SKIP.
         # 2026-11-25: windows +17 (377): selfpub tests that are POSIX-only skip on Windows — 12 new (jail rule paths, fake CLI
         #   permissions, checkout) and 5 already skipped there since v5.27.0 without a raise (symlinks, hooks, round 2/3, backstop symlink).
+        # 2026-11-25: EVERY OS +5 (ubuntu 279, windows 382): title-home-e2e (title Home, apostrophe, 4 chips-clearance sizes), skipped on CI by PA_E2E_SKIP.
         include:
           - os: ubuntu-latest
-            max_skipped: 274
+            max_skipped: 279
           - os: windows-latest
-            max_skipped: 377
+            max_skipped: 382
     env:
       MAX_SKIPPED: ${{ matrix.max_skipped }}
       PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED
