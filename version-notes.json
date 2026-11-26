@@ -1,4 +1,13 @@
 {
+  "v5.29.4": {
+    "date": "2026-11-26",
+    "time": "2026-11-26T18:14:34.947Z",
+    "features": [],
+    "fixes": [
+      "合并：自测豁免测试的 Windows 路径修正 · Merge: Windows-safe path in the bypass test"
+    ],
+    "through": "aac34e53397240aefab94995c4a6992d3a42d793"
+  },
   "v5.29.3": {
     "date": "2026-11-26",
     "time": "2026-11-26T18:09:09.970Z",
