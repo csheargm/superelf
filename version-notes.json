@@ -1,4 +1,13 @@
 {
+  "v5.29.1": {
+    "date": "2026-11-26",
+    "time": "2026-11-26T17:25:32.889Z",
+    "features": [],
+    "fixes": [
+      "合并：截图组件在无 window 环境也加载 · Merge: snap loads without window"
+    ],
+    "through": "99be8c9eca578fcefb52ce2635eaca0bdc6fd019"
+  },
   "v5.29.0": {
     "date": "2026-11-26",
     "time": "2026-11-26T17:19:50.964Z",
