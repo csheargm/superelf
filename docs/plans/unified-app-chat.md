@@ -102,7 +102,7 @@ C. Future: Review now, nightly review, version list with restore-to (docs/TODO.m
 - e2e (chromium + webkit, throwaway node): owner asks a question → answer, app untouched; asks a change →
   plan + Apply → app reloads → Done + Undo → Undo restores; Done not shown if reload fails; ⋯ entry opens
   the same convo; tip shows once; member edits own copy, shelf app forks first, "change superelf" refused;
-  demo guest cap hit. Raise CI skip ceilings exactly by new skipped browser tests.
+  demo guest cap hit. CI checks skip reason tags; no ceiling to raise.
 
 ## Needs the owner (docs/TODO.md)
 1. Keep in-page Ask AI for content apps (Bible/Journal/notes) — proposed yes.

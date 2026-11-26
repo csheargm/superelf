@@ -10,68 +10,100 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { judge } from '../.github/ci-guard.mjs';
+import { judge, skipReasons, unexpectedSkips } from '../.github/ci-guard.mjs';
+import { SKIP_TAGS, skipBecause, skipIf } from './helpers-skip.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const GUARD = path.join(ROOT, '.github/ci-guard.mjs');
 const WF = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
 const tap = (o) => Object.entries(o).map(([k, v]) => `# ${k} ${v}`).join('\n') + '\n';
-const GOOD = { tests: 1790, pass: 1789, fail: 0, cancelled: 0, skipped: 1, todo: 0 };
+const GOOD = { tests: 4000, pass: 3998, fail: 0, cancelled: 0, skipped: 2, todo: 0 };
+const SKIPS = 'ok 1 - opens the page # SKIP [no-browser] no Playwright: set PA_PLAYWRIGHT\n'
+  + '    ok 2 - nested e2e \\# 3 # SKIP [no-browser] no Playwright\n';
+const run = (skipLines, sum = GOOD, platform = 'linux', min = 3500) => judge('ok 9 - x\n' + skipLines + tap(sum), min, platform);
 
-const CEIL = 6;   // a per-OS MAX_SKIPPED
-
-test('guard: a full, clean run passes', () => {
-  const r = judge('ok 1 - x\n' + tap(GOOD), 1500, CEIL);
+test('guard: a full run whose every skip is tagged and expected passes', () => {
+  const r = run(SKIPS);
   assert.equal(r.ok, true, r.reason);
-  assert.equal(r.summary.tests, 1790, 'CONTROL: it read the summary');
+  assert.equal(r.summary.tests, 4000, 'CONTROL: it read the summary');
+  assert.deepEqual(skipReasons(SKIPS), ['[no-browser] no Playwright: set PA_PLAYWRIGHT', '[no-browser] no Playwright'],
+    'it reads reasons at any depth, past an escaped # in a name');
 });
 
-test('guard: fails a run with too few tests, no summary, a failure, or a bad floor', () => {
-  assert.equal(judge(tap({ ...GOOD, tests: 12, pass: 12 }), 1500, CEIL).ok, false, 'a handful of tests is not a run');
-  assert.equal(judge(tap({ ...GOOD, tests: 0, pass: 0 }), 1500, CEIL).ok, false, 'zero tests is not a run');
-  assert.equal(judge('npm ERR! something\n', 1500, CEIL).ok, false, 'no summary is no evidence');
-  assert.equal(judge('# pass 5\n# fail 0\n', 1500, CEIL).ok, false, 'a summary without a test count is no evidence either');
-  assert.equal(judge(tap({ ...GOOD, fail: 1 }), 1500, CEIL).ok, false);
-  assert.equal(judge(tap({ ...GOOD, cancelled: 2 }), 1500, CEIL).ok, false, 'a cancelled test (timeout) is not a pass');
-  assert.equal(judge(tap(GOOD), NaN, CEIL).ok, false, 'an unset MIN_TESTS must not disable the floor');
-  assert.equal(judge(tap(GOOD), 0, CEIL).ok, false);
+test('guard: fails a run with too few tests, no summary, a failure, a todo, or a bad floor', () => {
+  assert.equal(run(SKIPS, { ...GOOD, tests: 14, pass: 12 }).ok, false, 'a handful of tests is not a run');
+  assert.equal(judge('npm ERR! something\n', 3500).ok, false, 'no summary is no evidence');
+  assert.equal(judge('# pass 5\n# fail 0\n', 3500).ok, false, 'a partial summary is no evidence either');
+  assert.equal(run(SKIPS, { ...GOOD, fail: 1 }).ok, false);
+  assert.equal(run(SKIPS, { ...GOOD, cancelled: 2 }).ok, false, 'a cancelled test (timeout) is not a pass');
+  assert.equal(run(SKIPS, { ...GOOD, todo: 1 }).ok, false, 'a todo is not a pass');
+  assert.equal(run(SKIPS, GOOD, 'linux', NaN).ok, false, 'an unset MIN_TESTS must not disable the floor');
+  assert.equal(run(SKIPS, GOOD, 'linux', 0).ok, false);
 });
 
-test('guard: skips and todos are not passes (R14): the floor is on pass, and skips have a ceiling', () => {
-  const massSkip = { tests: 1817, pass: 1000, fail: 0, cancelled: 0, skipped: 817, todo: 0 };
-  assert.equal(judge(tap(massSkip), 1500, 1000).ok, false, 'most tests skipped: below the pass floor, whatever the ceiling');
-  assert.equal(judge(tap({ ...massSkip, pass: 0, skipped: 0, todo: 1817 }), 1500, 5000).ok, false, 'all todo');
-  assert.equal(judge(tap({ ...GOOD, tests: 1790 + 7, skipped: 8 }), 1500, CEIL).ok, false, 'over the per-OS ceiling, though pass is high');
-  assert.equal(judge(tap({ ...GOOD, tests: 1790 + 6, skipped: 4, todo: 3 }), 1500, CEIL).ok, false, 'todo counts toward the ceiling');
-  assert.equal(judge(tap({ ...GOOD, tests: 1790 + 5, skipped: 6 }), 1500, CEIL).ok, true, 'CONTROL: at the ceiling passes');
-  assert.equal(judge(tap(GOOD), 1500, NaN).ok, false, 'an unset MAX_SKIPPED must not disable the ceiling');
-  const noSkipLine = { ...GOOD };
-  delete noSkipLine.skipped;
-  assert.equal(judge(tap(noSkipLine), 1500, CEIL).ok, false, 'no "# skipped" line: the skips cannot be counted');
+test('guard: an untagged, unknown or unexpected skip fails; the same tag elsewhere passes', () => {
+  const one = { ...GOOD, skipped: 1, pass: 3999 };
+  assert.equal(run('ok 1 - a # SKIP\n', one).ok, false, 'no reason at all');
+  assert.equal(run('ok 1 - a # SKIP needs bash\n', one).ok, false, 'a reason without a tag');
+  assert.equal(run('ok 1 - a # SKIP [made-up] x\n', one).ok, false, 'a tag helpers-skip.mjs does not know');
+  assert.equal(run('ok 1 - a # SKIP [no-git-history] x\n', one).ok, false, 'a tag CI must never hit');
+  assert.equal(run('ok 1 - a # SKIP [posix-only] x\n', one, 'linux').ok, false, 'posix-only is unexpected on Linux');
+  assert.equal(run('ok 1 - a # SKIP [posix-only] x\n', one, 'win32').ok, true, 'CONTROL: and expected on Windows');
+  assert.match(run('ok 1 - a # SKIP needs bash\n', one).reason, /needs bash/, 'the failure names the reason');
+  assert.deepEqual(unexpectedSkips(['[no-browser] x', 'x', '[no-gpg] y'], 'linux'), ['x', '[no-gpg] y']);
+});
+
+test('guard: skip lines must add up to the summary, so a missed line cannot hide a skip', () => {
+  assert.equal(run(SKIPS, { ...GOOD, skipped: 3 }).ok, false, 'summary says 3, only 2 lines found');
+  assert.equal(run('', GOOD).ok, false, 'skips with no skip lines at all');
+  assert.equal(run('', { ...GOOD, skipped: 0, pass: 4000 }).ok, true, 'CONTROL: no skips, nothing to account for');
 });
 
 test('guard: the LAST summary wins, and Windows line endings parse', () => {
-  const early = '# tests 99999\n';   // a test printing a summary-shaped line mid-run
-  assert.equal(judge(early + tap({ ...GOOD, tests: 3, pass: 3 }), 1500, CEIL).ok, false);
-  assert.equal(judge(tap(GOOD).replace(/\n/g, '\r\n'), 1500, CEIL).ok, true, 'CRLF from a Windows runner');
+  assert.equal(judge('# tests 99999\n' + SKIPS + tap({ ...GOOD, tests: 5, pass: 3 }), 3500, 'linux').ok, false);
+  assert.equal(judge((SKIPS + tap(GOOD)).replace(/\n/g, '\r\n'), 3500, 'linux').ok, true, 'CRLF from a Windows runner');
 });
 
-test('guard as a command: exit 1 below the floor, exit 0 above it', () => {
+test('every skip tag is a known one, and skipBecause refuses an unknown tag', () => {
+  assert.equal(skipBecause('no-browser', 'x'), '[no-browser] x');
+  assert.equal(skipIf(false, 'no-browser', 'x'), false);
+  assert.throws(() => skipBecause('nope', 'x'), /unknown skip tag/);
+  for (const [tag, oses] of Object.entries(SKIP_TAGS)) {
+    assert.match(tag, /^[a-z-]+$/);
+    for (const o of oses) assert.ok(['linux', 'win32', 'darwin'].includes(o), `${tag}: ${o}`);
+  }
+});
+
+// Known limits: a text scan, so it pins the shapes that once existed (bare platform booleans, a
+// string literal handed to t.skip), not every way a test could skip. The runtime guard is the net.
+test('no test skips without a tag: no bare { skip: <platform test> } and no t.skip("literal")', () => {
+  const dir = path.join(ROOT, 'test');
+  const hits = [];
+  for (const f of fs.readdirSync(dir).filter((n) => n.endsWith('.mjs') && n !== 'ci.test.mjs')) {
+    fs.readFileSync(path.join(dir, f), 'utf8').split('\n').forEach((line, i) => {
+      if (/skip:\s*(true\b|process\.platform|!\w+\s*&&)/.test(line) || /\bt\.skip\(\s*['"`]/.test(line)) hits.push(`${f}:${i + 1}`);
+    });
+  }
+  assert.deepEqual(hits, [], 'use skipIf / skipBecause from test/helpers-skip.mjs');
+  assert.ok(/t\.skip\(\s*['"`]/.test("t.skip('x')") && /skip:\s*process\.platform/.test("{ skip: process.platform === 'win32' }"), 'CONTROL: the scan matches the old shapes');
+});
+
+test('guard as a command: exit 0 on a clean run, exit 1 on an untagged skip or a high floor', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pa-ci-guard-'));
   try {
     const f = path.join(dir, 'out.txt');
-    const run = (min, max = '6') => spawnSync(process.execPath, [GUARD, f],
-      { env: { ...process.env, MIN_TESTS: String(min), MAX_SKIPPED: max }, encoding: 'utf8' });
-    fs.writeFileSync(f, tap(GOOD));
-    const hi = run(1500), lo = run(5000);
+    const cmd = (min) => spawnSync(process.execPath, [GUARD, f], { env: { ...process.env, MIN_TESTS: String(min) }, encoding: 'utf8' });
+    fs.writeFileSync(f, SKIPS + tap(GOOD));
+    const hi = cmd(3500);
     assert.equal(hi.status, 0, hi.stdout + hi.stderr);
-    assert.match(hi.stdout, /^# tests 1790$/m, 'it prints the summary');
-    assert.equal(lo.status, 1, 'CONTROL: the same file fails a higher floor');
-    assert.equal(run(1500, '0').status, 1, 'CONTROL: the same file fails a lower ceiling');
-    fs.writeFileSync(f, tap({ ...GOOD, pass: 1790, skipped: 0 }));
-    assert.equal(run(1500, '0').status, 0, 'CONTROL: a run with no skips passes a ceiling of 0');
-    assert.equal(run(1500, '').status, 1, 'but an empty MAX_SKIPPED is unset, not 0: it fails');
+    assert.match(hi.stdout, /^# tests 4000$/m, 'it prints the summary');
+    assert.equal(cmd(5000).status, 1, 'CONTROL: the same file fails a higher floor');
+    assert.equal(cmd('').status, 1, 'an empty MIN_TESTS is unset, not 0: it fails');
+    fs.writeFileSync(f, 'ok 1 - a # SKIP\n' + SKIPS + tap({ ...GOOD, skipped: 3 }));
+    const bad = cmd(3500);
+    assert.equal(bad.status, 1, 'an untagged skip fails');
+    assert.match(bad.stdout, /unexpected skips/);
     assert.equal(spawnSync(process.execPath, [GUARD, path.join(dir, 'missing.txt')]).status, 1, 'unreadable output fails');
   } finally { rmTemp(dir); }
 });
@@ -86,13 +118,10 @@ test('workflow: least privilege, pinned actions, a floor, macOS only by hand', (
   }
   assert.match(WF, /^ {2}MIN_TESTS: \d{3,}$/m, 'a test-count floor is set');
   assert.match(WF, /ci-guard\.mjs/, 'and the guard runs');
-  for (const os of ['ubuntu-latest', 'windows-latest']) {
-    assert.match(WF, new RegExp(`- os: ${os}\\n {12}max_skipped: \\d+$`, 'm'), `${os} on every trigger, with its own skip ceiling`);
-  }
-  assert.match(WF, /^ {6}MAX_SKIPPED: \$\{\{ matrix\.max_skipped \}\}$/m, 'the matrix ceiling reaches the guard');
+  assert.match(WF, /^ {8}os: \[ubuntu-latest, windows-latest\]$/m, 'ubuntu and Windows on every trigger');
+  assert.ok(!/MAX_SKIPPED|max_skipped/.test(WF), 'no hand-raised skip ceiling: the guard checks skip tags');
   const mac = WF.slice(WF.indexOf('test-macos:'));
   assert.match(mac, /if: github\.event_name == 'workflow_dispatch'/, 'macOS runs only when started by hand');
-  assert.match(mac, /^ {6}MAX_SKIPPED: \d+$/m, 'and has its own ceiling');
   assert.ok(!/upload-artifact/.test(WF), 'nothing is uploaded');
   assert.match(WF, /timeout-minutes: \d+/);
   assert.match(WF, /cancel-in-progress: true/);

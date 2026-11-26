@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 import { hashPassword, verifyPassword, Sessions, appendAudit, readAudit } from '../lib/auth.mjs';
+import { skipIf } from './helpers-skip.mjs';
 
 test('password hash verifies correctly and rejects wrong', () => {
   const h = hashPassword('1234');
@@ -59,7 +60,7 @@ test('expired sessions, removed-member marks included, are pruned on load and on
   assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(f, 'utf8'))), ['b'], 'the sweep is written back');
 });
 
-test('a failed load-time cleanup write does not stop startup', { skip: process.platform === 'win32' && 'POSIX dir modes' }, () => {
+test('a failed load-time cleanup write does not stop startup', { skip: skipIf(process.platform === 'win32', 'posix-only', 'POSIX dir modes') }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pa-s4-')); const f = path.join(dir, 's.json');
   fs.writeFileSync(f, JSON.stringify({ old: { userId: 'x', expires: 1 }, live: { userId: 'y', expires: 1e15 } }));
   fs.chmodSync(dir, 0o500); // the atomic write's temp file cannot be created

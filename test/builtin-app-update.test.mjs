@@ -10,6 +10,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { updateInstalledApps, sha256, VERSIONS_FILE } from '../lib/builtin-app-update.mjs';
 import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, waitFor } from './helpers-web.mjs';
+import { skipIf } from './helpers-skip.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OLD = '857c8f2';   // the commit the live private node's Bible matched
@@ -54,7 +55,7 @@ test('updateInstalledApps: a known old page is replaced; an edited one, a missin
 });
 
 test('real start-up on a Docker-shaped root: the old 857c8f2 Bible (owner + shelf) becomes the current one; notes and an edited app survive',
-  { skip: !hasGitHistory && 'needs git history', timeout: 60000 }, async () => {
+  { skip: skipIf(!hasGitHistory, 'no-git-history', 'needs git history'), timeout: 60000 }, async () => {
     const port = await freePort(); const root = mkWebRoot({ port });
     const cur = fs.readFileSync(path.join(REPO, 'workspace/apps/bible/index.html'));
     put(path.join(root, 'builtin-apps/workspace-apps/bible/index.html'), cur);
@@ -87,7 +88,7 @@ test('real start-up on a Docker-shaped root: the old 857c8f2 Bible (owner + shel
 // old Bible for ever. Same rule as the owner: a known repo version is replaced from the image's member
 // template; an edited page, an app the template does not ship and data/ are never touched.
 test('real start-up: an owner and two members — the unedited member Bible is updated, the edited one and all data are kept',
-  { skip: !hasGitHistory && 'needs git history', timeout: 60000 }, async () => {
+  { skip: skipIf(!hasGitHistory, 'no-git-history', 'needs git history'), timeout: 60000 }, async () => {
     const port = await freePort();
     const users = [{ id: 'owner', name: 'Owner', role: 'owner', token: 'test-owner-token-abcdefgh', workspace: 'workspace' },
       { id: 'amy', name: 'Amy', role: 'member', token: 'test-amy-token-abcdefghij', workspace: 'workspace-amy' },

@@ -9,6 +9,7 @@ import { execFileSync } from 'node:child_process';
 import { ROOT } from './helpers-app.mjs';
 import { skip, chromium } from './helpers-note-link.mjs';
 import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, OWNER_TOKEN } from './helpers-web.mjs';
+import { skipIf } from './helpers-skip.mjs';
 
 let port, web, browser, root;
 const OLD_PAGE = (() => { try { return execFileSync('git', ['show', '857c8f2:workspace/apps/bible/index.html'], { cwd: ROOT }); } catch { return null; } })();   // no git history (a tarball): the control is skipped, said so
@@ -196,7 +197,7 @@ test('opening the Bible on a fresh account logs no 404 for absent data files', {
 
 // CONTROL (R14): the same checks against the Bible the live private node was stuck on (857c8f2) FAIL —
 // so the passes above prove F2-03 is in the shipped page, not that the harness passes anything.
-test('CONTROL: the old 857c8f2 Bible has no chapter-end buttons and a swipe does not turn it', { skip: skip || !OLD_PAGE, timeout: 90000 }, async () => {
+test('CONTROL: the old 857c8f2 Bible has no chapter-end buttons and a swipe does not turn it', { skip: skip || skipIf(!OLD_PAGE, 'no-git-history', 'needs git history for the 857c8f2 copy'), timeout: 90000 }, async () => {
   const f = path.join(root, 'workspace', 'apps', 'bible', 'index.html'), cur = fs.readFileSync(f);
   fs.writeFileSync(f, OLD_PAGE);
   try {

@@ -14,7 +14,7 @@ test('browser binary missing → throws naming the path', async () => {
 });
 test('PA_E2E_SKIP=1 turns the reason into a visible skip; other values do not', async () => {
   const reason = await missingReason(null);
-  assert.match(resolveSkip(reason, { PA_E2E_SKIP: '1' }), /^no Playwright/);
+  assert.match(resolveSkip(reason, { PA_E2E_SKIP: '1' }), /^\[no-browser\] no Playwright/);
   assert.throws(() => resolveSkip(reason, { PA_E2E_SKIP: 'true' }));
 });
 test('browser present → no skip', async () => {

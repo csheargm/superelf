@@ -33,9 +33,9 @@ concurrency:
 
 env:
   # R14: a run that tested nothing is a failure, not a green tick. The floor is on PASSED tests (a
-  # skip is not a pass). The suite has ~1,800; a glob or path bug on one OS that silently runs a
-  # handful must not pass. Raise it as the suite grows.
-  MIN_TESTS: 1500
+  # skip is not a pass): a stable lower bound, not an exact count. 2026-11-25: ~4,180 pass on macOS
+  # without Playwright, ~3,900 expected on Windows; a glob or path bug that runs a fraction must fail.
+  MIN_TESTS: 3500
 
 jobs:
   test:
@@ -45,111 +45,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # max_skipped: this OS's skip ceiling (R14). Skips hang on runtime probes, so a probe or
-        # runner-image regression could turn real tests into skips; above the ceiling is red. Measured
-        # 2026-10-11: ubuntu 6, windows 61 (60 ops-script tests: Windows runs the .ps1 scripts; plus
-        # harness-ports' probe test, which skips where it cannot fail), macOS 3 (2 measured on the
-        # runner, plus that same probe test, confirmed locally); +2 slack. A new POSIX-only test
-        # raises Windows' count: raise its ceiling with it. 2026-10-12: windows 63, from the two
-        # POSIX-only legacy-bot tests in removed-telegram (ADR 0006). 2026-10-13: windows 70, from
-        # the seven bash+gpg tests in backup.test.mjs (the backup is macOS-only for now).
-        # 2026-10-17: windows 73, from three more bash+gpg backup tests (backup_extra).
-        # 2026-10-18: windows 76, from three more in backup-extra.test.mjs (pause/resume, one tar each).
-        # 2026-10-27: EVERY OS +7 (ceilings ubuntu 15, windows 85, macOS 12), from note-link-e2e.test.mjs (6)
-        # and note-link-gate-e2e.test.mjs (1): they run real Chromium through PA_PLAYWRIGHT, which CI does
-        # not install (no dependencies), so all 7 skip here.
-        # 2026-11-01: EVERY OS +1 (ubuntu 16, windows 86, macOS 13), from note-photo-multi-e2e.test.mjs (1, Playwright).
-        # 2026-11-18: EVERY OS +37 (ubuntu 53, windows 123, macOS 49). All 45 Playwright e2e tests skip on
-        # CI by explicit PA_E2E_SKIP=1 (measured locally: `PA_E2E_SKIP=1 node --test test/*e2e*.test.mjs`
-        # → 45 skipped); 8 were already counted, 37 were added after 2026-11-13 without a ceiling raise.
-        # Without the opt-out those files now FAIL (test/helpers-e2e-gate.mjs).
-        # 2026-11-21: EVERY OS +6, from landing-page-e2e.test.mjs (6 Playwright layout checks, skip on CI).
-        # 2026-11-22: windows 143 (measured 142 in run 44990421956, +1 slack like ubuntu). The 12 new
-        # Windows-only skips are bash+gpg backup tests (13 counted above, 25 now): backup-linux.test.mjs
-        # (11, the Linux passphrase file for backup.sh/restore.sh) plus one more in the backup files.
-        # All of them run on ubuntu.
-        # 2026-11-22: EVERY OS +12 (ubuntu 73, windows 155; measured 72 and 154 in run 45054412816, +1
-        # slack): demo-account-ui-e2e.test.mjs + demo-home-link.test.mjs, 12 Playwright e2e checks
-        # that skip on CI (PA_E2E_SKIP), from the sync of the private repo's demo work.
-        # 2026-11-23: EVERY OS +6 (ubuntu 79, windows 161; measured 78 and 160 in run 45122519933, +1
-        # slack): new Playwright e2e checks (ink pen contrast, app-page access, 375px top bars) that
-        # skip on CI by PA_E2E_SKIP; no real test turned into a skip.
-        # 2026-11-23: EVERY OS +9 (ubuntu 88, windows 170; measured 87 and 169 in run 45124049583, +1
-        # slack): ink-enclosure-e2e.test.mjs, 9 Playwright checks that skip on CI by PA_E2E_SKIP.
-        # 2026-11-23: EVERY OS +6 (ubuntu 98, windows 180): fix/morning's new Playwright checks (demo
-        # limit screen 3, demo app sign-out 1, removed member 1, family labels 1), skipped on CI by PA_E2E_SKIP.
-        # 2026-11-23: windows +1 (181): test/auth.test.mjs read-only-folder sweep test skips on Windows
-        # (no POSIX file modes there); measured 181 in run 45247410656.
-        # 2026-11-23: EVERY OS +30 (ubuntu 128, windows 211; measured 128 and 211 in run 45262355037):
-        # overnight triage merge's new Playwright e2e files (bible reader, notes polish, chat stop,
-        # family offline, member tips, ...), skipped on CI by PA_E2E_SKIP; fail 0 on both.
-        # 2026-11-23: EVERY OS +1 (ubuntu 129, windows 212): shell-placeholder-e2e.test.mjs (1 Playwright check).
-        # 2026-11-23: EVERY OS +1 (ubuntu 130, windows 213): family-offline-e2e service-worker-on offline check.
-        # 2026-11-23: EVERY OS +1 (ubuntu 131, windows 214): bible-reader-e2e no-404 check.
-        # 2026-11-23: EVERY OS +1 (ubuntu 132, windows 215): note-link-e2e range-end check.
-        # 2026-11-23: EVERY OS +2 (ubuntu 135, windows 218): bible-reader-e2e swipe split per orientation + old-857c8f2-copy control.
-        # 2026-11-23: EVERY OS +10 (ubuntu 145, windows 228): bar-no-jump-e2e 8 hide/show viewports + 2 daily-banner checks.
-        # 2026-11-23: EVERY OS +2 (ubuntu 147, windows 230): bible-note-chapter-e2e, one test per shipped Bible copy.
-        # 2026-11-23: EVERY OS +1 (ubuntu 148, windows 231): bible-note-chapter-e2e held-photo check.
-        # 2026-11-23: EVERY OS +1 (ubuntu 149, windows 232): revision-update-e2e (PAUpdate after a REVISION change).
-        # 2026-11-24: WINDOWS ONLY +2 (windows 234): revision-stamp runs the Dockerfile stamp + entrypoint tar in POSIX bash.
-        # 2026-11-23: EVERY OS +1 (ubuntu 150, windows 236): release-notes-e2e (bumped version is current);
-        #   windows +1 more: bump-version-tool's version.sh parity check needs bash.
-        # 2026-11-24: EVERY OS +7 (ubuntu 157, windows 242): settings-close-e2e (sticky bar, discard guard, slow Save).
-        # 2026-11-24: EVERY OS +3 (ubuntu 160, windows 245): publish-e2e (owner publish, token-needed, member hidden).
-        # 2026-11-24: EVERY OS +2 (ubuntu 162, windows 247): app-edit-e2e (panel + change + undo, menu + phone sheet).
-        # 2026-11-24: EVERY OS +1 (ubuntu 163, windows 248): new-look (tiles, drawer 5 + More, Aa, app palette).
-        # 2026-11-24: EVERY OS +7 (ubuntu 170, windows 255): bible-verse-order-e2e (中文 first at 3 sizes, the ⚙ tick
-        #   + tip, ink + highlights across the flip at iPad portrait/landscape x both orders, the member template).
-        # 2026-11-24: EVERY OS +6 (ubuntu 178, windows 263): owner-alerts-e2e (dot + card + fix, Claude rebuild
-        #   confirm, Not today, member sees nothing, reduced motion + 375px, data box + reload mid-fix), skipped on CI by PA_E2E_SKIP.
-        # 2026-11-24: EVERY OS +2 (ubuntu 180, windows 265): stray-square-e2e (1600x900, 1180x820), skipped on CI by PA_E2E_SKIP.
-        # 2026-11-24: EVERY OS +1 (ubuntu 181, windows 266): app-chat-honesty-e2e (note + Change this app → panel prefilled), skipped on CI by PA_E2E_SKIP.
-        # 2026-11-24: EVERY OS +3 (ubuntu 184, windows 269): home-v2 (owner: chips + More menu + alert dot; member: Start here;
-        #   demo guest: welcome, Sign in, Diabetes hidden, Make an app, 390 width, reduced motion), skipped on CI by PA_E2E_SKIP.
-        # 2026-11-24: EVERY OS +7 (ubuntu 191, windows 276): drawer-sections-e2e (first open, remembered taps, keyboard,
-        #   header one line at 390/1180/dark, short-screen scroll), skipped on CI by PA_E2E_SKIP.
-        # 2026-11-24: EVERY OS +1 (ubuntu 192, windows 277): publish-e2e menu states (not in repo / up to date /
-        #   N changes), skipped on CI by PA_E2E_SKIP.
-        # 2026-11-24: EVERY OS +1 (ubuntu 193, windows 278): app-edit-e2e member test (own copy via the one app chat), skipped on CI by PA_E2E_SKIP.
-        # 2026-11-24: EVERY OS +2 (ubuntu 195, windows 280): iphone-chat-e2e (iPhone tab + home-screen PWA), skipped on CI by PA_E2E_SKIP.
-        # 2026-11-24: EVERY OS +4 (ubuntu 199, windows 284): demo-signin-link-e2e (other-browser link, expired link,
-        #   good link, 429 / sent), skipped on CI by PA_E2E_SKIP.
-        # 2026-11-25: EVERY OS +1 (ubuntu 200, windows 285): app-edit-e2e mouse bar test (F2-06), skipped on CI by PA_E2E_SKIP.
-        # 2026-11-25: EVERY OS +2 (ubuntu 202, windows 287): app-chat-camera-e2e (camera + 3-cap + retake after Undo/self-reload;
-        #   failure path + tip once), skipped on CI by PA_E2E_SKIP.
-        # 2026-11-25: windows +1 (288): app-edit-multi-apply's write half (the fake jail models POSIX rule paths).
-        # 2026-11-25: EVERY OS +7 (ubuntu 209, windows 295): menus-close-e2e (3 devices x bar hold + inventory close paths, stale Publish preview), skipped on CI by PA_E2E_SKIP.
-        # 2026-11-25: EVERY OS +9 (ubuntu 218, windows 304): tips-close-e2e (home tip x4 engine/device, blocked storage,
-        #   app tips x4), skipped on CI by PA_E2E_SKIP.
-        # 2026-11-25: EVERY OS +1 (ubuntu 219, windows 305): app-chat-sweep-ui F6 (PASnap fixed bar in Chromium), skipped on CI by PA_E2E_SKIP.
-        # 2026-11-25: EVERY OS +9 (ubuntu 228, windows 314): phone-friendly-e2e and phone-chat-notes-e2e (WebKit iPhone/iPad), skipped on CI by PA_E2E_SKIP.
-        # 2026-11-25: EVERY OS +2 (ubuntu 230, windows 316): stationery-from-photo-e2e (Chromium flow + WebKit iPhone/iPad delete-button checks), skipped on CI by PA_E2E_SKIP.
-        # 2026-11-25: EVERY OS +2 (ubuntu 232, windows 318): chat-phone-actions-e2e (440x956 and 390x844), skipped on CI by PA_E2E_SKIP.
-        # 2026-11-25: EVERY OS +4 (ubuntu 236, windows 322): fork-publish-honesty-e2e, skipped on CI by PA_E2E_SKIP.
-        # 2026-11-25: EVERY OS +1 (ubuntu 237, windows 323): journal-print-e2e, skipped on CI by PA_E2E_SKIP.
-        # 2026-11-25: EVERY OS +2 (ubuntu 239, windows 325): menu-anchor-e2e (1680 and 390 widths), skipped on CI by PA_E2E_SKIP.
-        # 2026-11-25: EVERY OS +2 (ubuntu 241, windows 327): demo-profile-name-e2e (Google and email sign-in), skipped on CI by PA_E2E_SKIP.
-        # 2026-11-25: EVERY OS +2 (ubuntu 243, windows 329): demo-app-edit-e2e (desktop + iPhone), skipped on CI by PA_E2E_SKIP.
-        # 2026-11-25: EVERY OS +8 (ubuntu 251, windows 337): app-back-e2e (4 cases x desktop + iPhone), skipped on CI by PA_E2E_SKIP.
-        # 2026-11-25: EVERY OS +11 (ubuntu 262, windows 348): panel-window-e2e (9) and panel-window-review-e2e (2), skipped on CI by PA_E2E_SKIP.
-        # 2026-11-25: EVERY OS +2 (ubuntu 264, windows 350): publish-copy-back-e2e (phone + iPad), skipped on CI by PA_E2E_SKIP.
-        # 2026-11-25: EVERY OS +3 (ubuntu 267, windows 353): demo-askai-keep-e2e (desktop + iPhone, older-page wipe), skipped on CI by PA_E2E_SKIP.
-        # 2026-11-25: EVERY OS +3 (ubuntu 270, windows 356): panel-window-dock-edge-e2e (desktop mouse, iPad finger + Pencil), skipped on CI by PA_E2E_SKIP.
-        # 2026-11-25: EVERY OS +3 (ubuntu 273, windows 359): selfpub-chat-e2e (iPhone + desktop) and selfpub-render (real Chromium), skipped on CI by PA_E2E_SKIP.
-        # 2026-11-25: EVERY OS +1 (ubuntu 274, windows 360): no-debug-overlay-e2e (WebKit triple-tap), skipped on CI by PA_E2E_SKIP.
-        # 2026-11-25: windows +17 (377): selfpub tests that are POSIX-only skip on Windows — 12 new (jail rule paths, fake CLI
-        #   permissions, checkout) and 5 already skipped there since v5.27.0 without a raise (symlinks, hooks, round 2/3, backstop symlink).
-        # 2026-11-25: EVERY OS +5 (ubuntu 279, windows 382): title-home-e2e (title Home, apostrophe, 4 chips-clearance sizes), skipped on CI by PA_E2E_SKIP.
-        # 2026-11-25: EVERY OS +4 (ubuntu 283, windows 386): chat-md-lists-e2e (desktop + iPhone) and version-time-e2e (2), skipped on CI by PA_E2E_SKIP.
-        include:
-          - os: ubuntu-latest
-            max_skipped: 283
-          - os: windows-latest
-            max_skipped: 386
+        # No per-OS skip ceiling to raise by hand any more: the guard checks every skip's REASON TAG
+        # against test/helpers-skip.mjs (which tags this OS may skip), so a new Playwright test
+        # ("[no-browser]") or POSIX-only test on Windows ("[posix-only]") passes with no edit here,
+        # and an untagged or unexpected skip fails (R14).
+        os: [ubuntu-latest, windows-latest]
     env:
-      MAX_SKIPPED: ${{ matrix.max_skipped }}
-      PA_E2E_SKIP: '1'   # no Playwright on CI: e2e files skip on purpose, still capped by MAX_SKIPPED
+      PA_E2E_SKIP: '1'   # no Playwright on CI: e2e tests skip on purpose, as "[no-browser] ..."
     steps: &steps
       # The ink tests load pinned older engines with `git show <sha>:path` as their honest
       # control (R14), so CI needs full history, not the default shallow clone.
@@ -174,6 +76,5 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 20
     env:
-      MAX_SKIPPED: 87
       PA_E2E_SKIP: '1'
     steps: *steps

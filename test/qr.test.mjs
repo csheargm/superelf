@@ -6,6 +6,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { spawnSync } from 'node:child_process';
 import { qrMatrix } from '../lib/qr.mjs';
+import { skipBecause } from './helpers-skip.mjs';
 
 // Structural guards for the dependency-free encoder, PLUS an automated
 // end-to-end decode proof against the OS decoder (CoreImage CIDetector) —
@@ -110,7 +111,7 @@ const SETUP_PAYLOAD = JSON.stringify({ u: 'http://superelf-host.tail1234.ts.net:
 test('empirical decode proof: OS decoder round-trips the exact text (v1 / realistic v5 payload / v6)', (t) => {
   for (const text of ['HELLO WORLD', SETUP_PAYLOAD, 'x'.repeat(130)]) {
     const d = osDecode(qrMatrix(text));
-    if (d.unavailable) return t.skip(`macOS CIDetector unavailable here (${d.detail || 'no osascript'}) — decode proof runs on macOS only`);
+    if (d.unavailable) return t.skip(skipBecause('darwin-only', `macOS CIDetector unavailable here (${d.detail || 'no osascript'}) — decode proof runs on macOS only`));
     assert.equal(d.text, 'DECODED:' + text);
   }
 });
@@ -129,7 +130,7 @@ test('decode-proof teeth: the review\'s "reversed format bits" variant must NOT 
     if (i < 8) m.rows[8][m.size - i - 1] = v; else if (i < 9) m.rows[8][15 - i] = v; else m.rows[8][15 - i - 1] = v;
   }
   const d = osDecode(m);
-  if (d.unavailable) return t.skip('macOS CIDetector unavailable — teeth check runs on macOS only');
+  if (d.unavailable) return t.skip(skipBecause('darwin-only', 'macOS CIDetector unavailable — teeth check runs on macOS only'));
   assert.equal(d.text, 'NO_DECODE', 'reversed order is NOT valid — the shipped order is the correct one');
   const blank = { size: 21, rows: Array.from({ length: 21 }, () => new Uint8Array(21)) };
   assert.equal(osDecode(blank).text, 'NO_DECODE', 'detector does not hallucinate successes');

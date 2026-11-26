@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import net from 'node:net';
 import { skip, MARKER, makeNode, archives, restoredOk } from './helpers-backup.mjs';
+import { skipIf } from './helpers-skip.mjs';
 
 // An agent-box-like folder outside the node: data to keep, a VM and caches to leave out.
 const BOX_KEEP = ['agent/memory.md', 'agent/.env', 'agent/browser-logins/Default/Cookies', 'data/projects/site/index.html'];
@@ -128,7 +129,7 @@ test('a pause that hangs is cut off: the folder is skipped, resume still runs, t
 // A file the backup cannot open stands in for one deleted mid-read (that race cannot be timed):
 // both fail that folder's tar, and bsdtar's copy then lacks an unknown part of the folder.
 const asRoot = process.getuid?.() === 0;
-test('an extra folder that cannot be read whole is skipped, never kept in part; the other folder and the node are backed up', { skip: skip || (asRoot && 'root reads every file') }, () => {
+test('an extra folder that cannot be read whole is skipped, never kept in part; the other folder and the node are backed up', { skip: skip || skipIf(asRoot, 'root-user', 'root reads every file') }, () => {
   const n = makeNode({ extra: (base) => ['broken', 'fine'].map((d) => ({ dir: path.join(base, d), exclude: BOX_EXCLUDE })) });
   const broken = makeBox(n.base, 'broken'), fine = makeBox(n.base, 'fine');
   fs.writeFileSync(path.join(broken, 'agent/unreadable'), MARKER, { mode: 0 });

@@ -10,11 +10,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { ocrPossible, ensureBuilt, runTool, ocrImage, ocrInk } from '../lib/note-ocr.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
+import { skipBecause } from './helpers-skip.mjs';
 
 const available = process.platform === 'darwin' && ocrPossible();
 const WHY = process.platform !== 'darwin' ? 'Apple Vision needs macOS' : 'no swiftc on PATH and no built tools/panote-ocr';
 
-test('real Vision: the tool builds, OCRs printed text it rendered itself, and reads real ink strokes', { skip: available ? false : WHY, timeout: 240000 }, async () => {
+test('real Vision: the tool builds, OCRs printed text it rendered itself, and reads real ink strokes', { skip: available ? false : skipBecause('darwin-only', WHY), timeout: 240000 }, async () => {
   const built = await ensureBuilt();
   assert.equal(built.ok, true, `ensureBuilt: ${built.error || ''}`);
   assert.ok(fs.existsSync(built.bin), 'the binary is on disk (gitignored build dir)');

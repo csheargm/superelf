@@ -12,6 +12,7 @@ import { ROOT } from './helpers-app.mjs';
 import { skip, chromium } from './helpers-note-link.mjs';
 import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, OWNER_TOKEN } from './helpers-web.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
+import { skipIf } from './helpers-skip.mjs';
 
 const SHOTS = process.env.PA_SHOTS || '';
 const PW = process.env.PA_PLAYWRIGHT ? await import(process.env.PA_PLAYWRIGHT).catch(() => null) : null;
@@ -90,7 +91,7 @@ async function openApp(page, slug) {
 
 const HOWS = ['x', 'esc', 'out'];
 for (const engine of ['chromium', 'webkit']) for (const dev of ['iphone', 'ipad']) {
-  test(`${engine} ${dev}: the home tip closes by ✕, Escape and an outside tap; stays closed on reload and on a second device`, { skip: skip || (engine === 'webkit' && !webkit), timeout: 180000 }, async () => {
+  test(`${engine} ${dev}: the home tip closes by ✕, Escape and an outside tap; stays closed on reload and on a second device`, { skip: skip || skipIf(engine === 'webkit' && !webkit, 'no-browser', 'this Playwright has no WebKit'), timeout: 180000 }, async () => {
     for (const how of HOWS) {
       await fresh();
       const ctx = await context(engine, dev); const { page, errors } = await shell(ctx);
@@ -125,7 +126,7 @@ test('chromium iphone: blocked localStorage AND a refused account write — the 
 });
 
 for (const engine of ['chromium', 'webkit']) for (const dev of ['iphone', 'ipad']) {
-  test(`${engine} ${dev}: every app tip (Notes, Bible) closes, covers no control, and stays closed on a second device`, { skip: skip || (engine === 'webkit' && !webkit), timeout: 300000 }, async () => {
+  test(`${engine} ${dev}: every app tip (Notes, Bible) closes, covers no control, and stays closed on a second device`, { skip: skip || skipIf(engine === 'webkit' && !webkit, 'no-browser', 'this Playwright has no WebKit'), timeout: 300000 }, async () => {
     await fresh(); await put({ tipsSeen: ['tip:home-more'] });   // the shell's own tip is tested above
     const found = [];
     for (const slug of ['notes', 'bible']) {

@@ -9,10 +9,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { skipIf } from './helpers-skip.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const has = (cmd) => spawnSync('sh', ['-c', `command -v ${cmd}`]).status === 0;
-export const skip = process.platform === 'win32' || !has('gpg') || !has('bash') ? 'needs bash and gpg' : false;
+export const skip = skipIf(process.platform === 'win32', 'posix-only', 'needs bash and gpg')
+  || skipIf(!has('gpg') || !has('bash'), 'no-gpg', 'needs bash and gpg');
 export const SECRET = 'test-passphrase-not-real';
 export const MARKER = 'JOURNAL-PRIVATE-MARKER-7f3a';
 const ARCHIVE = /^superelf-.+-\d{4}-\d{2}-\d{2}\.tar\.gz\.gpg$/;

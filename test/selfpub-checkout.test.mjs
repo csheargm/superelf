@@ -7,7 +7,8 @@ import path from 'node:path';
 import { selfpubFixture, tgit } from './helpers-selfpub.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
 import { ensureCheckout, startBranch, collectChange, acquireLock, deniedPath, discardBranch, git } from '../lib/selfpub/checkout.mjs';
-const POSIX_ONLY = process.platform === 'win32' && 'the core lane runs on Linux/macOS nodes; its jail rule paths, fake CLI permissions and checkout are POSIX (docs/adr/0044)';
+import { skipIf } from './helpers-skip.mjs';
+const POSIX_ONLY = skipIf(process.platform === 'win32', 'posix-only', 'the core lane runs on Linux/macOS nodes; its jail rule paths, fake CLI permissions and checkout are POSIX (docs/adr/0044)');
 
 const setup = () => { const fx = selfpubFixture(); const dir = ensureCheckout({ root: fx.root, cloneUrl: fx.bare }); return { fx, dir }; };
 
@@ -65,7 +66,7 @@ test('collectChange: writes, deletes, new files; denied paths, binaries refused;
   } finally { rmTemp(fx.d); }
 });
 
-test('symlinks are never published', { skip: process.platform === 'win32' }, () => {
+test('symlinks are never published', { skip: POSIX_ONLY }, () => {
   const { fx, dir } = setup();
   try {
     startBranch(dir, 'abcd1');
@@ -79,7 +80,7 @@ test('deny list', () => {
   for (const p of ['web/home.css', 'lib/selfpub/run.mjs', 'docs/adr/0044-self-publish.md']) assert.ok(!deniedPath(p), p);
 });
 
-test('a hook planted in the checkout never runs', { skip: process.platform === 'win32' }, () => {
+test('a hook planted in the checkout never runs', { skip: POSIX_ONLY }, () => {
   const { fx, dir } = setup();
   try {
     const mark = path.join(fx.d, 'hook-ran');

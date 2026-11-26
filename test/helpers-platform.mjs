@@ -13,6 +13,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { rmTemp } from './helpers-tmp.mjs';
+import { skipIf } from './helpers-skip.mjs';
 
 const have = (cmd, args) => {
   try { execFileSync(cmd, args, { stdio: 'ignore' }); return true; } catch { return false; }
@@ -35,25 +36,25 @@ export const CI_TIMING_FACTOR = IN_CI ? 5 : 1;
 export const SIMPLIFY_BOUND_BASE_MS = 200;   // "well under 200 ms" on the Mac; also the floor a MUTANT must exceed (slower runners only raise it)
 export const SIMPLIFY_BOUND_MS = SIMPLIFY_BOUND_BASE_MS * CI_TIMING_FACTOR;   // the one bound for stationery-simplify-budget / -share (R3)
 
-export const needBash = !HAS_BASH && 'bash is not on PATH (default Git for Windows install)';
-export const needPwsh = !HAS_PWSH && 'no PowerShell on PATH';
-export const needPerms = !HAS_POSIX_PERMS && 'chmod is a no-op on Windows';
+export const needBash = skipIf(!HAS_BASH, 'posix-only', 'bash is not on PATH (default Git for Windows install)');
+export const needPwsh = skipIf(!HAS_PWSH, 'no-pwsh', 'no PowerShell on PATH');
+export const needPerms = skipIf(!HAS_POSIX_PERMS, 'posix-only', 'chmod is a no-op on Windows');
 
 // The macOS/Linux ops scripts (install.sh, start/stop/run.sh, deploy.sh) driven in the ops sandbox:
 // a PATH made of symlinks to POSIX tools plus recording fakes. A Windows node runs the .ps1 scripts
 // instead, and Git Bash on Windows (present on CI runners) resolves tools to MSYS paths that a
 // Windows symlink cannot point at. Windows is not a platform these scripts serve.
 export const needPosixOps = needBash
-  || (process.platform === 'win32' && 'the macOS/Linux ops scripts do not run on Windows (it has the .ps1 scripts)');
+  || skipIf(process.platform === "win32", 'posix-only', 'the macOS/Linux ops scripts do not run on Windows (it has the .ps1 scripts)');
 
 // flock(1) is util-linux: on every systemd distro deploy.sh runs on, absent on macOS. Its refusal
 // path is tested everywhere against a fake; only the REAL tool's fd semantics need the real one.
-export const needFlock = !have('flock', ['--version']) && 'no flock(1) on this machine (util-linux; macOS has none)';
+export const needFlock = skipIf(!have('flock', ['--version']), 'no-flock', 'no flock(1) on this machine (util-linux; macOS has none)');
 
 // Windows has no POSIX signals: child.kill('SIGTERM') terminates the process outright, so a
 // graceful SIGTERM handler (what launchd bootout and systemctl stop rely on) can never run there.
-export const needPosixSignals = process.platform === 'win32'
-  && 'Windows has no POSIX signals: kill(SIGTERM) terminates outright, no handler runs';
+export const needPosixSignals = skipIf(process.platform === "win32", 'posix-only',
+  'Windows has no POSIX signals: kill(SIGTERM) terminates outright, no handler runs');
 
 // Windows (and macOS by default) match file names case-insensitively; most Linux filesystems do
 // not. A test that simulates Windows name resolution on THIS disk needs the Windows behaviour, so
@@ -67,8 +68,8 @@ const caseInsensitiveFs = () => {
   } catch { return false; }   // cannot tell: treated as case-sensitive, so the test SKIPS (never passes)
   finally { if (dir) rmTemp(dir); }
 };
-export const needCaseInsensitiveFs = !caseInsensitiveFs()
-  && 'this filesystem is case-sensitive; Windows name resolution (claude.cmd found via .CMD) cannot be simulated on it';
+export const needCaseInsensitiveFs = skipIf(!caseInsensitiveFs(), 'case-sensitive-fs',
+  'this filesystem is case-sensitive; Windows name resolution (claude.cmd found via .CMD) cannot be simulated on it');
 
 // A fake npm CLI that this OS can really launch · 本机真能启动的假命令行工具
 //

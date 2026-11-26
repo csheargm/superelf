@@ -22,6 +22,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { IN_CI } from './helpers-platform.mjs';   // CI means exactly CI=true (one definition, R3)
+import { skipBecause } from './helpers-skip.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DENYLIST_REL = 'workspace/identity-denylist.txt';
@@ -92,8 +93,8 @@ function offenders(files, entries) {
 test('no tracked file carries the identity of whoever runs this', (t) => {
   const entries = identityList();
   if (!entries.length) {
-    return t.skip(IN_CI ? 'CI: the OS login is a generic runner account; no config.json, no denylist file'
-      : 'nothing to check: no OS login, no owner in config.json, no denylist file');
+    return t.skip(IN_CI ? skipBecause('ci-runner', 'CI: the OS login is a generic runner account; no config.json, no denylist file')
+      : skipBecause('env-moot', 'nothing to check: no OS login, no owner in config.json, no denylist file'));
   }
   // R14 controls: a green result must mean absence, not a matcher that never fires.
   assert.ok(matcherFor(entries[0]).test(`x ${entries[0]} y`), 'CONTROL: the matcher must match its own entry');

@@ -17,6 +17,7 @@ import { execFileSync, spawnSync, spawn } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { freePort, releasePort, portWindowFor, PORT_POOL, PORT_WINDOW as SPAN, mkWebRoot, startWeb, stopWeb, waitReady, lockFileFor, pidAlive, STALE_EMPTY_MS, FETCH_BLOCKED_PORTS } from './helpers-web.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
+import { skipIf, skipBecause } from './helpers-skip.mjs';
 // SPAN: windows are SPAN-wide and SPAN-aligned, so "different" implies "disjoint".
 
 // Can `p` be bound: on 127.0.0.1 (bindable), or on every interface, as web.mjs binds (listensLikeWeb)?
@@ -140,7 +141,7 @@ test('the pool sits below every OS\'s DEFAULT ephemeral range (Linux starts at 3
   }
 });
 
-test('the pool is disjoint from THIS machine\'s ephemeral range', { skip: !rangeOk && 'cannot read this OS\'s ephemeral port range' }, () => {
+test('the pool is disjoint from THIS machine\'s ephemeral range', { skip: skipIf(!rangeOk, 'env-moot', 'cannot read this OS\'s ephemeral port range') }, () => {
   // listen(0) in a parallel test file, or any outbound connection, takes a port from this range.
   // A pool port inside it can be taken between the probe's close and web.mjs's bind.
   assert.ok(PORT_POOL.hi <= RANGE.lo || PORT_POOL.lo > RANGE.hi,
@@ -150,7 +151,7 @@ test('the pool is disjoint from THIS machine\'s ephemeral range', { skip: !range
 test('a port held on another interface is never handed out if web.mjs could not bind it', async (t) => {
   // Shaped like the CI runner's own connections: something holds the port on a NON-loopback address.
   const ip = Object.values(os.networkInterfaces()).flat().find((a) => a.family === 'IPv4' && !a.internal)?.address;
-  if (!ip) { t.skip('no non-loopback IPv4 interface to hold a port on'); return; }
+  if (!ip) { t.skip(skipBecause('env-moot', 'no non-loopback IPv4 interface to hold a port on')); return; }
   const next = nextAfter(await freePort());
   const squatter = await new Promise((r, j) => { const s = net.createServer(); s.once('error', j); s.listen(next, ip, () => r(s)); });
   try {
@@ -165,7 +166,7 @@ test('a port held on another interface is never handed out if web.mjs could not 
       assert.equal(fooled, true, 'precondition: on Linux a 127.0.0.1 probe misses a holder that blocks web.mjs '
         + `(127.0.0.1 probe says free: ${looksFree}; web.mjs-style bind succeeds: ${webBinds})`);
     } else if (!fooled) {
-      t.skip(`a 127.0.0.1 probe is not fooled on ${process.platform}, so this cannot tell the old probe from the new`);
+      t.skip(skipBecause('env-moot', `a 127.0.0.1 probe is not fooled on ${process.platform}, so this cannot tell the old probe from the new`));
       return;
     }
     const got = await freePort();
@@ -188,7 +189,7 @@ async function plant(p, pid) {
 
 test('a port another LIVE process has reserved is never handed out', async (t) => {
   const next = nextAfter(await freePort());
-  if (!(await plant(next, process.ppid))) return t.skip(`${next} is busy or already reserved: nothing to prove`);
+  if (!(await plant(next, process.ppid))) return t.skip(skipBecause('env-moot', `${next} is busy or already reserved: nothing to prove`));
   try {
     assert.notEqual(await freePort(), next, `${next} is reserved by pid ${process.ppid} (the runner) and must be skipped`);
   } finally { if (fs.readFileSync(lockFileFor(next), 'utf8') === String(process.ppid)) fs.rmSync(lockFileFor(next)); }
@@ -197,8 +198,8 @@ test('a port another LIVE process has reserved is never handed out', async (t) =
 test('a reservation whose owner is gone is taken over', async (t) => {
   const next = nextAfter(await freePort());
   const dead = spawnSync(process.execPath, ['-e', '']).pid;   // exited by the time spawnSync returns
-  if (pidAlive(dead)) return t.skip(`pid ${dead} was reused at once (Windows recycles pids): nothing to prove`);
-  if (!(await plant(next, dead))) return t.skip(`${next} is busy or already reserved: nothing to prove`);
+  if (pidAlive(dead)) return t.skip(skipBecause('env-moot', `pid ${dead} was reused at once (Windows recycles pids): nothing to prove`));
+  if (!(await plant(next, dead))) return t.skip(skipBecause('env-moot', `${next} is busy or already reserved: nothing to prove`));
   assert.equal(await freePort(), next, `a lock left by dead pid ${dead} must not hold ${next} forever`);
   assert.equal(fs.readFileSync(lockFileFor(next), 'utf8'), String(process.pid), 'and it is now this process\'s');
 });
@@ -242,7 +243,7 @@ test('a restarted root is not ready on its previous boot\'s listen line', async 
 // A lock with no pid yet is being written; one that stays empty was abandoned and is taken over.
 test('an empty lock is skipped while fresh and taken over once stale', async (t) => {
   const next = nextAfter(await freePort());
-  if (!(await plant(next, ''))) return t.skip(`${next} is busy or already reserved: nothing to prove`);
+  if (!(await plant(next, ''))) return t.skip(skipBecause('env-moot', `${next} is busy or already reserved: nothing to prove`));
   assert.notEqual(await freePort(), next, 'a fresh empty lock is still being written: skipped');
   const then = (Date.now() - STALE_EMPTY_MS - 1000) / 1000;
   fs.utimesSync(lockFileFor(next), then, then);
@@ -284,7 +285,7 @@ test('a port fetch() refuses is never handed out', async (t) => {
     assert.ok(p >= PORT_POOL.lo && p < PORT_POOL.hi, `${p} is in the pool, so a process's window can reach it`);
     await assert.rejects(fetch(`http://127.0.0.1:${p}/`), (e) => /bad port/.test(String(e.cause && e.cause.message)), 'CONTROL: fetch refuses it');
     const start = PORT_POOL.lo + Math.floor((p - PORT_POOL.lo) / SPAN) * SPAN;
-    if (start === portWindowFor(process.pid)) return t.skip(`this file's own window holds ${p}, and its tests already hold that window's ports`);
+    if (start === portWindowFor(process.pid)) return t.skip(skipBecause('env-moot', `this file's own window holds ${p}, and its tests already hold that window's ports`));
     const helper = pathToFileURL(path.join(path.dirname(fileURLToPath(import.meta.url)), 'helpers-web.mjs')).href;
     const out = execFileSync(process.execPath, ['--input-type=module', '-e',
       `const { freePort } = await import(${JSON.stringify(helper)}); const got = [];
