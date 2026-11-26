@@ -68,6 +68,13 @@ for (const [name, opts] of SIZES) {
     if (name === 'desktop') await tip.waitFor({ timeout: 10000 });   // first open on this account: the tip beside the button
     else { await page.waitForTimeout(1500); assert.equal(await tip.count(), 0, 'the tip shows once per account (the desktop run used it up)'); }
     await shot(page, `tip-${name}`);
+    // A screen that cannot be drawn: said in a line at the chips, nothing attached, and the home stays (GPT review).
+    await page.evaluate(() => { window._shot = PASnap.shot; PASnap.shot = () => Promise.reject(new Error('tainted')); });
+    await cam.click();
+    await page.locator('#camNote', { hasText: '这个画面截不下来' }).waitFor();
+    assert.equal(await page.locator('.chip.shot').count(), 0);
+    assert.ok(await page.evaluate(() => document.body.classList.contains('home-on')), 'the home is still showing');
+    await page.evaluate(() => { PASnap.shot = window._shot; });
     for (let i = 1; i <= 4; i++) { await cam.click(); await page.locator('.chip.shot').nth(Math.min(i, 3) - 1).waitFor({ timeout: 10000 }); await page.waitForTimeout(150); }
     assert.equal(await page.locator('.chip.shot').count(), 3, 'at most 3 screenshots in one message');
     assert.match(await page.locator('.chip.shot .ctime').first().innerText(), /^\d\d:\d\d:\d\d$/, 'each shot shows when it was taken');

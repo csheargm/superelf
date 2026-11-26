@@ -15,43 +15,43 @@ var PAShellCam=(function(){
   };
   const TIP_KEY='tip:main-chat-camera';
   // 64px: on a touch screen touch-base.css makes every button 44px, so the × gets the top-right 44px and the time strip stays visible.
-  const CSS='#camNote{font-size:13px;color:var(--muted);padding:2px 4px 6px;max-width:660px;margin:0 auto}'+
+  const CSS='#camNote{flex-basis:100%;font-size:13px;color:var(--muted);padding:2px 4px}'+
     '.chip.shot{position:relative;width:64px;height:64px;padding:0;border-radius:8px;overflow:hidden;max-width:none}'+
     '.chip.shot img{width:100%;height:100%;object-fit:cover;display:block}'+
     '.chip.shot .ctime{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);color:#fff;font-size:9px;line-height:12px;text-align:center;pointer-events:none}'+
     '#cam svg{width:22px;height:22px;display:block}'+
     // Each icon button is 44px with a 22px glyph, so the glyphs keep a clear gap when the boxes touch: the room goes to the
     // input, whose whole 中文 hint must fit at 390 (measured in test/shell-cam-e2e.test.mjs).
-    '#plus+#cam{margin-left:-8px}#cam+#box{padding-left:0}'+
+    '#plus+#cam,#cam+#box{margin-left:-4px}#cam+#box{padding-left:0}'+   // -4px cancels the row's 4px gap: touching, never overlapping
 
     '.chip.shot button{position:absolute;top:0;right:0;width:24px;height:24px;padding:0;background:none;display:flex;align-items:flex-start;justify-content:flex-end}'+
     '.chip.shot button span{width:22px;height:22px;line-height:22px;text-align:center;background:rgba(0,0,0,.55);color:#fff;font-size:13px;border-bottom-left-radius:8px}';
   const NOTE_MS=8000;
-  let seq=0, busy=false;
+  let seq=0, busy=false, epoch=0;   // epoch: bumped on every chat switch (setConvo), even A → B → A (GPT review r2)
   // The thumbnail chip, for renderChips: a.thumb is the PNG data URL PASnap drew (escaped like every other value).
   function chipHtml(a,i,esc){
     return `<div class="chip shot"><img src="${esc(a.thumb)}" alt=""><span class="ctime">${esc(a.label||'')}</span><button type="button" title="移除 · Remove" aria-label="移除 · Remove" onclick="removeChip(${i})"><span>×</span></button></div>`;
   }
   // Our own shots in the draft, oldest first, in PAShotFresh's shape (gen is always 0: the shell never reloads under a draft).
   const mine=(atts)=>atts.filter((a)=>a.shot).map((a)=>({path:a.path,gen:0,mine:true}));
-  // A status line just above the chips (both on the home and in a chat), gone after a while: never add(), which leaves the home (GPT review).
+  // A status line at the head of the chips (both on the home and in a chat), gone after a while: never add(), which leaves the home (GPT review).
   function say(t){
     const c=document.getElementById('chips'); if(!c) return;
     let n=document.getElementById('camNote');
     if(!n){ n=document.createElement('div'); n.id='camNote'; n.setAttribute('role','status'); }
-    c.before(n); n.textContent=t; clearTimeout(say.t); say.t=setTimeout(()=>n.remove(),NOTE_MS);
+    c.prepend(n); n.textContent=t;   // inside #chips: it moves with them between the home and a chat (GPT review r2); the next renderChips clears it clearTimeout(say.t); say.t=setTimeout(()=>n.remove(),NOTE_MS);
   }
   async function take(h){
     if(busy) return; busy=true;
     try{
-      const at=Date.now(), draft=h.atts(), convo=h.convo();   // a send replaces the draft array; a chat switch changes convo
+      const at=Date.now(), draft=h.atts(), e0=epoch;   // a send replaces the draft array; a chat switch bumps epoch
       let url;
       try{ url=await PASnap.shot(); }
       catch(_){ h.say(T.fail); return; }   // fails closed: said, nothing attached (WebKit taint, blank, too large)
       const name='screen-home-'+at+'-'+(++seq)+'.png';
       const g=await h.upload({name,data:url.split(',')[1]});
       if(!(g&&g.ok&&g.path)){ h.say(T.up+((g&&g.error)?' — '+g.error:'')); return; }
-      if(h.atts()!==draft||h.convo()!==convo) return;   // sent or switched meanwhile: never into the next draft or another chat (GPT review)
+      if(h.atts()!==draft||epoch!==e0) return;   // sent or switched meanwhile: never into the next draft or another chat (GPT review)
       const drop=PAShotFresh.makeRoom(mine(draft),0);   // the 4th drops the oldest of ours; a user's photo never
       for(let i=draft.length-1;i>=0;i--) if(drop.includes(draft[i].path)) draft.splice(i,1);
       draft.push({name,path:g.path,thumb:url,label:PAShotFresh.label(at),shot:true});   // the time it was taken, not uploaded
@@ -78,5 +78,6 @@ var PAShellCam=(function(){
     // PASnap (web/snap.inline.html) is inlined at the END of the shell's body, after this script: used from DOMContentLoaded on.
     document.addEventListener('DOMContentLoaded',()=>{ b.innerHTML=PASnap.CAM_SVG; if(!_SEEN.has(TIP_KEY)) PATipsShell.tip(TIP_KEY,'#cam',T.tip,{priority:true,dismissOnUse:true}); });   // the ONE tip mechanism, beside the button
   }
-  return {bind,chipHtml,take,say,T,TIP_KEY};
+  const cancel=()=>{ epoch++; };
+  return {bind,chipHtml,take,say,cancel,T,TIP_KEY};
 })();

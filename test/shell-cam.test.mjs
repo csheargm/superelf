@@ -14,10 +14,10 @@ const PNG = 'data:image/png;base64,iVBORw0KGgo=';
 function load({ shot = async () => PNG, upload = async (b) => ({ ok: true, path: 'uploads/' + b.name }) } = {}) {
   const ctx = { PASnap: { shot, CAM_SVG: '<svg></svg>' } };
   vm.runInNewContext(fresh + ';' + read('web/shell-cam.js') + ';this.C=PAShellCam;this.F=PAShotFresh;', ctx);
-  let atts = [], convo = 'c1'; const said = []; let renders = 0;
-  const h = { atts: () => atts, render: () => renders++, say: (t) => said.push(t), upload, convo: () => convo };
+  let atts = []; const said = []; let renders = 0;
+  const h = { atts: () => atts, render: () => renders++, say: (t) => said.push(t), upload };
   return { C: ctx.C, F: ctx.F, h, get atts() { return atts; }, said, renders: () => renders,
-    send: () => { atts = []; }, switchTo: (c) => { convo = c; } };
+    send: () => { atts = []; }, switchTo: () => ctx.C.cancel() };
 }
 
 test('a tap uploads the drawn PNG and attaches it with its time label', async () => {
@@ -39,8 +39,8 @@ test('a send or a chat switch during the capture: the picture never lands in the
   let go; const L = load({ upload: (b) => new Promise((r) => { go = () => r({ ok: true, path: 'uploads/' + b.name }); }) });
   let p = L.C.take(L.h); await new Promise((r) => setImmediate(r)); L.send(); go(); await p;
   assert.equal(L.atts.length, 0, 'sent meanwhile: the new draft stays empty');
-  p = L.C.take(L.h); await new Promise((r) => setImmediate(r)); L.switchTo('c2'); go(); await p;
-  assert.equal(L.atts.length, 0, 'another chat opened meanwhile');
+  p = L.C.take(L.h); await new Promise((r) => setImmediate(r)); L.switchTo(); L.switchTo(); go(); await p;
+  assert.equal(L.atts.length, 0, 'another chat opened meanwhile, even A → B → A (same draft array)');
 });
 test('the label is the time the picture was taken, not when the upload finished', async () => {
   let go; const L = load({ upload: (b) => new Promise((r) => { go = () => r({ ok: true, path: 'uploads/' + b.name }); }) });
@@ -67,5 +67,6 @@ test('one engine (R3): the shell carries PASnap + PAShotFresh from snap.inline.h
   assert.equal((read('web/app-edit-panel.html') + read('web/shell-cam.js')).includes('M4 8h3l2-2.5h6L17 8h3v11H4z'), false, 'the camera icon lives only in snap.inline.html');
   assert.ok(read('web/app-edit-panel.html').includes('svg:PASnap.CAM_SVG'));
   assert.ok(shell.indexOf('var PASnapNoAnswer=true') < shell.indexOf('var PASnap = PASnap ||'), 'the shell never answers a snap request, even framed');
+  assert.match(shell, /function setConvo\(id\)\{ convoId=id; if\(window\.PAShellCam\) PAShellCam\.cancel\(\);/, 'every chat switch cancels a capture in flight');
   assert.match(read('web/snap.inline.html'), /typeof PASnapNoAnswer==='undefined'\) addEventListener\('message'/);
 });
