@@ -53,11 +53,17 @@ for (const [name, opts] of SIZES) {
     await page.waitForFunction(() => !document.querySelector('#login[open]'));
     const cam = page.locator('#cam');
     await cam.waitFor();
+    await page.waitForFunction(() => document.querySelector('#homeForm #cam') && document.querySelector('#cam svg'));   // the composer row sits in the home ask box
     assert.equal(await cam.getAttribute('aria-label'), '截取当前画面 · Capture the screen as it looks now');
     const plus = await page.locator('#plus').boundingBox(), c = await cam.boundingBox(), send = await page.locator('#send').boundingBox(), box = await page.locator('#box').boundingBox();
     assert.ok(c.width >= 44 && c.height >= 44, `44px tap target: ${c.width}x${c.height}`);
-    assert.ok(Math.abs(c.y - plus.y) < 6 && c.x > plus.x && c.x < box.x, 'the camera sits between ＋ and the input');
+    assert.ok(Math.abs(c.y - plus.y) < 6 && c.x > plus.x && c.x < box.x, `the camera sits between ＋ and the input: ${JSON.stringify({ plus, c, box })}`);
     assert.ok(send.x + send.width <= opts.viewport.width, 'send stays on screen');
+    const hint = await page.evaluate(() => { const ph = document.querySelector('#hPh'), s = [...ph.children].find((e) => getComputedStyle(e).display !== 'none'), c = document.querySelector('#cam').getBoundingClientRect();
+      const zh = s.firstChild, rg = document.createRange(); rg.selectNodeContents(zh); const z = rg.getBoundingClientRect(), p = ph.getBoundingClientRect();
+      return { left: p.left, camRight: c.right, zhW: z.width, room: p.width }; });
+    assert.ok(hint.left >= hint.camRight, `the home hint starts after the camera: ${JSON.stringify(hint)}`);
+    assert.ok(hint.zhW <= hint.room + 0.5, `the 中文 hint line fits whole: ${JSON.stringify(hint)}`);
     const tip = page.locator('.pat-tip', { hasText: '点 📷 截取当前画面' });
     if (name === 'desktop') await tip.waitFor({ timeout: 10000 });   // first open on this account: the tip beside the button
     else { await page.waitForTimeout(1500); assert.equal(await tip.count(), 0, 'the tip shows once per account (the desktop run used it up)'); }

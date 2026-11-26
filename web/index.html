@@ -391,7 +391,6 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
 <div id="lightbox"><button id="lightbox-close">✕</button><img id="lightbox-img" src="" alt=""><div style="position:absolute;bottom:calc(env(safe-area-inset-bottom)+16px);left:0;right:0;text-align:center;color:rgba(255,255,255,.55);font-size:13px;pointer-events:none;">Tap outside image to close</div></div>
 <div id="frame"><div class="bar"><button class="plain" id="back" data-icon="back">主页 · Home</button><b id="ftitle" style="flex:1"></b><button class="plain" id="fmore" style="display:none" title="更多 · More" aria-label="More" data-icon="more"></button><span class="aa"><button class="ibtn aa-btn" type="button" title="字号 · Text size" aria-label="字号 · Text size" aria-expanded="false">Aa</button><span class="aa-set"><button class="ibtn fs-dn" id="fs-dn">A−</button><button class="ibtn fs-up" id="fs-up">A+</button></span></span></div><button id="barpeek" class="plain" title="显示应用栏 · Show the app bar" aria-label="Show the app bar"></button><iframe id="fr" sandbox="allow-scripts" allow="clipboard-write;microphone"></iframe></div>
 <!--PA_SETTINGS_DIALOG-->
-<!--PA_SNAP_UI-->   <!-- PASnap + PAShotFresh (web/snap.inline.html): the main chat camera draws with the app chat's engine -->
 <dialog id="actConfirm" style="max-width:340px">
   <div id="acText" style="margin-bottom:14px;overflow-wrap:anywhere"></div>
   <div style="display:flex;gap:8px;justify-content:flex-end">
@@ -2718,7 +2717,7 @@ $('#reload').onclick=()=>{ try{ sessionStorage.setItem('pa_refreshing','1'); }ca
 /* PA_APP_EDIT_JS */
 PAAppEdit.bindBar();
 /* PA_SHELL_CAM_JS */
-PAShellCam.bind({atts:()=>attachments,render:renderChips,say:(t)=>add('err','⚠ '+t),
+PAShellCam.bind({atts:()=>attachments,render:renderChips,say:(t)=>PAShellCam.say('⚠ '+t),convo:()=>convoId,
   upload:(b)=>relayCall('/api/upload',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(b)},'raw')});
 /* PA_UPDATE_JS */   /* TODO(R4 seam): the boot block below (reload, loaders, new-feature dots) belongs in web/boot.js like app-frame.js */
 /* PA_SW_CLIENT_JS */
@@ -2797,6 +2796,8 @@ const LOG_COMPOSER_GAP_PX=8;   // space between the last message and the compose
 // Must be a window property — a top-level const is NOT reachable as window._VER_NOTES.
 try{ window._VER_NOTES=JSON.parse(`<!--APP_NOTES-->`); }catch{ /* R5: raw file or bad embed → sheet shows its in-page empty message */ }
 </script>
+<script>var PASnapNoAnswer=true;</script>   <!-- the shell never answers a snap request: a page that frames it must not get a picture of it (GPT review) -->
+<!--PA_SNAP_UI-->   <!-- PASnap + PAShotFresh (web/snap.inline.html): the main chat camera draws with the app chat's engine -->
 <!--PA_TIPS_UI-->   <!-- PATips (web/tips.inline.html): after the shell script, before DOMContentLoaded registers the first tip -->
 </body>
 </html>
