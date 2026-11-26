@@ -17,4 +17,4 @@ The demo stored no email, no per-app activity and no history (quota counters res
 ## Consequences
 - The demo now holds emails; Delete my account removes them and the visitor's usage rows.
 - App opens are counted for the app's own visitor (demo apps live in each visitor's workspace); a
-  page reload counts again. An 8-hex network prefix could name two networks; Reset then clears both.
+  reopen counts again after a minute. "AI" counts visitor turns, not model calls inside a build. An app's Ask AI has no app name (the broker does not send one), so it counts toward the visitor's AI total only. Reset names the exact salted hash; the 8-hex prefix is display only.

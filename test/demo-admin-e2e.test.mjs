@@ -56,7 +56,7 @@ async function settled(page) {
 async function signedIn(sub, email) {
   const ctx = await browser.newContext(VIEW);
   await ctx.addInitScript((s) => { if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('sb_session', s); } },
-    JSON.stringify({ a: sb.jwt({ sub, email }), r: 'refresh', e: Math.floor(Date.now() / 1000) + 3600 }));
+    JSON.stringify({ a: sb.jwt({ sub, email, amr: [{ method: 'otp', timestamp: 1 }] }), r: 'refresh', e: Math.floor(Date.now() / 1000) + 3600 }));
   const page = await ctx.newPage();
   await page.goto(`http://127.0.0.1:${port}/`);
   await settled(page);

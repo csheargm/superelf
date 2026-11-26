@@ -97,7 +97,7 @@ removed on request.
   (visits, new visitors, networks by short hash, 清零 · Reset on a network at the cap), People (name,
   email, first/last visit, AI today vs cap, AI over 14 days, their apps), Apps (people, opens, AI,
   builds, edits), Waiting list, 14-day trend. Anyone else gets 404 from `/api/demo/admin/*`.
-- Recorded: per UTC day, per visitor and app: opens, AI calls, builds, edits; visits and new visitors
+- Recorded: per UTC day, per visitor and app: opens (once a minute, real apps only), AI turns (a chat or Ask AI request, not each model call inside a build), builds, edits; visits and new visitors
   per network short hash (8 hex of the salted hash). Never message text, prompts, searches or IPs.
   The owner's test requests (`x-superelf-test`) are not counted.
 - A signed-in visitor's sign-in email and account name are kept in `demo-users.json` (the sign-in

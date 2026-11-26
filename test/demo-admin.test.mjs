@@ -52,7 +52,7 @@ test('non-admins get 404 from every admin path; the admin email gets the summary
     assert.equal((await call(p, { sbToken: 'not.a.jwt' })).status, 404, `bad token ${p}`);
   }
   assert.equal((await call(ADMIN_PATHS.reset, { method: 'POST', sbToken: member, body: '{"net":"00000000"}' })).status, 404);
-  const admin = sb.jwt({ sub: 'owner-1', email: ADMIN });
+  const admin = sb.jwt({ sub: 'owner-1', email: ADMIN, amr: [{ method: 'otp', timestamp: 1 }] });
   assert.equal((await call(ADMIN_PATHS.me, { sbToken: admin })).status, 200);
   const s = await (await call(`${ADMIN_PATHS.summary}?days=14`, { sbToken: admin })).json();
   assert.equal(s.ok, true); assert.equal(s.trend.length, 14);
@@ -69,12 +69,12 @@ test('Reset clears only that network\'s visit counters today, and is audited', a
   const ip = '203.0.113.50';
   await call('/api/demo/start', { method: 'POST', ip }); await call('/api/demo/start', { method: 'POST', ip });
   assert.equal((await call('/api/demo/start', { method: 'POST', ip })).status, 429, 'the network is at the cap');
-  const admin = sb.jwt({ sub: 'owner-1', email: ADMIN });
+  const admin = sb.jwt({ sub: 'owner-1', email: ADMIN, amr: [{ method: 'otp', timestamp: 1 }] });
   const s = await (await call(ADMIN_PATHS.summary, { sbToken: admin })).json();
   const blocked = s.today.nets.filter((n) => n.blocked);
   assert.equal(blocked.length, 1);
   const others = s.today.nets.filter((n) => !n.blocked).map((n) => [n.net, n.visits]);
-  const r = await (await call(ADMIN_PATHS.reset, { method: 'POST', sbToken: admin, body: JSON.stringify({ net: blocked[0].net }) })).json();
+  const r = await (await call(ADMIN_PATHS.reset, { method: 'POST', sbToken: admin, body: JSON.stringify({ net: blocked[0].id }) })).json();
   assert.deepEqual(r, { ok: true, removed: 2 });
   assert.equal((await call('/api/demo/start', { method: 'POST', ip })).status, 200, 'the network may visit again');
   const after = await (await call(ADMIN_PATHS.summary, { sbToken: admin })).json();
