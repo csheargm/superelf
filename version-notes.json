@@ -1,4 +1,13 @@
 {
+  "v5.34.5": {
+    "date": "2026-11-26",
+    "time": "2026-11-26T21:23:40.474Z",
+    "features": [],
+    "fixes": [
+      "合并：📷 提示排序后的过期 e2e 断言、⋯ 菜单变宽跑出左边 · Merge: stale e2e tip-order expectations after the camera tip; a widened ⋯ menu ran past the left edge"
+    ],
+    "through": "4c1a09dae0ab332cfe753a8afdd057c148ec72cb"
+  },
   "v5.34.4": {
     "date": "2026-11-26",
     "time": "2026-11-26T21:17:43.907Z",
