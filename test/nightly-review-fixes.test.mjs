@@ -23,7 +23,7 @@ import { runJob } from '../lib/autonomy.mjs';
 
 const tmp = () => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'nrfix-')));
 const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
-const NOT_ROOT_POSIX = skipIf(process.platform === 'win32' || (process.getuid && process.getuid() === 0), 'posix-non-root', 'needs a read-only folder that the user cannot write');
+const NOT_ROOT_POSIX = skipIf(process.platform === 'win32' || (process.getuid && process.getuid() === 0), 'posix-only', 'needs a POSIX read-only folder the (non-root) user cannot write');
 
 test('nightly config: two repo names that share a checkout folder are refused', () => {
   const cfg = (names) => ({ nightly_review: { enabled: true, dir: '/tmp/nr', repos: names.map((name) => ({ name, url: 'https://github.com/o/r.git' })) } });
