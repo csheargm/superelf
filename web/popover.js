@@ -73,6 +73,7 @@ function armMenuPop(anchor){
 const MENU_GAP=6, MENU_EDGE=8;
 function placeMenu(m,a){
   m.style.maxWidth=(innerWidth-2*MENU_EDGE)+'px';   // measured at its natural width (up to the window), then anchored so its left edge stays inside
+  m.style.left='0'; m.style.right='auto';   // a re-place (a line that arrived later) measures unconstrained: at the old spot shrink-to-fit capped it at the room left of its ⋯, so a wider menu ran past the left edge (menu-anchor-e2e, 390)
   const r=a.getBoundingClientRect(), q=m.getBoundingClientRect();
   const right=Math.min(innerWidth-MENU_EDGE,Math.max(r.right,q.width+MENU_EDGE));
   let top=r.bottom+MENU_GAP; if(top+q.height>innerHeight-MENU_EDGE) top=Math.max(MENU_EDGE,r.top-MENU_GAP-q.height);
@@ -80,6 +81,8 @@ function placeMenu(m,a){
   const o=op?op.getBoundingClientRect():{top:0,right:innerWidth};
   m.style.left='auto'; m.style.top=(top-o.top)+'px'; m.style.right=(o.right-right)+'px';
   m._paAnchor=a;   // web/publish.js showState places it again when a later line widens it   // web/publish.js showState places it again when its line arrives
+  // Any later change of its size (an Undo row, a Publish state line, a share line) places it again: one rule for every late line.
+  if(!m._paRO&&typeof ResizeObserver==='function'){ m._paRO=new ResizeObserver(()=>{ if(m.isConnected&&!m.hidden&&m._paAnchor&&m._paAnchor.isConnected) placeMenu(m,m._paAnchor); }); m._paRO.observe(m); }
 }
 // Leaving or changing the app (goHome, openApp) closes every popover AND the Publish sheet: neither belongs to the next page.
 // _popGen: a reply that arrives after the user moved on (a slow Publish preview) must not open a sheet then.

@@ -105,6 +105,8 @@ test('USER FLOW owner: name + task chip, ⋯ holds every moved control, alert do
     assert.match(await page.textContent('#hChips'), /3 件待办 · 3 tasks/);
     assert.equal(await page.isVisible('#hAvatar'), true); assert.equal(await page.isVisible('#homeForm #box'), true, 'the ask ring holds the one composer');
     const apps = await homeApps(page); assert.equal(new Set(apps).size, apps.length, `no app twice: ${apps}`);
+    const camTip = page.locator('.pat-tip[data-tip="tip:main-chat-camera"] .pat-x');   // web/shell-cam.js's priority tip shows first on a fresh browser: closed, the ⋯ tip follows
+    if (await camTip.waitFor({ timeout: 5000 }).then(() => true, () => false)) { await camTip.click(); await page.evaluate(() => window.PATips.whenIdle()); }
     assert.equal(await page.waitForSelector('.pat-tip[data-tip="tip:home-more"]', { timeout: 5000 }).then(() => true, () => false), true, 'first-use tip beside ⋯ (PATips)');
     assert.equal(await page.isVisible('#settings'), false);
     await page.click('#hmore');

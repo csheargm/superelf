@@ -138,7 +138,9 @@ test('the build pill sits below the header at phone width, also once the header 
   const grow = await page.evaluate(() => { const h = document.querySelector('header'), b0 = h.getBoundingClientRect().bottom; h.style.paddingBottom = '40px'; return h.getBoundingClientRect().bottom - b0; });
   assert.ok(grow > 20, 'CONTROL: the header really grew past the old fixed 60px');
   await waitFor(async () => (await gap()) >= 0, 'the pill follows the header');
-  if (await page.waitForSelector('.pat-tip[data-tip="tip:home-more"]', { timeout: 5000 }).then(() => true, () => false)) await page.keyboard.press('Escape');   // one tip at a time: the home one first
+  for (const id of ['tip:main-chat-camera', 'tip:home-more']) {   // one tip at a time: the camera's priority tip, then the home one, then ours
+    if (await page.waitForSelector(`.pat-tip[data-tip="${id}"]`, { timeout: 5000 }).then(() => true, () => false)) { await page.keyboard.press('Escape'); await page.evaluate(() => window.PATips.whenIdle()); }
+  }
   await page.waitForSelector('.pat-tip[data-tip="tip:demo-build"]', { timeout: 5000 });   // the ONE tip mechanism: the next tip follows a dismissal in the shell
   const tip = await page.evaluate(() => document.querySelector('.pat-tip').getBoundingClientRect().top - document.getElementById('demoBuild').getBoundingClientRect().bottom);
   assert.ok(tip >= 0, 'the tip sits under the pill');

@@ -35,6 +35,7 @@ async function openHome(page) {
 }
 async function openRow(page) {
   await page.evaluate(() => openDrawer());
+  await page.waitForFunction(() => { try { return !!ME && ME.drawerOpen !== undefined; } catch { return false; } });   // the account's drawer state (the 1680 run saved 我的应用 open) is painted: read aria-expanded after it, never before
   if ((await page.getAttribute('#secApps .dsec-head', 'aria-expanded')) !== 'true') await page.click('#secApps .dsec-head');
   await page.click('[data-appmenu="todo"]'); await page.locator('#appMenu').waitFor();
 }

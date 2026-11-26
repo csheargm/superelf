@@ -53,7 +53,9 @@ const standalone = () => { Object.defineProperty(navigator, 'standalone', { get:
   window.matchMedia = (q) => (/display-mode:\s*standalone/.test(q) ? { matches: true, media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} } : m.call(window, q)); };
 
 for (const pwa of [false, true]) test(`iPhone${pwa ? ' home-screen PWA' : ''}: after two replies every control answers a tap, sizes agree, composer clears the answer`, { skip, timeout: 120000 }, async () => {
-  await fetch(`http://127.0.0.1:${port}/api/profile`, { method: 'PUT', headers: { 'content-type': 'application/json', authorization: `Bearer ${OWNER_TOKEN}` }, body: JSON.stringify({ tipsSeen: [] }) });   // the other run's dismissal is on the account now
+  const putSeen = (tipsSeen) => fetch(`http://127.0.0.1:${port}/api/profile`, { method: 'PUT', headers: { 'content-type': 'application/json', authorization: `Bearer ${OWNER_TOKEN}` }, body: JSON.stringify({ tipsSeen }) });
+  await putSeen([]);   // the other run's dismissal is on the account now (only a literal [] clears: web.mjs unions)
+  await putSeen(['tip:main-chat-camera']);   // past the camera's priority tip (web/shell-cam.js), so the ⋯ tip is the control
   const ctx = await browser.newContext(IPHONE); if (pwa) await ctx.addInitScript(standalone);
   const page = await ctx.newPage(); const errors = []; page.on('pageerror', (e) => errors.push(e.message));
   try {
