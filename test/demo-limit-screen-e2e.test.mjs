@@ -86,7 +86,10 @@ for (const vp of [{ width: 1920, height: 1080 }, { width: 390, height: 844 }]) {
     const ctx = await browser.newContext({ viewport: vp }); const page = await ctx.newPage();
     await page.goto(`http://127.0.0.1:${full.port}/`);
     await page.locator('#demoStop').waitFor({ state: 'visible' });
-    assert.equal(await page.evaluate(() => document.activeElement.id), 'demoStop', 'no focus ring drawn round the first link');
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'demoStopMsg', 'focus starts on the reason, not as a box round the first link');
+    await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'demoStopSignin', 'Tab reaches the first next step');
+    assert.notEqual(await page.locator('#demoStopSignin').evaluate((e) => getComputedStyle(e).outlineStyle), 'none', 'keyboard focus is visible');
     for (const id of ['#demoStopSignin', '#demoStopJoin']) {
       const b = await page.locator(id).boundingBox();
       assert.ok(b.x >= 0 && b.x + b.width <= vp.width, `${id} inside the viewport`);

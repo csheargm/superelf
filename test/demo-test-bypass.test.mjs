@@ -35,15 +35,20 @@ for (const [name, cfg, headers] of STILL_CAPPED) {
 }
 
 test('the right header: visits and per-network AI calls are not counted; per-visitor and node caps still are', () => {
-  const cfg = cfgWith({ test_bypass_token: TOKEN, ai_calls_per_user_per_day: 2 }), store = tmpStore();
+  const cfg = cfgWith({ test_bypass_token: TOKEN, ai_calls_per_user_per_day: 2, ai_calls_node_per_day: 3 }), store = tmpStore();
   const ip = ipFor(cfg, { [TEST_HEADER]: TOKEN });
   assert.equal(ip, TEST_IP);
   for (let i = 0; i < 5; i++) assert.equal(consumeVisit({ cfg, store, ip, isNew: true }).ok, true);
   assert.equal(consumeAiCall({ cfg, store, userId: 'u', ip }).ok, true);
   assert.equal(consumeAiCall({ cfg, store, userId: 'u', ip }).ok, true);
   assert.equal(consumeAiCall({ cfg, store, userId: 'u', ip }).status, 429, 'the per-visitor cap still holds');
-  const real = tmpStore();   // nothing was charged to a real network
-  assert.equal(consumeVisit({ cfg: cfgWith({ new_users_per_ip_per_day: 1, sessions_per_ip_per_day: 1 }), store: real, ip: '203.0.113.9', isNew: true }).ok, true);
+  // Same store: nothing was charged to the real network the tests came from…
+  const open = cfgWith({ new_users_per_ip_per_day: 1, sessions_per_ip_per_day: 1, ai_calls_per_ip_per_day: 1, ai_calls_node_per_day: 3 });
+  assert.equal(consumeVisit({ cfg: open, store, ip: '203.0.113.9', isNew: true }).ok, true);
+  assert.equal(consumeAiCall({ cfg: open, store, userId: 'v', ip: '203.0.113.9' }).ok, true);
+  // …but the test calls did use the node-wide cap (2 test + 1 real = 3).
+  assert.equal(consumeAiCall({ cfg: open, store, userId: 'w', ip: '198.51.100.7' }).status, 429);
+  assert.equal(consumeAiCall({ cfg, store, userId: 'x', ip }).status, 429, 'a test call is refused once the node cap is spent');
 });
 
 // R6: the real server, first visit refused by the cap, the owner's check let through and not in the visitor stats.
