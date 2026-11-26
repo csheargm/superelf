@@ -842,6 +842,10 @@ user's app (not in the repo) has no "send my change to its author" path; the lin
 
 ## 分享 · Share by link (ADR 0047) — deferred GPT-review edge cases
 - The privacy scan skips files with a NUL in their first 512 bytes (lib/publish/scan.mjs isText): a UTF-16 page is not scanned. Shared with Publish; decode UTF-16 before scanning.
-- A crash between the two renames of a re-share (lib/app-share.mjs put) leaves the link with no live snapshot until the next re-share.
+- A crash between the two renames of a re-share (lib/app-share.mjs put) leaves the link with no live snapshot until the next re-share; since the nightly review 2026-11-26 it reads as gone (get), not active, and a failed rename restores the old one.
 - A copy someone joined can be shared on by them as a new link (its own per-link and per-creator caps apply).
 - Join/collect on the demo trust the workspace apps/ path (demo visitors cannot make links; the owner node uses ownAppDir).
+
+## Nightly review 2026-11-26 — deferred (low, edge cases)
+- `PA_E2E_ENGINE=firefox`: Playwright's Firefox rejects `isMobile` in `newContext`, and about ten e2e suites pass it (test/title-home-e2e.test.mjs:31, app-back, bar-gestures, bible-reader, helpers-panel-window, …). Fix once in test/helpers-note-link.mjs (drop `isMobile` for Firefox) rather than per file.
+- lib/demo-routes.mjs:256 counts an app "open" for any GET of /app/<uid>/<slug>/ before the app is served, so a 404 slug is counted too. Analytics only; count after the page is served.

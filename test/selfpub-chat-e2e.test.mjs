@@ -113,8 +113,10 @@ for (const [name, vp] of [['iPhone', { width: 390, height: 844 }], ['desktop', {
     assert.match(await page.locator('#spChecks').textContent(), /测试 1\/1 通过.*iPhone width \(390\): before \/ after.*Privacy scan clean/s);
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `selfpub-preview-${name}.png`) });
     await page.click('#pubSheet #pubGo');
-    await page.waitForFunction(() => /Released v\d+\.\d+\.\d+ — waiting for deploy/.test((document.querySelector('.sp-row:last-of-type .sp-state') || document.querySelector('#spSheetState') || {}).textContent || '')
-      || [...document.querySelectorAll('.sp-state')].some((e) => /Released v/.test(e.textContent)), null, { timeout: 90000 });
+    // Released, then waiting for deploy; or already Live: this test node runs the repo's real version, which is past the
+    // fixture's v5.1.0, and a running version at or past the release counts as live (lib/selfpub/run.mjs versionAtLeast).
+    await page.waitForFunction(() => /Released v\d+\.\d+\.\d+ — waiting for deploy|已上线 v\d+\.\d+\.\d+ · Live/.test((document.querySelector('.sp-row:last-of-type .sp-state') || document.querySelector('#spSheetState') || {}).textContent || '')
+      || [...document.querySelectorAll('.sp-state')].some((e) => /Released v|已上线 v/.test(e.textContent)), null, { timeout: 90000 });
     const pr = gh.st.pulls[gh.st.pulls.length - 1];
     assert.match(pr.head, /^self\/\d{8}-[a-z0-9]+$/); assert.match(String(gh.files(pr)['web/home-v2.css']), /header h1\{font-size:26px\}/);
     assert.equal(await page.locator('.sp-row .sp-go').count(), 0, 'no second tap on a change on its way');

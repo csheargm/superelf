@@ -36,7 +36,7 @@ test('web.mjs: manual run audits job-run/job-failed in the tick\'s shape so last
   const epStart = web.indexOf('/api\\/jobs\\/[\\w-]+\\/run');
   const ep = web.slice(epStart, web.indexOf("\n    if (req.method ===", epStart + 100));
   assert.match(ep, /audit\('job-failed', \{ who: user\.id, job: job\.name, manual: true/, 'a thrown manual run is audited as failed, not lost in a generic 500');
-  assert.match(ep, /audit\('job-run', \{ who: user\.id, job: job\.name, briefing: out\.briefing \? out\.briefing\.id : null, skipped: !!out\.skipped, manual: true \}\)/);
+  assert.match(ep, /audit\('job-run', \{ who: user\.id, job: job\.name, briefing: out\.briefing \? out\.briefing\.id : null, skipped: !!out\.skipped, \.\.\.\(out\.failed \? \{ failed: true \} : \{\}\), manual: true \}\)/);
 });
 
 test('web.mjs: /api/admin/config + /api/admin/restart live INSIDE the owner-gated admin block', () => {

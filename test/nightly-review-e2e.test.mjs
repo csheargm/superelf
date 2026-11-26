@@ -23,7 +23,8 @@ const fs = process.getBuiltinModule('node:fs');
 const a = process.argv.slice(2), i = a.indexOf('--sandbox');
 if (a[0] !== 'exec' || i < 0 || a[i + 1] !== 'read-only') { process.stderr.write('fake codex: refusing, sandbox is not read-only'); process.exit(2); }
 let s = ''; process.stdin.on('data', (d) => s += d).on('end', () => {
-  fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ cwd: process.cwd(), argv: a }) + '\\n');
+  const path = process.getBuiltinModule('node:path');   // the log sits beside fakebin/: codex gets a scrubbed env, so no env var can carry its path
+  fs.appendFileSync(path.join(path.dirname(process.argv[1]), '..', 'codex.log'), JSON.stringify({ cwd: process.cwd(), argv: a, secret: process.env.NIGHTLY_FAKE_SECRET || null, home: !!process.env.HOME }) + '\\n');
   const out = a[a.indexOf('-o') + 1];
   const finding = /Repository: superelf/.test(s) ? [{ file: 'web/home.css', line: 1, severity: 'medium', claim: 'body colour is hard-coded', evidence: 'body{color:#111}' }]
     : [{ file: 'a.mjs', line: 1, severity: 'low', claim: 'a is a magic number', evidence: 'export const a = 1' }];
@@ -71,7 +72,7 @@ before(async () => {
   cfg.nightly_review.codex_cmd = writeFakeCli(bin, 'codex', FAKE_CODEX);
   fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
   log = path.join(root, 'codex.log');
-  process.env.FAKE_LOG = log;   // the child inherits it; only the fake codex reads it
+  process.env.NIGHTLY_FAKE_SECRET = 'not-for-codex';   // web.mjs inherits it; codex must not (lib/codex.mjs codexEnv)
   web = startWeb(root);
   await waitReady(port);
 });
@@ -80,7 +81,9 @@ after(async () => { if (web) await stopWeb(web); if (fx) rmTemp(fx.d); if (root)
 const run = (token) => api(port, '/api/jobs/nightly-review/run', { method: 'POST', body: '{}', ...(token ? { headers: { authorization: `Bearer ${token}` } } : {}) });
 
 test('a member cannot run the nightly review', { skip: POSIX_ONLY }, async () => {
-  assert.notEqual((await run(KID)).status, 200);
+  const r = await run(KID);   // the job is not on a member's list: 404 'unknown job', not any failure (nightly review 2026-11-26)
+  assert.equal(r.status, 404);
+  assert.equal((await r.json()).error, 'unknown job');
 });
 
 test('Run now: Codex read-only, findings verified, one unpublished superelf change, the findings-only repo untouched', { skip: POSIX_ONLY }, async () => {
@@ -96,6 +99,7 @@ test('Run now: Codex read-only, findings verified, one unpublished superelf chan
   const calls = fs.readFileSync(log, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
   assert.equal(calls.length, 2);
   assert.ok(calls.every((c) => c.argv.includes('read-only') && c.cwd.startsWith(fs.realpathSync(nrDir))));
+  assert.ok(calls.every((c) => c.secret === null && c.home), 'codex runs with a scrubbed env: the node\'s other variables never reach it, HOME (its sign-in) does');
   assert.equal(tgit(hgBare, 'for-each-ref').trim(), hgRefs, 'the findings-only remote is unchanged');
   const sp = JSON.parse(fs.readFileSync(path.join(fx.d, 'src', 'state.json'), 'utf8'));
   const changes = Object.values(sp.changes);

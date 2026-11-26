@@ -28,7 +28,7 @@ const PAShare=(()=>{
     if(demo()&&!PADemoAuth.session()){ dispatchEvent(new Event('pa-demo-signin')); return; }   // = SIGNIN_EVENT (lib/demo-boot.mjs)
     const mine=++seq; PAPublish.sheet('<p id="shWait">'+L.wait+'</p>');
     let j; try{ const r=await post('/api/share',{slug}); j=await r.json(); }catch(e){ j={error:(e&&e.message)||''}; }
-    if(mine!==seq) return;
+    if(mine!==seq||!$('#shWait')) return;   // a newer Share, or the wait sheet was dismissed / the app switched: never reopen it
     if(!j||!j.ok) return PAPublish.sheet('<p id="shFail"><b>'+esc((j&&j.error)||L.fail)+'</b></p>'+(j&&j.hits?hitsLine(j.hits):''));
     const s=PAPublish.sheet('<p><b>'+L.title+'</b></p><div style="display:flex;gap:6px"><input id="shUrl" readonly style="flex:1;min-width:0;width:auto" value="'+esc(j.url)+'"><button type="button" id="shCopy" class="primary" style="flex:none;width:auto">'+L.copy+'</button></div>'
       +(j.mail?'<form id="shMail" style="display:flex;gap:6px;margin-top:8px"><input id="shTo" type="email" required autocomplete="email" style="flex:1;min-width:0;width:auto" placeholder="'+L.email+'"><button type="submit" id="shSend" style="flex:none;width:auto">'+L.send+'</button></form><p id="shMailNote" style="font-size:12px;opacity:.7"></p>'

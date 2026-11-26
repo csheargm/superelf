@@ -49,7 +49,7 @@ const PASelfPub=(()=>{
     if(watching.has(id)) return; watching.add(id);
     try{ for(;;){ await new Promise(r=>setTimeout(r,POLL_MS));
       let j; try{ const r=await api(url(id)); j=await r.json(); }catch{ continue; /* offline for a beat: the publish runs on the node */ }
-      if(j&&j.status){ paint(id,j.status,j.state); const s=document.getElementById('spSheetState'); if(s) s.innerHTML=stateLine(j.status); if(DONE.has(j.status.state)) return; } } }
+      if(j&&j.status){ paint(id,j.status,j.state); const s=document.getElementById('spSheetState'); if(s&&s.dataset.id===String(id)) s.innerHTML=stateLine(j.status); if(DONE.has(j.status.state)) return; } } }
     finally{ watching.delete(id); }
   }
   async function shotUrl(id,n){ try{ const r=await api(url(id,'shot/'+n)); return r.ok?URL.createObjectURL(await r.blob()):''; }catch{ return ''; /* no shot: the sheet says so */ } }
@@ -77,15 +77,15 @@ const PASelfPub=(()=>{
       +`<p><b>改动的文件 · Files changed (${p.files.length+p.deletes.length})</b></p><ul id="spFiles">${files}</ul>`
       +(p.refused.length?`<p id="spRefused"><b>含不允许发布的文件 · Has files that are never published:</b> ${p.refused.map(x=>esc(x.file)).join(', ')}</p>`:'')
       +`<details><summary>改动内容 · The diff</summary><pre id="spDiff" style="white-space:pre-wrap;word-break:break-all;font-size:11px">${esc(p.diff)}</pre></details>`
-      +`<div id="spShots" style="display:flex;gap:8px"></div><p>会在 <code>${esc(p.repo||'')}</code> 开 PR；CI 通过后合并、发版，节点约 10 分钟内自动更新。 · Opens a PR on <code>${esc(p.repo||'')}</code>; on green CI it merges and releases, and the node updates itself within about 10 min.</p><p id="spSheetState"></p><button type="button" data-sp="discard" class="plain" style="min-height:44px">丢弃这个改动 · Discard this change</button>`,
+      +`<div id="spShots" style="display:flex;gap:8px"></div><p>会在 <code>${esc(p.repo||'')}</code> 开 PR；CI 通过后合并、发版，节点约 10 分钟内自动更新。 · Opens a PR on <code>${esc(p.repo||'')}</code>; on green CI it merges and releases, and the node updates itself within about 10 min.</p><p id="spSheetState" data-id="${esc(String(id))}"></p><button type="button" data-sp="discard" class="plain" style="min-height:44px">丢弃这个改动 · Discard this change</button>`,
       p.ready&&!p.refused.length);
     // The handler goes on NOW, before any await: a later preview reuses the same sheet, and a stale one must never publish it (GPT review).
     const close=s.onclick; s.onclick=(e)=>{ if(mine!==openSeq) return close(e); if(e.target.closest('[data-pub="go"]')){ s.onclick=close; go(id,p.hash,s); }
       else if(e.target.closest('[data-sp="discard"]')){ s.remove(); discard(id); } else close(e); };
     const box=s.querySelector('#spShots');
     if(p.verify&&p.verify.render&&p.verify.render.same) return;   // pixel-identical shots prove nothing: the checks line says so, no pictures
-    for(const n of [0,1]){ const u=await shotUrl(id,n); if(!u||mine!==openSeq||!box.isConnected) continue; const f=document.createElement('figure'); f.style.cssText='margin:0;flex:1;min-width:0';
-      f.innerHTML=`<img src="${u}" alt="" style="width:100%;border:1px solid currentColor;border-radius:8px"><figcaption style="font-size:11px;text-align:center">${n?'改后 · After':'改前 · Before'}</figcaption>`; box.appendChild(f); }
+    for(const n of [0,1]){ const u=await shotUrl(id,n); if(!u) continue; if(mine!==openSeq||!box.isConnected){ URL.revokeObjectURL(u); continue; } const f=document.createElement('figure'); f.style.cssText='margin:0;flex:1;min-width:0';
+      f.innerHTML=`<img src="${u}" onload="URL.revokeObjectURL(this.src)" alt="" style="width:100%;border:1px solid currentColor;border-radius:8px"><figcaption style="font-size:11px;text-align:center">${n?'改后 · After':'改前 · Before'}</figcaption>`; box.appendChild(f); }
   }
   async function go(id,hash,s){
     s.querySelectorAll('#pubGo,[data-sp="discard"]').forEach(b=>b.remove());
