@@ -839,3 +839,9 @@ user's app (not in the repo) has no "send my change to its author" path; the lin
 ## Self-publish render isolation (GPT review 2026-11-26, pre-existing)
 - lib/selfpub/render.mjs launches Chromium without its sandbox (cap-less container): checkout JS runs before approval; only routing/proxy contain it. ADR 0044 §2 names it; revisit with a sandboxed launch if the image allows.
 - readShell() follows symlinks in web/index.html and inlined parts with no realpath check (the /web/* route has one); a symlink in the checkout could inline host-readable content into a shot. Add the same realpath-under-web check to shell assembly in the preview.
+
+## 分享 · Share by link (ADR 0047) — deferred GPT-review edge cases
+- The privacy scan skips files with a NUL in their first 512 bytes (lib/publish/scan.mjs isText): a UTF-16 page is not scanned. Shared with Publish; decode UTF-16 before scanning.
+- A crash between the two renames of a re-share (lib/app-share.mjs put) leaves the link with no live snapshot until the next re-share.
+- A copy someone joined can be shared on by them as a new link (its own per-link and per-creator caps apply).
+- Join/collect on the demo trust the workspace apps/ path (demo visitors cannot make links; the owner node uses ownAppDir).

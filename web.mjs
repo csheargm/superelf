@@ -12,6 +12,7 @@ import { injectDemoBoot } from './lib/demo-boot.mjs';
 import { makeSigninGate, authConfig } from './lib/demo-auth.mjs';
 import { makeDemoRoutes } from './lib/demo-routes.mjs';
 import { handlePublishRoute } from './lib/publish/routes.mjs';
+import { handleOwnerShareRoute } from './lib/app-share-routes.mjs';
 import { handleSelfpubRoute, selfpubRoot } from './lib/selfpub/routes.mjs';
 import { coreChatTurn, coreDeps, coreRequestOf, endCore, markerRequest, ownerComposer, refuseCore, typedPublish, MAIN_CHAT_RULE } from './lib/selfpub/chat.mjs';
 import { handleAlertsRoute } from './lib/node-alerts.mjs';
@@ -1965,6 +1966,7 @@ const server = http.createServer(async (req, res) => {
     if (handleActivityRoute(req, res, p, url, { user, cfg, send, demo: demoOn(cfg), wsDir })) return;   // Settings → Activity log (lib/activity-view.mjs)
     if (await handleAlertsRoute(req, res, p, { user, cfg, readBody: (r) => readBody(r, BODY_LIMITS.control), send, audit, demo: demoOn(cfg) })) return;   // owner alerts + host actions (docs/adr/0041)
     if (await handlePublishRoute(req, res, p, { user, cfg, root: ROOT, slugOk, ownAppDir, readBody: (r) => readBody(r, BODY_LIMITS.control), send, audit, demo: demoOn(cfg) })) return;   // owner-only Publish (docs/adr/0039)
+    if (await handleOwnerShareRoute(req, res, p, { user, cfg, root: ROOT, ownAppDir, readBody: (r) => readBody(r, BODY_LIMITS.control), send, audit, mail: MAIL, demo: demoOn(cfg) })) return;   // 分享 · Share by link → the demo (lib/app-share-routes.mjs)
     if (await handleSelfpubRoute(req, res, p, { user, cfg, root: ROOT, readBody: (r) => readBody(r, BODY_LIMITS.control), send, audit, demo: demoOn(cfg), version: appVersion, apiKey: apiKeyBlocked(req, user) })) return;   // version: a function, read only on a selfpub GET (it hashes files: never per request). owner-only core Publish (docs/adr/0044). TODO(R4 seam): the owner publish routes move to lib/publish-routes-table.mjs
     // 改这个应用 · Change this app (lib/app-edit.mjs, ADR 0040): the panel page and its 撤销 · Undo. Owner only in Phase 1.
     if (req.method === 'GET' && p === '/api/app-edit/panel') {

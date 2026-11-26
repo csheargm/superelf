@@ -165,15 +165,15 @@ const PAAppEdit=(()=>{
     closeMenuPop();
     const slug=frameSlug(), title=$('#ftitle').textContent;
     const m=document.createElement('div'); m.id='frameMenu'; m.className='cmenu-pop';
-    m.innerHTML=item()+(window.PADemoAuth?'':PAPublish.item(slug));   // PAPublish decides for a fork (ONE gate); the demo has no Publish
+    m.innerHTML=item()+PAShare.item()+(window.PADemoAuth?'':PAPublish.item(slug));   // 分享 · Share by link (web/app-share.js)   // PAPublish decides for a fork (ONE gate); the demo has no Publish
     document.body.appendChild(m);
     placeMenu(m,anchor);
     editsLeftOf(slug).then(({left,v})=>{ if(!(left>0)||!v||!m.isConnected||frameSlug()!==slug||m.querySelector('#aeUndoItem')) return;
       const u=document.createElement('button'); u.dataset.a='undo-app'; u.id='aeUndoItem'; u.dataset.v=v; u.textContent=UNDO_ITEM;
       m.querySelector('#aeItem').after(u); placeMenu(m,anchor); });
     m.onclick=(ev)=>{ const b=ev.target.closest('button'); if(!b) return; closeMenuPop();
-      if(b.dataset.a==='edit-app') open(slug,title); else if(b.dataset.a==='undo-app') undoFromMenu(slug,b.dataset.v); else if(b.dataset.a==='publish') PAPublish.open(slug); };
-    armTip(); if(!window.PADemoAuth) PAPublish.armTip(slug); armMenuPop(anchor);
+      if(b.dataset.a==='edit-app') open(slug,title); else if(b.dataset.a==='undo-app') undoFromMenu(slug,b.dataset.v); else if(b.dataset.a==='publish') PAPublish.open(slug); else if(b.dataset.a==='share-link') PAShare.open(slug); };
+    armTip(); PAShare.armTip(); if(!window.PADemoAuth) PAPublish.armTip(slug); armMenuPop(anchor);
   }
   function bindBar(){
     const more=$('#fmore'), t=$('#ftitle');
