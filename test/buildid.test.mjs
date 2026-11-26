@@ -60,7 +60,8 @@ test('no git, or no PANote on disk: the id names what it can and never throws', 
 test('web.mjs shows it in the shell version line and stamps it into every app page', () => {
   assert.match(WEB, /import \{ makeBuildId, BUILD_MARKER, readRevision, readRevisionDate \} from '\.\/lib\/buildid\.mjs';/);
   assert.match(WEB, /const buildId = makeBuildId\(ROOT, gitHead, undefined, /, 'one git invocation, the existing gitHead (R3)');
-  assert.match(WEB, /const appVersion = \(\) => \{ try \{ const b = buildId\(\); const d = buildId\.date\(\); return 'v' \+ [^\n]*\+ \(b \? ' · ' \+ b : ''\) \+ \(d \? ' · ' \+ d : ''\); \}/);
+  assert.match(WEB, /const appVersion = \(\) => \{ try \{ const b = buildId\(\); return 'v' \+ pkgVersion\(\) \+ plusN\(\) \+ \(b \? ' · ' \+ b : ''\); \}/);
+  assert.match(WEB, /\.replace\('<!--APP_VTIME-->', appVTime\(\)\)\.replace\('<!--APP_VDATE-->', buildId\.date\(\)\)/, 'the date/time goes to the footer attributes, drawn in the viewer zone (web/version-time.js)');
   const loop = WEB.indexOf('html = html.split(c.marker).join(snippet);');
   const stamp = WEB.indexOf('html = html.split(BUILD_MARKER).join(buildId());');
   assert.ok(loop > 0 && stamp > loop, 'stamped AFTER the components are inlined — the marker lives in one of them');

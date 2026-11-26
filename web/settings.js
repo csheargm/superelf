@@ -418,7 +418,7 @@ const RECENT_VERSIONS=3;
 const verBadge=(t)=>'<span style="font-size:11px;font-weight:600;margin-left:6px;padding:1px 6px;border:1px solid var(--accent);border-radius:8px">'+t+'</span>';
 function verBlock(v,n,cur){
   const isCur=v===cur;
-  let h=`<div style="margin-bottom:18px${isCur?';border-left:3px solid var(--accent);padding-left:10px':''}"><div style="font-size:14px;font-weight:700;color:var(--accent)">${esc(v)}${isCur?verBadge('当前 · current'):''}${n.auto?verBadge(esc(n.auto)):''}<span style="font-weight:400;color:var(--muted);margin-left:8px;font-size:12px">${esc(n.date||'')}</span></div>`;
+  let h=`<div style="margin-bottom:18px${isCur?';border-left:3px solid var(--accent);padding-left:10px':''}"><div style="font-size:14px;font-weight:700;color:var(--accent)">${esc(v)}${isCur?verBadge('当前 · current'):''}${n.auto?verBadge(esc(n.auto)):''}<span style="font-weight:400;color:var(--muted);margin-left:8px;font-size:12px"${n.time?` title="${esc(verTimeFull(n.time))}"`:''}>${esc(verTimeLabel(n.time,n.date))}</span></div>`;
   const sec=(t,items)=>items&&items.length?`<div style="font-size:12px;font-weight:600;color:var(--muted);margin:8px 0 4px">${t}</div><ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.7">${items.map(f=>'<li>'+esc(f)+'</li>').join('')}</ul>`:'';
   return h+sec('新功能 · New',n.features)+sec('修复 · Fixed',n.fixes)+'</div>';
 }
@@ -447,6 +447,7 @@ function markNewSel(sel,key){ markNew($(sel),key); }
 // close) the sheet.
 (()=>{
   const vl=$('#ver-lbl'); if(!vl) return;
+  verTimeApply(vl);   // the release time, local (web/version-time.js)
   let _lt=null,_pt='mouse',_x=0,_y=0;
   const start=(e)=>{ _pt=e.pointerType||'mouse'; if(_pt==='mouse') return; _x=e.clientX; _y=e.clientY; clearTimeout(_lt); _lt=setTimeout(()=>{ _lt=null; showVerNotes(); },600); };
   const cancel=()=>{ clearTimeout(_lt); _lt=null; };

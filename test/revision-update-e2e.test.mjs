@@ -32,7 +32,8 @@ test('REVISION changes on the node → the open shell detects new code and reloa
   await page.waitForSelector('#login[open]');
   await page.fill('#luser', 'owner'); await page.fill('#lpin', 'owner-pass-123'); await page.click('#loginBtn');
   await page.waitForFunction(() => !document.querySelector('#login[open]'));
-  const footer = () => page.evaluate(() => document.querySelector('#ver-lbl').textContent.trim());
+  // The text names the build; the date is drawn after it from data-shown (web/version-time.js).
+  const footer = () => page.evaluate(() => { const el = document.querySelector('#ver-lbl'); return el.textContent.trim() + (el.dataset.shown ? ' · ' + el.dataset.shown : ''); });
   const before = await footer();
   assert.match(before, /· a1b2c3d · (note [0-9a-f]+ · )?11-22$/, `footer names build A and its date: ${before}`);
   assert.equal(await page.evaluate(() => PAUpdate.check()), 'same', 'CONTROL: no new code, no reload');

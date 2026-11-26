@@ -68,6 +68,7 @@ test('tool: --check refuses with the fix command, the bump writes both files, a 
     const notes = JSON.parse(fs.readFileSync(path.join(d, 'version-notes.json'), 'utf8'));
     assert.deepEqual(Object.keys(notes), ['v5.1.0', 'v5.0.0']);
     assert.deepEqual(notes['v5.1.0'].features, ['a feature']); assert.deepEqual(notes['v5.1.0'].fixes, ['first fix']);
+    assert.match(notes['v5.1.0'].time, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/, 'the release time, UTC ISO (shown in the footer, lib/version-time.mjs)');
     const snap = () => fs.readFileSync(path.join(d, 'package.json'), 'utf8') + fs.readFileSync(path.join(d, 'version-notes.json'), 'utf8');
     g('commit', '-qam', 'release: v5.1.0');   // the ship flow's direct commit on main is not a merge
     const s1 = snap();

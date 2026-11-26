@@ -19,7 +19,8 @@ function extractVerBuilders() {
   const recent = html.match(/const RECENT_VERSIONS=(\d+);/);
   const badge = html.match(/^const verBadge=\(t\)=>.*$/m);
   assert.ok(block && sheet && recent && badge, 'verBlock/verSheetHtml/verBadge must stay named top-level pure functions');
-  const make = new Function('esc', `const RECENT_VERSIONS=${recent[1]}; ${badge[0]}; ${block[0]}; ${sheet[0]}; return { verSheetHtml, RECENT_VERSIONS };`);
+  const vt = fs.readFileSync(path.join(ROOT, 'web', 'version-time.js'), 'utf8');   // verBlock formats n.time with it
+  const make = new Function('esc', `${vt}\nconst RECENT_VERSIONS=${recent[1]}; ${badge[0]}; ${block[0]}; ${sheet[0]}; return { verSheetHtml, RECENT_VERSIONS };`);
   return make(esc);
 }
 
