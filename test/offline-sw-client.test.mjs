@@ -35,7 +35,7 @@ function harness({ sw = 'yes', waiting = false, controlled = true, config = null
   const reg = { active: worker, waiting: waiting ? { postMessage: (m) => log.posted.push({ to: 'waiting', ...m }) } : null };
   const fakeSw = sw === 'yes' ? { register: async (u, o) => { log.registered = [u, o]; return reg; }, ready: Promise.resolve(reg), controller: controlled ? {} : null,
     addEventListener: (t, fn) => { if (t === 'message') pageListener = fn; if (t === 'controllerchange') log.onControl = fn; } } : null;
-  const d = { sw: fakeSw, loaded: () => FOOTER, frame: () => fr,
+  const d = { sw: fakeSw, loaded: () => FOOTER, frame: () => fr, loadDoc: (f, html) => { f.srcdoc = html; },   // the shell swaps in a fresh frame (web/app-frame.js appFrameLoadDoc): pinned in app-back-e2e
     fetchText: async (u) => { log.fetched.push(u); if (!(u in pages)) throw new Error('HTTP 404'); return pages[u]; },
     fetchJson: async (u) => { log.fetched.push(u); if (!config) throw new Error('HTTP 503'); return config; },
     fetchBytes: async (u) => { log.fetched.push(u); if (chapterBytes instanceof Error) throw chapterBytes; return chapterBytes; },
@@ -205,7 +205,9 @@ test('the wiring in the composed shell: the part, openApp\'s one call, frameRef 
   assert.match(update, /const frameApp=\(\)=>\{ const m=frameRef\(\)\.match\(/, 'the app to reopen after an update, on either route');
   assert.match(update, /frameWin:\(\)=>\{ const u=frameRef\(\); return u&&u!=='about:blank'\?\$\('#fr'\)\.contentWindow:null; \}/, 'a srcdoc app is asked before a reload, like a src one');
   const frame = stripComments(fs.readFileSync(path.join(ROOT, 'web', 'app-frame.js'), 'utf8'));
-  assert.match(frame, /nu\.src='about:blank';[^\n]*\n\s*nu\.removeAttribute\('srcdoc'\); nu\.removeAttribute\('data-app'\);/, 'the fresh frame never carries the leaving app\'s srcdoc page');
+  assert.match(frame, /nu\.removeAttribute\('src'\);\s*nu\.removeAttribute\('srcdoc'\); nu\.removeAttribute\('data-app'\);/, 'the fresh frame never carries the leaving app\'s page, and never navigates');
+  assert.match(frame, /function appFrameLoadDoc\(el,html\)\{\s*const nu=el\.cloneNode\(false\);\s*nu\.srcdoc=html;[\s\S]*?el\.replaceWith\(nu\);/, 'a srcdoc page goes in a frame BEFORE it is inserted: no Back entry (WebKit)');
+  assert.match(BLOCK, /loadDoc:\(fr,html\)=>appFrameLoadDoc\(fr,html\)/, 'the shell wires it');
   assert.match(raw, /PASW\.prefetch\(UID\);/, 'after the loaders settled');
   assert.ok(raw.indexOf('reopenAfterUpdate();') < raw.indexOf('PASW.prefetch(UID);'));
   assert.match(raw, /async function ping\(signal\)\{ if\(!T\) return false; const t0=T; let r; try\{ r=await api\('\/api\/ping',signal\?\{signal\}:\{\}\); \}catch\{ if\(T===t0&&!signal\) PAOffline\.noteNet\(false\); return 'offline'; \}/, 'a thrown fetch is "offline", never a refused token');

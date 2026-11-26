@@ -36,7 +36,7 @@ export function node(tag, { id = '', className = '' } = {}, parent = null) {
     appendChild: (c) => { c.parent = el; el.children.push(c); return c; },
     // What leaving an app does to the frame (web/app-frame.js): a shallow clone goes in BEFORE the
     // held iframe, which loses its id and is later removed. A cloned iframe gets its own window.
-    removeAttribute: (n) => { delete el.attrs[n]; if (n === 'id') el.id = ''; },
+    removeAttribute: (n) => { delete el.attrs[n]; if (n === 'id') el.id = ''; if (n === 'src') el.src = ''; },   // the src property reflects the attribute
     cloneNode: () => {
       const c = node(tag, { id: el.id, className: el.className });
       Object.assign(c, { attrs: { ...el.attrs }, src: el.src, _doc: el._doc });

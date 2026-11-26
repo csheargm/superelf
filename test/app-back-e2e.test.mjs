@@ -98,6 +98,25 @@ for (const [label, engine, opts] of ENGINES) {
     } finally { await browser.close(); }
   });
 
+  // Live check 2026-11-26: Tasks, Back, then Bible, Back → a blank screen. The fresh frame Home left had
+  // loaded about:blank, so the next app's srcdoc (the offline route) added a history entry of the
+  // frame's own, and Back blanked the frame instead of going Home. Pinned on BOTH routes.
+  test(`${label}: a second app after Back — Back again shows Home (src and srcdoc routes)`, { skip, timeout: 90000 }, async () => {
+    const { browser, page } = await boot(engine, opts);
+    try {
+      await page.evaluate(() => openApp(UID, 'todo', 'Todo')); await frameApp(page, 'todo');
+      await page.goBack({ waitUntil: 'commit' }).catch(() => {}); await homeShown(page);
+      await page.waitForFunction(() => PASW.route() === 'srcdoc', null, { timeout: 15000 });   // the offline route is up
+      await page.waitForTimeout(500);
+      const len = await page.evaluate(() => history.length);
+      await page.evaluate(() => openApp(UID, 'sums', 'Sums')); await frameApp(page, 'sums');
+      await page.waitForFunction(() => document.querySelector('#fr').hasAttribute('srcdoc'), null, { timeout: 10000 });
+      await page.waitForTimeout(500);
+      assert.ok(await page.evaluate(() => history.length) <= len, 'the srcdoc load added no history entry of the frame\'s own');
+      await page.goBack({ waitUntil: 'commit' }).catch(() => {}); await homeShown(page);
+    } finally { await browser.close(); }
+  });
+
   test(`${label}: an app opened by deep link — Back leaves the shell to the page before`, { skip, timeout: 90000 }, async () => {
     const { browser, page } = await boot(engine, opts, '/#open=owner/todo');
     try {

@@ -52,8 +52,8 @@ function swFrameLoad(d,route,uid,slug){
   const url=swAppUrl(uid,slug), fr=d.frame();
   if(route!==SW_ROUTE_SRCDOC){ fr.removeAttribute('srcdoc'); fr.removeAttribute('data-app'); fr.src=url; return url; }
   fr.removeAttribute('src'); fr.setAttribute('data-app',url);
-  d.fetchText(url).then((html)=>{ if(fr.getAttribute('data-app')===url) fr.srcdoc=html; })
-    .catch((err)=>{ if(fr.getAttribute('data-app')===url) fr.srcdoc='<!doctype html><meta charset="utf-8"><p>'+SW_OPEN_FAILED_TXT+' — '+swEsc(err&&err.message||err)+'</p>'; });   // the reason reaches the user (R5)
+  d.fetchText(url).then((html)=>{ if(fr.getAttribute('data-app')===url) d.loadDoc(fr,html); })
+    .catch((err)=>{ if(fr.getAttribute('data-app')===url) d.loadDoc(fr,'<!doctype html><meta charset="utf-8"><p>'+SW_OPEN_FAILED_TXT+' — '+swEsc(err&&err.message||err)+'</p>'); });   // the reason reaches the user (R5)
   return url;
 }
 // F3-15 (owner 2026-11-23): a first visit no longer pulls all 1189 chapters at once. FIRST: the book
@@ -179,6 +179,7 @@ const PASW=makeSwClient({
   sw:('serviceWorker' in navigator)?navigator.serviceWorker:null,
   loaded:()=>{ const vl=$('#ver-lbl'); return vl?vl.textContent.trim():''; },   // the same footer line PAUpdate reads (web/update.js)
   frame:()=>$('#fr'),
+  loadDoc:(fr,html)=>appFrameLoadDoc(fr,html),   // web/app-frame.js: the page goes in a fresh frame, so it leaves no Back entry
   fetchText:async(u)=>{ const r=await fetch(u,{credentials:'same-origin'});   // the Path=/app/ cookie: an unshared app page is its author's only (ADR 0037)
   if(!/^text\/html/.test(r.headers.get('content-type')||'')) throw new Error('HTTP '+r.status); return r.text(); },
   fetchJson:async(u)=>{ const r=await api(u); if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); },
