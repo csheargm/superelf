@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { consumeVisit, consumeAiCall, isTestRequest, quotaIp, makeQuotaStore, TEST_HEADER, TEST_IP } from '../lib/demo-quota.mjs';
 import { DEMO_START_PATH } from '../lib/demo.mjs';
 import { freePort, mkWebRoot, startWeb, stopWeb, waitReady } from './helpers-web.mjs';
@@ -57,7 +58,7 @@ after(async () => { if (n) { await stopWeb(n.web); rmTemp(n.root); } });
 test('demo start: capped without the header, admitted with it, and audited as a test', async () => {
   const port = await freePort();
   const root = mkWebRoot({ port, extraConfig: { users: [], demo: { enabled: true, new_users_per_ip_per_day: 0, test_bypass_token: TOKEN } } });
-  fs.cpSync(path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'workspace.example'), path.join(root, 'workspace.example'), { recursive: true });
+  fs.cpSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'workspace.example'), path.join(root, 'workspace.example'), { recursive: true });
   n = { root, web: startWeb(root) }; await waitReady(port);
   const go = (h) => fetch(`http://127.0.0.1:${port}${DEMO_START_PATH}`, { method: 'POST', headers: h });
   assert.equal((await go({})).status, 429);
