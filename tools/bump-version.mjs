@@ -15,7 +15,8 @@ import { pendingMerges, planReleases, applyReleases } from '../lib/version-bump.
 
 export const FIX_COMMAND = 'node tools/bump-version.mjs && git commit -am "release: v$(node -p \'require(\\"./package.json\\").version\')"';
 
-export function run(root, argv, exec = (args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })) {
+// now(): the release time; each new entry records it as `time` (UTC ISO, lib/version-time.mjs reads it).
+export function run(root, argv, exec = (args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }), now = () => new Date()) {
   const pkgFile = path.join(root, 'package.json'), notesFile = path.join(root, 'version-notes.json');
   const pkg = JSON.parse(fs.readFileSync(pkgFile, 'utf8'));
   const notesNow = JSON.parse(fs.readFileSync(notesFile, 'utf8'));
@@ -23,7 +24,7 @@ export function run(root, argv, exec = (args) => execFileSync('git', args, { cwd
     .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))[0];
   const { merges } = pendingMerges(root, exec);
   // Plan from the newest release ENTRY (the cursor), so an interrupted bump re-runs to the same result.
-  const releases = planReleases(newest ? newest.slice(1) : pkg.version, merges);
+  const releases = planReleases(newest ? newest.slice(1) : pkg.version, merges, now().toISOString());
   if (argv.includes('--check')) {
     // An interrupted bump (one file written, the other not) must not pass as "covered".
     if (newest && newest !== `v${pkg.version}`) return { code: 1, out: `package.json v${pkg.version} != newest release ${newest}.\nFix: set package.json to ${newest.slice(1)} and commit` };

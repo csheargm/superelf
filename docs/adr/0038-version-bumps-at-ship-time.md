@@ -40,3 +40,13 @@ Ship flow: merge → `node tools/bump-version.mjs` → `git commit -am "release:
 - Items are English where the merge title is English; a bilingual title stays bilingual. Writing
   merge titles as `中文 · English` makes the notes bilingual at no cost.
 - A shallow clone without the `through` commit counts nothing (+0) — same degradation as ADR 0026.
+
+## Addendum 2026-11-25: release time（发布时间）
+
+Many releases ship per day, so the footer's date alone did not say which one was running.
+`tools/bump-version.mjs` now records each new entry's `time` (UTC ISO, the one source).
+`lib/version-time.mjs` hands it to the Settings footer (`data-vtime`), and `web/version-time.js`
+shows it in the viewer's zone as `MM-DD HH:mm` (with the year when it is not the current year),
+with a tooltip giving the full date-time and zone. The release-notes sheet shows it the same way.
+The time is drawn with CSS `::after`, so the footer text that PAUpdate compares with `/api/build`
+does not depend on the viewer's zone. Releases from before `time` existed show their date only.

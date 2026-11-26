@@ -68,6 +68,7 @@ import { hashPassword, verifyPassword, makeAudit, readAudit, ACCOUNT_REMOVED_BOD
 import { notifyBriefingEmail } from './lib/notify.mjs';
 import { readShell } from './lib/shellhtml.mjs';
 import { makeBuildId, BUILD_MARKER, readRevision, readRevisionDate } from './lib/buildid.mjs';
+import { releaseTime } from './lib/version-time.mjs';
 import { SW_PATH, SW_PROBE_PATH, OFFLINE_CONFIG_PATH, offlineAppsFor, bibleIndex, withCspMeta, APP_CSP } from './lib/offline.mjs';
 import { corsHeaders } from './lib/local-origin.mjs';
 import { loadJobs as loadJobFiles, saveJob, deleteJob, validateJob } from './lib/jobs/store.mjs';
@@ -134,7 +135,11 @@ export const freeStamp = (k, now = new Date()) => {
 // …plus the build id (lib/buildid.mjs), because the version alone did not change across the fixes it shipped.
 // …and '+N' merges since the newest tag (lib/version-auto.mjs, the SAME N the Release Notes sheet shows).
 const plusN = () => { const n = autoSince(ROOT, buildId.head()).n; return n ? '+' + n : ''; };
-const appVersion = () => { try { const b = buildId(); const d = buildId.date(); return 'v' + JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version + plusN() + (b ? ' · ' + b : '') + (d ? ' · ' + d : ''); } catch { return ''; } };
+// The date/time is NOT in the string: the footer draws it from data-vtime/data-vdate (web/version-time.js),
+// in the viewer's zone, so this string — what PAUpdate compares — does not depend on where it is read.
+const pkgVersion = () => JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
+const appVersion = () => { try { const b = buildId(); return 'v' + pkgVersion() + plusN() + (b ? ' · ' + b : ''); } catch { return ''; } };
+const appVTime = () => { try { return releaseTime(ROOT, pkgVersion()); } catch { return ''; } };   // no package.json: no time; the version line is already ''
 const appHash = (dir) => { try { return crypto.createHash('sha1').update(fs.readFileSync(path.join(dir, 'index.html'))).digest('hex').slice(0, 12); } catch { return null; } };
 // ── Committing the shelf · 把 shelf 提交进 git ─────────────────────────────────────────────
 // shared-apps/ is tracked as of v3.5.0, so a promote/rollback/unshare leaves the repo dirty until
@@ -1755,6 +1760,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && (p === '/' || p === '/index.html')) {
       const html = readShell(ROOT)
         .replace('<!--APP_VERSION-->', appVersion())
+        .replace('<!--APP_VTIME-->', appVTime()).replace('<!--APP_VDATE-->', buildId.date())   // release time, else the commit date (lib/version-time.mjs)
         .replace('<!--APP_NOTES-->', embedInTemplateLiteral(appNotesJson(ROOT, undefined, buildId.head())));
       return sendHtml(res, demoOn(cfg) ? injectDemoBoot(html, cfg) : html);
     }
