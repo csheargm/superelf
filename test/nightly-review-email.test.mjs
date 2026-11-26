@@ -45,13 +45,17 @@ test('earlier fix went live; all failed; mixed', () => {
   assert.match(above(out.body), /another superelf change was still open/);
 });
 
-test('ordering: high first, then the model rank; at most 5 shown, low only counted', () => {
+test('ordering: high first, then the model rank; every medium+ shown, low only counted', () => {
   const conf = [f('low', 'L1'), f('medium', 'M1'), f('medium', 'M2'), f('high', 'H1'), f('medium', 'M3'), f('medium', 'M4'), f('medium', 'M5'), f('low', 'L2')];
   const plain = { items: conf.map((x, i) => ({ impact: `plain ${x.claim}`, severity: x.severity, rank: 10 - i })) };
   const v = digestView([reviewed(conf)], { date: 'd', plain });
-  assert.equal(v.found.length, TOP_MAX);
-  assert.deepEqual(v.found.map((x) => x.impact), ['plain H1', 'plain M5', 'plain M4', 'plain M3', 'plain M2']);
-  assert.equal(v.foundMore, 1); assert.equal(v.lowCount, 2);
+  assert.deepEqual(v.found.map((x) => x.impact), ['plain H1', 'plain M5', 'plain M4', 'plain M3', 'plain M2', 'plain M1']);
+  assert.ok(v.found.length > TOP_MAX, 'medium+ is never hidden behind a count');
+  assert.equal(v.lowCount, 2);
+  const out = renderEmail([reviewed(conf)], { date: 'd', plain });
+  assert.match(above(out.body), /plain M1 →/); assert.doesNotMatch(out.body, /\d+ more/);
+  assert.match(above(out.body), /- And 2 minor \(low risk\): see the technical details\./);
+  assert.match(out.html, /plain M1/);
   assert.match(digestView([reviewed(conf)], { date: 'd', plain }).details, /L1/);
   assert.equal(v.needs[0].text, 'superelf: plain H1', 'a serious finding with no ready fix needs the owner');
 });
@@ -79,4 +83,21 @@ test('details below the divider only; no emojis; html escapes and matches the te
   assert.doesNotMatch(out.html, /<script>|<style|<img|src=/);
   assert.match(out.html, /&lt;script&gt;/);
   assert.ok(out.html.indexOf(H.needs) < out.html.indexOf(H.found) && out.html.indexOf(H.found) < out.html.indexOf(H.details));
+});
+
+test('not handed to a fix: action says they will not come back and how to fix them', () => {
+  const out = renderEmail([reviewed([f('medium', 'x')], { fix: 'Fix in progress elsewhere', fixState: 'not-started' })], { date: 'd' });
+  assert.match(above(out.body), /Action: These will not come back by themselves\. Publish or discard the open superelf change, then ask superelf to "fix last night's review findings"\./);
+  assert.match(out.html, /will not come back by themselves/);
+});
+
+test('findings left unverified by the verify limit get a short line', () => {
+  const unverified = [1, 2, 3].map(() => ({ ...f('medium', 'u'), reason: 'not verified: over max_verify (20)' }))
+    .concat({ ...f('low', 'v'), reason: 'verifier failed: x' });
+  const out = renderEmail([reviewed([f('medium', 'x')], { unverified })], { date: 'd' });
+  assert.match(above(out.body), /- 3 not checked \(verify limit\)\./);
+  assert.match(out.html, /3 not checked \(verify limit\)/);
+  const none = renderEmail([reviewed([], { unverified })], { date: 'd' });
+  assert.match(above(none.body), /3 not checked \(verify limit\)/);
+  assert.doesNotMatch(renderEmail([reviewed([f('medium', 'x')])], { date: 'd' }).body, /not checked/);
 });
