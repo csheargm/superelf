@@ -1,11 +1,11 @@
-// Screenshot freshness in the app chat (web/app-edit-panel.html PA_SHOT_FRESH block), and the PASnap fix for
+// Screenshot freshness for both chat cameras (web/snap.inline.html PA_SHOT_FRESH block), and the PASnap fix for
 // pages whose HTML comments hold "--" (fatal in the XML the picture is drawn from: Sunday Study, Bible).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 
-const panel = fs.readFileSync(new URL('../web/app-edit-panel.html', import.meta.url), 'utf8');
+const panel = fs.readFileSync(new URL('../web/snap.inline.html', import.meta.url), 'utf8');   // PAShotFresh lives with PASnap: both composers share it
 const block = /\/\* ══ PA_SHOT_FRESH_BEGIN[\s\S]*?\*\/([\s\S]*?)\/\* ══ PA_SHOT_FRESH_END/.exec(panel)[1];
 const ctx = {}; vm.runInNewContext(block + ';this.F=PAShotFresh;', ctx);
 const F = ctx.F;

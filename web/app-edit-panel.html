@@ -29,20 +29,6 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px 
 <div id="mk" aria-label="标注截图 · Mark up the screenshot"><div class="row"><span style="flex:1;color:#fff;align-self:center">用笔圈出要改的地方 · Draw on what to change</span><button id="mkClear">清除 · Clear</button><button id="mkCancel">取消 · Cancel</button><button id="mkDone">完成 · Done</button></div><canvas id="mkc"></canvas></div>
 <!--PA_CHAT_UI-->
 <script>
-/* ══ PA_SHOT_FRESH_BEGIN ── which screenshots are stale (unit: test/app-chat-camera.test.mjs) ══
-   A shot is {path,gen,mine}: gen = the app's load count when it was taken (the shell bumps it on every
-   reload, e.g. after Apply/Undo); mine = taken by the camera or the auto-shot (not a user's file/photo). */
-var PAShotFresh={
-  MAX:3,
-  stale:(shots,gen)=>shots.filter((s)=>s.mine&&s.gen!==gen).map((s)=>s.path),
-  // A new camera shot: the stale ones go, then the oldest of ours while there would be more than MAX.
-  makeRoom:(shots,gen,max)=>{ const drop=PAShotFresh.stale(shots,gen), left=shots.filter((s)=>s.mine&&!drop.includes(s.path));
-    while(left.length>=(max||PAShotFresh.MAX)) drop.push(left.shift().path); return drop; },
-  label:(t)=>{ const d=new Date(t), z=(n)=>String(n).padStart(2,'0'); return z(d.getHours())+':'+z(d.getMinutes())+':'+z(d.getSeconds()); },
-};
-/* ══ PA_SHOT_FRESH_END ══ */
-</script>
-<script>
 (function(){
   let chat=null, inited=false;
   const note=(t,id)=>{ if(chat) chat.note(t,id); };   // PAChat's own status line: pinned above the composer row
@@ -53,7 +39,6 @@ var PAShotFresh={
   const CAM_FAIL='这个应用的画面截不下来，请用 ＋ 添加照片或截屏 · This app\'s screen cannot be captured — add a photo or a screenshot with ＋';
   const RETAKEN='应用已变，已重新截图 · The app changed, so the screenshot was retaken';
   const DROPPED='应用已变，旧截图已移除（未能重新截图）· The app changed; the old screenshot was removed (it could not be retaken)';
-  const CAM_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
   const SNAP_WAIT_MS=25000;   // the shell's snap (6 s) + upload (15 s) bound, plus slack: a lost answer never holds the composer
   let gen=0, shots=[], snapSeq=0, busy=Promise.resolve();   // shots: [{path,gen,mine}] — what PAShotFresh judges
   const waits=new Map();
@@ -87,7 +72,7 @@ var PAShotFresh={
   function mount(m){
     chat=PAChat.mount(document.getElementById('chat'),{
       placeholder:'提问，或说说想怎么改 · Ask, or say what to change',
-      beforeSend, tools:m.snap?[{id:'aeCam',label:CAM,svg:CAM_SVG,onClick:camera}]:[],
+      beforeSend, tools:m.snap?[{id:'aeCam',label:CAM,svg:PASnap.CAM_SVG,onClick:camera}]:[],
       greeting:'「'+m.title+'」：可以提问，也可以让它改这个应用；它先说明要怎么改，点「改 · Apply」才动手 · “'+m.title+'”: ask a question or ask for a change — it says the plan first and changes nothing until you tap Apply.',
     });
     chat.open('edit');

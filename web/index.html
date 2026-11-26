@@ -382,6 +382,7 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
   <div class="pac-pills"><button class="pac-model" id="shellModel" type="button" style="display:none"></button><button class="pac-vfy" id="shellVfy" type="button" style="display:none">校验 · ☐ Verify</button></div>
   <div id="frow">
     <button class="ibtn" id="plus" type="button" title="附件 · Attach" aria-label="附件 · Attach" data-icon="plus"></button>
+    <button class="ibtn" id="cam" type="button"></button>   <!-- 📷 the main chat's camera (web/shell-cam.js) -->
     <input id="box" placeholder="提问，或：创建一个应用… · Ask, or: create an app that…" autocomplete="off">
     <button class="primary" id="send" type="button" title="发送 · Send" aria-label="发送 · Send" data-icon="up"></button>
   </div>
@@ -390,6 +391,7 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
 <div id="lightbox"><button id="lightbox-close">✕</button><img id="lightbox-img" src="" alt=""><div style="position:absolute;bottom:calc(env(safe-area-inset-bottom)+16px);left:0;right:0;text-align:center;color:rgba(255,255,255,.55);font-size:13px;pointer-events:none;">Tap outside image to close</div></div>
 <div id="frame"><div class="bar"><button class="plain" id="back" data-icon="back">主页 · Home</button><b id="ftitle" style="flex:1"></b><button class="plain" id="fmore" style="display:none" title="更多 · More" aria-label="More" data-icon="more"></button><span class="aa"><button class="ibtn aa-btn" type="button" title="字号 · Text size" aria-label="字号 · Text size" aria-expanded="false">Aa</button><span class="aa-set"><button class="ibtn fs-dn" id="fs-dn">A−</button><button class="ibtn fs-up" id="fs-up">A+</button></span></span></div><button id="barpeek" class="plain" title="显示应用栏 · Show the app bar" aria-label="Show the app bar"></button><iframe id="fr" sandbox="allow-scripts" allow="clipboard-write;microphone"></iframe></div>
 <!--PA_SETTINGS_DIALOG-->
+<!--PA_SNAP_UI-->   <!-- PASnap + PAShotFresh (web/snap.inline.html): the main chat camera draws with the app chat's engine -->
 <dialog id="actConfirm" style="max-width:340px">
   <div id="acText" style="margin-bottom:14px;overflow-wrap:anywhere"></div>
   <div style="display:flex;gap:8px;justify-content:flex-end">
@@ -2401,7 +2403,7 @@ function addActions(el,kind,rawText,prompt){
 let attachments=[]; // [{name, text?} | {name, path}]
 
 function renderChips(){
-  $('#chips').innerHTML=attachments.map((a,i)=>
+  $('#chips').innerHTML=attachments.map((a,i)=>a.thumb?PAShellCam.chipHtml(a,i,esc):
     `<div class="chip"><span>📎 ${esc(a.name)}</span><button onclick="removeChip(${i})">×</button></div>`
   ).join('');
 }
@@ -2715,6 +2717,9 @@ $('#reload').onclick=()=>{ try{ sessionStorage.setItem('pa_refreshing','1'); }ca
 /* PA_SELFPUB_JS */
 /* PA_APP_EDIT_JS */
 PAAppEdit.bindBar();
+/* PA_SHELL_CAM_JS */
+PAShellCam.bind({atts:()=>attachments,render:renderChips,say:(t)=>add('err','⚠ '+t),
+  upload:(b)=>relayCall('/api/upload',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(b)},'raw')});
 /* PA_UPDATE_JS */   /* TODO(R4 seam): the boot block below (reload, loaders, new-feature dots) belongs in web/boot.js like app-frame.js */
 /* PA_SW_CLIENT_JS */
 /* PA_OFFLINE_JS */

@@ -89,11 +89,26 @@ var PASnap = PASnap || (function(){
     }
     throw new Error('the picture is too large');
   }
-  addEventListener('message',(e)=>{
+  // The camera button's icon, the ONE copy for both composers: the app chat (web/app-edit-panel.html) and the main chat (web/shell-cam.js).
+  const CAM_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+  // The shell carries this file too (main-chat camera): a top window is its own parent, so it never answers a snap request.
+  if(parent!==window) addEventListener('message',(e)=>{
     const m=e.data; if(!m||m.pa!=='snap'||e.source!==parent) return;
     shot().then((dataUrl)=>parent.postMessage({pa:'snap-res',id:m.id,ok:true,dataUrl},'*'),
       (err)=>parent.postMessage({pa:'snap-res',id:m.id,ok:false,error:String((err&&err.message)||err)},'*'));
   });
-  return {shot};
+  return {shot,CAM_SVG};
 })();
+/* ══ PA_SHOT_FRESH_BEGIN ── which screenshots are stale, shared by the app chat and the main chat (unit: test/app-chat-camera.test.mjs) ══
+   A shot is {path,gen,mine}: gen = the app's load count when it was taken (the shell bumps it on every
+   reload, e.g. after Apply/Undo); mine = taken by the camera or the auto-shot (not a user's file/photo). */
+var PAShotFresh=PAShotFresh||{
+  MAX:3,
+  stale:(shots,gen)=>shots.filter((s)=>s.mine&&s.gen!==gen).map((s)=>s.path),
+  // A new camera shot: the stale ones go, then the oldest of ours while there would be more than MAX.
+  makeRoom:(shots,gen,max)=>{ const drop=PAShotFresh.stale(shots,gen), left=shots.filter((s)=>s.mine&&!drop.includes(s.path));
+    while(left.length>=(max||PAShotFresh.MAX)) drop.push(left.shift().path); return drop; },
+  label:(t)=>{ const d=new Date(t), z=(n)=>String(n).padStart(2,'0'); return z(d.getHours())+':'+z(d.getMinutes())+':'+z(d.getSeconds()); },
+};
+/* ══ PA_SHOT_FRESH_END ══ */
 </script>
