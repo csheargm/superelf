@@ -77,6 +77,7 @@ test('share store: a link whose snapshot folder is missing is not active; a re-s
     assert.equal(again.id, rec.id); assert.equal(fs.readFileSync(path.join(s.dir, rec.id, 'index.html'), 'utf8'), '<p>v2</p>');
     fs.rmSync(path.join(s.dir, rec.id), { recursive: true });   // a crash between the two renames
     assert.equal(s.get(rec.id), null, 'no snapshot: never advertised as active');
+    assert.throws(() => s.join(rec.id, 'v1', path.join(d, 'apps'), 10), (e) => e.code === 'gone', 'an open landing page joining it gets gone, not a raw fs error');
   } finally { rmTemp(d); }
 });
 
@@ -163,4 +164,13 @@ test('Share sheet and the core-change card: a dismissed wait never reopens; a po
   assert.match(sp, /s&&s\.dataset\.id===String\(id\)/);
   assert.match(sp, /id="spSheetState" data-id="\$\{esc\(String\(id\)\)\}"/);
   assert.match(sp, /URL\.revokeObjectURL/);
+});
+
+test('Run now: an all-failed run answers failed: true and the Jobs row says the run failed', () => {
+  assert.match(read('web.mjs'), /alreadyRanToday, \.\.\.\(out\.failed \? \{ failed: true \} : \{\}\), body,/);
+  assert.match(read('web/settings.js'), /:j\.failed\?` · ✗ 运行失败/);
+});
+
+test('nightly config: a non-string repo name is a config error, never a TypeError', () => {
+  assert.throws(() => nightlySetting({ nightly_review: { enabled: true, dir: '/tmp/nr', repos: [{ name: 123, url: 'https://github.com/o/r.git' }] } }, {}), /nightly_review: repos\[0\]\.name/);
 });

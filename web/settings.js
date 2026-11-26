@@ -286,7 +286,7 @@ $('#jobsList').onclick=async(e)=>{
     const elapsed=took(Date.now()-t0);
     if(timedOut){ say(` · ✗ 超时未完成 · gave up after ${elapsed} — 可能仍会完成，请重新打开查看 · it may still finish; reopen to check`); return; }
     say((!j||!j.ok)?` · ✗ 失败 · failed${j&&j.error?': '+j.error:''}`
-      :j.skipped?` · 今日无简报 · no report today (${elapsed})`:j.alreadyRanToday?` · ✓ 已再次运行 · ran again today (${elapsed})`:` · ✓ 已运行 · ran (${elapsed})`);
+      :j.failed?` · ✗ 运行失败（简报说明原因） · run failed — the report says why (${elapsed})`:j.skipped?` · 今日无简报 · no report today (${elapsed})`:j.alreadyRanToday?` · ✓ 已再次运行 · ran again today (${elapsed})`:` · ✓ 已运行 · ran (${elapsed})`);
     // SHOW the result. "ran ok" with the output only in the feed is not an answer to someone
     // who just pressed Run now.
     const out=$('#jobRunOut');

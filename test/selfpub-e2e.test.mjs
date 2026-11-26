@@ -96,7 +96,9 @@ test('red CI: PR stays open, nothing released, the change can be tried again', {
     const end = await (await startSelf({ root: fx.root, id: r.id, options: opts(fx, gh), expectHash: p.hash })).done;
     assert.equal(end.code, 'CI_RED'); assert.match(end.pr, /pull\/1$/);
     assert.equal(tgit(fx.bare, 'rev-parse', 'main'), before); assert.equal(getChange(fx.root, r.id).state, 'ready');
-    // Tried again (nightly review 2026-11-26): the first attempt's branch is deleted (its PR closed), never BRANCH_EXISTS.
+    // Tried again (nightly review 2026-11-26): the first attempt's branch is deleted (its PR closed), never BRANCH_EXISTS —
+    // even when the saved status lost the PR URL (a failure after the ref was made; GPT review).
+    putChange(fx.root, r.id, { publish: { state: 'failed', step: 'pr', code: 'GITHUB_ERROR', at: Date.now() } });
     const p2 = previewSelf({ root: fx.root, id: r.id, options: opts(fx, gh) });
     const end2 = await (await startSelf({ root: fx.root, id: r.id, options: opts(fx, gh), expectHash: p2.hash })).done;
     assert.equal(end2.code, 'CI_RED', end2.error); assert.match(end2.pr, /pull\/2$/);

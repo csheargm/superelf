@@ -2617,7 +2617,7 @@ const server = http.createServer(async (req, res) => {
       // document channel — the whole briefing is always readable in the feed.
       const body = String(out.briefing.body || '').slice(0, RUN_BODY_MAX);
       return send(res, 200, 'application/json', JSON.stringify({ ok: true, briefing: out.briefing.id,
-        proposed: out.proposed.length, alreadyRanToday, body, truncated: (out.briefing.body || '').length > RUN_BODY_MAX }));
+        proposed: out.proposed.length, alreadyRanToday, ...(out.failed ? { failed: true } : {}), body, truncated: (out.briefing.body || '').length > RUN_BODY_MAX }));
     }
 
     // Own profile — any user edits their own name/about/prefs (not role/age).
