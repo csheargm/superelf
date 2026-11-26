@@ -56,7 +56,7 @@ test('USER FLOW: a save the page posts after ← Home lands in its own folder, a
   assert.deepEqual(notes.got.filter((x) => x.pa !== 'res'), [{ pa: 'leaving' }], 'it was told it is leaving');
   const fresh = B.live();
   assert.notEqual(fresh, notes, 'a fresh frame took #fr');
-  assert.equal(fresh.srcAtInsert, 'about:blank', 'blank BEFORE it was inserted, so it never starts loading the app again');
+  assert.ok(!fresh.srcAtInsert, 'no src when it was inserted: it never starts loading the app again, and never navigates (a later srcdoc then adds no history entry)');
   // PALeave runs the pad's pagehide handler now; its save arrives from the held page.
   await B.post({ id: 1, kind: 'save-data', path: 'entry-x.json', data: '{"strokes":2}' }, notes);
   assert.equal(replyTo(notes, 1)?.ok, true, B.said(1));
@@ -225,7 +225,7 @@ test('USER FLOW (the shell\'s own markup): open Notes, ← Home, open Bible — 
   s.goHome();
   const fresh = s.byId('fr');
   assert.notEqual(fresh, notes, 'Home put a fresh frame in #fr');
-  assert.equal(fresh.srcAtInsert, 'about:blank', 'blank before it was inserted');
+  assert.ok(!fresh.srcAtInsert, 'no src when it was inserted');
   assert.equal(notes.parent, fresh.parent, 'the held frame stays where it was: moving an iframe reloads it');
   assert.equal(fresh.parent.children.indexOf(fresh) + 1, fresh.parent.children.indexOf(notes), 'and the fresh one sits just before it');
   assert.equal(notes.style.display, 'none');
@@ -287,6 +287,6 @@ test('openApp and goHome leave through appFrameLeave, and nothing else loads or 
   assert.match(home, /appFrameLeave\(\);/, 'goHome leaves');
   // Enumerated, not trusted: every assignment to a frame's src in the shell.
   const sets = [...code.matchAll(/(?:\$\('#fr'\)|\bnu|\bfr|\bel)\.src=[^;]*;/g)].map((m) => m[0]).sort();
-  assert.deepEqual(sets, ['fr.src=url;', "nu.src='about:blank';"].sort(),
-    'only PASW.frameLoad (openApp\'s one call) loads an app, and only the fresh frame starts blank');
+  assert.deepEqual(sets, ['fr.src=url;'],
+    'only PASW.frameLoad (openApp\'s one call) loads an app; the fresh frame has no src at all (about:blank would leave a Back entry)');
 });

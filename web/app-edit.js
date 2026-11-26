@@ -103,11 +103,12 @@ const PAAppEdit=(()=>{
     const me=S, g=gen, at=Date.now();   // the load and the time the picture was TAKEN, not when its upload came back (GPT review)
     const shot=canEdit()&&frameSlug()===me.slug?await upload(me.slug,await snap(),g,at):null;
     if(S===me&&me.fr.contentWindow) me.fr.contentWindow.postMessage({pa:'edit-snap-res',id:m.id,shot},'*'); });
-  // The next load of the app frame that is not the blank placeholder (appFrameLeave loads about:blank first).
-  function loaded(){ const fr=$('#fr'); return new Promise((res)=>{ const t=setTimeout(()=>{ fr.removeEventListener('load',on); res(false); },LOAD_MS);
-    const on=()=>{ const u=fr.getAttribute('src'), sd=fr.getAttribute('srcdoc'); if(sd===null&&(!u||u==='about:blank')) return; clearTimeout(t); fr.removeEventListener('load',on);
+  // The next load of the app frame that is not the blank placeholder (a src-less fresh frame, web/app-frame.js).
+  // Heard on the document, not on one element: the srcdoc route loads into a fresh #fr (web/app-frame.js appFrameLoadDoc).
+  function loaded(){ return new Promise((res)=>{ const t=setTimeout(()=>{ document.removeEventListener('load',on,true); res(false); },LOAD_MS);
+    const on=(e)=>{ const fr=e.target; if(!fr||fr.id!=='fr') return; const u=fr.getAttribute('src'), sd=fr.getAttribute('srcdoc'); if(sd===null&&(!u||u==='about:blank')) return; clearTimeout(t); document.removeEventListener('load',on,true);
       res(!(sd&&sd.includes(SW_OPEN_FAILED_TXT))); };   // the srcdoc route's error page is a failed reload, never Done (GPT review)
-    fr.addEventListener('load',on); }); }
+    document.addEventListener('load',on,true); }); }
   function close(){
     openSeq++;
     if(!S) return;

@@ -62,7 +62,11 @@ function appFrameLeave(){
   const slug=frameSlug();
   if(!slug) return;
   const nu=el.cloneNode(false);
-  nu.src='about:blank';   // set BEFORE it is inserted: the clone carries the app's URL and would load it again
+  // src REMOVED, not set to about:blank, BEFORE it is inserted: the clone carries the app's URL and would
+  // load it again. A frame that never navigated replaces its first load in the joint session history; one
+  // that loaded about:blank adds an entry for a later srcdoc (the offline route, web/sw-client.js), and
+  // Browser Back then blanked that frame instead of going Home (live check 2026-11-26, Chrome and WebKit).
+  nu.removeAttribute('src');
   nu.removeAttribute('srcdoc'); nu.removeAttribute('data-app');   // and, on the srcdoc route (web/sw-client.js), the app's page itself
   for(const h of APP_FRAME_HANDLERS) nu[h]=el[h];
   el.removeAttribute('id'); el.style.display='none';
@@ -73,6 +77,16 @@ function appFrameLeave(){
   r.ackT=setTimeout(()=>appFrameLeft(r),APP_LEAVE_ACK_MS);
   r.maxT=setTimeout(()=>appFrameDrop(r),APP_LEAVE_MAX_MS);
   el.contentWindow.postMessage({pa:'leaving'},'*');
+}
+// The srcdoc route (web/sw-client.js): WebKit adds a joint-history entry when srcdoc is set on a frame
+// already in the page, even one that never navigated, and Browser Back then blanked the frame instead
+// of going Home (live check 2026-11-26). So the page goes into a fresh clone BEFORE it is inserted:
+// a frame's first load is never an entry. The frame swapped out holds no app yet (src-less, no page).
+function appFrameLoadDoc(el,html){
+  const nu=el.cloneNode(false);
+  nu.srcdoc=html;
+  for(const h of APP_FRAME_HANDLERS) nu[h]=el[h];
+  el.replaceWith(nu);
 }
 // Every message is looked at, not only 'left': any message from the page in #fr shows its page runs (PALeave's here comes first).
 window.addEventListener('message',(e)=>{
