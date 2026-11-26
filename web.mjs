@@ -63,6 +63,7 @@ import { CLAUDE_AUTH_FILENAME, claudeAuthFor, checkClaudeAuth, mergeBriefs, isAu
 import { claudeToken } from './lib/claude-token.mjs';
 import { runCodexLane, codexFallback } from './lib/lane-codex.mjs';
 import { modelReviewJobs } from './lib/model-review.mjs';
+import { nightlyJobs } from './lib/nightly-review/wire.mjs';
 // (listFamilyApps defined below near listApps)
 import { hashPassword, verifyPassword, makeAudit, readAudit, ACCOUNT_REMOVED_BODY } from './lib/auth.mjs';
 import { notifyBriefingEmail } from './lib/notify.mjs';
@@ -214,6 +215,7 @@ const MAIL = cfg.agentmailEnabled ? new AgentMail(cfg.agentmail_key, { root: ROO
 const pushBriefing = async (u, briefing) => {
   const prof = loadProfile(wsDir(u));
   await notifyBriefingEmail({ mail: MAIL, email: prof && prof.briefingEmail, user: u, briefing, audit })
+    .then((r) => { if (r && r.sent) audit('briefing-email-sent', { who: u.id, job: briefing.job, briefing: briefing.id }); })   // proof of delivery, never the content
     .catch((e) => audit('briefing-email-failed', { who: u.id, briefing: briefing.id, error: String(e && e.message || e) }));
 };
 
@@ -313,6 +315,10 @@ const JOBS = {
   ...modelReviewJobs({ cfg, root: ROOT, healthFile: () => modelHealth.file, userDirs: () => cfg.users.map(wsDir), auth: () => ollamaAuth(),
     ask: ({ args, prompt, user, timeoutMs }) => enqueue(() => runAgent(prompt, agentArgs(user, args, REVIEW_ORIGIN), wsDir(user), timeoutMs)),
     runLane: (a) => laneRunner({ cfg, wsDir, enqueue, runClaude, runCodex, claudeArgs: (user) => agentArgs(user, cfg.claude_args, REVIEW_ORIGIN) })(a) }),
+  // Nightly review（夜间代码审查）— lib/nightly-review, docs/adr/0046. Owner only, off unless nightly_review is set.
+  // A superelf fix goes through the core lane as the owner's composer turn (ADR 0044): never published untapped.
+  ...nightlyJobs({ cfg, audit: (...a) => audit(...a), enqueue: (f) => enqueue(f), runClaude, saveConvo, newId, version: appVersion,
+    coreTurn: (owner, request, convoId) => coreChatTurn(coreTurnDeps(owner, { fromApp: false }, request, convoId, () => {})) }),
 };
 
 // ── The job set for ONE user, resolved FRESH on every use ──────────────────────────────

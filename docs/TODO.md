@@ -828,3 +828,10 @@ user's app (not in the repo) has no "send my change to its author" path; the lin
   is unreadable to everyone already, and it may hold the deleting visitor. Revisit if a repair tool appears.
 - Demo admin: an app's Ask AI has no app name (the shell broker sends none), so it counts toward the
   visitor's AI total only. Pass the app slug from web/index.html relay if per-app Ask AI counts are wanted.
+## Nightly review (ADR 0046) — stage 2 and known limits
+- Stage 2: auto-fix for the findings-only (`fix: "none"`) repos: its own GitHub deploy key (push to a branch only), a PR, CI, then the VM redeploy. Not built; stage 1 reports findings only.
+- If a reviewed repo goes private: a host timer (ops/private in superelf-mine) writes `git bundle` of it into the node's data folder (`nightly-review/inbox`), and the job reads the bundle instead of cloning. Not built.
+- The scheduler tick waits for the whole run (up to `deadline_min`), so reminders due meanwhile wait. Seam: run long built-ins outside the tick, as a background task that saves its briefing.
+- A diff over `chunk_kb` per file is cut and said so; the cut part is not reviewed.
+- GPT review r1 leftovers: (a) the Jobs view shows a run whose every project failed as "ok" (job-run is audited after the briefing is saved); the email subject and `nightly-review-failed` audit lines say it. Seam: a job result flag that audits job-failed after saving. (b) Codex's read-only sandbox can still READ node files outside the clone, and a reviewed repo's text could steer it to quote one into a finding (emailed to the owner only). Both reviewed repos are the owner's own. Seam: run Codex with a scrubbed HOME/env and a cwd-only read policy. (c) A superelf fix's render check runs the changed page in headless Chromium before the owner's tap (ADR 0044 behaviour, now reachable from review text).
+- `rev-list --max-age` (the first-run window) stops early at a backdated commit; a newer-dated ancestor behind it is not reviewed.
