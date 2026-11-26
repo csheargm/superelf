@@ -90,3 +90,19 @@ export function clearanceFailures(where, c) {
   if (c.jumpBottom != null && c.jumpBottom > c.composerTop + 0.5) bad.push(`${where}: ↓ button over the composer`);
   return bad;
 }
+// The shell's own chat (index.html): the composer's top is the chips row (model + Verify pills) above the input pill.
+export const SHELL_CLEAR_SEL = { log: '#log', row: '#f .pac-pills', jump: '#scrollBtn' };
+
+// Last message's controls hit（最后一条的按钮可点）— at EVERY width (owner desktop 2026-11-25: the chips row sat on the last
+// reply's copy/speak/retry and its 'took …' line). Scrolls the log to its end, then each action button and the meta line
+// of the last message must be the element hit at its centre. Runs in the page; returns { checked, covered[] }.
+export function coveredActions(logSel) {
+  const log = document.querySelector(logSel); log.scrollTop = log.scrollHeight;
+  const items = [...log.children].filter((e) => e.getClientRects().length), last = items[items.length - 1];
+  const els = last ? [...last.querySelectorAll('.mab,.pac-ab,.pa-took')] : [];
+  const nm = (e) => e ? e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') + (typeof e.className === 'string' && e.className ? '.' + e.className.split(' ')[0] : '') : 'nothing';
+  const covered = els.filter((e) => { const b = e.getBoundingClientRect(), t = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+    return !t || (t !== e && !e.contains(t)); }).map((e) => { const b = e.getBoundingClientRect();
+    return nm(e) + ' under ' + nm(document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2)); });
+  return { checked: els.length, covered };
+}
