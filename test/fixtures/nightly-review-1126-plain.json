@@ -1,0 +1,14 @@
+[
+  {"n": 1, "impact": "If re-sharing is interrupted, the app can keep showing a share link as active even though people who open it cannot join.", "severity": "medium", "rank": 1},
+  {"n": 3, "impact": "Someone trying the demo can be blocked from signing in because an optional step of saving their account name failed.", "severity": "medium", "rank": 2},
+  {"n": 4, "impact": "Pressing Publish a second time can make a change that was already released successfully show the wrong release status.", "severity": "medium", "rank": 3},
+  {"n": 10, "impact": "A published change can appear stuck on \"waiting to deploy\" forever even though it is already live as part of a later release.", "severity": "medium", "rank": 4},
+  {"n": 9, "impact": "If a publish fails its automatic checks, trying to publish the same change again fails too until leftovers from the first attempt are cleaned up.", "severity": "medium", "rank": 5},
+  {"n": 5, "impact": "If a page freezes after loading, further core changes to the app can stay blocked indefinitely because the previous one never lets go of its turn.", "severity": "medium", "rank": 6},
+  {"n": 2, "impact": "If two projects are set up to use the same working folder, the nightly review can mix up their histories and report findings against the wrong project.", "severity": "medium", "rank": 7},
+  {"n": 11, "impact": "A notice saying the camera failed stays on screen indefinitely unless the user does something with their draft.", "severity": "low", "rank": 8},
+  {"n": 8, "impact": "Only the developers' tests are affected: a check that members are kept out of the nightly review can pass even when that feature is broken for an unrelated reason, so a real problem could go unnoticed.", "severity": "low", "rank": 9},
+  {"n": 6, "impact": "Only the developers' tests are affected: a check on the page footer will start failing once the year is no longer 2026, even though the app itself is fine.", "severity": "low", "rank": 10},
+  {"n": 7, "impact": "Only the developers' tests are affected: the test suite cannot start at all when the project is downloaded without its full history, even with browser tests switched off.", "severity": "low", "rank": 11},
+  {"n": 12, "impact": "Only the developers' tests are affected: a check of the iPad layout fails to start when the tests are run in the Firefox browser.", "severity": "low", "rank": 12}
+]
