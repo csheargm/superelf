@@ -43,7 +43,7 @@ Codex CLI signed in to the owner's ChatGPT subscription and the Claude CLI.
 
 ## Consequences
 
-- Hagency (and any `fix: "none"` repo) gets findings only. Auto-fix for it needs its own deploy key and a
+- A `fix: "none"` repo gets findings only. Auto-fix for it needs its own deploy key and a
   redeploy step: stage 2, in docs/TODO.md.
 - A private repo cannot be cloned anonymously; the fallback (a host timer that drops a `git bundle` into
   the node's data folder) is in docs/TODO.md, not built.

@@ -829,7 +829,7 @@ user's app (not in the repo) has no "send my change to its author" path; the lin
 - Demo admin: an app's Ask AI has no app name (the shell broker sends none), so it counts toward the
   visitor's AI total only. Pass the app slug from web/index.html relay if per-app Ask AI counts are wanted.
 ## Nightly review (ADR 0046) — stage 2 and known limits
-- Stage 2: auto-fix for Hagency Rooms (and any `fix: "none"` repo): its own GitHub deploy key (push to a branch only), a PR, CI, then the VM redeploy. Not built; stage 1 reports findings only.
+- Stage 2: auto-fix for the findings-only (`fix: "none"`) repos: its own GitHub deploy key (push to a branch only), a PR, CI, then the VM redeploy. Not built; stage 1 reports findings only.
 - If a reviewed repo goes private: a host timer (ops/private in superelf-mine) writes `git bundle` of it into the node's data folder (`nightly-review/inbox`), and the job reads the bundle instead of cloning. Not built.
 - The scheduler tick waits for the whole run (up to `deadline_min`), so reminders due meanwhile wait. Seam: run long built-ins outside the tick, as a background task that saves its briefing.
 - A diff over `chunk_kb` per file is cut and said so; the cut part is not reviewed.

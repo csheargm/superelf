@@ -85,7 +85,7 @@ test('email: plain text, no emojis, failures and skips said plainly', () => {
     { name: 'superelf', status: 'reviewed', base: 'a'.repeat(40), tip: 'b'.repeat(40), commits: ['x', 'y'], cut: [], note: '',
       confirmed: [{ file: 'lib/x.mjs', line: 4, severity: 'high', claim: 'token logged' }], rejected: [{ file: 'y', line: null, claim: 'z', reason: 'guarded' }], unverified: [],
       fix: 'Ready to publish.', prevFix: 'Live v5.30.0' },
-    { name: 'Hagency Rooms', status: 'failed', base: '', tip: '', commits: [], why: 'codex: timed out' },
+    { name: 'Other Repo', status: 'failed', base: '', tip: '', commits: [], why: 'codex: timed out' },
     { name: 'other', status: 'skipped', base: '', tip: '', commits: [] },
   ];
   const body = emailBody(projects, '2026-11-26');
@@ -107,13 +107,13 @@ function deps(cfg, { codex, verify, startFix } = {}) {
     startFix: async (a) => { calls.fix.push(a); return startFix ? startFix(a) : { id: 'abcd1234', text: 'Ready to publish.' }; } } };
 }
 
-test('run: reviews, verifies, fixes only the selfpub repo; Hagency is never written; next night with no commits = no briefing', async () => {
+test('run: reviews, verifies, fixes only the selfpub repo; the findings-only repo is never written; next night with no commits = no briefing', async () => {
   const d = tmp();
   try {
     const se = remote(d, 'se'), hg = remote(d, 'hg');
     const hgBefore = tgit(hg.bare, 'for-each-ref').trim();
     const dir = path.join(d, 'nr');
-    const cfg = cfgFor(dir, [{ name: 'superelf', url: se.bare, fix: 'selfpub' }, { name: 'Hagency Rooms', url: hg.bare }]);
+    const cfg = cfgFor(dir, [{ name: 'superelf', url: se.bare, fix: 'selfpub' }, { name: 'Other Repo', url: hg.bare }]);
     const { d: dd, calls } = deps(cfg);
     const out = await runNightlyReview(dd);
     assert.match(out.subject, /2 confirmed/);
@@ -125,7 +125,7 @@ test('run: reviews, verifies, fixes only the selfpub repo; Hagency is never writ
     const st = readState(dir);
     assert.equal(st.repos.superelf.lastSha, se.head()); assert.equal(st.repos.superelf.fixId, 'abcd1234');
     assert.equal(await runNightlyReview(dd), null, 'no new commits and no fix news: no briefing');
-    assert.match((await runNightlyReview(dd, { manual: true })).body, /No new commits: superelf, Hagency Rooms/);
+    assert.match((await runNightlyReview(dd, { manual: true })).body, /No new commits: superelf, Other Repo/);
   } finally { rmTemp(d); }
 });
 

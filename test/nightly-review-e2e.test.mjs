@@ -61,7 +61,7 @@ before(async () => {
   port = await freePort();
   nrDir = path.join(fx.d, 'nightly');
   root = mkWebRoot({ port, extraConfig: { task_timeout_minutes: 1, selfpub_root: path.join(fx.d, 'src'), selfpub_clone_url: fx.bare,
-    nightly_review: { enabled: true, time: '23:59', dir: nrDir, repos: [{ name: 'superelf', url: fx.bare, fix: 'selfpub' }, { name: 'Hagency Rooms', url: hgBare }] },
+    nightly_review: { enabled: true, time: '23:59', dir: nrDir, repos: [{ name: 'superelf', url: fx.bare, fix: 'selfpub' }, { name: 'Other Repo', url: hgBare }] },
     users: [{ id: 'owner', name: 'Owner', role: 'owner', token: OWNER_TOKEN, workspace: 'workspace' },
       { id: 'kid', name: 'Kid', role: 'member', token: KID, workspace: 'ws-kid' }] } });
   fs.writeFileSync(path.join(root, 'workspace', 'job-runs.json'), JSON.stringify({ 'model-check': localDateStr(new Date()), 'nightly-review': localDateStr(new Date()) }));
@@ -107,5 +107,5 @@ test('Run now: Codex read-only, findings verified, one unpublished superelf chan
   assert.ok(c && c.messages[1].selfpub && c.messages[1].selfpub.id === changes[0].id, 'the Publish button lives in an owner chat');
   const st = JSON.parse(fs.readFileSync(path.join(nrDir, 'state.json'), 'utf8'));
   assert.equal(st.repos.superelf.lastSha, tgit(fx.bare, 'rev-parse', 'main').trim());
-  assert.equal(st.repos['Hagency Rooms'].lastSha, tgit(hgBare, 'rev-parse', 'main').trim());
+  assert.equal(st.repos['Other Repo'].lastSha, tgit(hgBare, 'rev-parse', 'main').trim());
 });
