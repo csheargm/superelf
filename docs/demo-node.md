@@ -32,6 +32,8 @@ apps from `workspace.example` — nothing else.
 | `app_builds_per_user_per_day` / `_per_ip_` | 5 / 15 | the build stops with the EN + 中文 reason |
 | `web_search_per_day` / `web_search_per_ip_per_day` | 10 / 50 | said in a status line; the answer comes without search |
 | `ai_calls_node_per_day` | 3000 | 429 for everyone: the hosted-model cost ceiling |
+| `admin_emails` | `[]` (no admin) | sign-in emails that see 演示管理 · Demo admin (below); compared ignoring case; never sent to the browser |
+| `usage_retention_days` | 90 | days of usage rollups kept in `demo-usage/` (1–3650) |
 
 Models, Ask AI in demo apps and web search: see `docs/demo-models.md`.
 
@@ -88,6 +90,20 @@ removed on request.
   all: the same, with `rm /data/superelf/waitlist.jsonl` as the command.
 - Known limit: the form needs the demo shell, so a network over `new_users_per_ip_per_day` sees the
   quota message instead (docs/TODO.md).
+
+## Demo admin · 演示管理 (lib/demo-admin.mjs, lib/demo-usage.mjs, ADR 0045)
+
+- A signed-in visitor whose email is in `demo.admin_emails` gets ⋯ → 演示管理 · Demo admin: Today
+  (visits, new visitors, networks by short hash, 清零 · Reset on a network at the cap), People (name,
+  email, first/last visit, AI today vs cap, AI over 14 days, their apps), Apps (people, opens, AI,
+  builds, edits), Waiting list, 14-day trend. Anyone else gets 404 from `/api/demo/admin/*`.
+- Recorded: per UTC day, per visitor and app: opens, AI calls, builds, edits; visits and new visitors
+  per network short hash (8 hex of the salted hash). Never message text, prompts, searches or IPs.
+  The owner's test requests (`x-superelf-test`) are not counted.
+- A signed-in visitor's sign-in email and account name are kept in `demo-users.json` (the sign-in
+  popover says so). Delete my account removes them and every usage row of that visitor.
+- Reset deletes only that network's `session:` and `new:` counters for today, audited as
+  `demo-admin-reset`.
 
 ## Files · 文件 (`ops/demo/`)
 
