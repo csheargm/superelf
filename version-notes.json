@@ -1,4 +1,13 @@
 {
+  "v5.32.0": {
+    "date": "2026-11-26",
+    "time": "2026-11-26T18:45:56.853Z",
+    "features": [
+      "合并：主页底部显示版本与更新时间 · Merge: the home ends with the version and its release time"
+    ],
+    "fixes": [],
+    "through": "ce065d4f2f0d87fac097ce2303a09d95039aa10b"
+  },
   "v5.31.0": {
     "date": "2026-11-26",
     "time": "2026-11-26T18:41:49.897Z",
