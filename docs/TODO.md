@@ -857,3 +857,6 @@ user's app (not in the repo) has no "send my change to its author" path; the lin
 - 分享登录 · Share sign-in: the email box offers the link only; Supabase's magic-link template has no
   {{ .Token }}, so no 6-digit code can be typed. Adding a code needs the owner to edit the shared Supabase
   template (it is scripturetolife's too).
+- 分享登录 · Share sign-in (GPT review r3, edge case): an email-link request finishing in ANOTHER tab while
+  Google consent is open overwrites the shared verifier, so that Google return fails (the visitor signs in
+  again). Same fix as above: one verifier per method.
