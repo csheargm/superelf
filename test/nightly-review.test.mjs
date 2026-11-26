@@ -141,7 +141,7 @@ test('run: a failed, empty or garbage Codex reply is REVIEW FAILED and the range
       assert.match(out.body, /REVIEW FAILED: /, JSON.stringify(reply));
       assert.match(out.subject, /0 confirmed, 1 failed/);
       assert.equal(calls.fix.length, 0);
-      assert.equal(readState(dir).repos.superelf, undefined, 'not marked reviewed');
+      assert.equal((readState(dir).repos.superelf || {}).lastSha, undefined, 'not marked reviewed');
     }
     const { d: ok } = deps(cfg, { codex: () => ({ ok: true, text: '[]' }) });
     assert.match((await runNightlyReview(ok)).body, /Confirmed \(0\):\n- none/);
@@ -159,6 +159,32 @@ test('run: a review that changes the clone is not trusted; the deadline fails cl
     assert.match((await runNightlyReview(w)).body, /changed files in the read-only clone/);
     const late = deps(cfgFor(dir, [{ name: 'superelf', url: se.bare }], { deadline_min: 0.5 })).d;
     assert.match((await runNightlyReview(late)).body, /deadline/);
-    assert.equal(readState(dir).repos.superelf, undefined);
+    assert.equal((readState(dir).repos.superelf || {}).lastSha, undefined);
+  } finally { rmTemp(d); }
+});
+
+test('GPT review r1: a crashed Codex run, an error text quoting [], an aged-out failed first range, a fix not started', async () => {
+  const d = tmp();
+  try {
+    const se = remote(d, 'se');
+    const dir = path.join(d, 'nr');
+    const cfg = cfgFor(dir, [{ name: 'superelf', url: se.bare, fix: 'selfpub' }]);
+    for (const reply of [{ ok: true, text: '[]', code: 1, signal: null }, { ok: true, text: '[]', code: null, signal: 'SIGTERM' }, { ok: true, text: 'Error: expected [] got nothing' }]) {
+      const { d: dd } = deps(cfg, { codex: () => reply });
+      assert.match((await runNightlyReview(dd)).body, /REVIEW FAILED/, JSON.stringify(reply));
+    }
+    assert.ok(readState(dir).repos.superelf.retryBase, 'the failed first range is remembered');
+    const later = deps(cfg, { codex: () => ({ ok: true, text: '[]', code: 0, signal: null }) }).d;
+    later.now = () => Date.now() + 3 * 864e5;   // the window alone would now find nothing
+    assert.match((await runNightlyReview(later)).body, /Range: 4b825dc\.\.\w{7} \(1 commit\)/);
+    assert.equal(readState(dir).repos.superelf.retryBase, undefined);
+    se.commit('b.mjs', 'export const b = 2;\n', 'second');
+    const st = JSON.parse(fs.readFileSync(path.join(dir, 'state.json'), 'utf8'));
+    st.repos.superelf.fixId = 'open1234'; fs.writeFileSync(path.join(dir, 'state.json'), JSON.stringify(st));
+    const busy = deps(cfg, { startFix: () => ({ id: null, text: 'not started: another change is in progress' }) });
+    busy.d.fixStatus = () => ({ text: 'still waiting for your Publish tap', final: false });
+    const out = await runNightlyReview(busy.d);
+    assert.match(out.body, /Fix: not started: another change/); assert.match(out.body, /Previous fix: still waiting/);
+    assert.equal(readState(dir).repos.superelf.fixId, 'open1234', 'the open fix is still tracked');
   } finally { rmTemp(d); }
 });
