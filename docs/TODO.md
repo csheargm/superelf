@@ -822,3 +822,9 @@ user's app (not in the repo) has no "send my change to its author" path; the lin
 - The render check draws Home only, with a fake empty owner (lib/selfpub/render.mjs): a change visible only inside an app or with real data is not seen. Seam: render the changed app page too.
 - Stale-lock reclaim is check-then-unlink: two processes that both see the dead pid can both proceed. The node runs one server process; an O_EXCL rename-based reclaim is the fix if that changes.
 - API-key refusal on /api/selfpub follows apiKeyBlocked (accounts with a PIN). An owner with no PIN signs in by that key, so it cannot be refused without locking them out; set a PIN to close it.
+
+- Demo admin (ADR 0045), GPT review r3, not adopted: Delete my account removes a whole usage day file
+  whose content is damaged (not JSON / wrong shape) rather than keeping it for repair — a damaged day
+  is unreadable to everyone already, and it may hold the deleting visitor. Revisit if a repair tool appears.
+- Demo admin: an app's Ask AI has no app name (the shell broker sends none), so it counts toward the
+  visitor's AI total only. Pass the app slug from web/index.html relay if per-app Ask AI counts are wanted.
