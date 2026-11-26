@@ -108,3 +108,21 @@ test run, no review and no way to ship the change.
 - Discard re-reads state under the lock; a dirty self/* branch no saved change owns (crash) is discarded.
 - Rejected/deferred: stale-lock race and the no-PIN API-key case (docs/TODO.md).
 - Round 3: the tree hash includes the executable bit; discard also removes ignored files (`clean -x`).
+
+## The card tells the truth (2026-11-26)
+
+Owner report: a version-line change in 3 files showed "Files changed: web/home-v2.css" and two identical
+shots of an empty Home. Causes: the two tall shots pushed the file list below the fold; the preview served
+the shell without the build markers web.mjs fills (`<!--APP_VERSION-->` …), so a line that shows the version
+drew nothing; and the fake owner answered `{}` for every list, so Home had no apps and no greeting.
+
+- Files changed (with a count) and the diff come BEFORE the shots.
+- The preview fills the markers through the same helper as web.mjs (`fillShellMarkers`, lib/shellhtml.mjs)
+  with fixed values, and the fake owner is seeded like a real Home (apps, a task count, name), at one fixed
+  moment (Playwright clock) so the greeting never differs by when the shot ran.
+- "Same" is pixel-identical PNGs (animations off, caret hidden), not a DOM signature. Then the card says
+  "改动在截图里看不出 · Change not visible in screenshots" and shows no pictures as proof.
+- Every repo path the reply names must be in the real diff vs origin/main; otherwise the change is not
+  ready and the reply and card say which file is missing. Known limits: a regex over prose; a path named
+  only as context counts as a claim (safe side), an unnamed file is not seen.
+
