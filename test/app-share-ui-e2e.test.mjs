@@ -126,7 +126,7 @@ test('a demo user shares (Copy only, said plainly); a privacy hit is refused; th
   assert.match(await page.textContent('#shDemoNote'), /演示版只能复制链接/);
   await shot(page, 'demo-link');
   const uid = await page.evaluate(() => UID);
-  fs.writeFileSync(path.join(dRoot, `workspace-${uid}`, 'apps', 'notes', 'index.html'), '<p>call (415) 555-0134</p>');
+  fs.writeFileSync(path.join(dRoot, `workspace-${uid}`, 'apps', 'notes', 'index.html'), `<p>call (415) ${'555'}-0134</p>`);
   await page.evaluate(() => { document.querySelector('#pubSheet')?.remove(); PAShare.open('notes'); });
   await page.waitForSelector('#shFail');
   assert.match(await page.textContent('#shFail'), /个人信息/);

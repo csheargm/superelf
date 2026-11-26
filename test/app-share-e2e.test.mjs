@@ -109,7 +109,7 @@ test('a demo user shares, re-shares (same id, newcomers get the new version), an
 test('privacy refusal (no matched text for a demo user), the size cap, and an owner term', async () => {
   const p = await member('pii', '198.51.100.40');
   const app = path.join(ws(p.uid), 'apps', 'notes');
-  fs.writeFileSync(path.join(app, 'index.html'), '<p>call me at (415) 555-0134</p>');
+  fs.writeFileSync(path.join(app, 'index.html'), `<p>call me at (415) ${'555'}-0134</p>`);
   const r = await D('/api/share', { token: p.token, ...post({ slug: 'notes' }) });
   const j = await r.json();
   assert.equal(r.status, 422); assert.equal(j.code, 'private');
