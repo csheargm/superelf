@@ -102,7 +102,7 @@ let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{
 `;
 const FAKE_CODEX = `#!/usr/bin/env node
 import fs from 'node:fs';let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{
-  const a=process.argv.slice(2);fs.appendFileSync(process.env.PA_FAKE_LOG,JSON.stringify({cli:'codex',argv:a,stdin:s})+'\\n');
+  const a=process.argv.slice(2);fs.appendFileSync(__LOG__,JSON.stringify({cli:'codex',argv:a,stdin:s})+'\\n');
   const o=a[a.indexOf('-o')+1];fs.writeFileSync(o,'CODEX-ANSWER');
   process.stdout.write('session id: 11111111-2222-3333-4444-555555555555\\n');
 });
@@ -142,7 +142,8 @@ export async function startLaneServer({ extraConfig = {} } = {}) {
   // Launchable the way the real CLI is on THIS OS: on Windows an npm .cmd shim, so the server runs
   // the fakes through wincmd's real shim resolution (see writeFakeCli).
   const claudeCmd = writeFakeCli(bin, 'claude', FAKE_CLAUDE);
-  writeFakeCli(bin, 'codex', FAKE_CODEX);
+  // The log path is baked in: codex runs with an allow-listed env (lib/codex.mjs codexEnv), so PA_FAKE_LOG never reaches it.
+  writeFakeCli(bin, 'codex', FAKE_CODEX.replace('__LOG__', JSON.stringify(path.join(root, 'spawns.jsonl'))));
   const cfgPath = path.join(root, 'config.json');
   const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
   cfg.claude_cmd = claudeCmd;
