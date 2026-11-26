@@ -1,4 +1,13 @@
 {
+  "v5.29.2": {
+    "date": "2026-11-26",
+    "time": "2026-11-26T17:34:33.720Z",
+    "features": [],
+    "fixes": [
+      "合并：截图按钮的 CI 修正 · Merge: screenshot button CI fixes"
+    ],
+    "through": "ca129f7f53fb9ddfd3ae4b188bbf8e08b5f4b529"
+  },
   "v5.29.1": {
     "date": "2026-11-26",
     "time": "2026-11-26T17:25:32.889Z",
