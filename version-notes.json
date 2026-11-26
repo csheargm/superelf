@@ -1,4 +1,13 @@
 {
+  "v5.33.0": {
+    "date": "2026-11-26",
+    "time": "2026-11-26T19:25:32.521Z",
+    "features": [
+      "合并：分享应用链接——对方登录后得到自己的一份 · Merge: share an app by link — whoever opens it signs in and gets their own copy"
+    ],
+    "fixes": [],
+    "through": "82afc0f94f0f7bc4e0e4f549e1bed335f7a5eeda"
+  },
   "v5.32.3": {
     "date": "2026-11-26",
     "time": "2026-11-26T19:13:40.905Z",
