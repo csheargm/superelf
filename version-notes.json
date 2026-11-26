@@ -1,4 +1,12 @@
 {
+  "v5.27.3": {
+    "date": "2026-11-25",
+    "features": [],
+    "fixes": [
+      "聊天列表不再空行 · Chat lists without blank gaps"
+    ],
+    "through": "6031d37d1e4a9a58581371a8b78ccc634ec017cf"
+  },
   "v5.27.2": {
     "date": "2026-11-25",
     "features": [],
