@@ -20,7 +20,8 @@ test('every menu asks PAPublish.item(slug): the fork gate lives in ONE place', (
 });
 
 function loadPublish(forks, role = 'member') {
-  const ctx = { FORK_APPS: new Set(forks), ROLE: role, $: () => null, api: () => null, esc: (s) => s, _SEEN: new Set(), localStorage: null };
+  const ctx = { FORK_APPS: new Set(forks), ROLE: role, $: () => null, api: () => null, esc: (s) => s, _SEEN: new Set(), localStorage: null,
+    MutationObserver: class { observe() {} }, document: { body: {} } };   // publish.js watches body for the sheet's removal (its scrim)
   vm.createContext(ctx); vm.runInContext(`${read('web/publish.js')}\nthis.P=PAPublish;`, ctx);
   return ctx.P;
 }
