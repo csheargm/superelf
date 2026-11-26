@@ -1,4 +1,13 @@
 {
+  "v5.28.2": {
+    "date": "2026-11-26",
+    "time": "2026-11-26T15:46:29.060Z",
+    "features": [],
+    "fixes": [
+      "返回不再留下空白页 · Back after a second app goes Home, never a blank frame"
+    ],
+    "through": "2e91117df20b28547ee70e920256586c8d6d441e"
+  },
   "v5.28.1": {
     "date": "2026-11-25",
     "time": "2026-11-26T01:31:38.008Z",
