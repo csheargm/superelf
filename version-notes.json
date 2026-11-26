@@ -1,4 +1,13 @@
 {
+  "v5.33.1": {
+    "date": "2026-11-26",
+    "time": "2026-11-26T20:15:45.851Z",
+    "features": [],
+    "fixes": [
+      "合并：首次夜间审查的修复——发布重试、部署状态、截图超时、分享快照、codex 环境 · Merge: first nightly review fixes — publish retry, deploy status, render deadline, share snapshot, codex env"
+    ],
+    "through": "21be25f90d2a8cf1d20f1d2270d19026d7d94c1c"
+  },
   "v5.33.0": {
     "date": "2026-11-26",
     "time": "2026-11-26T19:25:32.521Z",
