@@ -35,7 +35,7 @@ test('the email is minimal: no sender, no "someone shared", note above the link,
   assert.equal(cleanNote(5), '');
 });
 
-test('sendOnce: one key = one send, even while in flight; a failure frees the key', async () => {
+test('sendOnce: one key = one send, even while in flight; only a plain refusal frees the key', async () => {
   const once = makeSendOnce();
   let n = 0, release;
   const slow = () => new Promise((r) => { n++; release = () => r({ ok: true }); });
@@ -43,9 +43,12 @@ test('sendOnce: one key = one send, even while in flight; a failure frees the ke
   await new Promise((r) => setImmediate(r)); release();
   assert.deepEqual(await a, { ok: true }); assert.deepEqual(await b, { ok: true, again: true });
   assert.equal(n, 1);
-  await assert.rejects(once('k2', () => { n++; throw new Error('boom'); }));
-  assert.deepEqual(await once('k2', () => { n++; return { ok: true }; }), { ok: true });
+  await assert.rejects(once('k2', () => { n++; throw new Error('agentmail POST /x → HTTP 422: bad'); }));
+  assert.deepEqual(await once('k2', () => { n++; return { ok: true }; }), { ok: true }, 'a plain refusal (4xx) frees the key');
   assert.equal(n, 3);
+  await assert.rejects(once('k3', () => { n++; throw new Error('fetch failed'); }));
+  await assert.rejects(once('k3', () => { n++; return { ok: true }; }), 'a dropped connection may have sent: never a second email');
+  assert.equal(n, 4);
   let t = 0; const timed = makeSendOnce(() => t);
   await timed('k', () => ({ ok: true })); t = 11 * 60 * 1000;
   assert.deepEqual(await timed('k', () => ({ ok: true, second: true })), { ok: true, second: true }, 'an old key is forgotten');

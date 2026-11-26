@@ -849,3 +849,11 @@ user's app (not in the repo) has no "send my change to its author" path; the lin
 ## Nightly review 2026-11-26 — deferred (low, edge cases)
 - `PA_E2E_ENGINE=firefox`: Playwright's Firefox rejects `isMobile` in `newContext`, and about ten e2e suites pass it (test/title-home-e2e.test.mjs:31, app-back, bar-gestures, bible-reader, helpers-panel-window, …). Fix once in test/helpers-note-link.mjs (drop `isMobile` for Firefox) rather than per file.
 - lib/demo-routes.mjs:256 counts an app "open" for any GET of /app/<uid>/<slug>/ before the app is served, so a 404 slug is counted too. Analytics only; count after the page is served.
+
+- 分享登录 · Share sign-in (GPT review r2, edge case, not fixed): starting Continue with Google replaces the
+  PKCE verifier of an email sign-in link already asked for in the same browser. If the visitor cancels Google
+  and then opens that older email link, it says the link expired and offers a new one. Fix if seen: keep one
+  verifier per method and try both at the boot exchange (lib/demo-boot.mjs).
+- 分享登录 · Share sign-in: the email box offers the link only; Supabase's magic-link template has no
+  {{ .Token }}, so no 6-digit code can be typed. Adding a code needs the owner to edit the shared Supabase
+  template (it is scripturetolife's too).
