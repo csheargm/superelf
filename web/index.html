@@ -374,6 +374,7 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
     <div class="home-start" id="hStart"></div>
     <div class="home-dockhead" id="hDockHead">更多应用 · More apps</div>
     <div class="grid" id="eApps"></div>
+    <p class="home-ver" id="hVer" hidden></p>   <!-- version + release time, web/home-ver.js PAHomeVer -->
   </div>
   <div id="log"></div>
 </main>
@@ -2689,6 +2690,7 @@ function renderShellVfy(){ const btn=$('#shellVfy'); btn.textContent=(shellVerif
 $('#shellVfy').onclick=()=>{ shellVerifyOn=!shellVerifyOn; renderShellVfy(); };
 
 /* PA_VERSION_TIME_JS */
+/* PA_HOME_VER_JS */
 /* PA_SETTINGS_JS */
 /* PA_TIPS_STORE_JS */
 /* PA_SETTINGS_HEAD_JS */
