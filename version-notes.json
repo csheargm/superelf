@@ -1,4 +1,13 @@
 {
+  "v5.28.3": {
+    "date": "2026-11-26",
+    "time": "2026-11-26T17:00:06.347Z",
+    "features": [],
+    "fixes": [
+      "合并：主页输入框提示改为“做一个应用” · Merge: home placeholder says create an app"
+    ],
+    "through": "3de83c75af9718752177ba49af6791997fb558f9"
+  },
   "v5.28.2": {
     "date": "2026-11-26",
     "time": "2026-11-26T15:46:29.060Z",
