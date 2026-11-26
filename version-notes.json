@@ -1,4 +1,13 @@
 {
+  "v5.34.4": {
+    "date": "2026-11-26",
+    "time": "2026-11-26T21:17:43.907Z",
+    "features": [],
+    "fixes": [
+      "分享登录手机布局与单次已发送 · share sign-in phone layout + single Sent"
+    ],
+    "through": "baaedd709fd156846673ad2ae3365638cb00ea15"
+  },
   "v5.34.3": {
     "date": "2026-11-26",
     "time": "2026-11-26T21:03:43.814Z",
