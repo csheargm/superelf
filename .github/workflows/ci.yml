@@ -85,7 +85,7 @@ jobs:
   # other engine skips as "[other-engine]" without launching it (test/helpers-e2e-gate.mjs).
   e2e-chromium:
     name: e2e (chromium, ubuntu)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # pinned: Playwright 1.58.2 has no Chromium build for ubuntu-latest (26.04)
     timeout-minutes: 45
     env:
       PLAYWRIGHT_VERSION: 1.58.2

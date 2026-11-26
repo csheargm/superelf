@@ -10,7 +10,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { missingReason, resolveSkip } from './helpers-e2e-gate.mjs';
+import { missingReason, resolveSkip, engineFiltered } from './helpers-e2e-gate.mjs';
+import { skipIf } from './helpers-skip.mjs';
 import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, OWNER_TOKEN } from './helpers-web.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
 import { ROOT } from './helpers-app.mjs';
@@ -18,6 +19,7 @@ import { checkSurface, overlaps } from './helpers-phone-check.mjs';
 
 const pw = await (async () => { try { return process.env.PA_PLAYWRIGHT ? await import(pathToFileURL(process.env.PA_PLAYWRIGHT).href) : await import('playwright'); } catch { return null; } })();
 const skip = resolveSkip(await missingReason(pw && pw.webkit));
+const crOff = engineFiltered(pw && pw.chromium);   // PA_E2E_ONLY=webkit: the Chromium control is never launched (CI's macOS job has no Chromium)
 const DEVICES = { iPhone: { width: 390, height: 844 }, iPad: { width: 820, height: 1180 } };
 const APPS = fs.readdirSync(path.join(ROOT, 'workspace.example/apps')).filter((s) => fs.existsSync(path.join(ROOT, 'workspace.example/apps', s, 'index.html')));
 const SETTLE_MS = 1500;
@@ -30,7 +32,7 @@ before(async () => {
   port = await freePort(); root = mkWebRoot({ port });
   fs.cpSync(path.join(ROOT, 'workspace.example/apps'), path.join(root, 'workspace/apps'), { recursive: true });
   web = startWeb(root); await waitReady(port);
-  if (!skip) { wk = await pw.webkit.launch(); cr = await pw.chromium.launch(); }
+  if (!skip) { wk = await pw.webkit.launch(); if (!crOff) cr = await pw.chromium.launch(); }
 });
 after(async () => { if (OUT) fs.writeFileSync(OUT, JSON.stringify(report, null, 1)); if (wk) await wk.close(); if (cr) await cr.close(); if (web) await stopWeb(web); if (root) rmTemp(root); });
 
@@ -128,7 +130,7 @@ for (const [dev, viewport] of Object.entries(DEVICES)) test(`${dev}: shell + eve
   assert.deepEqual(bad, [], bad.join('\n'));
 });
 
-test('desktop mouse (CONTROL): the touch floor stays off — the home avatar keeps its 36px', { skip, timeout: 60000 }, async () => {
+test('desktop mouse (CONTROL): the touch floor stays off — the home avatar keeps its 36px', { skip: skip || skipIf(crOff, 'other-engine', crOff), timeout: 60000 }, async () => {
   const { ctx, page } = await open(cr, { viewport: { width: 1568, height: 721 } });
   try {
     const coarse = await page.evaluate(() => matchMedia('(pointer:coarse)').matches);
