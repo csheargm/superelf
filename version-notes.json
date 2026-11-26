@@ -1,4 +1,13 @@
 {
+  "v5.28.0": {
+    "date": "2026-11-25",
+    "time": "2026-11-26T01:02:05.934Z",
+    "features": [
+      "版本显示到分钟 · Version shows the release time"
+    ],
+    "fixes": [],
+    "through": "7b471e0e6fa7a4d9d927f2028732f9d3534d1fb3"
+  },
   "v5.27.3": {
     "date": "2026-11-25",
     "features": [],
