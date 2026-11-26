@@ -1,4 +1,13 @@
 {
+  "v5.32.2": {
+    "date": "2026-11-26",
+    "time": "2026-11-26T19:03:14.933Z",
+    "features": [],
+    "fixes": [
+      "合并：主页版本行固定在应用列表外（仅英文，一行）· Merge: the Home version footer pinned outside the app list, English only, one line"
+    ],
+    "through": "fe8f9845d8d3ab6eea6c650d0e323eedb122764e"
+  },
   "v5.32.1": {
     "date": "2026-11-26",
     "time": "2026-11-26T18:52:47.505Z",
