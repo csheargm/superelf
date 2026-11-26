@@ -31,6 +31,7 @@ const USABLE = {
   'span#fsToast': 'answers the app bar\'s A-/A+ too',
   'span#updBar': 'the "Update ready" line (web/update.js): tappable while an app is open',
   'span#offLine': 'the offline state line (web/offline-client.js): read while an app is open',
+  'p#hVer': 'the Home version footer (web/home-ver.js): plain text, display:none unless body.home-on, so nothing to make inert',
   'div#lightbox': 'image viewer, fixed above everything',
   'input#filein-photo': 'hidden file input (never laid out)',
   'dialog#cfg': 'settings — top layer', 'dialog#actConfirm': 'app approval prompts — top layer',
