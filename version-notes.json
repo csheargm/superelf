@@ -1,4 +1,13 @@
 {
+  "v5.34.3": {
+    "date": "2026-11-26",
+    "time": "2026-11-26T21:03:43.814Z",
+    "features": [],
+    "fixes": [
+      "合并：分享链接——已登录直接打开、Google 优先、邮箱预填、一次一封 · Merge: share link — signed-in skips sign-in, Google first, prefilled email, one tap one email"
+    ],
+    "through": "5d2aaf343e29cecc4ce3da3903603efee4f93977"
+  },
   "v5.34.2": {
     "date": "2026-11-26",
     "time": "2026-11-26T20:53:45.292Z",
