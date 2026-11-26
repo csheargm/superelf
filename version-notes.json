@@ -1,4 +1,13 @@
 {
+  "v5.33.2": {
+    "date": "2026-11-26",
+    "time": "2026-11-26T20:21:25.582Z",
+    "features": [],
+    "fixes": [
+      "合并：主页应用列表下到版本行，去掉中间空白 · Merge: Home app list reaches the version footer, no empty band"
+    ],
+    "through": "1aeb57c86dd2b25792ba7071e02d0bbdb41e62eb"
+  },
   "v5.33.1": {
     "date": "2026-11-26",
     "time": "2026-11-26T20:15:45.851Z",
