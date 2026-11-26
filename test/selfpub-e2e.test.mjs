@@ -10,7 +10,7 @@ import { selfpubFixture, tgit } from './helpers-selfpub.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
 import { startFakeGitHub, FAKE_TOKEN } from './helpers-fake-github.mjs';
 import { runCoreChange } from '../lib/selfpub/lane.mjs';
-import { previewSelf, startSelf, liveStatus, sameVersion, securityRelevant } from '../lib/selfpub/run.mjs';
+import { previewSelf, startSelf, liveStatus, sameVersion, versionAtLeast, securityRelevant } from '../lib/selfpub/run.mjs';
 import { handleSelfpubRoute } from '../lib/selfpub/routes.mjs';
 import { getChange, putChange } from '../lib/selfpub/state.mjs';
 import { discardBranch } from '../lib/selfpub/checkout.mjs';
@@ -96,7 +96,26 @@ test('red CI: PR stays open, nothing released, the change can be tried again', {
     const end = await (await startSelf({ root: fx.root, id: r.id, options: opts(fx, gh), expectHash: p.hash })).done;
     assert.equal(end.code, 'CI_RED'); assert.match(end.pr, /pull\/1$/);
     assert.equal(tgit(fx.bare, 'rev-parse', 'main'), before); assert.equal(getChange(fx.root, r.id).state, 'ready');
+    // Tried again (nightly review 2026-11-26): the first attempt's branch is deleted (its PR closed), never BRANCH_EXISTS.
+    const p2 = previewSelf({ root: fx.root, id: r.id, options: opts(fx, gh) });
+    const end2 = await (await startSelf({ root: fx.root, id: r.id, options: opts(fx, gh), expectHash: p2.hash })).done;
+    assert.equal(end2.code, 'CI_RED', end2.error); assert.match(end2.pr, /pull\/2$/);
+    assert.equal(gh.st.pulls[0].closed, true, 'the first PR was closed with its branch');
   } finally { await gh.close(); rmTemp(fx.d); }
+});
+
+test('a repeated Publish on a released change is refused and never overwrites its deploy status; a later release counts as live', { skip: POSIX_ONLY }, async () => {
+  const fx = selfpubFixture();
+  try {
+    const r = await change(fx, libAgent);
+    assert.equal(r.ready, true, r.headline);
+    putChange(fx.root, r.id, { state: 'released', publish: { state: 'deploying', step: 'deploy', version: 'v5.1.0', pr: 'https://x/pull/1', at: Date.now() } });
+    await assert.rejects(startSelf({ root: fx.root, id: r.id, options: { token: 't' }, expectHash: 'h' }), (e) => e.code === 'NOT_READY');
+    assert.equal(getChange(fx.root, r.id).publish.state, 'deploying', 'the deploy status is kept');
+    // The node skipped v5.1.0 and deployed v5.2.0, which contains it: live, not "waiting" for good.
+    assert.equal(liveStatus(fx.root, r.id, 'v5.0.9+0 · abc').state, 'deploying');
+    assert.equal(liveStatus(fx.root, r.id, 'v5.2.0+0 · abc · 2026-11-27').state, 'live');
+  } finally { rmTemp(fx.d); }
 });
 
 test('scan hit blocks; a changed checkout after preview refuses; token missing refuses; a write outside undoes the turn', { skip: POSIX_ONLY }, async () => {
@@ -236,6 +255,10 @@ test('GPT review: merged but no new version cut is never "deploying" or "Live"; 
   } finally { await gh.close(); rmTemp(fx.d); }
 });
 
+test('versionAtLeast: a later X.Y.Z counts, an earlier or unreadable one does not', () => {
+  assert.ok(versionAtLeast('v5.1.0+0', 'v5.1.0')); assert.ok(versionAtLeast('v5.10.0', 'v5.9.3')); assert.ok(versionAtLeast('v6.0.0', 'v5.99.99'));
+  assert.ok(!versionAtLeast('v5.0.9', 'v5.1.0')); assert.ok(!versionAtLeast('', 'v5.1.0')); assert.ok(!versionAtLeast('v5.2.0', ''));
+});
 test('sameVersion compares X.Y.Z only', () => {
   assert.ok(sameVersion('v5.1.0+0 · abc · 2026-11-25', 'v5.1.0'));
   assert.ok(!sameVersion('v5.1.01', 'v5.1.0')); assert.ok(!sameVersion('v5.10.0', 'v5.1.0')); assert.ok(!sameVersion('', 'v5.1.0'));

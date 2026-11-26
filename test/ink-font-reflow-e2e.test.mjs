@@ -17,7 +17,8 @@ const TARGET = '叫我们结果子给神', IPAD = 820;
 const ZH4 = '你们藉着基督的身体，在律法上也是死了，叫你们归于别人，就是归于那从死里复活的，叫我们结果子给神。';
 const REF = '62ecd54b';   // v5.27.1, the owner's node: the control
 const here = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8'), show = (f) => execFileSync('git', ['show', `${REF}:${f}`], { cwd: ROOT, encoding: 'utf8' });
-const ENGINES = { now: here('web/ink-frame.inline.html') + here('web/ink-anchor.inline.html'), ref: show('web/ink-frame.inline.html') + show('web/ink-anchor.inline.html') };
+// Read when a page is built, never at load: a shallow checkout without REF must still load (and skip) under PA_E2E_SKIP=1.
+const ENGINES = { get now() { return here('web/ink-frame.inline.html') + here('web/ink-anchor.inline.html'); }, get ref() { return show('web/ink-frame.inline.html') + show('web/ink-anchor.inline.html'); } };
 const IPAD_FONT = 'font:20px/1.6 sans-serif', OTHER_FONT = 'font:19px/1.5 sans-serif;letter-spacing:0.4px';
 const page = (font, eng = 'now') => `<!doctype html><meta charset=utf-8><style>body{margin:0;${font}}#v{position:relative;padding:0 16px;height:100vh;overflow:auto}.verse{margin:0 0 12px}</style>
 <div id=v><div class=verse data-n=4><div class=vzh>${ZH4}</div><div class=ven>So, my brothers, you also died to the law through the body of Christ.</div></div>

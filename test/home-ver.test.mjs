@@ -22,9 +22,10 @@ const TIME = `${new Date().getUTCFullYear()}-03-04T06:32:09Z`;
 const LINE_RE = new RegExp(`^Version ${VERSION.replace(/\./g, '\\.')}\\S* · Updated (Mar \\d{1,2}, \\d{2}:\\d{2})$`);
 const SHOTS = process.env.PA_SHOT_DIR || '';
 
+// vtime is THIS year: a fixed past year's stamp shows its year ("Nov 26, 2026, …") and the pinned line fails (nightly review 2026-11-26).
 function unit() {
   const el = (id, o) => ({ id, hidden: true, textContent: '', dataset: {}, title: '', removeAttribute(a) { delete this[a]; }, ...o });
-  const els = { 'ver-lbl': el('ver-lbl', { textContent: '管家 · v5.30.0+2 · ab12cd3', dataset: { vtime: '2026-11-26T02:30:00Z', vdate: '11-26' } }), hVer: el('hVer') };
+  const els = { 'ver-lbl': el('ver-lbl', { textContent: '管家 · v5.30.0+2 · ab12cd3', dataset: { vtime: `${new Date().getUTCFullYear()}-11-26T02:30:00Z`, vdate: '11-26' } }), hVer: el('hVer') };
   const ctx = vm.createContext({ document: { getElementById: (i) => els[i] || null }, MutationObserver: class { observe() {} }, Intl, Date });
   vm.runInContext(read('web/version-time.js') + read('web/home-ver.js') + ';this.PAHomeVer=PAHomeVer;', ctx);
   return { ...ctx.PAHomeVer, els };

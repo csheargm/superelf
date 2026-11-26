@@ -125,6 +125,10 @@ html.paw-pb>body>:is(.pan-fs,.pac-fs){margin-bottom:var(--paw-b)}
     ['top','bottom'].forEach(tb=>{ const g=on(tb); if(!g.length) return;
       const px=Math.round(Math.max(...g.map(s=>clampSize(tb,s.size[tb])))*vh); push[tb]=px;
       g.forEach((s,i)=>{ const w=span/g.length; rects[s.key]={x:Math.round(x0+i*w),y:tb==='top'?0:vh-px,w:Math.round(w),h:px}; }); });
+    // Top + bottom together never take more than TB[1] of the height, like left + right: never overlapping (nightly review 2026-11-26).
+    const tbSum=push.top+push.bottom, tbCap=Math.round(TB[1]*vh);
+    if(push.top&&push.bottom&&tbSum>tbCap){ const t=Math.round(push.top*tbCap/tbSum), b=tbCap-t;
+      on('top').forEach(s=>{ rects[s.key].h=t; }); on('bottom').forEach(s=>{ rects[s.key].y=vh-b; rects[s.key].h=b; }); push.top=t; push.bottom=b; }
     vis.forEach(s=>{
       if(s.max) rects[s.key]={x:0,y:0,w:vw,h:vh};
       else if(s.mode==='dock'&&(s.where==='tr'||s.where==='br')){ const w=Math.round(clampSize('right',s.size.right)*vw), h=Math.round(vh/2);

@@ -39,7 +39,8 @@ var PAShellCam=(function(){
     const c=document.getElementById('chips'); if(!c) return;
     let n=document.getElementById('camNote');
     if(!n){ n=document.createElement('div'); n.id='camNote'; n.setAttribute('role','status'); }
-    c.prepend(n); n.textContent=t;   // inside #chips: it moves with them between the home and a chat (GPT review r2); the next renderChips clears it clearTimeout(say.t); say.t=setTimeout(()=>n.remove(),NOTE_MS);
+    c.prepend(n); n.textContent=t;   // inside #chips: it moves with them between the home and a chat (GPT review r2); the next renderChips clears it
+    clearTimeout(say.t); say.t=setTimeout(()=>n.remove(),NOTE_MS);   // gone after NOTE_MS even when the draft is left alone (nightly review 2026-11-26)
   }
   async function take(h){
     if(busy) return; busy=true;

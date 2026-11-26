@@ -2611,7 +2611,7 @@ const server = http.createServer(async (req, res) => {
       catch (e) { audit('job-state-error', { who: user.id, job: job.name, error: String(e && e.message || e) }); }
       // Same job-run audit shape the tick writes (lib/jobruns.mjs tickUser) —
       // the Jobs view derives lastOutcome for manual and scheduled runs alike.
-      audit('job-run', { who: user.id, job: job.name, briefing: out.briefing ? out.briefing.id : null, skipped: !!out.skipped, manual: true });
+      audit('job-run', { who: user.id, job: job.name, briefing: out.briefing ? out.briefing.id : null, skipped: !!out.skipped, ...(out.failed ? { failed: true } : {}), manual: true });
       if (out.skipped) return send(res, 200, 'application/json', JSON.stringify({ ok: true, skipped: true, alreadyRanToday }));
       // The body comes back so the caller can SHOW it. Capped: this is a status reply, not a
       // document channel — the whole briefing is always readable in the feed.
