@@ -4,9 +4,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { fileURLToPath } from 'node:url';
 import { readShell } from '../lib/shellhtml.mjs';
 
-const ROOT = new URL('..', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('..', import.meta.url));   // a URL pathname is /D:/… on Windows
 const read = (f) => fs.readFileSync(new URL('../' + f, import.meta.url), 'utf8');
 const fresh = /\/\* ══ PA_SHOT_FRESH_BEGIN[\s\S]*?\*\/([\s\S]*?)\/\* ══ PA_SHOT_FRESH_END/.exec(read('web/snap.inline.html'))[1];
 const PNG = 'data:image/png;base64,iVBORw0KGgo=';
