@@ -1,4 +1,13 @@
 {
+  "v5.30.0": {
+    "date": "2026-11-26",
+    "time": "2026-11-26T18:29:54.245Z",
+    "features": [
+      "合并：演示管理（谁登录了、用了哪些应用）· Merge: Demo admin — who signed in, which apps they use (ADR 0045)"
+    ],
+    "fixes": [],
+    "through": "8d621ca93469fc91ff20ad616a007d0ae2aea788"
+  },
   "v5.29.4": {
     "date": "2026-11-26",
     "time": "2026-11-26T18:14:34.947Z",
