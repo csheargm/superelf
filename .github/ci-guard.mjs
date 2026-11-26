@@ -35,7 +35,13 @@ export function unexpectedSkips(reasons, platform, tags = SKIP_TAGS) {
 
 // judge(text, min, platform) → { ok, summary, reason }. The LAST value of each summary key wins: the
 // summary is the tail of the output, and a test's own output could print a look-alike line earlier.
-export function judge(text, min, platform = process.platform) {
+// forbidTags('no-browser') → SKIP_TAGS minus those tags: a browser job must never skip for a missing
+// browser, or it would be green having tested nothing it exists to test (R14).
+export function forbidTags(list, tags = SKIP_TAGS) {
+  const drop = new Set(String(list || '').split(',').map((t) => t.trim()).filter(Boolean));
+  return Object.fromEntries(Object.entries(tags).filter(([t]) => !drop.has(t)));
+}
+export function judge(text, min, platform = process.platform, tags = SKIP_TAGS) {
   const summary = {};
   for (const k of KEYS) {
     const all = [...String(text).matchAll(new RegExp(`^# ${k} (\\d+)\\s*$`, 'gm'))];
@@ -49,7 +55,7 @@ export function judge(text, min, platform = process.platform) {
   if (summary.todo > 0) problems.push(`${summary.todo} todo tests: a todo is not a pass`);
   const reasons = skipReasons(text);
   if (reasons.length !== summary.skipped) problems.push(`found ${reasons.length} skip lines but the summary says ${summary.skipped} skipped: cannot check every reason`);
-  const bad = unexpectedSkips(reasons, platform);
+  const bad = unexpectedSkips(reasons, platform, tags);
   if (bad.length) {
     const shown = [...new Set(bad)].slice(0, 10).map((r) => `  "${r || '(no reason)'}"`).join('\n');
     problems.push(`${bad.length} unexpected skips on ${platform} (no tag, or a tag not allowed here; see test/helpers-skip.mjs):\n${shown}`);
@@ -63,7 +69,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try { text = fs.readFileSync(process.argv[2], 'utf8'); }
   catch (e) { console.error(`ci-guard: cannot read the test output (${e.message})`); process.exit(1); }
   const num = (v) => (v === undefined || v === '' ? NaN : Number(v));   // unset is NOT 0
-  const r = judge(text, num(process.env.MIN_TESTS));
+  const r = judge(text, num(process.env.MIN_TESTS), process.platform, forbidTags(process.env.CI_FORBID_SKIP));
   for (const k of KEYS) console.log(`# ${k} ${r.summary[k] ?? '(missing)'}`);
   console.log(`${r.ok ? 'OK' : 'FAIL'}: ${r.reason}`);
   process.exit(r.ok ? 0 : 1);
