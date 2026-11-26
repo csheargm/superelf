@@ -96,7 +96,7 @@ const INVENTORY = [
   { menu: '#appMenu', open: openAppRowMenu, paths: ['escape', 'outside', 'anchor-hidden'] },
   { menu: '#frame .aa.open', open: openBarAa, paths: ['escape', 'outside', 'frame-tap', 'bar-retract', 'app-change'] },
   { menu: '#hmenu', open: openHomeMenu, paths: ['escape', 'outside'] },
-  { menu: '#pubSheet', open: openPubSheet, paths: ['close', 'escape', 'app-change'] },
+  { menu: '#pubSheet', open: openPubSheet, paths: ['close', 'escape', 'app-change', 'scrim'] },
 ];
 async function closeBy(page, dev, how) {
   if (how === 'escape') return page.keyboard.press('Escape');
@@ -112,6 +112,7 @@ async function closeBy(page, dev, how) {
   if (how === 'app-change') return page.evaluate(() => goHome());
   if (how === 'anchor-hidden') return page.evaluate(() => closeDrawer());
   if (how === 'close') return press(page, dev, '#pubClose');
+  if (how === 'scrim') { const x = dev.viewport.width / 2, y = 60; return dev.touch ? page.touchscreen.tap(x, y) : page.mouse.click(x, y); }   // above the sheet: the dimming scrim
   throw new Error('unknown close path ' + how);
 }
 
@@ -144,6 +145,35 @@ for (const dev of DEVICES) {
     } finally { await ctx.close(); }
   });
 }
+
+// 分享/发布窗口要醒目 · The sheet stands out (owner 2026-11-26): a dimming scrim covers the page AND the app
+// frame behind it, a tap above the sheet lands on the scrim, focus is in the modal dialog, and every
+// close path takes the scrim with it (no invisible layer left eating taps).
+for (const dev of DEVICES.slice(0, 2)) test(`${dev.name}: the sheet has a dimming scrim over the page behind`, { skip }, async () => {
+  const { ctx, page } = await signIn(dev);
+  try {
+    await openPubSheet(page, dev);
+    const r = await page.evaluate(() => {
+      const m = document.querySelector('#pubScrim'), s = document.querySelector('#pubSheet'), b = m.getBoundingClientRect(), sb = s.getBoundingClientRect();
+      return { bg: getComputedStyle(m).backgroundColor, b: [b.left, b.top, b.width, b.height], hit: document.elementFromPoint(innerWidth / 2, Math.max(4, sb.top - 30))?.id,
+        sheetHit: document.elementFromPoint(sb.left + sb.width / 2, sb.top + 8)?.closest('#pubSheet') != null,
+        modal: s.getAttribute('aria-modal'), role: s.getAttribute('role'), focusIn: s.contains(document.activeElement), w: innerWidth, h: innerHeight };
+    });
+    const alpha = Number((r.bg.match(/rgba?\(([^)]+)\)/) || [])[1]?.split(',')[3] ?? 1);
+    assert.ok(alpha >= 0.3, `the scrim dims (${r.bg})`);
+    assert.deepEqual(r.b, [0, 0, r.w, r.h], 'the scrim covers the whole viewport');
+    assert.equal(r.hit, 'pubScrim', 'above the sheet, the scrim is on top of the app frame');
+    assert.ok(r.sheetHit, 'the sheet is above the scrim');
+    assert.equal(r.modal, 'true'); assert.equal(r.role, 'dialog'); assert.ok(r.focusIn, 'focus is in the sheet');
+    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `sheet-scrim-${dev.name}-${ENGINE}.png`) });
+    await closeBy(page, dev, 'scrim');
+    await waitGone(page, '#pubSheet', { timeout: 3000 });
+    assert.equal(await page.locator('#pubScrim').count(), 0, 'the scrim leaves with the sheet');
+    await openPubSheet(page, dev); await page.evaluate(() => goHome());
+    await waitGone(page, '#pubSheet', { timeout: 3000 });
+    await page.waitForFunction(() => !document.querySelector('#pubScrim'), null, { timeout: 3000 });
+  } finally { await ctx.close(); }
+});
 
 test('a Publish preview that answers after the user left opens no sheet', { skip }, async () => {
   const dev = DEVICES[0]; const { ctx, page } = await signIn(dev);
