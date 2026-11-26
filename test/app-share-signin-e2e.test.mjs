@@ -77,6 +77,7 @@ test('signed out, from a share email: Google first, the email prefilled, nothing
   await tap(page, '#shGo');
   await page.waitForSelector('#demoAuth #demoGoogle', { timeout: 15000 });
   assert.equal(await page.inputValue('#demoAuthEmail'), TO, 'prefilled');
+  if (PHONE) assert.ok(await page.evaluate(() => { const i = document.querySelector('#demoAuthEmail'); return i.scrollWidth <= i.clientWidth && parseFloat(getComputedStyle(i).fontSize) >= 16; }), 'phone: the whole address shows, 16px+ (no zoom)');
   assert.ok(await page.evaluate(() => !!(document.querySelector('#demoGoogle').compareDocumentPosition(document.querySelector('#demoAuthEmail')) & Node.DOCUMENT_POSITION_FOLLOWING)), 'Google comes first');
   assert.equal(await page.evaluate(() => localStorage.getItem('sb_session')), null, 'the link signed no one in');
   const g = await page.locator('#demoGoogle').boundingBox();
@@ -118,6 +119,7 @@ test('the owner double-taps Send and presses Enter: one email request, then Sent
   await waitFor(async () => (await page.textContent('#shSend')).includes('已发送'), 'Sent').catch(async (e) => { throw new Error(e.message + ' ' + JSON.stringify(keys) + ' ' + await page.textContent('#pubSheet')); });
   await page.waitForTimeout(800);
   assert.equal(keys.length, 1, 'one tap = one email');
+  assert.equal(((await page.textContent('#pubSheet')).match(/已发送/g) || []).length, 1, 'Sent shows once (on the button)');
   assert.ok(await page.locator('#shSend').isDisabled(), 'Send stays off after it worked');
   await page.fill('#shTo', 'other@example.com');
   await tap(page, '#shSend');

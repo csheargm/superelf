@@ -49,7 +49,7 @@ const PAShare=(()=>{
     to.addEventListener('input',fresh); note.addEventListener('input',fresh);
     f.onsubmit=async(ev)=>{ ev.preventDefault(); if(busy||b.disabled) return; busy=true; b.disabled=true;
       let ok=false;
-      try{ const r=await post('/api/share/email',{id:j.id,to:to.value,name:j.name,note:note.value,key}); const k=await r.json(); ok=!!k.ok; n.textContent=ok?L.sent:(k.error||L.fail); }
+      try{ const r=await post('/api/share/email',{id:j.id,to:to.value,name:j.name,note:note.value,key}); const k=await r.json(); ok=!!k.ok; n.textContent=ok?'':(k.error||L.fail); /* Sent shows on the button only */ }
       catch(e){ n.textContent=L.fail+': '+((e&&e.message)||''); }
       busy=false; if(ok) b.textContent=L.sent; else b.disabled=false;
       if(dirty){ dirty=false; fresh(); } };   // edited while it was sending: the edit is a new send
