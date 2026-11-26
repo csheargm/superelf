@@ -1,4 +1,13 @@
 {
+  "v5.34.1": {
+    "date": "2026-11-26",
+    "time": "2026-11-26T20:48:02.647Z",
+    "features": [],
+    "fixes": [
+      "合并：修复发布单元测试的沙盒 · Merge: publish unit-test sandbox fix (CI)"
+    ],
+    "through": "ba9e98341ef459f3d2295723c5bdfbf401fa8f0d"
+  },
   "v5.34.0": {
     "date": "2026-11-26",
     "time": "2026-11-26T20:43:09.461Z",
