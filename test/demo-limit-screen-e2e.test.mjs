@@ -79,3 +79,24 @@ test('refused first visit: Escape does not close the limit card', { skip }, asyn
   assert.ok(await card.evaluate((d) => d.open), 'the card stays open');
   await ctx.close();
 });
+
+// 2026-11-26: on a wide desktop the sign-in link stretched into a long bordered bar off the right edge.
+for (const vp of [{ width: 1920, height: 1080 }, { width: 390, height: 844 }]) {
+  test(`refused first visit at ${vp.width}px: each next step is a short centred link inside the screen`, { skip }, async () => {
+    const ctx = await browser.newContext({ viewport: vp }); const page = await ctx.newPage();
+    await page.goto(`http://127.0.0.1:${full.port}/`);
+    await page.locator('#demoStop').waitFor({ state: 'visible' });
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'demoStopMsg', 'focus starts on the reason, not as a box round the first link');
+    await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'demoStopSignin', 'Tab reaches the first next step');
+    assert.notEqual(await page.locator('#demoStopSignin').evaluate((e) => getComputedStyle(e).outlineStyle), 'none', 'keyboard focus is visible');
+    for (const id of ['#demoStopSignin', '#demoStopJoin']) {
+      const b = await page.locator(id).boundingBox();
+      assert.ok(b.x >= 0 && b.x + b.width <= vp.width, `${id} inside the viewport`);
+      assert.ok(b.width < 480, `${id} is ${b.width}px wide`);
+      assert.ok(Math.abs(b.x + b.width / 2 - vp.width / 2) < 4, `${id} centred`);
+    }
+    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `demo-limit-${vp.width}.png`) });
+    await ctx.close();
+  });
+}

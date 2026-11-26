@@ -28,6 +28,7 @@ apps from `workspace.example` — nothing else.
 | `new_users_per_ip_per_day` | 10 | 429 |
 | `user_disk_mb` | 20 | 507 on chat and save |
 | `total_disk_gb` | 0.5 (5 when unset) | 507; new visitors refused |
+| `test_bypass_token` | unset (no bypass) | the owner's own checks · 自测: a request with header `x-superelf-test` equal to this (24+ chars) is not counted as a visit/new visitor, skips the per-network AI cap and is audited as `demo-test-visitor`; node and per-visitor caps still apply. Set only in the live `config.json`, never in a repo |
 | `app_builds_per_user_per_day` / `_per_ip_` | 5 / 15 | the build stops with the EN + 中文 reason |
 | `web_search_per_day` / `web_search_per_ip_per_day` | 10 / 50 | said in a status line; the answer comes without search |
 | `ai_calls_node_per_day` | 3000 | 429 for everyone: the hosted-model cost ceiling |
