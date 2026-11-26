@@ -127,3 +127,5 @@ body.home-on #emptyState{ flex:1 1 auto; flex-direction:column; align-items:cent
   #emptyState .grid-sep{ grid-column:1 / -1; }
 }
 @media (prefers-reduced-motion:reduce){ header .mark .spark,header .mark .blink{ animation:none !important; } .st{ transition:none; } .st:active{ transform:none; } }
+.home-ver{ margin:28px 0 0; color:var(--muted); font-size:12.5px; text-align:center; max-width:36em; line-height:1.5; }
+.home-ver[hidden]{ display:none; }
