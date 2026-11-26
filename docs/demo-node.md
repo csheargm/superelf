@@ -33,6 +33,7 @@ apps from `workspace.example` — nothing else.
 | `web_search_per_day` / `web_search_per_ip_per_day` | 10 / 50 | said in a status line; the answer comes without search |
 | `ai_calls_node_per_day` | 3000 | 429 for everyone: the hosted-model cost ceiling |
 | `admin_emails` | `[]` (no admin) | sign-in emails that see 演示管理 · Demo admin (below); compared ignoring case; never sent to the browser |
+| `admin_subs` | unset | optional: Supabase user ids the admin must also match (an immutable pin beside the email) |
 | `usage_retention_days` | 90 | days of usage rollups kept in `demo-usage/` (1–3650) |
 
 Models, Ask AI in demo apps and web search: see `docs/demo-models.md`.
@@ -93,7 +94,7 @@ removed on request.
 
 ## Demo admin · 演示管理 (lib/demo-admin.mjs, lib/demo-usage.mjs, ADR 0045)
 
-- A signed-in visitor whose email is in `demo.admin_emails` gets ⋯ → 演示管理 · Demo admin: Today
+- A visitor signed in by the email link (Supabase `amr` otp/magiclink, no phone claim) whose email is in `demo.admin_emails` gets ⋯ → 演示管理 · Demo admin: Today
   (visits, new visitors, networks by short hash, 清零 · Reset on a network at the cap), People (name,
   email, first/last visit, AI today vs cap, AI over 14 days, their apps), Apps (people, opens, AI,
   builds, edits), Waiting list, 14-day trend. Anyone else gets 404 from `/api/demo/admin/*`.

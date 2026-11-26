@@ -71,6 +71,15 @@ test('dropUser removes the visitor from every kept day; others stay', () => {
   assert.deepEqual(Object.keys(readDay(root, '2026-11-26').users), [U2]);
 });
 
+test('a damaged day is never overwritten by a count (a passing read error must not wipe everyone)', () => {
+  const root = tmp(), f = path.join(root, USAGE_DIR, '2026-11-26.json');
+  fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, '{"users":');
+  const audits = []; const u2 = makeDemoUsage({ root, cfg: {}, audit: (k) => audits.push(k) });
+  u2.track(U1, { kind: 'ai', now: T0 });
+  assert.equal(fs.readFileSync(f, 'utf8'), '{"users":');
+  assert.deepEqual(audits, ['demo-usage-failed']);
+});
+
 test('open: counted once a minute per visitor and app, only for an app that exists', () => {
   const root = withApp(tmp(), U1, 'notes'), u = makeDemoUsage({ root, cfg: {} });
   u.track(U1, { kind: 'open', app: 'notes', now: T0 });
@@ -108,7 +117,11 @@ test('adminEmails / adminOf: only a verified token whose email is listed; anonym
   const req = (t) => ({ headers: t ? { 'x-demo-auth': t } : {} });
   const otp = [{ method: 'otp', timestamp: 1 }];
   assert.ok((await adminOf(gate({ ok: true, sub: 's', email: 'OWNER@example.org', amr: otp, iat: 1 }), cfg, req('t'))).startsWith('sb-'));
-  assert.ok((await adminOf(gate({ ok: true, sub: 's', email: 'owner@example.org', amr: ['oauth'] }), cfg, req('t'))).startsWith('sb-'));
+  assert.equal(await adminOf(gate({ ok: true, sub: 's', email: 'owner@example.org', amr: ['oauth'] }), cfg, req('t')), '', 'a provider session is not the email link');
+  assert.equal(await adminOf(gate({ ok: true, sub: 's', email: 'owner@example.org', phone: '15550001', amr: otp }), cfg, req('t')), '', 'an SMS code proves a phone, not the email');
+  const pinned = { demo: { admin_emails: ['owner@example.org'], admin_subs: ['real-sub'] } };
+  assert.equal(await adminOf(gate({ ok: true, sub: 'other', email: 'owner@example.org', amr: otp }), pinned, req('t')), '', 'admin_subs pins the account');
+  assert.ok((await adminOf(gate({ ok: true, sub: 'real-sub', email: 'owner@example.org', amr: otp }), pinned, req('t'))).startsWith('sb-'));
   assert.equal(await adminOf(gate({ ok: true, sub: 's', email: 'owner@example.org', amr: [{ method: 'password' }], meta: { email_verified: true } }), cfg, req('t')), '', 'a password session does not prove the email; user_metadata never counts');
   assert.equal(await adminOf(gate({ ok: true, sub: 's', email: 'owner@example.org' }), cfg, req('t')), '', 'no amr: refused');
   assert.equal(await adminOf(gate({ ok: true, sub: 's', email: 'owner@example.org' }), cfg, req('')), '', 'anonymous');
