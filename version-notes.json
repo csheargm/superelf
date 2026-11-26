@@ -1,4 +1,14 @@
 {
+  "v5.28.1": {
+    "date": "2026-11-25",
+    "time": "2026-11-26T01:31:38.008Z",
+    "features": [],
+    "fixes": [
+      "手写笔迹跟着经文走 · Handwriting stays on its words at any width",
+      "CI 跳过检查按原因 · CI skip guard checks reasons, not counts"
+    ],
+    "through": "c76e2254c59deafeac4ea88e99e4773df18c84b3"
+  },
   "v5.28.0": {
     "date": "2026-11-25",
     "time": "2026-11-26T01:02:05.934Z",
