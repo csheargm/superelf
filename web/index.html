@@ -72,7 +72,7 @@ h2{ font-size:13px; text-transform:uppercase; letter-spacing:.08em; color:var(--
 .msg h1,.msg h2,.msg h3{ margin:.6em 0 .2em; font-size:1em; font-weight:700; }
 .msg h2{ font-size:.95em; } .msg h3{ font-size:.9em; }
 .msg ul,.msg ol{ padding-left:1.4em; margin:.3em 0; }
-.msg li{ margin:.1em 0; }
+.msg li{ margin:.1em 0; } .msg blockquote{ margin:.4em 0; padding-left:.8em; border-left:3px solid var(--line); color:var(--muted); } .msg hr{ border:none; border-top:1px solid var(--line); margin:.6em 0; }
 .msg table{ border-collapse:collapse; font-size:13px; margin:.5em 0; display:block; overflow-x:auto; max-width:100%; }
 .msg th,.msg td{ border:1px solid var(--line); padding:4px 8px; text-align:left; vertical-align:top; }
 .msg th{ background:rgba(128,128,128,.1); font-weight:600; white-space:nowrap; }
@@ -665,34 +665,53 @@ function renderMd(raw){
   s=s.replace(/\*\*\*(.+?)\*\*\*/g,'<strong><em>$1</em></strong>');
   s=s.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
   s=s.replace(/\*([^*\n]+?)\*/g,'<em>$1</em>');
-  s=s.replace(/^### (.+)$/gm,'<h3>$1</h3>');
-  s=s.replace(/^## (.+)$/gm,'<h2>$1</h2>');
-  s=s.replace(/^# (.+)$/gm,'<h1>$1</h1>');
-  // GFM tables: a header row, a |---| separator, then body rows. Cells keep the
-  // inline formatting already applied above.
-  s=s.replace(/^\|(.+)\|[ \t]*\n\|[ \t:|-]+\|[ \t]*\n((?:^\|.*\|[ \t]*\n?)*)/gm,(_,head,body)=>{
-    const cells=(r)=>r.split('|').slice(1,-1).map(c=>c.trim());
-    const h=cells('|'+head+'|');
-    const rows=(body||'').split('\n').filter(l=>l.trim().startsWith('|')).map(cells);
-    let out='<table><thead><tr>'+h.map(c=>'<th>'+c+'</th>').join('')+'</tr></thead>';
-    if(rows.length) out+='<tbody>'+rows.map(r=>'<tr>'+h.map((_,i)=>'<td>'+(r[i]||'')+'</td>').join('')+'</tr>').join('')+'</tbody>';
-    return out+'</table>';
-  });
-  s=s.replace(/^(\d+)\. (.+)$/gm,'<oli>$2</oli>');
-  s=s.replace(/^[-*] (.+)$/gm,'<uli>$1</uli>');
-  s=s.replace(/(?:<uli>[\s\S]*?<\/uli>\s*)+/g,m=>'<ul>'+m.replace(/<uli>/g,'<li>').replace(/<\/uli>/g,'</li>')+'</ul>');
-  s=s.replace(/(?:<oli>[\s\S]*?<\/oli>\s*)+/g,m=>'<ol>'+m.replace(/<oli>/g,'<li>').replace(/<\/oli>/g,'</li>')+'</ol>');
-  const BLOCK=/^<(h[1-3]|ul|ol|pre|li|table)/;
-  s=s.split(/\n{2,}/).map(para=>{
-    const lines=para.split('\n').filter(l=>l.trim());
-    if(!lines.length) return '';
-    if(BLOCK.test(lines[0].trim())) return lines.join('\n');
-    return '<p>'+lines.join('<br>')+'</p>';
-  }).join('\n');
+  s=mdBlocks(s);
   s=s.replace(/\x02B(\d+)\x03/g,(_,i)=>blocks[+i]);
   s=s.replace(/\x02S(\d+)\x03/g,(_,i)=>spans[+i]);
   s=s.replace(/\x02L(\d+)\x03/g,(_,i)=>links[+i]);
   return s;
+}
+
+/* Block layout, one line at a time. SCAR (v5.27.1): blocks were cut on blank lines AFTER the list
+   regex had wrapped them, so a loose list (a blank line between "- " items, which models write
+   all the time) came out as <p><ul><li>…</li></p><li>… — the browser turned each stray </p> into an
+   empty paragraph, one blank gap per bullet. Now a blank line never closes a list; only another
+   kind of block does. TODO(R4): renderMd + mdBlocks → web/render-md.js (seam: the markdown renderer). */
+const MD_LI=/^(\s*)([-*+]|\d+[.)])\s+(.*)$/, MD_TROW=/^\|[ \t:|-]+\|\s*$/, MD_HR=/^(?:-{3,}|_{3,})$/;
+function mdTable(L,i,out){
+  const cells=r=>r.trim().replace(/^\||\|$/g,'').split('|').map(c=>c.trim());
+  const h=cells(L[i]); let html='<table><thead><tr>'+h.map(c=>'<th>'+c+'</th>').join('')+'</tr></thead>', rows=[];
+  for(i+=2;i<L.length&&L[i].trim().startsWith('|');i++) rows.push(cells(L[i]));
+  if(rows.length) html+='<tbody>'+rows.map(r=>'<tr>'+h.map((_,k)=>'<td>'+(r[k]||'')+'</td>').join('')+'</tr>').join('')+'</tbody>';
+  out.push(html+'</table>'); return i-1;
+}
+function mdBlocks(s){
+  const L=s.split('\n'), out=[], stack=[]; let para=[], quote=[];
+  const flush=()=>{ if(para.length){ out.push('<p>'+para.join('<br>')+'</p>'); para=[]; } if(quote.length){ out.push('<blockquote>'+quote.join('<br>')+'</blockquote>'); quote=[]; } };
+  const pop=()=>out.push('</li></'+stack.pop().tag+'>');
+  const closeAll=()=>{ flush(); while(stack.length) pop(); };
+  for(let i=0;i<L.length;i++){
+    const line=L[i], t=line.trim(), m=MD_LI.exec(line);
+    if(!t){ flush(); continue; }   // a blank line never closes a list (a loose list is ONE list)
+    if(m&&!MD_HR.test(t)){
+      flush(); const ind=m[1].replace(/\t/g,'    ').length, tag=/\d/.test(m[2])?'ol':'ul', n=parseInt(m[2],10);
+      while(stack.length>1&&ind<stack[stack.length-1].ind) pop();
+      const top=stack[stack.length-1];
+      if(top&&ind<=top.ind&&top.tag===tag){ out.push('</li><li>'+m[3]); continue; }
+      if(top&&ind<=top.ind) pop();
+      stack.push({tag,ind}); out.push('<'+tag+(tag==='ol'&&n>1?' start="'+n+'"':'')+'><li>'+m[3]); continue;
+    }
+    if(stack.length&&/^\s{2,}/.test(line)){ out.push('<br>'+t); continue; }   // an indented line belongs to the item above
+    if(t.startsWith('|')&&MD_TROW.test(L[i+1]||'')){ closeAll(); i=mdTable(L,i,out); continue; }
+    const h=/^(#{1,6})\s+(.+)$/.exec(t);
+    if(h){ closeAll(); const n=Math.min(h[1].length,3); out.push('<h'+n+'>'+h[2]+'</h'+n+'>'); continue; }
+    if(MD_HR.test(t)){ closeAll(); out.push('<hr>'); continue; }
+    if(/^\x02B\d+\x03$/.test(t)){ closeAll(); out.push(t); continue; }
+    const q=/^&gt;\s?(.*)$/.exec(t);
+    if(q){ while(stack.length) pop(); if(para.length) flush(); quote.push(q[1]); continue; }
+    while(stack.length) pop(); if(quote.length) flush(); para.push(t);
+  }
+  closeAll(); return out.join('');
 }
 
 function stripMd(text){
