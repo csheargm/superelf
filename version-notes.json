@@ -1,4 +1,13 @@
 {
+  "v5.32.1": {
+    "date": "2026-11-26",
+    "time": "2026-11-26T18:52:47.505Z",
+    "features": [],
+    "fixes": [
+      "合并：发布卡片显示真实改动（全部文件、版本行、截图看不出时直说）· Merge: the publish card shows the real change — every file, the version line, and says when shots show nothing"
+    ],
+    "through": "bafb19d51976c0506058d7d5c9e4ecb7208d8f0c"
+  },
   "v5.32.0": {
     "date": "2026-11-26",
     "time": "2026-11-26T18:45:56.853Z",
