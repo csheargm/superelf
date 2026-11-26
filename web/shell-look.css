@@ -42,7 +42,7 @@ header .hsub:empty{ display:none; }
 
 /* Home: rounded soft cards, coloured filled icon, bold title, the live number leading. */
 main{ max-width:1040px; }
-#log{ max-width:720px; width:100%; margin:0 auto; }
+#log{ max-width:720px; width:100%; margin:0 auto var(--log-clear, 96px); }   /* bottom: ends at the composer (web/index.html --log-clear) */
 #emptyState{ padding-top:10px; }
 #emptyState .grid{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
 @media (min-width:600px){ #emptyState .grid{ grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; } }
