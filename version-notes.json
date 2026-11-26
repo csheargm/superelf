@@ -1,4 +1,13 @@
 {
+  "v5.34.6": {
+    "date": "2026-11-26",
+    "time": "2026-11-26T23:32:08.566Z",
+    "features": [],
+    "fixes": [
+      "合并：浏览器测试进 CI — Chromium（ubuntu）+ WebKit iPhone（macOS） · Merge: browser e2e tests in CI"
+    ],
+    "through": "902bc2e950d012104e8210607a296cbb776f15c5"
+  },
   "v5.34.5": {
     "date": "2026-11-26",
     "time": "2026-11-26T21:23:40.474Z",
