@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { coreJailArgs, SKIP_PERMISSIONS } from '../lib/agent-origin.mjs';
-import { coreLaneAllowed, lanePathProblems } from '../lib/selfpub/lane.mjs';
+import { coreLaneAllowed, lanePathProblems, claimedNotChanged, claimsNote } from '../lib/selfpub/lane.mjs';
 import { skipIf } from './helpers-skip.mjs';
 
 const REPO = '/data/superelf-src/repo';
@@ -57,4 +57,14 @@ test('backstop: a path through a symlink in the checkout that leads outside is a
     const calls = [{ name: 'Write', input: { file_path: path.join(repo, 'web', 'escape', 'new.js') } }, { name: 'Write', input: { file_path: path.join(repo, 'web', 'ok.css') } }];
     assert.deepEqual(lanePathProblems(repo, calls), [path.join(repo, 'web', 'escape', 'new.js')]);
   } finally { fs.rmSync(d, { recursive: true, force: true }); }
+});
+
+test('claimedNotChanged: a path the reply names but the diff lacks is caught; named-and-changed is fine (2026-11-26)', () => {
+  const changed = ['web/home-v2.css', 'web/home-v2.js', 'web/index.html'].map((p) => ({ path: p, kind: 'write' }));
+  const owner = 'Changes: web/index.html new <p class="home-ver" id="hVer"> after the app grid; web/home-v2.js new syncVer() called from render(); web/home-v2.css small muted centred style for .home-ver.';
+  assert.deepEqual(claimedNotChanged(owner, changed), [], 'the owner\'s real reply matches its 3-file diff');
+  assert.deepEqual(claimedNotChanged(`${owner} Also web/settings.js and web.mjs, and \`lib/x.mjs\`.`, changed), ['lib/x.mjs', 'web.mjs', 'web/settings.js']);
+  assert.deepEqual(claimedNotChanged('I bumped package.json and version-notes.json.', changed), ['package.json', 'version-notes.json'], 'root files too (GPT review)');
+  assert.deepEqual(claimedNotChanged('no paths here; a URL https://x.test/web/a.js is not a repo path? it is ignored', changed), []);
+  assert.match(claimsNote(['web/settings.js']), /^回复说改了 web\/settings\.js，但改动里没有，不能发布 · The reply names web\/settings\.js/);
 });

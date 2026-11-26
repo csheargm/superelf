@@ -835,3 +835,7 @@ user's app (not in the repo) has no "send my change to its author" path; the lin
 - A diff over `chunk_kb` per file is cut and said so; the cut part is not reviewed.
 - GPT review r1 leftovers: (a) the Jobs view shows a run whose every project failed as "ok" (job-run is audited after the briefing is saved); the email subject and `nightly-review-failed` audit lines say it. Seam: a job result flag that audits job-failed after saving. (b) Codex's read-only sandbox can still READ node files outside the clone, and a reviewed repo's text could steer it to quote one into a finding (emailed to the owner only). Both reviewed repos are the owner's own. Seam: run Codex with a scrubbed HOME/env and a cwd-only read policy. (c) A superelf fix's render check runs the changed page in headless Chromium before the owner's tap (ADR 0044 behaviour, now reachable from review text).
 - `rev-list --max-age` (the first-run window) stops early at a backdated commit; a newer-dated ancestor behind it is not reviewed.
+
+## Self-publish render isolation (GPT review 2026-11-26, pre-existing)
+- lib/selfpub/render.mjs launches Chromium without its sandbox (cap-less container): checkout JS runs before approval; only routing/proxy contain it. ADR 0044 §2 names it; revisit with a sandboxed launch if the image allows.
+- readShell() follows symlinks in web/index.html and inlined parts with no realpath check (the /web/* route has one); a symlink in the checkout could inline host-readable content into a shot. Add the same realpath-under-web check to shell assembly in the preview.

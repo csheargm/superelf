@@ -58,7 +58,8 @@ const PASelfPub=(()=>{
     const sk=t.skipped?`（${t.skipped} 个跳过）`:'', skE=t.skipped?` (${t.skipped} skipped)`:'';
     const tests=t.ci?'测试：由 GitHub CI 运行，CI 通过才合并 · Tests: run by GitHub CI; merges only on green':`测试 ${t.pass||0}/${t.tests||0} 通过${sk} · Tests ${t.pass||0}/${t.tests||0} pass${skE}`;
     const shot=rd.note?esc(rd.note):(rd.shots&&rd.shots.length?'iPhone 宽度（390）截图：改前 / 改后 · iPhone width (390): before / after':'');
-    return `<p id="spChecks">${esc(tests)}${shot?'<br>'+shot:''}<br>隐私检查通过 · Privacy scan clean</p>`;
+    const claims=p.verify&&p.verify.claims?`<br><b id="spClaims">${esc(p.verify.claims.note)}</b>`:'';   // the reply named a file the change does not have
+    return `<p id="spChecks">${esc(tests)}${shot?'<br>'+shot:''}${claims}<br>隐私检查通过 · Privacy scan clean</p>`;
   }
   let openSeq=0;
   async function open(id){
@@ -71,16 +72,18 @@ const PASelfPub=(()=>{
     const p=j.preview;
     if(p.hits.length) return PAPublish.sheet(PAPublish.hitsHtml(p.hits));
     const files=p.files.map(f=>`<li><code>${esc(f.path)}</code> (${f.bytes} B)${f.security?' <b>⚠ 安全相关 · security-relevant</b>':''}</li>`).join('')+p.deletes.map(d=>`<li><code>${esc(d)}</code> 删除 · deleted</li>`).join('');
-    const s=PAPublish.sheet(`<p id="spWhat"><b>发布这个 superelf 改动 · Publish this change to superelf</b></p><p id="spTitle">公开的 PR 标题 · Public PR title: <code>${esc(p.title||'')}</code></p>${checksHtml(p)}<div id="spShots" style="display:flex;gap:8px"></div>`
-      +`<p><b>改动的文件 · Files changed</b></p><ul id="spFiles">${files}</ul>`
+    const s=PAPublish.sheet(`<p id="spWhat"><b>发布这个 superelf 改动 · Publish this change to superelf</b></p><p id="spTitle">公开的 PR 标题 · Public PR title: <code>${esc(p.title||'')}</code></p>${checksHtml(p)}`
+      // Files and the diff BEFORE the shots: two tall phone shots pushed the list below the fold, so the card looked like one file (owner 2026-11-26).
+      +`<p><b>改动的文件 · Files changed (${p.files.length+p.deletes.length})</b></p><ul id="spFiles">${files}</ul>`
       +(p.refused.length?`<p id="spRefused"><b>含不允许发布的文件 · Has files that are never published:</b> ${p.refused.map(x=>esc(x.file)).join(', ')}</p>`:'')
       +`<details><summary>改动内容 · The diff</summary><pre id="spDiff" style="white-space:pre-wrap;word-break:break-all;font-size:11px">${esc(p.diff)}</pre></details>`
-      +`<p>会在 <code>${esc(p.repo||'')}</code> 开 PR；CI 通过后合并、发版，节点约 10 分钟内自动更新。 · Opens a PR on <code>${esc(p.repo||'')}</code>; on green CI it merges and releases, and the node updates itself within about 10 min.</p><p id="spSheetState"></p><button type="button" data-sp="discard" class="plain" style="min-height:44px">丢弃这个改动 · Discard this change</button>`,
+      +`<div id="spShots" style="display:flex;gap:8px"></div><p>会在 <code>${esc(p.repo||'')}</code> 开 PR；CI 通过后合并、发版，节点约 10 分钟内自动更新。 · Opens a PR on <code>${esc(p.repo||'')}</code>; on green CI it merges and releases, and the node updates itself within about 10 min.</p><p id="spSheetState"></p><button type="button" data-sp="discard" class="plain" style="min-height:44px">丢弃这个改动 · Discard this change</button>`,
       p.ready&&!p.refused.length);
     // The handler goes on NOW, before any await: a later preview reuses the same sheet, and a stale one must never publish it (GPT review).
     const close=s.onclick; s.onclick=(e)=>{ if(mine!==openSeq) return close(e); if(e.target.closest('[data-pub="go"]')){ s.onclick=close; go(id,p.hash,s); }
       else if(e.target.closest('[data-sp="discard"]')){ s.remove(); discard(id); } else close(e); };
     const box=s.querySelector('#spShots');
+    if(p.verify&&p.verify.render&&p.verify.render.same) return;   // pixel-identical shots prove nothing: the checks line says so, no pictures
     for(const n of [0,1]){ const u=await shotUrl(id,n); if(!u||mine!==openSeq||!box.isConnected) continue; const f=document.createElement('figure'); f.style.cssText='margin:0;flex:1;min-width:0';
       f.innerHTML=`<img src="${u}" alt="" style="width:100%;border:1px solid currentColor;border-radius:8px"><figcaption style="font-size:11px;text-align:center">${n?'改后 · After':'改前 · Before'}</figcaption>`; box.appendChild(f); }
   }

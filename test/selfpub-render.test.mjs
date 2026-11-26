@@ -9,7 +9,9 @@ import path from 'node:path';
 import { skip } from './helpers-note-link.mjs';
 import { selfpubFixture, tgit } from './helpers-selfpub.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
-import { makeRenderer, playwrightPath, PHONE } from '../lib/selfpub/render.mjs';
+import { makeRenderer, playwrightPath, PHONE, NOT_VISIBLE, PREVIEW_MARKERS } from '../lib/selfpub/render.mjs';
+import { fillShellMarkers } from '../lib/shellhtml.mjs';
+import { writeVerLine } from './helpers-selfpub-verline.mjs';
 
 function checkout(fx) {
   const dir = path.join(fx.d, 'co'); tgit(fx.d, 'clone', '-q', fx.bare, dir); return dir;
@@ -34,7 +36,10 @@ test('renders before and after at iPhone width; a page that scrolls sideways fai
     const hidden = path.join(fx.d, 'co2'); tgit(fx.d, 'clone', '-q', fx.bare, hidden);
     fs.appendFileSync(path.join(hidden, 'web', 'home-v2.css'), '\n.nowhere-on-home{color:red}\n');
     const same = await render(hidden, ['web/home-v2.css'], 'dddd4');
-    assert.equal(same.same, true); assert.match(same.note, /Before and after look the same/);
+    assert.equal(same.same, true, 'pixel-identical shots are said to be'); assert.equal(same.note, NOT_VISIBLE);
+    assert.match(same.note, /^改动在截图里看不出 · Change not visible in screenshots/);
+    assert.notEqual(same.measured.hello, '', 'the seeded Home draws the greeting (2026-11-26: it was bare)'); assert.match(same.measured.hello, /Owner/);
+    assert.ok(same.measured.tiles >= 3, `the seeded Home draws app tiles (${same.measured.tiles})`);
     const words = path.join(fx.d, 'co3'); tgit(fx.d, 'clone', '-q', fx.bare, words);
     for (const f of ['home-v2.js', 'index.html']) { const hv = path.join(words, 'web', f); fs.writeFileSync(hv, fs.readFileSync(hv, 'utf8').replace(/更多应用 · More apps/g, '更多 · Mehr')); }
     assert.equal((await render(words, ['web/home-v2.js'], 'eeee5')).same, false, 'changed words with the same layout are seen (GPT review r2)');
@@ -45,4 +50,21 @@ test('renders before and after at iPhone width; a page that scrolls sideways fai
     const broken = await render(dir, ['web/home-v2.js'], 'cccc3');
     assert.equal(broken.ok, false, 'a script error at load is not a pass (GPT review)'); assert.match(broken.note, /New page script error: .*selfpub broken home/);
   } finally { rmTemp(fx.d); }
+});
+
+test('the owner\'s version-line change (3 files) shows in After: the preview fills the version like the live node (2026-11-26)', { skip, timeout: 120000 }, async () => {
+  const fx = selfpubFixture({ web: true });
+  try {
+    const dir = checkout(fx), render = makeRenderer({ shotsDir: path.join(fx.d, 'shots') });
+    writeVerLine(dir);
+    const r = await render(dir, ['web/home-v2.css', 'web/home-v2.js', 'web/index.html'], 'ver01');
+    assert.equal(r.ok, true, r.note); assert.equal(r.same, false, 'the version line is drawn, so the shots differ'); assert.equal(r.note, '');
+  } finally { rmTemp(fx.d); }
+});
+
+test('fillShellMarkers: every build marker filled, a $ in a value kept literally (one helper for web.mjs and the preview, R3)', () => {
+  const html = fillShellMarkers('<!--APP_VERSION-->|<!--APP_VTIME-->|<!--APP_VDATE-->|<!--APP_NOTES-->', { version: 'v1 $&', vtime: 't', vdate: 'd', notes: '{"a":1}' });
+  assert.equal(html, 'v1 $&|t|d|{"a":1}');
+  assert.doesNotMatch(fillShellMarkers('<!--APP_VERSION-->', PREVIEW_MARKERS), /<!--/);
+  assert.doesNotMatch(fs.readFileSync(new URL('../web.mjs', import.meta.url), 'utf8'), /\.replace\('<!--APP_VERSION-->'/, 'web.mjs fills through the shared helper');
 });

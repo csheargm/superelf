@@ -67,7 +67,7 @@ import { nightlyJobs } from './lib/nightly-review/wire.mjs';
 // (listFamilyApps defined below near listApps)
 import { hashPassword, verifyPassword, makeAudit, readAudit, ACCOUNT_REMOVED_BODY } from './lib/auth.mjs';
 import { notifyBriefingEmail } from './lib/notify.mjs';
-import { readShell } from './lib/shellhtml.mjs';
+import { readShell, fillShellMarkers } from './lib/shellhtml.mjs';
 import { makeBuildId, BUILD_MARKER, readRevision, readRevisionDate } from './lib/buildid.mjs';
 import { releaseTime } from './lib/version-time.mjs';
 import { SW_PATH, SW_PROBE_PATH, OFFLINE_CONFIG_PATH, offlineAppsFor, bibleIndex, withCspMeta, APP_CSP } from './lib/offline.mjs';
@@ -1764,10 +1764,8 @@ const server = http.createServer(async (req, res) => {
   try {
     if (demoOn(cfg) && await demoRoutes(req, res, p)) return;   // demo mode: allow-list first, fail closed (lib/demo.mjs)
     if (req.method === 'GET' && (p === '/' || p === '/index.html')) {
-      const html = readShell(ROOT)
-        .replace('<!--APP_VERSION-->', appVersion())
-        .replace('<!--APP_VTIME-->', appVTime()).replace('<!--APP_VDATE-->', buildId.date())   // release time, else the commit date (lib/version-time.mjs)
-        .replace('<!--APP_NOTES-->', embedInTemplateLiteral(appNotesJson(ROOT, undefined, buildId.head())));
+      const html = fillShellMarkers(readShell(ROOT), { version: appVersion(), vtime: appVTime(), vdate: buildId.date(),   // release time, else the commit date (lib/version-time.mjs)
+        notes: embedInTemplateLiteral(appNotesJson(ROOT, undefined, buildId.head())) });
       return sendHtml(res, demoOn(cfg) ? injectDemoBoot(html, cfg) : html);
     }
     // The service worker (offline-first, lib/offline.mjs): unauthenticated like the shell, scope /, revalidated like HTML.
