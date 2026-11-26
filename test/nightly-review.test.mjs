@@ -9,7 +9,6 @@ import path from 'node:path';
 import { nightlySetting, ENV_KEY, urlOk } from '../lib/nightly-review/config.mjs';
 import { syncRepo, pickRange, diffChunks, EMPTY_TREE, NO_PUSH_URL } from '../lib/nightly-review/repo.mjs';
 import { parseFindings, parseVerdict, fixRequest } from '../lib/nightly-review/prompt.mjs';
-import { emailBody, emailSubject } from '../lib/nightly-review/email.mjs';
 import { runNightlyReview, readState } from '../lib/nightly-review/job.mjs';
 import { VERIFY_ARGS } from '../lib/nightly-review/wire.mjs';
 import { tgit } from './helpers-selfpub.mjs';
@@ -80,24 +79,6 @@ test('verify args: read-only file tools, no repo settings (its hooks never run),
   assert.ok(!VERIFY_ARGS.some((a) => /dangerously|bypass/i.test(a)));
 });
 
-test('email: plain text, no emojis, failures and skips said plainly', () => {
-  const projects = [
-    { name: 'superelf', status: 'reviewed', base: 'a'.repeat(40), tip: 'b'.repeat(40), commits: ['x', 'y'], cut: [], note: '',
-      confirmed: [{ file: 'lib/x.mjs', line: 4, severity: 'high', claim: 'token logged' }], rejected: [{ file: 'y', line: null, claim: 'z', reason: 'guarded' }], unverified: [],
-      fix: 'Ready to publish.', prevFix: 'Live v5.30.0' },
-    { name: 'Other Repo', status: 'failed', base: '', tip: '', commits: [], why: 'codex: timed out' },
-    { name: 'other', status: 'skipped', base: '', tip: '', commits: [] },
-  ];
-  const body = emailBody(projects, '2026-11-26');
-  assert.match(body, /Range: aaaaaaa\.\.bbbbbbb \(2 commits\)/);
-  assert.match(body, /- lib\/x\.mjs:4 \[high\] token logged/);
-  assert.match(body, /REVIEW FAILED: codex: timed out/);
-  assert.match(body, /No new commits: other/);
-  assert.match(body, /Previous fix: Live v5\.30\.0/);
-  assert.doesNotMatch(body, /\p{Extended_Pictographic}/u);
-  assert.equal(emailSubject(projects, '2026-11-26'), 'Nightly review 2026-11-26: 1 confirmed, 1 failed');
-});
-
 const FINDING = '[{"file":"a.mjs","line":1,"severity":"high","claim":"a is wrong","evidence":"a = 1"}]';
 function deps(cfg, { codex, verify, startFix } = {}) {
   const calls = { codex: [], verify: [], fix: [] };
@@ -116,7 +97,7 @@ test('run: reviews, verifies, fixes only the selfpub repo; the findings-only rep
     const cfg = cfgFor(dir, [{ name: 'superelf', url: se.bare, fix: 'selfpub' }, { name: 'Other Repo', url: hg.bare }]);
     const { d: dd, calls } = deps(cfg);
     const out = await runNightlyReview(dd);
-    assert.match(out.subject, /2 confirmed/);
+    assert.match(out.subject, /2 found/);
     assert.match(out.body, /Fix: Ready to publish\./);
     assert.match(out.body, /Fix: none \(findings only\)/);
     assert.equal(calls.fix.length, 1, 'only superelf asks for a fix');
@@ -139,7 +120,7 @@ test('run: a failed, empty or garbage Codex reply is REVIEW FAILED and the range
       const { d: dd, calls } = deps(cfg, { codex: () => reply });
       const out = await runNightlyReview(dd);
       assert.match(out.body, /REVIEW FAILED: /, JSON.stringify(reply));
-      assert.match(out.subject, /0 confirmed, 1 failed/);
+      assert.equal(out.subject, 'Nightly review FAILED for superelf');
       assert.equal(calls.fix.length, 0);
       assert.equal((readState(dir).repos.superelf || {}).lastSha, undefined, 'not marked reviewed');
     }
@@ -186,5 +167,22 @@ test('GPT review r1: a crashed Codex run, an error text quoting [], an aged-out 
     const out = await runNightlyReview(busy.d);
     assert.match(out.body, /Fix: not started: another change/); assert.match(out.body, /Previous fix: still waiting/);
     assert.equal(readState(dir).repos.superelf.fixId, 'open1234', 'the open fix is still tracked');
+  } finally { rmTemp(d); }
+});
+
+test('run: the plain-words pass rewrites the finding for the owner; the technical claim stays in the details', async () => {
+  const d = tmp();
+  try {
+    const se = remote(d, 'se');
+    const cfg = cfgFor(path.join(d, 'nr'), [{ name: 'superelf', url: se.bare, fix: 'selfpub' }]);
+    const { d: dd, calls } = deps(cfg, { verify: (a) => ({ ok: true, text: /does not code/.test(a.prompt)
+      ? '[{"n":1,"impact":"Some people see the wrong total.","severity":"high","rank":1}]' : 'CONFIRMED\nseen in a.mjs' }) });
+    const out = await runNightlyReview(dd);
+    assert.equal(calls.verify.length, 2, 'one verify + one plain-words pass');
+    const [top, details] = out.body.split('技术细节 · Technical details');
+    assert.match(top, /Some people see the wrong total\./);
+    assert.doesNotMatch(top, /a is wrong/);
+    assert.match(details, /a\.mjs:1 \[high\] a is wrong/);
+    assert.match(out.html, /Some people see the wrong total\./);
   } finally { rmTemp(d); }
 });

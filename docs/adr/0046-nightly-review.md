@@ -50,3 +50,18 @@ Codex CLI signed in to the owner's ChatGPT subscription and the Claude CLI.
 - The scheduler tick waits for the job (as for the model review): reminders due during the run wait too.
 - Codex reads AGENTS.md in the reviewed repo as instructions (prompt injection can only steer its words:
   the sandbox is read-only, and Codex runs a project's hooks only after a saved trust, which is never given).
+
+## Amendment 2026-11-26 — the morning email leads with the answer
+
+The owner on the first real email ("12 confirmed, 1 failed", a file:line list): "a data dump … show me what's
+more critical, and what's the action taken on it". The email is now built once (lib/nightly-review/digest.mjs
+`digestView`) and drawn as text (the briefing) and as Gmail-safe HTML (digest-html.mjs, ADR 0020 rules):
+
+1. Subject = the answer: "all clear", "N need you, M found", "fix live", "<project> failed", or "FAILED for …".
+2. First line: one-sentence verdict. Then 需要你 · Needs you (each item: plain impact + the one action, a link to
+   the node when public_base_url is set), 发现的问题 · What was found (high/medium, at most 5, each with what
+   happened to it; low only counted), 没能审查 · Could not review (plain reason, retries tonight or stuck on a
+   setting). File, line, ranges, rejected and unverified lists only below "技术细节 · Technical details".
+3. Plain words come from ONE extra read-only pass (the verify runner, `plainPrompt`/`parsePlain` in prompt.mjs,
+   PLAIN_WORDS_RULE reused). Strict parse; any failure falls back to the technical claim and says so in the
+   details: a finding is never dropped (R14).
