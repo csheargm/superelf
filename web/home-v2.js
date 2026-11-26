@@ -12,7 +12,7 @@ const PAHome=(function(){
     demo:['这是演示版 · 点任一应用试试，或在下方让我做一个新应用','This is the demo — open any app, or ask below for a new one.'],
     keep:['登录后可保存','Sign in to keep your work'],
     phGuest:['试试：“给孩子做个背经文的小游戏”','Try: “make a verse game for my kids”'], phGuestShort:['让我做个应用','Ask me to make an app'],
-    phMember:['问我，或让我改一个应用','Ask anything, or change an app'],
+    phMember:['问我，或让我做一个应用','Ask anything, or create an app'],
     make:['做个应用','Make an app'], starter:'帮我做一个应用，它能',
     more:'更多应用 · More apps', shelf:'家庭书架 · Family shelf',
     tip:'新：字号、刷新和设置都在这里 · New: text size, refresh and settings are here',

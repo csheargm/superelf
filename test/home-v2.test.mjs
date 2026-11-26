@@ -157,3 +157,7 @@ test('USER FLOW demo guest: welcome, Sign in in the header, Diabetes hidden, Mak
     assert.equal(clipped, 0, 'dock labels fit');
   } finally { await c.close(); }
 });
+
+test('member ask box placeholder is about CREATING an app, 中文 first', () => {
+  assert.deepEqual([...PAHome.T.phMember], ['问我，或让我做一个应用', 'Ask anything, or create an app']);
+});
