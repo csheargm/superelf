@@ -550,7 +550,9 @@ Without it they now FAIL (R14), not pass as `# pass 0 / # fail 0`. To run them:
 2. Its browser build must be cached. If you see `Executable doesn't exist ... chromium_headless_shell-NNNN`,
    the cache holds a different build: run `npx playwright install chromium` from that Playwright's
    project (~150 MB), or set `PLAYWRIGHT_BROWSERS_PATH` to a cache holding build NNNN.
-3. To skip on purpose (CI does): `PA_E2E_SKIP=1`. Each skip carries a reason tag (test/helpers-skip.mjs) that CI checks.
+3. To skip on purpose (CI's unit job does): `PA_E2E_SKIP=1`. Each skip carries a reason tag (test/helpers-skip.mjs) that CI checks.
+4. One engine only: `PA_E2E_ONLY=chromium` or `webkit` (other suites skip as `[other-engine]`). CI's `e2e-chromium`
+   job runs the whole suite that way on ubuntu; `e2e-webkit` runs the iPhone suites in WebKit on macOS.
 
 - [ ] 2026-11-18: with a real browser, 6 e2e tests fail on main (hidden until now by the silent skip):
   note-link-e2e.test.mjs (5: Link apply/finger tap/phone strip/edit-remove/pasted URL — timeouts

@@ -24,3 +24,15 @@ test('browser present → no skip', async () => {
   assert.ok(closed, 'trial browser closed');
   assert.equal(resolveSkip('', {}), false);
 });
+test('PA_E2E_ONLY skips another engine without launching it; same engine and unset run', async () => {
+  let launched = 0;
+  const wk = { name: () => 'webkit', launch: async () => { launched++; return { close: async () => {} }; } };
+  const reason = await missingReason(wk, { PA_E2E_ONLY: 'chromium' });
+  assert.equal(launched, 0, 'a filtered engine is never launched (its browser may not be installed)');
+  assert.match(resolveSkip(reason, {}), /^\[other-engine\] webkit suite; this run is PA_E2E_ONLY=chromium$/);
+  assert.equal(await missingReason(wk, { PA_E2E_ONLY: 'webkit' }), '');
+  assert.equal(await missingReason(wk, {}), '');
+  assert.equal(launched, 2);
+  const none = await missingReason(null, { PA_E2E_ONLY: 'webkit' });
+  assert.throws(() => resolveSkip(none, {}), /no Playwright/, 'no Playwright still fails closed');
+});
