@@ -56,7 +56,9 @@
 .pac-log{flex:1;overflow-y:auto;padding:10px 12px var(--pac-pill);display:flex;flex-direction:column;gap:8px;scroll-padding-bottom:var(--pac-pill)}
 .pac-m{max-width:82%;padding:8px 11px;border-radius:13px;font-size:var(--pac-fs,14px);line-height:1.5;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere}
 .pac-m.me{align-self:flex-end;background:var(--accent,#0a7a5a);color:#fff;border-bottom-right-radius:4px}
-.pac-m.ai{align-self:flex-start;background:var(--card,#fff);border:1px solid var(--line,#e6e6e6);color:var(--text,#111);border-bottom-left-radius:4px}
+/* A reply is a document, not a speech bubble: it takes the log's full width (owner, v5.27.1: an empty strip
+   on the right of every answer). A typed message (.me) keeps the 82% bubble. */
+.pac-m.ai{max-width:100%;align-self:flex-start;background:var(--card,#fff);border:1px solid var(--line,#e6e6e6);color:var(--text,#111);border-bottom-left-radius:4px}
 .pac-m.status{align-self:flex-start;background:none;border:none;color:var(--muted,#888);font-size:calc(var(--pac-fs,14px) * .86);padding:2px 4px;max-width:100%}
 .pac-m img{max-width:min(120px,50%);max-height:120px;border-radius:8px;border:1px solid var(--line,#e6e6e6);margin-top:5px;display:block;cursor:zoom-in}
 .pac-lb{position:fixed;inset:0;background:rgba(0,0,0,.9);display:none;align-items:center;justify-content:center;z-index:1000;padding:16px;cursor:zoom-out}
@@ -72,7 +74,7 @@
 .pac-m.pac-md{white-space:normal}
 .pac-m.ai p{margin:.35em 0}.pac-m.ai p:first-child{margin-top:0}.pac-m.ai p:last-child{margin-bottom:0}
 /* A nested list was doubling the gap — the outer li already spaces it. */
-.pac-m.ai li{margin:.1em 0}.pac-m.ai li>ul,.pac-m.ai li>ol{margin:.15em 0}
+.pac-m.ai li{margin:.1em 0}.pac-m.ai li>p{margin:0}.pac-m.ai blockquote{margin:.35em 0;padding-left:.8em;border-left:3px solid var(--line,#ddd);color:var(--muted,#666)}.pac-m.ai hr{border:none;border-top:1px solid var(--line,#e6e6e6);margin:.6em 0}.pac-m.ai li>ul,.pac-m.ai li>ol{margin:.15em 0}
 .pac-m.ai pre{white-space:pre-wrap;background:rgba(127,127,127,.14);padding:6px 8px;border-radius:6px;overflow-x:auto;font-size:calc(var(--pac-fs,14px) * .93)}
 .pac-m.ai code{background:rgba(127,127,127,.16);padding:1px 4px;border-radius:4px;font-size:calc(var(--pac-fs,14px) * .93)}
 .pac-m.ai pre code{background:none;padding:0}
