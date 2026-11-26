@@ -215,7 +215,7 @@ const MAIL = cfg.agentmailEnabled ? new AgentMail(cfg.agentmail_key, { root: ROO
 const pushBriefing = async (u, briefing) => {
   const prof = loadProfile(wsDir(u));
   await notifyBriefingEmail({ mail: MAIL, email: prof && prof.briefingEmail, user: u, briefing, audit })
-    .then((r) => { if (r && r.sent) audit('briefing-email-sent', { who: u.id, job: briefing.job, briefing: briefing.id }); })   // proof of delivery, never the content
+    .then((r) => { if (r && r.sent) audit('briefing-email-sent', { who: u.id, job: briefing.job, briefing: briefing.id }); })   // proof it was sent, never the content
     .catch((e) => audit('briefing-email-failed', { who: u.id, briefing: briefing.id, error: String(e && e.message || e) }));
 };
 
