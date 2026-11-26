@@ -21,7 +21,7 @@ const PASelfPub=(()=>{
     return (t||esc(st.state))+pr;
   }
   const GONE={ discarded:'已丢弃 · Discarded', superseded:'已并入下面较新的改动 · Folded into the newer change below' };
-  function gone(id,text){ const r=rowOf(id); if(!r) return; r.querySelectorAll('.sp-go,.sp-drop').forEach(b=>b.remove()); const l=r.querySelector('.sp-state'); if(l) l.textContent=text; }
+  function gone(id,text){ const r=rowOf(id); if(!r) return; r.querySelectorAll('.sp-go,.sp-drop,.sp-why').forEach(b=>b.remove()); const l=r.querySelector('.sp-state'); if(l) l.textContent=text; }
   async function discard(id){ try{ const r=await post(id,'discard'); if(r.ok) gone(id,GONE.discarded); }catch{ /* offline: the change stays; try again */ } }
   const rowOf=(id)=>document.querySelector('.sp-row[data-id="'+CSS.escape(id)+'"]');
   function paint(id,st,shown){ const r=rowOf(id); if(!r) return; const l=r.querySelector('.sp-state'); if(l) l.innerHTML=stateLine(st);
@@ -32,7 +32,7 @@ const PASelfPub=(()=>{
     const row=document.createElement('div'); row.className='sp-row'; row.dataset.id=ev.id;
     row.style.cssText='margin:4px 0 10px;display:flex;flex-direction:column;gap:4px;align-items:flex-start';
     row.innerHTML=(ev.ready?'<button type="button" class="sp-go primary" style="min-height:44px;padding:8px 18px;border-radius:22px">发布 · Publish</button>'
-      :'<span style="font-size:13px;opacity:.7">未通过检查，不能发布。两种办法：让 superelf 修好它（会接着这个改动改），或丢弃 · Checks did not pass: cannot publish. Two ways forward: ask superelf to fix it (it continues this change), or Discard</span><button type="button" class="sp-drop plain" style="min-height:44px">丢弃这个改动 · Discard this change</button>')+'<span class="sp-state" style="font-size:13px;opacity:.8"></span>';
+      :'<span class="sp-why" style="font-size:13px;opacity:.7">未通过检查，不能发布。两种办法：说「改 superelf：修好它」（会接着这个改动改），或丢弃 · Checks did not pass: cannot publish. Two ways forward: say "change superelf: fix it" (it continues this change), or Discard</span><button type="button" class="sp-drop plain" style="min-height:44px">丢弃这个改动 · Discard this change</button>')+'<span class="sp-state" style="font-size:13px;opacity:.8"></span>';
     bubble.after(row);
     document.querySelectorAll('.sp-row').forEach((r)=>{ if(r!==row) refresh(r.dataset.id); });   // an earlier one may now be folded into this one
     const d=row.querySelector('.sp-drop'); if(d) d.onclick=()=>discard(ev.id);

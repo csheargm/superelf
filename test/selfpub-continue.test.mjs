@@ -52,3 +52,12 @@ test('unknown dirt is still CHECKOUT_DIRTY; a change mid-publish is still CHANGE
     assert.equal(tgit(dir, 'status', '--porcelain').trim(), 'M web/home.css');
   } finally { rmTemp(fx.d); }
 });
+
+test('GPT review: the hint names the typed prefix that reaches the lane; a folded card drops it', async () => {
+  const { coreRequestOf } = await import('../lib/selfpub/chat.mjs');
+  const typed = /「(.+?)」/.exec(FAILED_NEXT)[1];
+  assert.equal(coreRequestOf(typed), '修好它', 'the words the hint says to type reach the core lane');
+  const js = fs.readFileSync(new URL('../web/selfpub.js', import.meta.url), 'utf8');
+  assert.ok(js.includes(typed), 'the card says the same words');
+  assert.match(js, /querySelectorAll\('\.sp-go,\.sp-drop,\.sp-why'\)/, 'a discarded or folded card loses the fix-it hint');
+});
