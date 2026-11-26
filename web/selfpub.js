@@ -32,7 +32,7 @@ const PASelfPub=(()=>{
     const row=document.createElement('div'); row.className='sp-row'; row.dataset.id=ev.id;
     row.style.cssText='margin:4px 0 10px;display:flex;flex-direction:column;gap:4px;align-items:flex-start';
     row.innerHTML=(ev.ready?'<button type="button" class="sp-go primary" style="min-height:44px;padding:8px 18px;border-radius:22px">发布 · Publish</button>'
-      :'<span style="font-size:13px;opacity:.7">未通过检查，不能发布 · Checks did not pass: cannot publish</span><button type="button" class="sp-drop plain" style="min-height:44px">丢弃这个改动 · Discard this change</button>')+'<span class="sp-state" style="font-size:13px;opacity:.8"></span>';
+      :'<span style="font-size:13px;opacity:.7">未通过检查，不能发布。两种办法：让 superelf 修好它（会接着这个改动改），或丢弃 · Checks did not pass: cannot publish. Two ways forward: ask superelf to fix it (it continues this change), or Discard</span><button type="button" class="sp-drop plain" style="min-height:44px">丢弃这个改动 · Discard this change</button>')+'<span class="sp-state" style="font-size:13px;opacity:.8"></span>';
     bubble.after(row);
     document.querySelectorAll('.sp-row').forEach((r)=>{ if(r!==row) refresh(r.dataset.id); });   // an earlier one may now be folded into this one
     const d=row.querySelector('.sp-drop'); if(d) d.onclick=()=>discard(ev.id);
