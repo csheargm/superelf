@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { judge, skipReasons, unexpectedSkips } from '../.github/ci-guard.mjs';
+import { judge, skipReasons, unexpectedSkips, forbidTags } from '../.github/ci-guard.mjs';
 import { SKIP_TAGS, skipBecause, skipIf } from './helpers-skip.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
 
@@ -125,4 +125,12 @@ test('workflow: least privilege, pinned actions, a floor, macOS only by hand', (
   assert.ok(!/upload-artifact/.test(WF), 'nothing is uploaded');
   assert.match(WF, /timeout-minutes: \d+/);
   assert.match(WF, /cancel-in-progress: true/);
+});
+
+test('CI_FORBID_SKIP: a browser job that skips for a missing browser goes red (R14)', () => {
+  const out = 'ok 1 - a # SKIP [no-browser] none\nok 2 - b\n# tests 2\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 1\n# todo 0\n';
+  assert.equal(judge(out, 1, 'linux').ok, true);
+  const r = judge(out, 1, 'linux', forbidTags('no-browser'));
+  assert.equal(r.ok, false); assert.match(r.reason, /unexpected skips/);
+  assert.ok(Object.hasOwn(forbidTags(''), 'no-browser'));
 });

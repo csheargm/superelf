@@ -11,6 +11,7 @@
 // tag → the platforms (process.platform) where CI may skip it. An empty list: never on CI.
 export const SKIP_TAGS = Object.freeze({
   'no-browser': ['linux', 'win32', 'darwin'],      // no Playwright on CI (PA_E2E_SKIP=1), test/helpers-e2e-gate.mjs
+  'other-engine': ['linux', 'darwin'],             // PA_E2E_ONLY: each CI browser job runs one engine (helpers-e2e-gate)
   'posix-only': ['win32'],                         // bash, POSIX modes/signals/symlinks, the .sh ops scripts
   'no-pwsh': ['linux', 'darwin'],                  // the .ps1 scripts need PowerShell
   'no-flock': ['darwin', 'win32'],                 // util-linux flock(1)

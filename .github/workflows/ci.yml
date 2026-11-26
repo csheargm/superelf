@@ -78,3 +78,84 @@ jobs:
     env:
       PA_E2E_SKIP: '1'
     steps: *steps
+
+  # Real-browser suites · 真实浏览器测试. Owner 2026-11-26: Chromium on Linux, WebKit (iPhone Safari's
+  # engine) on macOS. Playwright is not a dependency of the repo, so each job installs one pinned copy
+  # outside the tree and points PA_PLAYWRIGHT at it. PA_E2E_ONLY picks the engine: a suite for the
+  # other engine skips as "[other-engine]" without launching it (test/helpers-e2e-gate.mjs).
+  e2e-chromium:
+    name: e2e (chromium, ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PLAYWRIGHT_VERSION: 1.58.2
+      PA_E2E_ONLY: chromium
+      MIN_TESTS: 3500
+      CI_FORBID_SKIP: no-browser   # a browser job skipping for no browser is a vacuous pass
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ env.PLAYWRIGHT_VERSION }}-chromium
+      - name: Install Playwright + Chromium
+        shell: bash
+        run: |
+          npm install --prefix "$RUNNER_TEMP/pw" --no-save --no-audit --no-fund "playwright@$PLAYWRIGHT_VERSION"
+          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+          echo "PA_PLAYWRIGHT=$RUNNER_TEMP/pw/node_modules/playwright/index.mjs" >> "$GITHUB_ENV"
+      # The WHOLE suite, so every browser test runs wherever it lives (no file list to drift). Lower
+      # concurrency than the default: the browser suites time out when the runner is oversubscribed.
+      - name: npm test (with Chromium)
+        shell: bash
+        run: node --test --test-concurrency=2 "test/*.test.mjs" 2>&1 | tee "$RUNNER_TEMP/test-output.txt"
+      - name: Guard against a vacuous run (R14)
+        if: always()
+        shell: bash
+        run: node .github/ci-guard.mjs "$RUNNER_TEMP/test-output.txt"
+
+  e2e-webkit:
+    name: e2e (webkit iPhone, macos)
+    runs-on: macos-latest
+    timeout-minutes: 20
+    env:
+      PLAYWRIGHT_VERSION: 1.58.2
+      PA_E2E_ONLY: webkit
+      PA_E2E_ENGINE: webkit   # the shared harness (test/helpers-note-link.mjs) launches WebKit too
+      # Measured 2026-11-26 on the owner's Mac: the iPhone WebKit suites pass 17 (2 skip); a selection bug that
+      # finds none or a handful must fail.
+      MIN_TESTS: 15
+      CI_FORBID_SKIP: no-browser
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/Library/Caches/ms-playwright
+          key: pw-${{ runner.os }}-${{ env.PLAYWRIGHT_VERSION }}-webkit
+      - name: Install Playwright + WebKit
+        shell: bash
+        run: |
+          npm install --prefix "$RUNNER_TEMP/pw" --no-save --no-audit --no-fund "playwright@$PLAYWRIGHT_VERSION"
+          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps webkit
+          echo "PA_PLAYWRIGHT=$RUNNER_TEMP/pw/node_modules/playwright/index.mjs" >> "$GITHUB_ENV"
+      # Only the iPhone suites: the files that launch WebKit themselves (`pw.webkit`) plus the phone
+      # files on the shared harness (*phone*e2e*, run in WebKit by PA_E2E_ENGINE). Mixed files skip
+      # their Chromium half as "[other-engine]". Everything else runs in Chromium on ubuntu.
+      - name: WebKit suites
+        shell: bash
+        run: |
+          files=$({ grep -lE 'pw\.webkit' test/*.test.mjs; ls test/*phone*e2e*.test.mjs; } | sort -u)
+          echo "$files"
+          node --test --test-concurrency=2 $files 2>&1 | tee "$RUNNER_TEMP/test-output.txt"
+      - name: Guard against a vacuous run (R14)
+        if: always()
+        shell: bash
+        run: node .github/ci-guard.mjs "$RUNNER_TEMP/test-output.txt"

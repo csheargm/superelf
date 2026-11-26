@@ -13,10 +13,13 @@ import { skip, chromium } from './helpers-note-link.mjs';
 import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, OWNER_TOKEN } from './helpers-web.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
 import { skipIf } from './helpers-skip.mjs';
+import { engineFiltered } from './helpers-e2e-gate.mjs';
 
 const SHOTS = process.env.PA_SHOTS || '';
 const PW = process.env.PA_PLAYWRIGHT ? await import(process.env.PA_PLAYWRIGHT).catch(() => null) : null;
-const webkit = PW && (PW.webkit || (PW.default && PW.default.webkit));
+const wkType = PW && (PW.webkit || (PW.default && PW.default.webkit));
+const wkOff = engineFiltered(wkType);   // PA_E2E_ONLY=chromium: never launch WebKit (CI's Linux job has none)
+const webkit = wkOff ? null : wkType;
 const UA_IOS = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
 const DEVICES = {
   iphone: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, userAgent: UA_IOS },
@@ -92,7 +95,7 @@ async function openApp(page, slug) {
 
 const HOWS = ['x', 'esc', 'out'];
 for (const engine of ['chromium', 'webkit']) for (const dev of ['iphone', 'ipad']) {
-  test(`${engine} ${dev}: the home tip closes by ✕, Escape and an outside tap; stays closed on reload and on a second device`, { skip: skip || skipIf(engine === 'webkit' && !webkit, 'no-browser', 'this Playwright has no WebKit'), timeout: 180000 }, async () => {
+  test(`${engine} ${dev}: the home tip closes by ✕, Escape and an outside tap; stays closed on reload and on a second device`, { skip: skip || skipIf(engine === 'webkit' && wkOff, 'other-engine', wkOff) || skipIf(engine === 'webkit' && !webkit, 'no-browser', 'this Playwright has no WebKit'), timeout: 180000 }, async () => {
     for (const how of HOWS) {
       await fresh();
       const ctx = await context(engine, dev); const { page, errors } = await shell(ctx);
@@ -127,7 +130,7 @@ test('chromium iphone: blocked localStorage AND a refused account write — the 
 });
 
 for (const engine of ['chromium', 'webkit']) for (const dev of ['iphone', 'ipad']) {
-  test(`${engine} ${dev}: every app tip (Notes, Bible) closes, covers no control, and stays closed on a second device`, { skip: skip || skipIf(engine === 'webkit' && !webkit, 'no-browser', 'this Playwright has no WebKit'), timeout: 300000 }, async () => {
+  test(`${engine} ${dev}: every app tip (Notes, Bible) closes, covers no control, and stays closed on a second device`, { skip: skip || skipIf(engine === 'webkit' && wkOff, 'other-engine', wkOff) || skipIf(engine === 'webkit' && !webkit, 'no-browser', 'this Playwright has no WebKit'), timeout: 300000 }, async () => {
     await fresh(); await put({ tipsSeen: ['tip:home-more', CAM_TIP] });   // the shell's own tip is tested above
     const found = [];
     for (const slug of ['notes', 'bible']) {
