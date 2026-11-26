@@ -79,11 +79,11 @@ after(async () => { if (web) await stopWeb(web); if (fx) rmTemp(fx.d); if (root)
 
 const run = (token) => api(port, '/api/jobs/nightly-review/run', { method: 'POST', body: '{}', ...(token ? { headers: { authorization: `Bearer ${token}` } } : {}) });
 
-test('a member cannot run the nightly review', POSIX_ONLY, async () => {
+test('a member cannot run the nightly review', { skip: POSIX_ONLY }, async () => {
   assert.notEqual((await run(KID)).status, 200);
 });
 
-test('Run now: Codex read-only, findings verified, one unpublished superelf change, the findings-only repo untouched', POSIX_ONLY, async () => {
+test('Run now: Codex read-only, findings verified, one unpublished superelf change, the findings-only repo untouched', { skip: POSIX_ONLY }, async () => {
   const r = await run();
   const j = await r.json();
   assert.equal(r.status, 200, JSON.stringify(j));
