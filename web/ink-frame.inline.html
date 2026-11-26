@@ -136,6 +136,7 @@
   //    cluster's anchor (the record with this bid and no rel). Never re-measured, never guessed (fc2940c).
   const FONT_EPS=0.003;   // a font ratio this close to 1 is the same font (sub-px rounding between engines)
   const FONT_MAX=0.15;   // fonts differ by less than this; a bigger gap is another kind of record
+  const FONT_MAX_CHECKED=0.6;   // an enclosure re-verifies its run, so a font-size preference change may pass
   const FONT_TRY=3;   // copies tried each side of W x font ratio
   const EPS_W=1;   // px: a column this close to the written one IS the written one (the drawing is untouched)
   function clusterOf(prev,now,g,ext,box){
@@ -221,7 +222,7 @@
     for(const a of placed){
       if(!a.at||a.orphan||moved.has(a)||!isEnclosure(a.g)) continue;
       const el=env.lineEl(a.g.verse,a.g.lang); if(!el) continue;
-      const lr=env.local(el.getBoundingClientRect()), key=widthsOf(a.g,groups).join(','), memo=env.encMemo.get(a.g);   // keyed by the widths: new ink re-measures
+      const lr=env.local(el.getBoundingClientRect()), key=widthsOf(a.g,groups).join(',')+'|'+(env.fontKey?env.fontKey(el):''), memo=env.encMemo.get(a.g);   // keyed by the widths and font: new ink or a font change re-measures
       const enc=memo&&memo.key===key?memo.enc:encWritten(a.g,groups,el,env); if(!memo||memo.key!==key) env.encMemo.set(a.g,{key,enc});
       if(!enc||(enc.k===1&&Math.abs(env.colW(lr)-enc.W)<=EPS_W)) continue;   // the written width and fonts: drawn exactly as stored
       // No ww: W is a guess from other ink. If the record already encloses its words here, this may be the
@@ -248,14 +249,14 @@
     // depend on wrapping, only on the font. Owner, 2026-11-25: iPad ink re-laid at the iPad's width on a
     // laptop with other fonts wrapped elsewhere, so the repair refused and the oval sat on the wrong words.
     // The copy is laid at w x ratio, which wraps as the iPad did. ~1 (same fonts): exactly 1 (identity).
-    function fontRatio(el,s,e,gw){
+    function fontRatio(el,s,e,gw,max){
       const r=gw>0&&o.measurer(el).runRect(s,e), k=r&&r.width>0?r.width/gw:1;
-      return Math.abs(k-1)<=FONT_EPS||Math.abs(k-1)>FONT_MAX?1:k;   // past FONT_MAX: w was not a run (an old union box), not a font
+      return Math.abs(k-1)<=FONT_EPS||Math.abs(k-1)>(max||FONT_MAX)?1:k;   // past FONT_MAX: w was not a run (an old union box), not a font
     }
     function measureAt(el,w,s,e,gw){
       const k=w?fontRatio(el,s,e,gw):1;
       const c=w?el.cloneNode(true):el; if(w){ c.style.cssText='position:absolute;visibility:hidden;left:0;top:0;width:'+(w*k)+'px'; el.parentNode.appendChild(c); }
-      try{ const r=o.measurer(c).anchorRect(s,e,gw), cr=c.getBoundingClientRect(); return r&&r.width>0?{left:r.left-cr.left,top:r.top-cr.top}:null; }
+      try{ const r=o.measurer(c).anchorRect(s,e,gw), cr=c.getBoundingClientRect(); return r&&r.width>0?{left:(r.left-cr.left)/k,top:(r.top-cr.top)/k}:null; }   // written units, as the stored dx/dy
       finally{ if(w) c.parentNode.removeChild(c); }
     }
     // An enclosure on a hidden copy of the line at width W: null unless its stored run measures g.w there
@@ -265,7 +266,7 @@
     // The ratio is a summed width, so a row's break can sit a few px either way: on another font the copy
     // tries widths near W x ratio (FONT_TRY steps of 1%) and takes the first that reproduces the run.
     function enclosedAt(el,W,g,raw){
-      const k=raw?1:fontRatio(el,g.charStart,g.charEnd,g.w);
+      const k=raw?1:fontRatio(el,g.charStart,g.charEnd,g.w,FONT_MAX_CHECKED);
       if(k===1) return enclosedAtW(el,W,g,1);
       for(let i=0;i<=FONT_TRY*2;i++){ const d=(i%2?1:-1)*Math.ceil(i/2)*0.01, r=enclosedAtW(el,W*(1+d),g,k); if(r) return r; }
       return null;
@@ -286,7 +287,8 @@
     // which the union box (rangeRect) counts as a second row.
     const runNow=(el,s,e)=>{ const m=o.measurer(el), r=m.runRect(s,e); if(!(r&&r.width>0)) return null;
       const tops=m.rowTops(s,e); return tops.length&&Math.max(...tops)-Math.min(...tops)<=r.height*0.5?o.local(r):null; };
-    return {lineEl:o.lineEl,local:o.local,colW,measureAt,wholeOf,extentOf,enclosedAt,runNow,memo:new WeakMap(),encMemo:new WeakMap(),nowMemo:new WeakMap()};
+    const fontKey=el=>{ const cs=getComputedStyle(el); return [cs.fontFamily,cs.fontSize,cs.letterSpacing,cs.lineHeight].join(';'); };
+    return {lineEl:o.lineEl,local:o.local,colW,fontKey,measureAt,wholeOf,extentOf,enclosedAt,runNow,memo:new WeakMap(),encMemo:new WeakMap(),nowMemo:new WeakMap()};
   }
   window.PAInkFrame={env,NEAR,isSmall,bboxOf,isScrub,hitGroups,extentOf,SCRUB,ERASE_HIT,BURST_MS,SMALL,NEIGHBOR,isLine,sameLine,handwriting,writtenWidth,placeLine,joinsBurst,frameOf,places,toLine,EPS_W,MIN_LINE_S,clusterOf,relOf,widthChanged,shiftClusters,ENC_GAP,isEnclosure,followEnclosures};
 })();
