@@ -1,4 +1,13 @@
 {
+  "v5.32.3": {
+    "date": "2026-11-26",
+    "time": "2026-11-26T19:13:40.905Z",
+    "features": [],
+    "fixes": [
+      "内部改进 · Internal upkeep"
+    ],
+    "through": "cf3f39d3ec02ed67ebc7e6c2e1607ae63ed8cf5b"
+  },
   "v5.32.2": {
     "date": "2026-11-26",
     "time": "2026-11-26T19:03:14.933Z",
