@@ -44,14 +44,15 @@ const PAShare=(()=>{
   const newKey=()=>{ const a=new Uint8Array(16); crypto.getRandomValues(a); return Array.from(a,(x)=>x.toString(16).padStart(2,'0')).join(''); };
   function mailForm(s,f,j){
     const n=s.querySelector('#shMailNote'), b=s.querySelector('#shSend'), to=s.querySelector('#shTo'), note=s.querySelector('#shNote');
-    let key=newKey(), busy=false;
-    const fresh=()=>{ if(busy) return; key=newKey(); b.disabled=false; b.textContent=L.send; };
+    let key=newKey(), busy=false, dirty=false;
+    const fresh=()=>{ if(busy){ dirty=true; return; } key=newKey(); b.disabled=false; b.textContent=L.send; };
     to.addEventListener('input',fresh); note.addEventListener('input',fresh);
     f.onsubmit=async(ev)=>{ ev.preventDefault(); if(busy||b.disabled) return; busy=true; b.disabled=true;
       let ok=false;
       try{ const r=await post('/api/share/email',{id:j.id,to:to.value,name:j.name,note:note.value,key}); const k=await r.json(); ok=!!k.ok; n.textContent=ok?L.sent:(k.error||L.fail); }
       catch(e){ n.textContent=L.fail+': '+((e&&e.message)||''); }
-      busy=false; if(ok) b.textContent=L.sent; else b.disabled=false; };
+      busy=false; if(ok) b.textContent=L.sent; else b.disabled=false;
+      if(dirty){ dirty=false; fresh(); } };   // edited while it was sending: the edit is a new send
   }
   // ---- the demo's receiving end -----------------------------------------------------------------
   function keep(){ try{ const q=new URLSearchParams(location.search), id=q.get('share'); if(id&&ID_RE.test(id)){ localStorage.setItem(PENDING,id); q.delete('share'); history.replaceState(null,'',location.pathname+(q.toString()?'?'+q:'')+location.hash); } return localStorage.getItem(PENDING); }

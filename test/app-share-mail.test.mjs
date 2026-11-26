@@ -74,3 +74,14 @@ test('POST /api/share/email: a double send with one key sends one email; the lin
   assert.equal(sent.length, 2, 'a new key is a new email');
   assert.equal((await post(ctx, { ...body, key: '' })).code, 400, 'a key is required');
 });
+
+test('sendOnce: a key still in flight past the TTL is never sent twice', async () => {
+  let t = 0, n = 0, release; const once = makeSendOnce(() => t);
+  const a = once('k', () => new Promise((r) => { n++; release = r; }));
+  await new Promise((r) => setImmediate(r));
+  t = 11 * 60 * 1000;
+  const b = once('k', () => { n++; return { ok: true }; });
+  release({ ok: true });
+  await a; assert.deepEqual(await b, { ok: true, again: true });
+  assert.equal(n, 1);
+});
