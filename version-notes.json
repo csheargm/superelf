@@ -1,4 +1,13 @@
 {
+  "v5.34.0": {
+    "date": "2026-11-26",
+    "time": "2026-11-26T20:43:09.461Z",
+    "features": [
+      "夜间审查邮件先说结论 · nightly review email leads with the answer (ADR 0046 amendment)"
+    ],
+    "fixes": [],
+    "through": "287769404c686936141e8743365e567ac0b8fe2f"
+  },
   "v5.33.3": {
     "date": "2026-11-26",
     "time": "2026-11-26T20:40:02.369Z",
