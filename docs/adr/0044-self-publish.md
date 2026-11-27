@@ -19,7 +19,8 @@ test run, no review and no way to ship the change.
    The lock records pid + a per-process id + host + boot id + the pid's start time, and the holder
    heartbeats it (mtime). Reclaimed when the owner is provably gone (our pid but not our process — a
    restarted container's PID 1 —, another boot, a dead or reused pid) or silent past `selfpub_lock_max_ms`
-   (30 min, floor 5 min). An owner on another host is reclaimed by age only. A live holder is never stolen.
+   (30 min, floor 5 min). An owner on another host is reclaimed by age only. A live holder is never stolen; in its own process a held
+   lock is respected whatever its age (a sync git call can block the heartbeat).
 2. **A jailed lane.** `coreJailArgs` (lib/agent-origin.mjs): no bypass, `default` mode, file tools only
    (no Bash, no Web, no MCP, no settings files), Edit allowed only under the checkout, never its `.git`,
    `.github`, dot-names or agent instruction files. After the turn the server checks every file tool call

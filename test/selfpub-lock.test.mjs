@@ -42,7 +42,7 @@ test('PID-1 lock left by a previous container run is reclaimed (the 2026-11-27 i
 
 test('PID 1 alive but started at a different time (another process owns pid 1 now): stale', () => {
   const rec = { pid: 1, proc: 'old', host: 'h', boot: 'b', start: '100' };
-  const env = { proc: 'new', pid: 7, host: 'h', boot: 'b', alive: () => true, startOf: () => '999' };
+  const env = { proc: 'new', pid: 7, host: 'h', boot: 'b', alive: () => true, startOf: () => '999', held: () => false };
   assert.equal(lockVerdict(rec, 0, 60000, env), 'pid-reused');
   assert.equal(lockVerdict(rec, 0, 60000, { ...env, startOf: () => '100' }), '', 'CONTROL: the same start identity is the live owner');
   assert.equal(lockVerdict(rec, 0, 60000, { ...env, boot: 'other' }), 'rebooted');
@@ -80,6 +80,19 @@ test('a held lock heartbeats: past max age, a live holder is never stolen', asyn
     assert.ok(Date.now() - fs.statSync(lockFile(own)).mtimeMs < maxAgeMs, 'this process beats its own lock too');
     rel(); rmTemp(own);
   } finally { if (child) await stop(child); rmTemp(d); }
+});
+
+test('our own held lock is never stolen, even when a blocked heartbeat lets it look older than max age', () => {
+  const d = tmp();
+  try {
+    const rel = acquireLock(d, { maxAgeMs: 60000 });
+    backdate(d, 60001 * 10);   // sync git calls blocked the beat timer
+    assert.throws(() => acquireLock(d, { maxAgeMs: 60000 }), { code: 'IN_FLIGHT' }, 'a running publish in this process keeps its lock');
+    rel();
+    acquireLock(d, { maxAgeMs: 60000 })();
+  } finally { rmTemp(d); }
+  const env = { proc: 'me', pid: 7, host: 'h', boot: 'b', alive: () => true, startOf: () => null, held: () => false };
+  assert.equal(lockVerdict({ pid: 7, proc: 'me', owner: 'gone', host: 'h' }, 0, 60000, env), 'released', 'ours but no longer held: stale');
 });
 
 test('age-based expiry: an owner that stopped beating past max age is reclaimed', () => {
