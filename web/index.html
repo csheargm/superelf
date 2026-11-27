@@ -964,11 +964,12 @@ async function saveAppSettings(slug,prefs,systemPrompt,appSent){
 // app-side handlers are idempotent; newFeatureKeys ride the second push only, so the blue dots are
 // announced once.
 function sendAppPrefs(withModels=true){ const fw=$('#fr').contentWindow; if(!(fw&&$('#fr').src!=='about:blank')) return;
-  const m={pa:'prefs',fontScale:FS_STEPS[fsIdx],fingerDraw:localStorage.getItem('pa_fingerdraw')==='1',fingerDrawSet:localStorage.getItem('pa_fingerdraw')!==null,noteZoom:noteZoomsOf(frameSlug()),seamless:localStorage.getItem('pa_seamless')==='1',printInk:localStorage.getItem('pa_printink')!=='0',noFlip:localStorage.getItem('pa_noflip')==='1',openAi:(appPrefsMap()[frameSlug()]||{}).openAi===true,uploadMaxBytes:RELAY_LIMITS.upload,chatMaxBytes:RELAY_LIMITS.chat,ownBar:frameOwnBar(),fsTitles:[fsTitle(-1),fsTitle(1)]};
+  const m={pa:'prefs',fontScale:FS_STEPS[fsIdx],fingerDraw:localStorage.getItem('pa_fingerdraw')==='1',fingerDrawSet:localStorage.getItem('pa_fingerdraw')!==null,noteZoom:noteZoomsOf(frameSlug()),readSize:Number(localStorage.getItem('pa_notereadsize'))||0,seamless:localStorage.getItem('pa_seamless')==='1',printInk:localStorage.getItem('pa_printink')!=='0',noFlip:localStorage.getItem('pa_noflip')==='1',openAi:(appPrefsMap()[frameSlug()]||{}).openAi===true,uploadMaxBytes:RELAY_LIMITS.upload,chatMaxBytes:RELAY_LIMITS.chat,ownBar:frameOwnBar(),fsTitles:[fsTitle(-1),fsTitle(1)]};
   if(withModels) Object.assign(m,{models:CHAT_MODELS,wantModel:appModel(frameSlug()),newFeatureKeys:Object.keys(window._PA_NEW_KEYS||{}).filter(k=>!_SEEN.has(k))});
   fw.postMessage(m,'*'); }
 // Per-note pinch zoom, per device: pa_notezoom = {"<slug>\n<note id>": z}, the newest NOTE_ZOOM_MAX kept.
 const NOTE_ZOOM_KEY='pa_notezoom', NOTE_ZOOM_MAX=200, NOTE_ID_MAX=200;
+const READ_SIZE_MIN=12, READ_SIZE_MAX=48;   // the Read view size the shell stores: a sanity range, the pad owns the steps
 function noteZoomMap(){ try{ const o=JSON.parse(localStorage.getItem(NOTE_ZOOM_KEY)||'{}'); return o&&typeof o==='object'&&!Array.isArray(o)?o:{}; }
   catch(_){ return {}; /* unreadable: every note opens at fit, the safe default */ } }
 function noteZoomsOf(slug){ const out=Object.create(null), pre=slug+'\n'; for(const [k,z] of Object.entries(noteZoomMap())) if(k.startsWith(pre)&&Number.isFinite(z)) out[k.slice(pre.length)]=z; return out; }
@@ -1987,6 +1988,8 @@ window.addEventListener('message',async(e)=>{
       if(typeof m.noFlip==='boolean') localStorage.setItem('pa_noflip', m.noFlip?'1':'0');
       // A note's pinch zoom on THIS device (PANote phone mode): {id, z} for the frame's app.
       if(m.noteZoom&&typeof m.noteZoom.id==='string'&&m.noteZoom.id.length<=NOTE_ID_MAX&&Number.isFinite(m.noteZoom.z)) saveNoteZoom(frameSlug(),m.noteZoom.id,m.noteZoom.z);
+      // The note Read view's text size on THIS device (PANote phone mode; the pad clamps it to its sizes).
+      if(Number.isInteger(m.readSize)&&m.readSize>=READ_SIZE_MIN&&m.readSize<=READ_SIZE_MAX) localStorage.setItem('pa_notereadsize',String(m.readSize));
       // TODO(R4 seam): the pref store + sendAppPrefs push is one block to lift out of the broker.
       // (openAi used to live here, per device. It is the app pref appPrefs[slug].openAi now, set in
       // the app's Settings dialog — one place, on the account — and pushed by sendAppPrefs.)

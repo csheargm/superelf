@@ -529,6 +529,7 @@
     erase:'M9 18.5h10M13.4 5.1l5.5 5.5a1.4 1.4 0 010 2l-5.9 5.9H9.2l-3.6-3.6a1.4 1.4 0 010-2l7.8-7.8a1.4 1.4 0 012 0zM9.6 8.9l5.5 5.5',
     select:'M4.5 9V6.5a2 2 0 012-2H9M15 4.5h2.5a2 2 0 012 2V9M19.5 15v2.5a2 2 0 01-2 2H15M9 19.5H6.5a2 2 0 01-2-2V15',
     paper:'M5 4h14v16H5zM8 9h8M8 12.5h8M8 16h5',
+    read:'M4 5.5c2.7-1 5.3-1 8 .8 2.7-1.8 5.3-1.8 8-.8v13c-2.7-1-5.3-1-8 .8-2.7-1.8-5.3-1.8-8-.8zM12 6.3v13.3',
     undo:'M9.5 14.5L5 10l4.5-4.5M5 10h8.5a5 5 0 010 10H10',
     redo:'M14.5 14.5L19 10l-4.5-4.5M19 10h-8.5a5 5 0 000 10H14',
     hand:'M8 12.5V6.5a1.5 1.5 0 013 0V11M11 10.5V5a1.5 1.5 0 013 0v5.5M14 10.5V6.5a1.5 1.5 0 013 0V14a6 6 0 01-6 6h-.5a6 6 0 01-4.9-2.6L3.8 14a1.5 1.5 0 012.4-1.8L8 14',
@@ -1476,6 +1477,10 @@
   // The phone's pen toggle (web/note-phone.inline.html): its two states and its first-use tip. 中文 first.
   const FINGER_TXT={on:'手指书写（两指滚动） · Finger writes (two fingers scroll)',off:'手指滚动 · Finger scrolls',
     tip:'笔开：一指书写，两指滚动或缩放。笔关：手指滚动翻页 · Pen on: one finger writes, two fingers scroll or zoom. Pen off: a finger scrolls'};
+  // The phone's Read view（阅读视图）: typed text reflowed at the device's own size, ink hidden. 中文 first.
+  const READ_TXT={btn:'阅读视图 · Read view',title:'阅读视图 · Read view',inkHidden:'手写已隐藏，没有删除 · Ink hidden, not deleted',
+    empty:'这一页没有打字的文字 · No typed text on this page',smaller:'字小一点 · Smaller text',bigger:'字大一点 · Larger text',close:'关闭阅读视图 · Close Read view',
+    tip:'阅读视图：文字按手机宽度重排，手写暂时隐藏。A−/A+ 只改这台设备 · Read view: text fits the phone, ink is hidden for now. A−/A+ change this device only'};
   const TIP_OPEN_MODE='打字的页面以文字打开，手写的页面以手写或选择打开 · A note opens in Text when its page is typed, in Draw or Select when it is ink';   // TODO(R4 seam): first-use tip text (ADR 0030)
   function Note(host, opts){
     const PAGES=!!opts.pages;
@@ -1491,6 +1496,7 @@
     // Bottom bar layout: in multi-page mode the tool bar sits above the page bar; the color
     // panel and (below) the tool bar derive their bottom offset from this so they stack cleanly.
     if(PAGES) host.style.setProperty('--pan-toolsbottom','60px');
+    const readBtnHtml=cls=>'<button class="'+cls+' pan-readbtn" aria-pressed="false" title="'+READ_TXT.btn+'" aria-label="'+READ_TXT.btn+'">'+ico('read')+'</button>';
     host.innerHTML=
       (hasTop?'<div class="pan-top">'+
         (opts.onHistory?'<button class="pan-hbtn pan-hist" title="笔记与对话 · Notes &amp; Chats" aria-label="Notes &amp; Chats">'+ico('menu')+'</button>':'<span style="width:30px"></span>')+
@@ -1498,6 +1504,8 @@
         (opts.onAsk?'<button class="pan-hask" title="问一问 · Ask AI" aria-label="Ask AI">'+ico('ask')+'</button>':'')+
         '<button class="pan-hmode pan-mdraw" data-mode="draw" title="手写 · Draw" aria-pressed="false">'+ico('pen')+'<span class="pan-mlbl">Draw</span></button>'+
         '<button class="pan-hmode pan-mtext" data-mode="text" title="文字 · Text" aria-pressed="false"><span class="pan-mico">T</span><span class="pan-mlbl">Text</span></button>'+
+        /* Read view（阅读视图, web/note-phone.inline.html): beside the modes, reachable in both; display:none unless .pan-phone. */
+        readBtnHtml('pan-hmode')+
         /* Page SETTINGS, not a mode. Template and Background were parked in the drawing row, which
            made them unreachable from Text mode even though a template is a property of the PAGE —
            the ruled lines a typed note sits on are the same ruled lines a written one does. */
@@ -1521,6 +1529,8 @@
         '<button class="pan-grip" title="Drag to move · tap to collapse" aria-label="Move or collapse toolbar">'+ico('grip')+'</button>'+
         /* The phone's pen toggle (web/note-phone.inline.html): display:none unless .pan-phone. */
         '<button class="pan-tbtn pan-fingerbtn" aria-pressed="false" title="'+FINGER_TXT.off+'" aria-label="'+FINGER_TXT.off+'">'+ico('pen','pan-fon')+ico('hand','pan-foff')+'</button>'+
+        /* Read view in mount mode (no header to hold it): display:none unless .pan-phone. */
+        (hasTop?'':readBtnHtml('pan-tbtn'))+
         /* T is PROMOTED to the header as the Text tab when there is a header to hold it; in mount
            mode (no .pan-top) there is nowhere to promote it to, so it stays in the row. */
         TOOLS.filter(t=>!(hasTop&&t[0]==='text')).map(t=>'<button class="pan-tbtn pan-tool" data-tool="'+t[0]+'" title="'+t[2]+'" aria-label="'+t[2]+'">'+(ICON[t[1]]?ico(t[1]):t[1])+'</button>').join('')+
@@ -1785,6 +1795,17 @@
     // wraps its typed text at the visible width (owner 2026-11-13: an AI summary ran off the right
     // edge of an iPhone). Nothing on such a page is placed against the 816px line, so the fixed-page
     // scar (text reflowing under ink) cannot happen; a page with ink keeps the fixed page.
+    // PHONE FIT-WIDTH（适配宽度, plan rule 2）: on a phone a page with ink or photos fits the whole 816px
+    // page to the screen (no MIN_PAGE_W floor), so an iPad note shows every stroke. Decided once per
+    // opened page, so the first stroke on a blank page never re-scales it mid-writing. Off a phone this
+    // is the old expression exactly. TODO(R4 seam): belongs with fitTextToView in a note-open part.
+    let fitKey='', fitWide=false;
+    function kFitOf(rw){
+      if(!phoneOn()||!window.PANotePhone) return Math.max(MIN_PAGE_W/PAGE_W, rw/PAGE_W);
+      const pg=page(), key=(NB&&NB.id)+'\n'+(pg&&pg.id)+'\n'+cur;
+      if(key!==fitKey){ fitKey=key; fitWide=!!(pg&&(hasRealInk(pg)||(pg.images||[]).length)); }
+      return window.PANotePhone.fitK(rw,PAGE_W,MIN_PAGE_W,fitWide);
+    }
     function fitTextToView(){
       const pg=page(), bare=!(pg&&(hasRealInk(pg)||(pg.images||[]).length));
       const narrow=bare&&viewW>0&&viewW<W;
@@ -1831,7 +1852,7 @@
       // landscape iPad that meant a narrow page stranded between two wide grey margins — the
       // screen-waste report again, in the other orientation. A document viewer fills the width and
       // scrolls; that is what Notability does and what was asked for.
-      const kFit=Math.max(MIN_PAGE_W/PAGE_W, r.width/PAGE_W), k=kFit*zoomNow();   // zoomNow() is 1 off a phone
+      const kFit=kFitOf(r.width), k=kFit*zoomNow();   // zoomNow() is 1 off a phone
       viewW=r.width/kFit;                                      // the fit width: a pinch never re-wraps the text
       const tail=seamless?Math.max(PAGE_TAIL_PX,Math.round(r.height/k)):PAGE_TAIL_PX;
       const want=Math.ceil(pageExtent(page())*W)+tail;
@@ -3518,7 +3539,7 @@
     function cancelStroke(){ if(!drawing) return; drawing=false; strokePtr=null; curPts=[];
       if(rafId){ cancelAnimationFrame(rafId); rafId=0; } redrawPage(); }
     function applyZoomLive(z,cx,cy){                           // CSS zoom only; setupCanvases re-renders at the end
-      const r=stage.getBoundingClientRect(), k0=pageK()||1, k1=Math.max(MIN_PAGE_W/PAGE_W,r.width/PAGE_W)*z;
+      const r=stage.getBoundingClientRect(), k0=pageK()||1, k1=kFitOf(r.width)*z;
       const px=stage.scrollLeft+(cx-r.left), py=stage.scrollTop+(cy-r.top);
       liveZoom=z;
       for(const el of [pageInner,flip]){ el.style.zoom=k1; el.style.left='0px'; }
@@ -3547,6 +3568,12 @@
     { let first=true; if(window.PANotePhone) window.PANotePhone.watch(host,on=>{ if(first){ first=false; return; }
       if(!on&&fingerDefaulted){ fingerDraw=false; fingerDefaulted=false; showFinger(); syncPan(); }   // the phone default leaves with the phone
       if(W) setupCanvases(); },listenG); }
+    // Read view（阅读视图）: web/note-phone.inline.html owns it; the pad only lends its text layer.
+    const readView=(window.PANotePhone&&window.PANotePhone.readView)?window.PANotePhone.readView({host,textLayer,
+      btn:q('.pan-readbtn'),txt:READ_TXT,hasInk:()=>{ const pg=page(); return !!(pg&&hasRealInk(pg)); },listen:listenG,
+      onSize:readSize=>{ try{ parent.postMessage({pa:'req',id:'panreadpref',kind:'pref',readSize},'*'); }catch(_){ /* no shell (standalone/harness): the size holds this session */ } }}):null;
+    if(readView) listenG(window,'message',e=>{ const m=e.data; if(m&&m.pa==='prefs'&&Number.isFinite(m.readSize)) readView.setSize(m.readSize); });
+    if(window.PATips&&readView) window.PATips.register({id:'note-read-view',anchor:()=>q('.pan-readbtn'),text:READ_TXT.tip,when:phoneOn});
     function onDown(e){
       if(flipping){ pdec('refused-flipping',e); return; }
       // (No closePops here: with a popover open, the outside tap is swallowed by onPopOutside

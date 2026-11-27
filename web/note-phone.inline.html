@@ -13,6 +13,13 @@
          c.begin()     → the host drops what the first finger started (a stroke, a scroll); false refuses
          c.zoomNow()   → the zoom at the start;  c.pan(dx,dy) / c.zoom(z,cx,cy) / c.end() while it runs
        Each handler returns true when it CONSUMED the event (the host's own routing must then skip it).
+       PANotePhone.fitK(rw,pageW,minW,wide) → the page scale: on a phone a WIDE page (ink or photos) fits the
+                                          screen width with no floor (适配宽度); otherwise max(minW,rw)/pageW
+                                          exactly as before. Stored ink stays in pageW units either way.
+       PANotePhone.readView(c)          → Read view（阅读视图）: the page's typed text reflowed at this device's
+         text size, ink hidden. c = {host, textLayer, btn, txt, hasInk(), listen}. → {open(), close(), isOpen()}
+         c.onSize(px) reports an A−/A+ change; the host stores it on THIS device (the shell's pa_notereadsize,
+         a sandboxed app has no storage of its own) and hands it back with view.setSize(px). Never in the note.
      Driven by test/note-phone.test.mjs (the tracker) and test/note-phone-e2e.test.mjs (WebKit iPhone). -->
 <style id="pnp-style">
 /* The phone's pen toggle: hidden everywhere but phone mode, where it replaces the 16px checkbox. */
@@ -21,6 +28,19 @@
 .pan-phone .pan-fingerrow{display:none}
 .pan-fingerbtn .pan-foff,.pan-fingerbtn.on .pan-fon{display:block}
 .pan-fingerbtn .pan-fon,.pan-fingerbtn.on .pan-foff{display:none}
+.pan-readbtn{display:none}
+.pan-phone .pan-readbtn{display:flex;min-width:44px;min-height:44px}
+.pnp-read{position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;background:var(--pan-paper,#fffdf8);color:#1c1e1d}
+.pnp-read[hidden]{display:none}
+.pnp-rhead{display:flex;align-items:center;gap:6px;padding:6px 8px;padding-top:max(6px,env(safe-area-inset-top));border-bottom:1px solid rgba(0,0,0,.12);background:inherit}
+.pnp-rtitle{flex:1;min-width:0;font:600 15px/1.25 system-ui,-apple-system,sans-serif}
+.pnp-rnote{display:block;font-weight:400;font-size:13px;color:#5b5f5d}
+.pnp-rhead button{min-width:44px;min-height:44px;border:0;border-radius:10px;background:rgba(0,0,0,.06);color:inherit;font:600 16px system-ui,-apple-system,sans-serif}
+.pnp-rbody{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:16px 16px calc(24px + env(safe-area-inset-bottom));overflow-wrap:anywhere;line-height:1.55}
+.pnp-rbody *{position:static!important;font-size:inherit!important;max-width:100%!important;width:auto!important;height:auto!important;margin-left:0!important;transform:none!important;line-height:inherit!important}
+.pnp-rbody h1{font-size:1.5em!important}.pnp-rbody h2{font-size:1.3em!important}.pnp-rbody h3{font-size:1.15em!important}
+.pnp-rbody img{height:auto!important}
+.pnp-rempty{color:#5b5f5d;font-style:italic}
 </style>
 <script id="pnp-script">
 (function(){
@@ -95,6 +115,50 @@
     }
     return {down,move,up,active:()=>!!g};
   }
-  window.PANotePhone={PHONE_MQ,ZOOM_MIN,ZOOM_MAX,PINCH_SLOP,isPhone,watch,clampZoom,gesture};
+  function fitK(rw,pageW,minW,wide){
+    if(!(rw>0)||!(pageW>0)) return 1;
+    return (wide&&isPhone()) ? rw/pageW : Math.max(minW/pageW, rw/pageW);
+  }
+  // ── Read view（阅读视图）── text size per device: READ_SIZES px, never below 18 (plan rule 4).
+  const READ_SIZES=[18,20,22,24,28,32], READ_DEF=18;
+  const readSize=v=>{ v=Number(v); return READ_SIZES.includes(v)?v:READ_DEF; };
+  function stepSize(cur,dir){ const i=READ_SIZES.indexOf(cur), j=Math.min(READ_SIZES.length-1,Math.max(0,(i<0?0:i)+dir)); return READ_SIZES[j]; }
+  function readView(c){
+    const doc=c.host.ownerDocument, T=c.txt, add=c.listen||((t,ty,f)=>t.addEventListener(ty,f));
+    const el=doc.createElement('div'); el.className='pnp-read'; el.hidden=true;
+    el.setAttribute('role','dialog'); el.setAttribute('aria-label',T.title);
+    const head=doc.createElement('div'); head.className='pnp-rhead';
+    const title=doc.createElement('div'); title.className='pnp-rtitle'; title.textContent=T.title;
+    const note=doc.createElement('span'); note.className='pnp-rnote'; note.textContent=T.inkHidden; title.appendChild(note);
+    const mk=(txt,label,cls)=>{ const b=doc.createElement('button'); b.type='button'; b.className=cls; b.textContent=txt; b.title=label; b.setAttribute('aria-label',label); return b; };
+    const less=mk('A−',T.smaller,'pnp-rless'), more=mk('A+',T.bigger,'pnp-rmore'), shut=mk('✕',T.close,'pnp-rclose');
+    head.append(title,less,more,shut);
+    const body=doc.createElement('div'); body.className='pnp-rbody';
+    el.append(head,body); c.host.appendChild(el);
+    let size=READ_DEF, obs=null;
+    const applySize=()=>{ body.style.fontSize=size+'px'; less.disabled=size<=READ_SIZES[0]; more.disabled=size>=READ_SIZES[READ_SIZES.length-1]; };
+    // A COPY of the rendered text layer, so nothing typed here can reach the note (it is read only).
+    function fill(){
+      body.textContent='';
+      for(const n of c.textLayer.childNodes) body.appendChild(n.cloneNode(true));
+      body.querySelectorAll('[contenteditable],[id]').forEach(n=>{ n.removeAttribute('contenteditable'); n.removeAttribute('id'); });
+      if(!body.textContent.trim()&&!body.querySelector('img')){ const p=doc.createElement('p'); p.className='pnp-rempty'; p.textContent=T.empty; body.appendChild(p); }
+      note.hidden=!c.hasInk();
+    }
+    function sync(on){ if(c.btn){ c.btn.classList.toggle('on',on); c.btn.setAttribute('aria-pressed',String(on)); } }
+    function open(){ applySize(); fill(); el.hidden=false; sync(true);
+      if(!obs&&window.MutationObserver){ obs=new MutationObserver(fill); obs.observe(c.textLayer,{childList:true,subtree:true,characterData:true}); } }
+    function close(){ el.hidden=true; sync(false); if(obs){ obs.disconnect(); obs=null; } }
+    const step=dir=>{ size=stepSize(size,dir); applySize(); if(c.onSize) c.onSize(size); };
+    less.addEventListener('click',()=>step(-1)); more.addEventListener('click',()=>step(1));
+    shut.addEventListener('click',close);
+    if(c.btn) c.btn.addEventListener('click',()=>{ if(el.hidden) open(); else close(); });
+    add(doc,'keydown',e=>{ if(e.key==='Escape'&&!el.hidden) close(); });
+    // Leaving phone mode (rotation, Split View widening) leaves the view too: its button is gone.
+    let mq=null; try{ mq=window.matchMedia?window.matchMedia(PHONE_MQ):null; }catch(_){ mq=null; /* never phone mode: nothing opens */ }
+    if(mq&&mq.addEventListener) add(mq,'change',()=>{ if(!isPhone()) close(); });
+    return {open,close,isOpen:()=>!el.hidden,size:()=>size,setSize:px=>{ size=readSize(px); applySize(); }};
+  }
+  window.PANotePhone={PHONE_MQ,ZOOM_MIN,ZOOM_MAX,PINCH_SLOP,READ_SIZES,isPhone,watch,clampZoom,gesture,fitK,readSize,stepSize,readView};
 })();
 </script>
