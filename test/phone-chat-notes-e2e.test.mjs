@@ -74,6 +74,17 @@ async function notesFrame(page) {
   }
   throw new Error('the Journal never showed its header');
 }
+// When a click finds its target "outside of the viewport", say where everything was: the button in its frame,
+// the frame in the shell, both scroll offsets and the visual viewport (a pinch/auto zoom moves it).
+async function whereIs(page, fr, sel) {
+  const r = (b) => b && { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height) };
+  const vp = () => ({ W: innerWidth, H: innerHeight, sx: scrollX, sy: scrollY, vv: visualViewport && { s: visualViewport.scale, x: visualViewport.offsetLeft, y: visualViewport.offsetTop, w: visualViewport.width } });
+  return { btn: await fr.evaluate((s) => document.querySelector(s)?.getBoundingClientRect().toJSON(), sel).then(r, () => 'n/a'),
+    inFrame: await fr.evaluate(`(${vp})()`).catch(() => 'n/a'),
+    frame: await page.evaluate(() => document.querySelector('#fr')?.getBoundingClientRect().toJSON()).then(r, () => 'n/a'),
+    frameCls: await page.evaluate(() => document.querySelector('#frame')?.className).catch(() => 'n/a'),
+    shell: await page.evaluate(`(${vp})()`).catch(() => 'n/a') };
+}
 // The bottom of the last chat bubble vs the top of the composer's chips, after scrolling the log to its end (#9).
 const lastClearsPills = (t, logSel, msgSel) => t.evaluate(([l, m]) => {
   const log = document.querySelector(l); log.scrollTop = log.scrollHeight;
@@ -104,7 +115,7 @@ for (const [dev, viewport] of Object.entries(DEVICES)) {
       if (phone && (head.photo || head.print)) bad.push(`${dev} notes: Photo / Print still in the phone header`);
       if (!phone && !(head.photo && head.print)) bad.push(`${dev} notes: Photo / Print left the tablet header (CONTROL)`);
       // ⋯ → on a phone a menu (Page settings · Photo · Print), on an iPad Page settings itself.
-      await fr.click('.pan-hmore'); await page.waitForTimeout(400);
+      await fr.click('.pan-hmore').catch(async (e) => { throw new Error(`${e.message}\nlayout: ${JSON.stringify(await whereIs(page, fr, '.pan-hmore'))}`); }); await page.waitForTimeout(400);
       if (phone) {
         const rows = await fr.$$eval('.pan-ovf.on [data-ovf]', (bs) => bs.map((b) => b.dataset.ovf));
         assert.deepEqual(rows, ['paper', 'photo', 'print'], 'the phone ⋯ menu holds what the header folded away');

@@ -128,6 +128,25 @@ test('USER FLOW owner: name + task chip, ⋯ holds every moved control, alert do
   } finally { await c.close(); }
 });
 
+// Regression (CI run 45915589878): boot docks the composer row into the home ring AFTER sign-in. Moving a
+// node drops its focus, so a user who had already started typing lost the caret and Enter did nothing.
+test('docking the composer while the user types keeps focus and caret; Enter still sends', { skip, timeout: 60000 }, async () => {
+  const { c, page } = await signedIn(OWNER_TOKEN);
+  try {
+    const state = () => page.evaluate(() => { const b = document.querySelector('#box'); return { focused: document.activeElement === b, caret: [b.selectionStart, b.selectionEnd], home: !!b.closest('#homeForm') }; });
+    await page.evaluate(() => hideEmptyState());   // the chat composer, as it stands before boot shows the home
+    await page.fill('#box', 'typing already'); await page.evaluate(() => document.querySelector('#box').setSelectionRange(3, 6));
+    assert.deepEqual(await state(), { focused: true, caret: [3, 6], home: false });
+    await page.evaluate(() => showEmptyState());   // boot docks the row into the home ring
+    assert.deepEqual(await state(), { focused: true, caret: [3, 6], home: true }, 'docking keeps the caret');
+    // CONTROL: an unfocused box is not grabbed by a dock move.
+    await page.evaluate(() => { document.querySelector('#box').blur(); hideEmptyState(); showEmptyState(); });
+    assert.equal((await state()).focused, false, 'a dock move never steals focus');
+    await page.focus('#box'); await page.keyboard.press('Enter');
+    await page.waitForFunction(() => document.querySelector('#box').value === '');   // the keyboard Enter sent it
+  } finally { await c.close(); }
+});
+
 test('USER FLOW member: own greeting, no owner chips, Start here opens an app, the ask box sends', { skip, timeout: 60000 }, async () => {
   const { c, page } = await signedIn(MEMBER_TOKEN);
   try {

@@ -107,8 +107,11 @@ const PAHome=(function(){
     const att=$('#chips'); if(att&&!chipAnchor){ chipAnchor=document.createComment('chips'); att.after(chipAnchor); }   // attachment chips go with the row, or they hide in #f
 
     docked=on;
+    // Moving a node drops its focus: a user already typing (boot docks the row after sign-in) lost the caret and Enter did nothing.
+    const typing=document.activeElement===box, sel=typing?[box.selectionStart,box.selectionEnd]:null;
     if(on){ chatPh=box.placeholder; box.placeholder=' '; if(PH_LABEL) box.setAttribute('aria-label',PH_LABEL); $('#homeForm').prepend(row); if(att) $('#homeForm').after(att); }
     else { box.placeholder=chatPh; box.removeAttribute('aria-label'); anchor.before(row); if(att) chipAnchor.before(att); }
+    if(typing){ box.focus(); box.setSelectionRange(sel[0],sel[1]); }
   }
   function startMake(){ const i=$('#box'); i.value=T.starter; i.focus(); i.setSelectionRange(i.value.length,i.value.length); i.dispatchEvent(new Event('input')); }
   function closeMore(){ const m=$('#hmenu'); if(m&&!m.hidden){ m.hidden=true; $('#hmore').setAttribute('aria-expanded','false'); } }
