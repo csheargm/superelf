@@ -1,4 +1,13 @@
 {
+  "v5.35.1": {
+    "date": "2026-11-26",
+    "time": "2026-11-27T00:40:03.186Z",
+    "features": [],
+    "fixes": [
+      "合并：CI 浏览器测试转绿 — 输入框停靠保焦点、笔记保存按磁盘等待 · Merge: CI browser jobs green — composer keeps focus when docked, ink save waits on disk"
+    ],
+    "through": "64fa002833bf32c939cbd3483a421b2118fa72b2"
+  },
   "v5.35.0": {
     "date": "2026-11-26",
     "time": "2026-11-27T00:14:20.644Z",
