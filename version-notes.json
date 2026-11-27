@@ -1,4 +1,13 @@
 {
+  "v5.38.1": {
+    "date": "2026-11-27",
+    "time": "2026-11-27T08:07:17.364Z",
+    "features": [],
+    "fixes": [
+      "合并：补齐单语言开关的缺口 · Merge: close the one-language switch gaps"
+    ],
+    "through": "5f0158a77e6d0e336751bce4ecfea019a7fc833a"
+  },
   "v5.38.0": {
     "date": "2026-11-26",
     "time": "2026-11-27T06:29:12.909Z",
