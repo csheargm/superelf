@@ -1,4 +1,13 @@
 {
+  "v5.36.0": {
+    "date": "2026-11-26",
+    "time": "2026-11-27T01:26:45.113Z",
+    "features": [
+      "手机适配宽度与阅读视图 · phone fit-width page + Read view + per-device text size (journal-iphone step 2)"
+    ],
+    "fixes": [],
+    "through": "8031f282bf6bee2684904b524875f77105443d0f"
+  },
   "v5.35.2": {
     "date": "2026-11-26",
     "time": "2026-11-27T00:47:19.520Z",
