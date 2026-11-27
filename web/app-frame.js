@@ -88,6 +88,16 @@ function appFrameLoadDoc(el,html){
   for(const h of APP_FRAME_HANDLERS) nu[h]=el[h];
   el.replaceWith(nu);
 }
+// The src route, for the same reason: #fr is not always a frame that never navigated. A Forward (or
+// Back) onto the shell is a fresh load, and the browser RESTORES #fr to the app page it last held
+// before any script runs; setting src on it then added a joint-history entry of the frame's own, so
+// Back stepped only the hidden frame and Home never showed (CI flake v5.37.0, Chromium).
+function appFrameLoadSrc(el,url){
+  const nu=el.cloneNode(false);
+  nu.src=url;
+  for(const h of APP_FRAME_HANDLERS) nu[h]=el[h];
+  el.replaceWith(nu);
+}
 // Every message is looked at, not only 'left': any message from the page in #fr shows its page runs (PALeave's here comes first).
 window.addEventListener('message',(e)=>{
   const r=appFrameOf(e.source);
