@@ -41,6 +41,8 @@ async function shellOpens(token) {
     const frame = page.frames().find((f) => f.url().includes('/app/alice/diary/'));
     // The response status arrives before the frame has parsed its body: read it once the DOM is in.
     if (frame) await frame.waitForLoadState('domcontentloaded').catch(() => { /* a refused page may never load: its body reads '' below */ });
+    // domcontentloaded can fire for the frame's first (blank) document: wait for its text, up to a bound (a refused page never has any)
+    if (frame && statuses[0] === 200) await frame.waitForFunction(() => document.body && document.body.innerText.trim(), null, { timeout: 10000 }).catch(() => { /* asserted below: an empty body fails the match */ });
     const body = frame ? await frame.evaluate(() => document.body ? document.body.innerText : '') : '';
     // the srcdoc route (web/sw-client.js fetchText) fetches the same page with credentials:'same-origin'
     const viaFetch = await page.evaluate(() => fetch('/app/alice/diary/', { credentials: 'same-origin' }).then((r) => r.status));

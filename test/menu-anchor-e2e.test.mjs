@@ -50,6 +50,11 @@ const INVENTORY = [
   { name: 'drawer row ⋯', btn: '[data-appmenu="todo"]', menu: '#appMenu', open: openRow, done: (p) => p.evaluate(() => { closeMenuPop(); closeDrawer(); }) },
   { name: 'app bar ⋯', btn: '#fmore', menu: '#frameMenu', open: openFrame, done: (p) => p.evaluate(() => goHome()) },
 ];
+// settled: the menu's box is the same over two frames running (placeMenu re-places on a ResizeObserver tick).
+const settled = (page, m) => page.waitForFunction((m) => new Promise((ok) => {
+  const box = () => JSON.stringify(document.querySelector(m).getBoundingClientRect());
+  const a = box(); requestAnimationFrame(() => requestAnimationFrame(() => ok(box() === a)));
+}), m, { polling: 100 });
 const rects = (page, b, m) => page.evaluate(([b, m]) => {
   const r = (s) => { const q = document.querySelector(s).getBoundingClientRect(); return { top: q.top, bottom: q.bottom, left: q.left, right: q.right }; };
   return { b: r(b), m: r(m), w: innerWidth };
@@ -65,6 +70,7 @@ for (const vp of VIEWPORTS) {
       await page.waitForFunction(() => !document.querySelector('#login[open]'));
       for (const row of INVENTORY) {
         await row.open(page);
+        await settled(page, row.menu);   // a late line (Publish state) re-places it on the next frame: measure after that
         const { b, m, w } = await rects(page, row.btn, row.menu);
         const dTop = m.top - b.bottom;
         assert.ok(dTop >= 0 && dTop <= ANCHOR_SLACK, `${row.name}: top ${dTop}px below its ⋯`);

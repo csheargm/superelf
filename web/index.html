@@ -584,7 +584,7 @@ function closeConvoMenu(){ closeMenuPop(); }
 function convoMenu(id, convoEl, anchor){
   closeConvoMenu();
   const m=document.createElement('div'); m.id='convoMenu'; m.className='cmenu-pop';
-  m.innerHTML='<button data-a="rename">Rename</button><button data-a="delete" class="del">Delete</button>';
+  m.innerHTML='<button data-a="rename">重命名 · Rename</button><button data-a="delete" class="del">删除 · Delete</button>';
   document.body.appendChild(m);
   placeMenu(m,anchor);
   m.onclick=async(ev)=>{ const b=ev.target.closest('button'); if(!b) return; const a=b.dataset.a; closeConvoMenu();
@@ -1268,12 +1268,12 @@ function appMenu(name, anchor){
   const nextVer=ver?ver.replace(/(\d+)$/,n=>+n+1):'1.0.0';
   const m=document.createElement('div'); m.id='appMenu'; m.className='cmenu-pop';
   m.innerHTML=(ROLE==='owner'?PAAppEdit.item():'')   // ADR 0040 order
-    +(first?'':'<button data-a="up">Move up</button>')
-    +(last?'':'<button data-a="dn">Move down</button>')
-    +`<button data-a="share">${shared?'Unshare from family':'Share to family'}</button>`
+    +(first?'':'<button data-a="up">上移 · Move up</button>')
+    +(last?'':'<button data-a="dn">下移 · Move down</button>')
+    +`<button data-a="share">${shared?'取消家人共享 · Unshare from family':'分享给家人 · Share to family'}</button>`
     +(ROLE==='owner'?PAPublish.item(name):'')   // PAPublish decides for a fork (ONE gate)
     +(shared&&!forked?`<button data-a="bump">发布更新 ${nextVer} · Publish update ${nextVer}</button>`:'')
-    +'<button data-a="delete" class="del">Delete</button>';
+    +'<button data-a="delete" class="del">删除 · Delete</button>';
   document.body.appendChild(m);
   placeMenu(m,anchor);
   m.onclick=async(ev)=>{ const b=ev.target.closest('button'); if(!b) return; const a=b.dataset.a; closeAppMenu();
