@@ -813,6 +813,8 @@ const PA_COMPONENTS = [
   { marker: '<!--PA_INK_FRAME_UI-->', file: 'ink-frame.inline.html' },
   // PASnap, the app's picture for 改这个应用 · Change this app (ADR 0040): on EVERY app page, after PABusy. Appended last.
   { marker: PA_SNAP_MARKER, file: 'snap.inline.html' },
+  // PANotePhone, phone mode for PANote — finger ink, two-finger pan, pinch zoom: note-ui carries its marker. Appended last.
+  { marker: '<!--PA_NOTE_PHONE_UI-->', file: 'note-phone.inline.html' },
 ];
 // Injected into EVERY served app page, unconditionally. The shell broadcasts the user's A-/A+
 // scale to each app (sendAppPrefs -> pa:'prefs'), but only chat-ui.inline.html ever applied it,
