@@ -83,7 +83,9 @@ async function close(page, f, how, frameEl) {
   await page.touchscreen.tap(o.x + p.x, o.y + p.y);
 }
 const shot = (page, name) => (SHOTS ? page.screenshot({ path: path.join(SHOTS, name + '.png') }) : null);
-const gone = (f) => f.waitForFunction(() => !document.querySelector('.pat-tip'), null, { timeout: 3000 }).then(() => true, () => false);
+// THIS tip is gone. Not "no tip at all": the one tip slot hands over to the next queued tip (tip:lang-switch after
+// the home tip), and under a 16-way parallel run it arrived inside the 3 s window every time (16/16 failed).
+const gone = (f, id) => f.waitForFunction((id) => ![...document.querySelectorAll('.pat-tip')].some((t) => t.dataset.tip === id), id, { timeout: 3000 }).then(() => true, () => false);
 
 async function openApp(page, slug) {
   await page.evaluate((s) => openApp('owner', s, s), slug);
@@ -103,7 +105,7 @@ for (const engine of ['chromium', 'webkit']) for (const dev of ['iphone', 'ipad'
       assert.equal(t.label, '关闭提示'); assert.ok(t.xw >= 44 && t.xh >= 44, `✕ is a 44px target (${t.xw}x${t.xh})`);
       assert.deepEqual(await overlapsIn(page), [], 'the tip covers no control');
       if (how === 'x') await shot(page, `after-${engine}-${dev}-home`);
-      await close(page, page, how); assert.equal(await gone(page), true, `closed by ${how}`);
+      await close(page, page, how); assert.equal(await gone(page, t.id), true, `closed by ${how}`);
       await page.evaluate(() => window.PATips.whenIdle());
       await page.reload(); await page.waitForFunction(() => document.querySelector('#dot.ok'));
       await page.waitForTimeout(1500); assert.equal(await page.locator(HOME).count(), 0, 'stays closed after reload');
@@ -120,8 +122,8 @@ test('chromium iphone: blocked localStorage AND a refused account write — the 
   const ctx = await context('chromium', 'iphone', { blockLocal: true });
   await ctx.route('**/api/profile', (r) => (r.request().method() === 'PUT' ? r.fulfill({ status: 500, body: '{"error":"refused"}' }) : r.continue()));
   const { page, errors } = await shell(ctx);
-  assert.ok(await tipIn(page), 'the tip shows (the account read worked)');
-  await close(page, page, 'x'); assert.equal(await gone(page), true, 'closed although nothing could be stored on the device or the account');
+  const t = await tipIn(page); assert.ok(t, 'the tip shows (the account read worked)');
+  await close(page, page, 'x'); assert.equal(await gone(page, t.id), true, 'closed although nothing could be stored on the device or the account');
   await page.evaluate(() => window.PATips.whenIdle());
   await page.reload(); await page.waitForFunction(() => document.querySelector('#dot.ok')); await page.waitForTimeout(1500);
   assert.equal(await page.locator(HOME).count(), 0, 'not shown again this session (the tab copy)');
@@ -157,7 +159,7 @@ for (const engine of ['chromium', 'webkit']) for (const dev of ['iphone', 'ipad'
         assert.deepEqual(await overlapsIn(f), [], `${t.id}: covers no control`);
         if (engine === 'chromium') await shot(page, `after-${engine}-${dev}-${t.id}`);
         const how = HOWS[found.length % HOWS.length]; found.push({ ...t, slug, how });
-        await close(page, f, how, '#fr'); assert.equal(await gone(f), true, `${t.id} closed by ${how}`);
+        await close(page, f, how, '#fr'); assert.equal(await gone(f, t.id), true, `${t.id} closed by ${how}`);
         await f.evaluate(() => window.PATips.whenIdle());
         await ctx.close();
       }

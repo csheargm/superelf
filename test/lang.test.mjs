@@ -14,13 +14,16 @@ import { SHELL_PARTS } from '../lib/shellhtml.mjs';
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const script = fs.readFileSync(path.join(REPO, 'web/lang.js'), 'utf8');
 
-function palang({ language = 'en-US', stored = null, both = false } = {}) {
+const WIN = new WeakMap(); const globalThisOf = (L) => WIN.get(L);
+function palang({ language = 'en-US', stored = null, both = false, shown = null } = {}) {
   const store = new Map(stored ? [['pa_lang', stored]] : []);
   const ctx = { navigator: { language, languages: [language] }, localStorage: { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) },
     document: { readyState: 'complete', documentElement: null }, addEventListener() {}, setTimeout };
+  if (shown) for (const k of ['alert', 'confirm', 'prompt']) ctx[k] = (...a) => { shown.push([k, ...a]); return k === 'confirm' ? true : 'typed'; };
   ctx.window = ctx;
   const src = script.split('/*PA_LANG_BOTH*/false').join(String(both));
   vm.runInNewContext(src, ctx);
+  WIN.set(ctx.PALang, ctx);
   return { L: ctx.PALang, store };
 }
 
@@ -30,6 +33,20 @@ test('the device language is the default: zh* → 中文, anything else → Engl
   assert.equal(palang({ language: 'en-GB' }).L.get(), 'en');
   assert.equal(palang({ language: 'fr-FR' }).L.get(), 'en');
   assert.equal(palang({ language: 'zh-CN', stored: 'en' }).L.get(), 'en', 'a choice kept on this device wins');
+});
+
+test('native pop-ups show only the chosen language; prompt keeps its default value and every return value', () => {
+  for (const [language, want] of [['en-US', 'Delete this chat?'], ['zh-CN', '删除这个对话？']]) {
+    const shown = []; const { L } = palang({ language, shown });
+    assert.equal(L.get(), language === 'en-US' ? 'en' : 'zh');
+    assert.equal(globalThisOf(L).confirm('删除这个对话？ · Delete this chat?'), true);
+    globalThisOf(L).alert('移除失败 · Remove failed');
+    assert.equal(globalThisOf(L).prompt('已添加 Ada。把这个登录码交给对方 · Added Ada. Give them this sign-in code', 'abc · 码'), 'typed');
+    assert.deepEqual(shown[0], ['confirm', want]);
+    assert.equal(shown[1][1], language === 'en-US' ? 'Remove failed' : '移除失败');
+    assert.equal(shown[2][2], 'abc · 码', 'the default value (a sign-in code) is never switched');
+    globalThisOf(L).alert('plain English only'); assert.equal(shown[3][1], 'plain English only', 'CONTROL: a single-language message is untouched');
+  }
 });
 
 test('t() picks the chosen side of a pair or a "中文 · English" string', () => {
