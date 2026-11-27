@@ -848,7 +848,7 @@ async function boot(){
   // Only when there is something to show: an empty drawer over an empty pad is two empty things.
   // Awaited, so boot is done only once the list is on screen (PANotesBoot below). A list that cannot open is told,
   // never a boot failure: the note itself loaded, so writes must not be blocked for it.
-  if(last) await drawer.open().catch((err)=>paNotice('列表打不开 · Could not open the list — '+((err&&err.message)||err),'','drawer'));
+  if(last) try{ await drawer.open(); }catch(err){ paNotice('列表打不开 · Could not open the list — '+((err&&err.message)||err),'','drawer'); }
 }
 // A throw here must not white-screen the app — but it must not look healthy either: writes stay
 // blocked until a read succeeds, and the reason is on the notice (R5: never a bare catch).
