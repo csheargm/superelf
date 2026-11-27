@@ -57,6 +57,14 @@ const barHidden = (frame) => frame.evaluate(() => document.getElementById('nav')
 const reachable = (frame, sel) => frame.evaluate((s) => { const b = document.querySelector(s), r = b.getBoundingClientRect();
   if (r.top < 0 || r.bottom > innerHeight || r.width === 0) return false;
   const e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!e && (e === b || b.contains(e)); }, sel);
+// Polled for up to SLIDE_WAIT_MS: a control that is mid-slide is not yet where the finger lands (CI WebKit, 2026-11-27).
+const SLIDE_WAIT_MS = 2000;
+async function reachableSoon(frame, sel) {
+  for (const end = Date.now() + SLIDE_WAIT_MS; ; await frame.waitForTimeout(50)) {
+    if (await reachable(frame, sel)) return true;
+    if (Date.now() > end) return false;
+  }
+}
 const pressed = (frame) => frame.evaluate(() => { const b = document.getElementById('top-ai'); return { aria: b.getAttribute('aria-pressed'), on: b.classList.contains('on') }; });
 const tapIn = async (page, frame, sel) => { const b = await frame.locator(sel).boundingBox(); await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2); };
 
@@ -83,7 +91,8 @@ test('iPhone: after picking a chapter the bar stays (Ask AI reachable past the i
     // ...and it comes back from the handle.
     await tapIn(page, frame, '.paab-handle');
     await frame.waitForFunction(() => document.getElementById('nav').getAttribute('data-paab-hidden') === '0');
-    assert.equal(await reachable(frame, '#top-ai'), true, 'back from the handle');
+    // The bar slides back in (.18s transform): wait out the slide, then the button must be under the finger.
+    assert.equal(await reachableSoon(frame, '#top-ai'), true, 'back from the handle');
   } finally { await ctx.close(); }
 });
 

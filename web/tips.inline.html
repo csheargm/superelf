@@ -170,7 +170,9 @@
     // Then, if every spot beside the bar covers something, the nearest free band in the viewport (SCAN_PX steps).
     const band=[]; for(let y=EDGE_PX;y+h<=H-EDGE_PX;y+=SCAN_PX) band.push(y);
     band.sort((p,q)=>Math.abs(p-v.bottom)-Math.abs(q-v.bottom));
-    outer: for(const t of [...tops,...band]) for(const l of lefts){ const T=clampT(t), n=covers(ctrls,{left:l,top:T,right:l+w,bottom:T+h});
+    // Its own (small) anchor outweighs any other control: a crowded phone home put the tip on the pill (CI 2026-11-27).
+    const own=a.height<H?CTRL_MAX+1:0;
+    outer: for(const t of [...tops,...band]) for(const l of lefts){ const T=clampT(t), box={left:l,top:T,right:l+w,bottom:T+h}, n=covers(ctrls,box)+(hit(a,box)?own:0);
       if(!best||n<best.n) best={t:T,l,n}; if(n===0) break outer; }
     tip.style.top=Math.round(best.t-dy)+'px'; tip.style.left=Math.round(best.l-dx)+'px';
   }

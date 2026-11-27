@@ -67,3 +67,14 @@ test('a page title is kept clear: the tip moves off an h1 that sits right under 
   const r = h1.getBoundingClientRect();
   assert.ok(!(tip.left < r.right && r.left < tip.right && tip.top < r.bottom && r.top < tip.bottom), `tip ${tip.top}-${tip.bottom} clears the title ${r.top}-${r.bottom}`);
 });
+
+test('a crowded phone page: when every spot covers something, the tip still never sits on its own anchor (CI 2026-11-27)', async () => {
+  // Titles fill the screen above and below the anchor (300-330); only the 50px gap around it is free of them.
+  const heads = [fakeEl('h1', { top: 0, left: 0, width: 390, height: 290 }), fakeEl('h1', { top: 340, left: 0, width: 390, height: 300 }),
+    fakeEl('h1', { top: 640, left: 0, width: 390, height: 204 })];   // each under half the screen, or it counts as a page wrapper
+  const p = page({ heads }), a = anchor();
+  p.T.register({ id: 't', anchor: a, text: '提示 · Tip' });
+  await flush();
+  const tip = p.html.children.find((c) => c.className.includes('pat-tip')).getBoundingClientRect(), r = a.getBoundingClientRect();
+  assert.ok(!(tip.left < r.right && r.left < tip.right && tip.top < r.bottom && r.top < tip.bottom), `tip ${tip.top}-${tip.bottom} is off its anchor ${r.top}-${r.bottom}`);
+});
