@@ -15,6 +15,7 @@ const PAIcons=(function(){
     chev:'<path d="M9 5l7 7-7 7"/>',
     up:'<path d="M12 19V5M6 11l6-6 6 6"/>',
     stop:'<rect x="7" y="7" width="10" height="10" rx="2"/>',
+    lang:'<path d="M3 5h9M7.5 3v2M5 5c1 3.5 3.5 6 6.5 7M10 5c-1 3.5-3.5 6-6.5 7"/><path d="M12 21l4.5-10 4.5 10M13.8 17h5.4"/>',   // 文/A: the language row (web/lang-switch.js)
     more:'<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>',
     close:'<path d="M6 6l12 12M18 6L6 18"/>',
     chat:'<path d="M4 5h16v11H9l-5 4z"/>',

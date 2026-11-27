@@ -1,5 +1,5 @@
 // The ONE language setting · 界面语言, in a real browser (R6) on a throwaway node: the device language is the
-// default; the ☰ drawer's 中 / EN switch flips the home, the drawer, the first-use tips and an open app LIVE;
+// default; the home ⋯ menu's language row flips the home, the drawer, the first-use tips and an open app LIVE;
 // the choice survives a reload and reaches a fresh device through the account; the Bible app stays bilingual;
 // the AI turn carries the language line. PA_E2E_ENGINE=webkit runs it in iPhone Safari's engine (390 wide).
 // No Playwright: FAILS unless PA_E2E_SKIP=1.
@@ -57,6 +57,8 @@ async function open(locale, opts = {}) {
 }
 const lang = (page) => page.evaluate(() => document.documentElement.dataset.paLang);
 const shown = (page, sel) => page.evaluate((s) => { const e = document.querySelector(s); return e ? e.innerText.trim() : null; }, sel);
+async function openMore(page) { if (await page.locator('#hmenu').isHidden()) await page.click('#hmore'); await page.waitForSelector('#hmenu:not([hidden]) #langSw'); }
+const row = (page) => shown(page, '#langSw .hm-l');
 async function openDrawer(page) { await page.evaluate(() => openDrawer()); await page.waitForSelector('#drawer.open'); await page.waitForTimeout(250); }
 
 test('the device language is the default: 中文 device → 中文 only, English device → English only', { skip, timeout: 90000 }, async () => {
@@ -75,33 +77,44 @@ test('the device language is the default: 中文 device → 中文 only, English
   }
 });
 
-test('the drawer switch flips home, drawer, tips and an open app live; persists across reload and via the account', { skip, timeout: 120000 }, async () => {
+test('the ⋯ menu language row flips home, drawer, menu, tips and an open app live; persists across reload and via the account', { skip, timeout: 120000 }, async () => {
   await profile({ lang: '' });
   const { c, page } = await open('en-US');
   try {
-    // Every other shell tip already seen on the account, so the switch's own tip is the one that shows.
+    // Every other shell tip already seen on the account, so the row's own tip is the one that shows.
     const others = await page.evaluate(() => window.PATips.registered().map((r) => r.id).filter((id) => id !== 'tip:lang-switch'));
     await profile({ tipsSeen: [] }); await profile({ tipsSeen: others });
     await page.reload(); await page.waitForSelector('#hStart .st');
-    await openDrawer(page);
+    assert.equal(await page.locator('#drawer #langSw, .dlang').count(), 0, 'one control: no drawer-foot switch');
     const tip = page.locator('.pat-tip[data-tip="tip:lang-switch"]');
-    await tip.waitFor({ state: 'attached', timeout: 8000 });   // the switch's first-use tip must show (ADR 0030)
-    assert.equal((await tip.innerText()).replace('✕', '').trim(), 'New: switch the language here', 'the new tip, in English only');
-    // The 390 phone: the switch is a full tap target inside the drawer.
-    const box = await page.locator('#langSw').boundingBox(); assert.ok(box.height >= 44 && box.x >= 0 && box.x + box.width <= 390, JSON.stringify(box));
-    await page.evaluate(() => PALangSwitch.choose('zh'));   // the tip sits on the switch; the tap path is below
-    assert.equal(await lang(page), 'zh');
+    await tip.waitFor({ state: 'attached', timeout: 8000 });   // the row's first-use tip, on the ⋯ button (ADR 0030)
+    assert.equal((await tip.innerText()).replace('✕', '').trim(), 'New: switch the language in ⋯', 'the new tip, in English only');
+    await page.evaluate(() => PALangSwitch.choose('zh'));
+    assert.equal((await tip.innerText()).replace('✕', '').trim(), '新：在 ⋯ 里切换语言', 'the tip on screen flips too');
+    await page.evaluate(() => PALangSwitch.choose('en'));
+    await page.locator('.pat-tip .pat-x').click();
+    await openMore(page);
+    // The row sits right after Text size and names the OTHER language; a full tap target on the 390 phone.
+    assert.equal(await page.evaluate(() => document.querySelector('#hmenu .aa').nextElementSibling.id), 'langSw', 'right after Text size');
+    assert.equal(await row(page), '中文', 'English mode: the row offers 中文');
+    assert.equal(await shown(page, '#reload .hm-l'), 'Refresh', 'menu rows in English');
+    const box = await page.locator('#langSw').boundingBox(); assert.ok(box.height >= 40 && box.x >= 0 && box.x + box.width <= 390, JSON.stringify(box));
+    await page.click('#langSw'); assert.equal(await lang(page), 'zh', 'a real tap switches');
+    assert.ok(await page.locator('#hmenu').isVisible(), 'the menu stays open');
+    assert.equal(await row(page), 'English', '中文 mode: the row offers English');
+    assert.equal(await shown(page, '#reload .hm-l'), '刷新', 'menu rows flip live');
+    assert.equal(await shown(page, '#settings .hm-l'), '设置');
+    assert.equal(await page.getAttribute('#langSw', 'aria-label'), '语言');
+    await page.click('#langSw'); assert.equal(await lang(page), 'en', 'a tap flips back');
+    await page.click('#langSw'); assert.equal(await lang(page), 'zh');
+    await openDrawer(page);
     assert.equal(await shown(page, '#goHome'), '主页', 'drawer, no reload');
     assert.equal(await shown(page, '#secApps .dsec-l'), '我的应用');
-    assert.equal((await tip.innerText()).replace('✕', '').trim(), '新：在这里切换语言', 'the tip on screen flips too');
-    await page.locator('.pat-tip .pat-x').click();
-    await page.click('#langSw [data-l="en"]'); assert.equal(await lang(page), 'en', 'a tap on EN');
-    await page.click('#langSw'); assert.equal(await lang(page), 'zh', 'a tap on the switch toggles');
+    await page.evaluate(() => closeDrawer());
     assert.match(await shown(page, '#hStart'), /[一-鿿]/, 'home tiles');
     assert.doesNotMatch(await shown(page, '#hStart'), /Journal|Tasks|Bible\b/);
     await waitFor(async () => (await profile()).lang === 'zh', 'saved on the account');
     // An open app follows at once: Tasks (bilingual chrome from the shared components), then back to English.
-    await page.evaluate(() => closeDrawer());
     await page.evaluate(() => openApp(UID, 'tasks', 'Tasks'));
     const fr = page.frameLocator('#fr');
     await waitFor(() => fr.locator('html').getAttribute('data-pa-lang').then((v) => v === 'zh').catch(() => false), 'the app frame is 中文');
@@ -113,6 +126,7 @@ test('the drawer switch flips home, drawer, tips and an open app live; persists 
     await waitFor(async () => (await profile()).lang === 'zh', 'saved again');
     await page.reload(); await page.waitForSelector('#hStart .st');
     assert.equal(await lang(page), 'zh', 'kept across a reload');
+    await openMore(page); assert.equal(await row(page), 'English', 'the row after a reload');
   } finally { await c.close(); }
   // A fresh device (no local copy) whose language is English: the account's 中文 wins.
   const fresh = await open('en-US');
@@ -193,7 +207,7 @@ test('the account refuses a junk language loudly and "" goes back to the device'
   await profile({ lang: '' }); assert.equal((await profile()).lang, '');
 });
 
-test('the drawer switch fits and is tappable on the iPad (820×1180) and the desktop (1280)', { skip, timeout: 90000 }, async () => {
+test('the ⋯ language row fits and is tappable on the iPad (820×1180) and the desktop (1280)', { skip, timeout: 90000 }, async () => {
   const sess = (await (await fetch(`http://127.0.0.1:${port}/api/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: OWNER_TOKEN }) })).json()).token;
   for (const [width, height, hasTouch] of [[820, 1180, true], [1280, 800, false]]) {
     await profile({ lang: 'en' });   // a known start: the tap below must change it
@@ -201,12 +215,18 @@ test('the drawer switch fits and is tappable on the iPad (820×1180) and the des
     try {
       await c.addInitScript((t) => { try { localStorage.setItem('pa_session', t); } catch { /* sandboxed frame */ } }, sess);
       const page = await c.newPage(); await page.goto(`http://127.0.0.1:${port}/`); await page.waitForSelector('#hStart .st');
-      await openDrawer(page);
-      const m = await page.evaluate(() => { const sw = document.getElementById('langSw'), dr = document.getElementById('drawer'), b = sw.getBoundingClientRect(), d = dr.getBoundingClientRect();
+      await page.evaluate(() => document.querySelectorAll('.pat-tip .pat-x').forEach((x) => x.click()));
+      await openMore(page);
+      const m = await page.evaluate(() => { const sw = document.getElementById('langSw'), b = sw.getBoundingClientRect();
         const hit = document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2);
-        return { b: { x: b.x, y: b.y, w: b.width, h: b.height }, d: { w: d.width }, inView: b.y >= 0 && b.y + b.height <= innerHeight, inDrawer: b.x >= d.x && b.x + b.width <= d.x + d.width, hit: !!hit && sw.contains(hit), noHScroll: dr.scrollWidth <= dr.clientWidth }; });
-      assert.ok(m.inView && m.inDrawer && m.hit && m.noHScroll && m.b.h >= 44, `${width}: ${JSON.stringify(m)}`);
-      await page.click('#langSw [data-l="zh"]'); assert.equal(await lang(page), 'zh', `${width}: a real tap switches`);
+        return { b: { x: b.x, y: b.y, w: b.width, h: b.height }, inView: b.y >= 0 && b.y + b.height <= innerHeight && b.x >= 0 && b.x + b.width <= innerWidth, hit: !!hit && sw.contains(hit) }; });
+      assert.ok(m.inView && m.hit && m.b.h >= 40, `${width}: ${JSON.stringify(m)}`);
+      assert.equal(await row(page), '中文', `${width}: offers 中文`);
+      await page.click('#langSw'); assert.equal(await lang(page), 'zh', `${width}: a real tap switches`);
+      assert.equal(await shown(page, '#reload .hm-l'), '刷新', `${width}: the menu flips`);
+      await waitFor(async () => (await profile()).lang === 'zh', 'saved');
+      await page.reload(); await page.waitForSelector('#hStart .st');
+      assert.equal(await lang(page), 'zh', `${width}: kept across a reload`);
     } finally { await c.close(); }
   }
 });
