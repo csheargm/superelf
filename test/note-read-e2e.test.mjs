@@ -124,7 +124,7 @@ test('iPhone: Read view — reflowed text ≥18px, ink hidden and labelled; A+ i
       wrap: b.scrollWidth <= b.clientWidth + 1, text: b.textContent, width: v.getBoundingClientRect().width,
       editable: !!b.querySelector('[contenteditable]') }; });
   let s = await rv();
-  assert.ok(s.shown, 'Read view opens'); assert.match(s.title, /^阅读视图 · Read view/, 'clearly labelled, 中文 first');
+  assert.ok(s.shown, 'Read view opens'); assert.match(s.title, /^阅读视图/, 'clearly labelled, 中文 first');
   assert.ok(s.inkNote, 'it says the ink is hidden, not deleted');
   assert.ok(s.font >= 18, `text is at least 18px (${s.font})`);
   assert.ok(s.wrap && s.lines > 3, `the text wraps to the phone width (${s.lines.toFixed(1)} lines, no sideways scroll)`);

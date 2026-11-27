@@ -95,7 +95,7 @@ test('iPhone: ⋯, colour/size and the header ⋯ open as one bottom sheet; a sh
   assert.ok(Math.abs(b.b - b.vh) < 1 && b.l <= 0.5 && Math.abs(b.r - b.vw) < 1, `at the bottom edge, full width (${b.l}-${b.r}, bottom ${b.b}/${b.vh})`);
   const rows = await frame.evaluate(() => [...document.querySelectorAll('.pan-toolsheet button')].map((e) => ({ k: e.dataset.k, t: e.textContent, h: e.getBoundingClientRect().height })));
   assert.deepEqual(rows.map((r) => r.k), ['marker', 'highlighter', 'select', 'ink'], 'the rest of the drawing controls');
-  for (const r of rows) { assert.ok(r.h >= TAP, `${r.k} row is 44px (${r.h})`); assert.match(r.t, /^[一-鿿].* · [A-Z]/, `${r.k} label is 中文 first`); }
+  for (const r of rows) { assert.ok(r.h >= TAP, `${r.k} row is 44px (${r.h})`); assert.match(r.t, /^[一-鿿][^A-Za-z]*$/, `${r.k} label is 中文 on a 中文 device`); }
   await frame.locator('.pan-toolsheet [data-k=marker]').click();
   assert.deepEqual(await frame.evaluate(() => [...document.querySelectorAll('.pan-tool.on')].map((e) => e.dataset.tool)), ['marker'], 'the Marker row picked the marker');
   assert.equal((await box(frame, '.pan-toolsheet')).on, false, 'and the sheet closed');

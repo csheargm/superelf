@@ -214,9 +214,9 @@ test('the shell\'s slug comes from the frame, not the app; an ask carries none (
   assert.match(shell, /const frameSlug=\(\)=>\(frameRef\(\)\.match\(/, 'which reads the frame URL…');
   assert.match(shell, /const frameRef=\(\)=>\{ const fr=\$\('#fr'\); return fr\.getAttribute\('data-app'\)\|\|fr\.src\|\|''; \};/, '…its src, or data-app when the shell loaded it by srcdoc (web/sw-client.js)');
   // Nothing needs a slug on ask once an app's agent writes nothing, so neither side carries one.
-  assert.match(shell, /relayCall\('\/api\/ask',appAgentInit\(JSON\.stringify\(\{message:String\(m\.message\|\|''\)\}\)\)/);
+  assert.match(shell, /relayCall\('\/api\/ask',appAgentInit\(JSON\.stringify\(\{message:String\(m\.message\|\|''\),lang:frameLang\(\)\}\)\)/);
   // This pins the one line that reads the body. That an ask gets the plain app lane, whatever it
   // names, is what 'an app's agent writes nothing' checks (it sends app: 'tasks').
   const web = fs.readFileSync(path.join(ROOT, 'web.mjs'), 'utf8');
-  assert.match(web, /p === '\/api\/ask'\) \{\n\s*const \{ message \} = await readBody\(req, BODY_LIMITS\.chat\);/, '/api/ask reads only the message');
+  assert.match(web, /p === '\/api\/ask'\) \{\n\s*const \{ message, lang \} = \(await readBody\(req, BODY_LIMITS\.chat\)\) \|\| \{\};/, '/api/ask reads only the message and its reply language');
 });

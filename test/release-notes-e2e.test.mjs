@@ -35,6 +35,6 @@ test('footer and Release Notes name the bumped version as current, newest first'
   await page.evaluate(() => document.querySelector('#ver-lbl').dispatchEvent(new MouseEvent('click', { bubbles: true })));
   await page.waitForSelector('#_ver_sheet');
   const first = await page.evaluate(() => document.querySelector('#_ver_sheet [style*="font-weight:700"]').textContent);
-  assert.ok(first.startsWith(`v${VERSION}`) && first.includes('当前 · current'), `newest entry is current: ${first}`);
+  assert.ok(first.startsWith(`v${VERSION}`) && first.includes('当前'), `newest entry is current: ${first}`);
   await ctx.close();
 });

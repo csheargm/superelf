@@ -17,7 +17,7 @@ import { handleSelfpubRoute, selfpubRoot } from './lib/selfpub/routes.mjs';
 import { coreChatTurn, coreDeps, coreRequestOf, endCore, markerRequest, ownerComposer, refuseCore, typedPublish, MAIN_CHAT_RULE } from './lib/selfpub/chat.mjs';
 import { handleAlertsRoute } from './lib/node-alerts.mjs';
 import { handleActivityRoute, refuseStaleUndo, newestEditVersion } from './lib/activity-view.mjs';
-import { langOf, appIsBilingual, replyLanguageRule, turnLang, withLangDefault } from './lib/ui-lang.mjs';
+import { langOf, appIsBilingual, replyLanguageRule, turnLang } from './lib/ui-lang.mjs';
 import { loadConfig, configPath, fastLaneGuard, GUARD_DEFAULT_SURFACE, agentCapabilities, appContract, OVERRIDABLE_PROMPT_MAX } from './lib/config.mjs';
 import { runClaude, APPEND_SYSTEM_PROMPT_MAX } from './lib/runner.mjs';
 import { agentAllowed, lanesFor, memberLane, NO_PLAIN_LANE_TEXT, AGENT_OFF_TEXT, PLAIN_LANE_STATUS } from './lib/member-lanes.mjs';
@@ -339,12 +339,13 @@ const RESOLVE_MS = 60000;   // one structured answer; a task timeout would be wr
 // The lanes a job's tools may reach. `research` takes the pinned model when a job names one,
 // falling back to the configured research lane — so a global change never alters a pinned job.
 const jobRunner = makeRunner(undefined, {
-  research: (question, model) => {
+  research: (question, model, user) => {
     const laneId = model || (cfg.research && cfg.research.llm);
     const lane = (cfg.chat_models || []).find((mm) => mm.id === laneId) || {};
     return runResearch(question, {
       research: cfg.research, keys: { tavily: cfg.tavily_key, firecrawl: cfg.firecrawl_key },
       lanes: { streamOllama }, ollamaUrl: cfg.ollama_url, model: lane.model,
+      guide: user ? userLangRule(user) : '',   // the owner's language, so a scheduled run and Run now match
     });
   },
 });
@@ -695,7 +696,7 @@ const PA_LEAVE_MARKER = '<!--PA_LEAVE_UI-->';
 const PA_BROKER_MARKER = '<!--PA_BROKER_UI-->';
 const PA_BUSY_MARKER = '<!--PA_BUSY_UI-->';
 const PA_SNAP_MARKER = '<!--PA_SNAP_UI-->';
-// PALang (web/lang.inline.html): the ONE 中文/English setting, on every app page ahead of its first script (lib/ui-lang.mjs).
+// PALang (web/lang.js): the ONE 中文/English setting, on every app page ahead of its first script (lib/ui-lang.mjs).
 const PA_LANG_MARKER = '<!--PA_LANG_UI-->', PA_LANG_BOTH = '/*PA_LANG_BOTH*/false', PA_LANG_JS_FILE = 'lang.js';
 // The shared palette (web/theme-tokens.css, also inlined into the shell): placed at the END of <head>, after the
 // app's own <style>, so every app that names --bg/--card/--text/--accent… gets the one look (no per-app fork).
@@ -862,7 +863,7 @@ function appStamp(file) {
   return k;
 }
 function sendAppHtml(res, file, type, extra, bilingual = false) {
-  const s0 = appStamp(file), stamp = s0 && s0 + (bilingual ? '|both' : '') + (cfg.ui_lang_default === 'both' ? '|dboth' : '');   // either language input rebuilds the page
+  const s0 = appStamp(file), stamp = s0 && s0 + (bilingual ? '|both' : '');   // a bilingual flip rebuilds the page
   const hit = stamp && APP_CACHE.get(file);
   if (hit && hit.stamp === stamp) return sendHtml(res, hit.html, extra, hit);
   fs.readFile(file, 'utf8', (err, html) => {
@@ -905,7 +906,7 @@ function sendAppHtml(res, file, type, extra, bilingual = false) {
       catch { return send(res, 500, 'text/plain', 'component unavailable'); }   // fail loud, as for any component (R5)
       html = html.split(PA_REPLY_CLEAN_MARKER).join(rc);
     }
-    html = withLangDefault(html.split(PA_LANG_BOTH).join(bilingual ? 'true' : 'false'), cfg);   // a bilingual app (lib/ui-lang.mjs) keeps both languages
+    html = html.split(PA_LANG_BOTH).join(bilingual ? 'true' : 'false');   // a bilingual app (lib/ui-lang.mjs) keeps both languages
     html = html.split(BUILD_MARKER).join(buildId());   // the Pencil recorder's log header names this build
     // The same CSP inside the page, for the shell's srcdoc route (lib/offline.mjs; no header reaches a srcdoc document).
     html = withCspMeta(html, extra && extra['content-security-policy']);
@@ -1101,6 +1102,9 @@ const fastBaseArgs = (user, origin) => yieldSettings(cfg.fast_args, memberArgsOf
 // The capability note follows the LANE, not the account: the owner's app request is confined, so
 // it must be told so, or it narrates a permission prompt nobody can grant.
 const laneRole = (user, origin) => (agentConfined(user, origin) ? 'confined' : 'owner');
+// One turn's reply-language line (lib/ui-lang.mjs): the page's word ('both' = a bilingual app), else the account's choice.
+// TODO(R4 seam): laneRole, userLangRule and the lane arg helpers above belong in lib/lane-args.mjs.
+const userLangRule = (user, sent, bilingual = false) => replyLanguageRule(turnLang({ sent, saved: (loadProfile(wsDir(user)) || {}).lang, bilingual }));
 
 async function runAgent(message, extraArgs, cwd, timeoutMs, systemPrompt) {
   const r = await runClaude({ claudeCmd: cfg.claude_cmd, extraArgs, cwd, prompt: message, timeoutMs, systemPrompt });
@@ -1396,7 +1400,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
   const canEditHere = user.role === 'owner' && typeof app === 'string' && slugOk(app) && appEditable(appsDir(user), app);
   const chatRole = user.role !== 'owner' ? 'member' : canEditHere ? 'owner' : 'ownerShared';
   // The member's 中文/English setting (lib/ui-lang.mjs): the page's word, else the account's; a bilingual app keeps both.
-  const langRule = replyLanguageRule(turnLang({ sent: body.lang, saved: (loadProfile(wsDir(user)) || {}).lang, bilingual: appIsBilingual(appsDir(user), edit ? edit.slug : app) }));
+  const langRule = userLangRule(user, body.lang, appIsBilingual(appsDir(user), edit ? edit.slug : app));
   // A oneShot caller that left while this turn was queued: nothing is saved, nothing spawns.
   if (cancel && cancel.signal.aborted) { audit('chat-cancelled', { who: user.id, convo: convoId || '', queued: true }); if (!res.writableEnded) res.end(); return; }
   // Decided ONCE per turn, from the shell relay's header OR the app slug (lib/agent-origin.mjs),
@@ -1553,14 +1557,14 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
       const lane = (cfg.chat_models || []).find((mm) => mm.id === cfg.research.llm) || {};
       r = await runResearch(message, {
         research: cfg.research, keys: { tavily: cfg.tavily_key, firecrawl: cfg.firecrawl_key },
-        lanes: { streamOllama }, ollamaUrl: cfg.ollama_url, model: lane.model,
+        lanes: { streamOllama }, ollamaUrl: cfg.ollama_url, model: lane.model, guide: langRule,
         onStatus: (t) => line({ type: 'status', text: t }),
         onDelta: (t) => line({ type: 'delta', text: t }) });
     } else if (chosen && chosen.provider === 'codex') {
       // GPT via Codex (on the ChatGPT subscription). An agent → non-streaming: a status while it
       // works, then its final message. It reads images (-i). ONE lane function, shared with the
       // Claude lane's sign-in fallback below (lib/lane-codex.mjs, R3).
-      r = await runCodexLane({ convo, prompt: message, images: imgs, cwd: wsDir(user), model: chosen.model,
+      r = await runCodexLane({ convo, prompt: message, images: imgs, cwd: wsDir(user), model: chosen.model, langRule,
         timeoutMs: cfg.task_timeout_minutes * 60000, runCodex, enqueue, onStatus: (t) => line({ type: 'status', text: t }) });
     } else {
       // Agent lane: Claude CLI (tools + resume). A chosen Claude tier just adds --model.
@@ -1640,7 +1644,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
         claudeAuth.noteFailure(r.text);
         r = (oneShot || edit || agentConfined(user, origin)) ? { ok: false, text: CLAUDE_SIGNIN_EXPIRED }   // edit: Codex has no edit scope (ADR 0040)
           : await codexFallback({ chatModels: cfg.chat_models, claudeError: r.text,
-          convo, prompt: histPrompt, images: imgs, cwd: wsDir(user), timeoutMs: cfg.task_timeout_minutes * 60000,
+          convo, prompt: histPrompt, images: imgs, cwd: wsDir(user), langRule, timeoutMs: cfg.task_timeout_minutes * 60000,
           runCodex, enqueue, onStatus: (t) => line({ type: 'status', text: t }) });
       }
       // A oneShot run's session holds one answer, so it never becomes the conversation's: the next
@@ -1785,8 +1789,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && (p === '/' || p === '/index.html')) {
       const html = fillShellMarkers(readShell(ROOT), { version: appVersion(), vtime: appVTime(), vdate: buildId.date(),   // release time, else the commit date (lib/version-time.mjs)
         notes: embedInTemplateLiteral(appNotesJson(ROOT, undefined, buildId.head())) });
-      const shell = withLangDefault(html, cfg);   // the node's both-at-once default, if set (lib/ui-lang.mjs)
-      return sendHtml(res, demoOn(cfg) ? injectDemoBoot(shell, cfg) : shell);
+      return sendHtml(res, demoOn(cfg) ? injectDemoBoot(html, cfg) : html);
     }
     // The service worker (offline-first, lib/offline.mjs): unauthenticated like the shell, scope /, revalidated like HTML.
     // TODO(R4 seam): this and /api/offline-config below belong with the shell routes in lib/version-routes.mjs.
@@ -3033,7 +3036,7 @@ const server = http.createServer(async (req, res) => {
     // whoever is signed in, marker or not — the relay's header is still sent, and checked by
     // test/app-agent-confinement.test.mjs, but this route does not depend on it.
     if (req.method === 'POST' && p === '/api/ask') {
-      const { message } = await readBody(req, BODY_LIMITS.chat);
+      const { message, lang } = (await readBody(req, BODY_LIMITS.chat)) || {};
       // No slug: an ask has no conversation to tag, and an app's agent writes nothing (ADR 0019).
       const origin = { fromApp: true };
       if (typeof message !== 'string' || !message.trim()) return send(res, 400, 'application/json', '{"error":"empty message"}');
@@ -3043,7 +3046,7 @@ const server = http.createServer(async (req, res) => {
       res.flushHeaders?.();
       const beat = setInterval(() => { if (!res.writableEnded) res.write(' '); }, 20000); // whitespace heartbeat; JSON.parse ignores leading spaces
       try {
-        const r = await enqueue(() => runAgent(message, agentArgs(user, fastBaseArgs(user, origin), origin), wsDir(user), 5 * 60000, agentCapabilities(laneRole(user, origin), APP_CONTRACT)));
+        const r = await enqueue(() => runAgent(message, agentArgs(user, fastBaseArgs(user, origin), origin), wsDir(user), 5 * 60000, agentCapabilities(laneRole(user, origin), APP_CONTRACT, userLangRule(user, lang))));
         clearInterval(beat);
         res.end(JSON.stringify({ ok: r.ok, text: r.text }));
       } catch (e) { clearInterval(beat); if (!res.writableEnded) res.end(JSON.stringify({ ok: false, text: turnErrorText(null, e) })); }

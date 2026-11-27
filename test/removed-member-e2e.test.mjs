@@ -13,6 +13,7 @@ import { skip, chromium } from './helpers-note-link.mjs';
 import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, OWNER_TOKEN } from './helpers-web.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
 import { Sessions, ACCOUNT_REMOVED_CODE, hashPassword } from '../lib/auth.mjs';
+import { zh } from './helpers-lang.mjs';
 
 const SHOTS = process.env.PA_SHOTS || '';
 const SHELL = fs.readFileSync(new URL('../web/index.html', import.meta.url), 'utf8');
@@ -81,7 +82,7 @@ test('a removed member reloads and sees "你的账号已被移除 · Your accoun
   assert.equal((await owner('/api/admin/users/mia', { method: 'DELETE' })).status, 200);
   await page.reload();
   await page.waitForSelector('#login[open]');
-  await page.waitForFunction((t) => document.querySelector('#loginErr').textContent === t, REMOVED_TEXT);
+  await page.waitForFunction((t) => document.querySelector('#loginErr').textContent === t, zh(REMOVED_TEXT));
   assert.deepEqual(await page.evaluate(() => [localStorage.getItem('pa_session'), localStorage.getItem('pa_uid')]), [null, null], 'nothing left to reopen offline as the removed member');
   await ctx.setOffline(true); await page.reload().catch(() => { /* no worker page cached: the reload itself fails offline, which is also no way in */ });
   assert.equal(await page.evaluate(() => !!document.querySelector('#dot.ok')).catch(() => false), false, 'offline boot does not start the app as the removed member');

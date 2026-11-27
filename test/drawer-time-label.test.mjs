@@ -1,7 +1,7 @@
 // The drawer row's time label · 抽屉行的时间标签
 //
 // SCAR 2026-09-12. A note last written at 20:27 was read at 00:20 the next morning. Its row sat
-// under "Yesterday 昨天" — correct — while its own label read "4h", which reads as today. It was
+// under "昨天 · Yesterday" — correct — while its own label read "4h", which reads as today. It was
 // reported as a stale-timestamp bug. It was not: the stored time was right, the label was
 // unreadable next to the header above it.
 //
@@ -38,7 +38,7 @@ const ts = (iso) => new Date(iso).getTime();
 test('the reported case: a row reads as the evening it was written, not as "4h"', () => {
   const { listDay, listTime } = at('2026-09-12T00:20:00');
   const john31 = ts('2026-09-11T20:27:57');
-  assert.equal(listDay(john31), 'Yesterday 昨天', 'the day header was never wrong');
+  assert.equal(listDay(john31), '昨天 · Yesterday', 'the day header was never wrong');
   assert.equal(listTime(john31), '20:27', 'and the row now says WHEN, so the header makes sense');
 });
 
@@ -48,11 +48,11 @@ test('no row can contradict the header above it', () => {
   // lets the header supply the day.
   const { listDay, listTime } = at('2026-09-12T00:20:00');
   const cases = [
-    ['2026-09-11T20:27:00', 'Yesterday 昨天', '20:27'],
-    ['2026-09-11T18:55:00', 'Yesterday 昨天', '18:55'],
-    ['2026-09-11T23:59:00', 'Yesterday 昨天', '23:59'],   // 21 minutes ago, and still yesterday
-    ['2026-09-12T00:01:00', 'Today 今天', '00:01'],       // 19 minutes ago, and today
-    ['2026-09-10T21:00:00', 'Thu 周四 · 9月10日', '21:00'],
+    ['2026-09-11T20:27:00', '昨天 · Yesterday', '20:27'],
+    ['2026-09-11T18:55:00', '昨天 · Yesterday', '18:55'],
+    ['2026-09-11T23:59:00', '昨天 · Yesterday', '23:59'],   // 21 minutes ago, and still yesterday
+    ['2026-09-12T00:01:00', '今天 · Today', '00:01'],       // 19 minutes ago, and today
+    ['2026-09-10T21:00:00', '周四 9月10日 · Thu Sep 10', '21:00'],
   ];
   for (const [iso, day, time] of cases) {
     assert.equal(listDay(ts(iso)), day, iso);
@@ -83,9 +83,9 @@ test('midnight and noon are not mangled, and single digits are padded', () => {
 
 test('a row with no timestamp says so instead of inventing one', () => {
   // Both the header and the label used to fall back to Date.now(), so a stamp-less row rendered as
-  // "now" under "Today 今天" — a fabricated modification time for a write that never happened
+  // "now" under "今天 · Today" — a fabricated modification time for a write that never happened
   // (the same shape as the save-pill scar). Worse, the SORT used ||0, so that row sorted to the
-  // BOTTOM and minted a second "Today 今天" header underneath "Yesterday".
+  // BOTTOM and minted a second "今天 · Today" header underneath "Yesterday".
   const { usableTs, listDay, listTime } = at('2026-09-12T00:20:00');
   for (const bad of [0, undefined, null, '', NaN, -1, 'nonsense']) {
     assert.equal(usableTs(bad), 0, `${String(bad)} is not a usable instant`);

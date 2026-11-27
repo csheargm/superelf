@@ -44,12 +44,12 @@ test('offline: the last Family Apps list and the name, marked offline — never 
   await signIn(page, 'kid', 'kid-pass-12345');
   await page.waitForFunction(() => document.querySelector('header h1').textContent.startsWith('Kid'));
   const online = await family(page);
-  assert.match(online, /Chores/); assert.doesNotMatch(online, /离线 · Offline/, 'CONTROL: online has no offline mark');
+  assert.match(online, /Chores/); assert.doesNotMatch(online, /离线/, 'CONTROL: online has no offline mark');
   await page.route('**/api/**', (r) => r.abort());   // the node is unreachable; the shell page itself still loads
   await page.reload();
   await page.waitForFunction(() => document.querySelector('header h1').textContent.startsWith('Kid'), null, { timeout: 15000 });
   const off = await family(page);
-  assert.match(off, /离线 · Offline — 上次保存的列表 · the last saved list/);
+  assert.match(off, /离线.*上次保存的列表/);
   assert.match(off, /Chores/);
   assert.doesNotMatch(off, /None shared yet/);
   await page.unroute('**/api/**');
@@ -64,7 +64,7 @@ test('offline with nothing saved says it cannot load, not "None shared yet."; an
   await signIn(page, 'owner', 'owner-pass-123');
   const off = await family(page);
   assert.doesNotMatch(off, /KIDS SECRET/);
-  assert.match(off, /家庭应用暂时无法加载 · Family Apps cannot load right now/);
+  assert.match(off, /家庭应用暂时无法加载/);
   await ctx.close();
 });
 
@@ -77,7 +77,7 @@ test('a refused /api/family-apps (403) drops the saved list instead of showing i
   await page.route('**/api/family-apps', (r) => r.fulfill({ status: 403, contentType: 'application/json', body: '{"error":"forbidden"}' }));
   const denied = await family(page);
   assert.doesNotMatch(denied, /Chores/); assert.doesNotMatch(denied, /上次保存的列表/, 'no saved-list mark');
-  assert.match(denied, /Family Apps cannot load right now/);
+  assert.match(denied, /家庭应用暂时无法加载/);
   assert.equal(await page.evaluate(() => localStorage.getItem('pa_family')), null, 'the saved list is gone');
   await ctx.close();
 });
@@ -92,7 +92,7 @@ test('service worker on, device offline: the saved Family Apps list shows, marke
   await page.waitForFunction(() => navigator.serviceWorker && navigator.serviceWorker.controller, null, { timeout: 20000 }).catch(async () => { await page.reload(); await page.waitForFunction(() => navigator.serviceWorker.controller, null, { timeout: 20000 }); });
   await ctx.setOffline(true);
   const off = await family(page);
-  assert.match(off, /离线 · Offline — 上次保存的列表 · the last saved list/);
+  assert.match(off, /离线.*上次保存的列表/);
   assert.match(off, /Chores/);
   await ctx.setOffline(false); await ctx.close();
 });

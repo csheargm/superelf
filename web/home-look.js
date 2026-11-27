@@ -47,7 +47,7 @@ const PAHomeLook=(function(){
     if(!groups.length) return '<div class="d-empty">还没有对话 · No chats yet.</div>';
     return groups.map((g)=>`<div class="day">${esc(g.label)}</div>`+g.items.map((c)=>
       `<div class="convo${c.id===activeId?' active':''}" data-id="${esc(c.id)}"><div class="t">${esc(c.title||'New chat')}</div><button class="cmenu" data-menu="${esc(c.id)}" title="更多 · More" aria-label="More">${PAIcons.svg('more')}</button></div>`).join('')).join('')
-      +(hidden>0?`<button type="button" class="more-chats" data-more-chats>更多 · More (${hidden})</button>`:'');
+      +(hidden>0?`<button type="button" class="more-chats" data-more-chats>更多（${hidden}） · More (${hidden})</button>`:'');
   }
   function closeAa(){ document.querySelectorAll('.aa.open').forEach((x)=>{ x.classList.remove('open'); x.querySelector('.aa-btn')?.setAttribute('aria-expanded','false'); }); }
   function bindAa(root){

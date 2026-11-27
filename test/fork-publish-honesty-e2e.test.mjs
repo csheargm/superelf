@@ -60,7 +60,7 @@ for (const [name, vp] of [['phone', { width: 390, height: 844 }], ['iPad', { wid
     // school-src is not in the repo: the server's line replaces the item (no Publish that can only refuse).
     await page.locator('#frameMenu #pubFork').waitFor({ timeout: 10000 });
     assert.equal(await page.locator('#frameMenu #pubItem').count(), 0, 'no Publish on a copy that cannot go back');
-    assert.match(await page.locator('#frameMenu #pubFork').textContent(), /^这个副本的原应用不在公开仓库里.*not in the public repo/);
+    assert.match(await page.locator('#frameMenu #pubFork').textContent(), /^这个副本的原应用不在公开仓库里/);
     assert.doesNotMatch(await page.locator('#frameMenu #pubFork').textContent(), /original author/);
     await page.keyboard.press('Escape'); await page.mouse.click(5, vp.height - 5);
     await page.evaluate(() => document.querySelector('#back').click());   // Home (the bar may have slid away)

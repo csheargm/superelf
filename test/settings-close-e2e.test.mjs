@@ -46,7 +46,7 @@ for (const vp of SIZES) {
       assert.ok(box.height >= 44 && box.width >= 44, `a 44px touch target: ${JSON.stringify(box)}`);
       const head = await page.locator('#cfgHead').boundingBox();
       assert.ok(head.y <= 1, `the bar is flush with the top, nothing scrolls above it: y=${head.y}`);
-      assert.match(await page.locator('#cfgTitle').innerText(), /^设置 · Settings$/);
+      assert.match(await page.locator('#cfgTitle').innerText(), /^设置$/);
       if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await page.screenshot({ path: path.join(SHOTS, `${process.env.PA_E2E_ENGINE || 'chromium'}-${vp.width}x${vp.height}-bottom.png`) }); }
       await x.click();
       await page.waitForFunction(() => !document.querySelector('#cfg').open);
@@ -76,7 +76,7 @@ test('Save sits in the top bar, lights up only on an edit, and ✕ with an unsav
   page.on('dialog', async (d) => { asked.push(d.message()); if (asked.length === 1) await d.dismiss(); else await d.accept(); });
   try {
     const save = page.locator('#cfgHead #pSave');
-    assert.match(await save.innerText(), /^保存 · Save$/);
+    assert.match(await save.innerText(), /^保存$/);
     assert.equal(await save.isDisabled(), true, 'nothing edited: Save is not lit');
     await page.fill('#pAbout', 'likes short answers');
     assert.equal(await save.isDisabled(), false, 'an edit lights Save');
@@ -96,8 +96,8 @@ test('the profile, family and shelf labels read 中文 first', { skip, timeout: 
   const { ctx, page } = await openSettings(SIZES[2]);
   try {
     const t = await page.locator('#cfg').innerText();
-    for (const s of ['你的资料 · Your profile', '名字 · Name', '关于你（助手会读）', '回复风格 · Reply style', '高级：AI 系统提示', '角色：所有者 · role: owner',
-      '家庭账号 · Family accounts', '所有者 · owner', '添加成员 · Add member', '共享应用（家庭书架）', '活动记录 · Activity log', '退出登录 · Sign out', '修改密码（可选）']) assert.ok(t.includes(s), `shows "${s}"`);
+    for (const s of ['你的资料', '名字', '关于你（助手会读）', '回复风格', '高级：AI 系统提示', '角色：所有者',
+      '家庭账号', '所有者', '添加成员', '共享应用（家庭书架）', '活动记录', '退出登录', '修改密码（可选）']) assert.ok(t.includes(s), `shows "${s}"`);
     assert.ok(!/\bClose\b/.test(await page.locator('#cfg form > div:last-of-type').innerText()), 'no bottom Close');
   } finally { await ctx.close(); }
 });

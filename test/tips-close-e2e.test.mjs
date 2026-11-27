@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT } from './helpers-app.mjs';
-import { skip, chromium } from './helpers-note-link.mjs';
+import { skip, chromium, localed } from './helpers-note-link.mjs';
 import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, OWNER_TOKEN } from './helpers-web.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
 import { skipIf } from './helpers-skip.mjs';
@@ -19,7 +19,7 @@ const SHOTS = process.env.PA_SHOTS || '';
 const PW = process.env.PA_PLAYWRIGHT ? await import(process.env.PA_PLAYWRIGHT).catch(() => null) : null;
 const wkType = PW && (PW.webkit || (PW.default && PW.default.webkit));
 const wkOff = engineFiltered(wkType);   // PA_E2E_ONLY=chromium: never launch WebKit (CI's Linux job has none)
-const webkit = wkOff ? null : wkType;
+const webkit = wkOff ? null : localed(wkType);
 const UA_IOS = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
 const DEVICES = {
   iphone: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, userAgent: UA_IOS },
@@ -100,7 +100,7 @@ for (const engine of ['chromium', 'webkit']) for (const dev of ['iphone', 'ipad'
       await fresh();
       const ctx = await context(engine, dev); const { page, errors } = await shell(ctx);
       const t = await tipIn(page); assert.ok(t, 'the home tip shows'); assert.equal(t.id, 'tip:home-more');
-      assert.equal(t.label, '关闭提示 · Dismiss tip'); assert.ok(t.xw >= 44 && t.xh >= 44, `✕ is a 44px target (${t.xw}x${t.xh})`);
+      assert.equal(t.label, '关闭提示'); assert.ok(t.xw >= 44 && t.xh >= 44, `✕ is a 44px target (${t.xw}x${t.xh})`);
       assert.deepEqual(await overlapsIn(page), [], 'the tip covers no control');
       if (how === 'x') await shot(page, `after-${engine}-${dev}-home`);
       await close(page, page, how); assert.equal(await gone(page), true, `closed by ${how}`);

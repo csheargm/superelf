@@ -81,7 +81,7 @@ test('camera beside ＋: tip once, a fresh labelled shot per tap (max 3), a stal
   const p = await openChat(page, 'todo');
   const cam = p.locator('#aeCam');
   await cam.waitFor();
-  assert.equal(await cam.getAttribute('aria-label'), '截取当前画面 · Capture the app as it looks now');
+  assert.equal(await cam.getAttribute('aria-label'), '截取当前画面');
   const plusBox = await p.locator('.pac-plus').boundingBox(), camBox = await cam.boundingBox();
   assert.ok(Math.abs(camBox.y - plusBox.y) < 4 && camBox.x > plusBox.x && camBox.x - plusBox.x < 60, 'the camera sits right beside ＋');
   await p.locator('#aeCamTip').waitFor();
@@ -93,15 +93,15 @@ test('camera beside ＋: tip once, a fresh labelled shot per tap (max 3), a stal
   await shot(page, 'cam-three');
   // The change, then Undo: the app reloads twice; a shot taken in between is stale by the send.
   await ask(p, 'make it red');
-  await p.locator('.pac-change-app', { hasText: '改 · Apply' }).waitFor({ timeout: 20000 });
-  await p.locator('.pac-change-app', { hasText: '改 · Apply' }).click();
-  await p.locator('text=已完成 · Done').waitFor({ timeout: 20000 });
+  await p.locator('.pac-change-app', { hasText: '改' }).waitFor({ timeout: 20000 });
+  await p.locator('.pac-change-app', { hasText: '改' }).click();
+  await p.locator('text=已完成').waitFor({ timeout: 20000 });
   await cam.click(); await p.locator('.pac-chip img').first().waitFor();
   await page.click('#aeUndo');
   await p.locator('text=已撤销').first().waitFor({ timeout: 20000 });
   await page.frameLocator('#fr').locator('#t').waitFor();
   await ask(p, 'what is attached');
-  await p.locator('text=应用已变，已重新截图 · The app changed, so the screenshot was retaken').waitFor({ timeout: 15000 });
+  await p.locator('text=应用已变，已重新截图').waitFor({ timeout: 15000 });
   const reply = await p.locator('.pac-m.ai', { hasText: 'ATT[' }).last().innerText({ timeout: 20000 });
   const sent = /ATT\[([^\]]*)\]/.exec(reply)[1].split(',').filter(Boolean);
   assert.equal(sent.length, 1, `one retaken screenshot went with the message: ${reply}`);
@@ -114,7 +114,7 @@ test('camera beside ＋: tip once, a fresh labelled shot per tap (max 3), a stal
   await page.frameLocator('#fr').locator('#t').waitFor();
   await page.waitForTimeout(500);
   await ask(p, 'what is attached');
-  await p.locator('text=应用已变，已重新截图 · The app changed, so the screenshot was retaken').nth(1).waitFor({ timeout: 15000 });
+  await p.locator('text=应用已变，已重新截图').nth(1).waitFor({ timeout: 15000 });
   kept = { ctx, page };   // the same device for the next test: the tip is remembered per device
 });
 let kept = null;

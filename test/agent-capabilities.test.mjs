@@ -56,7 +56,7 @@ test('the note is appended OUTSIDE the overridable prompt chain', () => {
   // reads both prompts back from argv.
   assert.match(WEB, /systemPrompt: agentSystemPrompt\(\[agentPrompts\.global, agentPrompts\.app, origin\.fromApp \? noChangeRule\(chatRole\) : null, coreOn \? MAIN_CHAT_RULE : null\], agentCapabilities\(laneRole\(user, origin\), oneShot \? null : APP_CONTRACT, langRule\), turnFacts\)/,
     'the chat agent lane appends it after the override chain');
-  assert.match(WEB, /5 \* 60000, agentCapabilities\(laneRole\(user, origin\), APP_CONTRACT\)\)/,
+  assert.match(WEB, /5 \* 60000, agentCapabilities\(laneRole\(user, origin\), APP_CONTRACT, userLangRule\(user, lang\)\)\)/,
     'and the app ask lane sends the same one');
   assert.match(WEB, /const APP_CONTRACT = appContract\(ROOT\);/, 'read ONCE at boot, from the one file');
 });
@@ -143,6 +143,7 @@ test('the rule reaches the FAST lanes too, outside the override chain', () => {
   assert.match(web, /const sys = \[prompts\.global, prompts\.app, langRule, origin\.fromApp \? noChangeRule\(chatRole\) : null, turnFacts\(\)\]/,
     'the fast lane appends it after the overridable prompts');
   // langRule = the member's 中文/English line, else REPLY_LANGUAGE_RULE (lib/ui-lang.mjs replyLanguageRule): never both.
-  assert.match(web, /const langRule = replyLanguageRule\(turnLang\(/, 'one per turn');
+  assert.match(web, /const langRule = userLangRule\(/, 'one per turn');
+  assert.match(web, /const userLangRule = [^\n]*replyLanguageRule\(turnLang\(/, 'through the one helper (R3)');
   assert.equal((web.match(/REPLY_LANGUAGE_RULE/g) || []).length, 0, 'web.mjs no longer names it: it arrives through replyLanguageRule');
 });

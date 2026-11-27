@@ -1511,7 +1511,7 @@
            the ruled lines a typed note sits on are the same ruled lines a written one does. */
         (imgHooks?'<button class="pan-hphoto" title="插入图片 · Insert photo" aria-label="Insert photo">'+ico('photo')+'</button>':'')+
         '<button class="pan-hmore" title="页面设置 · Page settings" aria-label="Page settings">'+ico('more')+'</button>'+
-        '<button class="pan-hprint" title="打印 · Print" aria-label="Print 打印">'+ico('print')+'</button>'+
+        '<button class="pan-hprint" title="打印 · Print" aria-label="打印 · Print">'+ico('print')+'</button>'+
         (opts.onClose?'<button class="pan-hx" title="Close" aria-label="Close">'+ico('close')+'</button>':'<span style="width:30px"></span>')+
       '</div>':'')+
       /* Save status — always in the DOM, so a rejected write can never fail to have a surface. */
@@ -2584,7 +2584,7 @@
       host.classList.add('pan-editing');                       // arm the edge gutters; the ink canvas above the text goes pointer-events:none
       syncGuard();                                             // native caret/selection/scroll back on the stage
       textLayer.classList.add('pan-txted'); textLayer.contentEditable='true'; textLayer.spellcheck=false;
-      textLayer.setAttribute('data-ph',PH);
+      textLayer.setAttribute('data-ph',window.PALang?PALang.t(PH):PH);   // a data-* attribute: PALang does not switch it in place (the text layer is skipped), so pick the side here
       if(!already){ textLayer.addEventListener('input',onTextInput); textLayer.addEventListener('paste',onPaste); }
       showFmt();
       requestAnimationFrame(()=>{ try{ if(!noFocus){ textLayer.focus(); caretToEnd(textLayer); } }catch(_){ /* focus best-effort (no gesture): region still editable */ } positionFmt(); });
@@ -4597,7 +4597,7 @@
   // drawer needs no change when those hits arrive.
   // `pending` carries the count as {n}; `noOcr` is said when the node cannot transcribe at all and
   // `ocrFailed` when it could but failed lately (the drawer appends the node's reason).
-  const SEARCH_TXT=Object.freeze({ transcript:'转写 · Transcript', tag:'Tag 标签', typed:'Text 文本', ink:'Ink 手写', photo:'Photo 图片', failed:'搜索不可用 · Search unavailable', searching:'Searching… 搜索中', more:'仅显示最相关的笔记 · Only the best matches are shown',
+  const SEARCH_TXT=Object.freeze({ transcript:'转写 · Transcript', tag:'标签 · Tag', typed:'文本 · Text', ink:'手写 · Ink', photo:'图片 · Photo', failed:'搜索不可用 · Search unavailable', searching:'搜索中… · Searching…', more:'仅显示最相关的笔记 · Only the best matches are shown',
     pending:'正在识别 {n} 页 · Transcribing {n} pages', noOcr:'手写搜索需要 Mac 节点 · Handwriting search needs the Mac node', ocrFailed:'本机手写识别失败 · Handwriting transcription failed on this node' });
   let _searchSeq=0;
   async function searchNotes(q){

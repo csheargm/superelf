@@ -139,7 +139,7 @@ test('a demo user shares (Copy only, said plainly); a privacy hit is refused; th
     const x = page.locator('.pat-tip .pat-x').first(); if (await x.isVisible()) { await x.click(); continue; }
     try { await page.locator('#demoAdminItem').click({ timeout: 3000 }); break; } catch (e) { if (i > 4) throw e; }
   }
-  await page.locator('#demoAdm .da-t button', { hasText: '分享 · Shares' }).click();
+  await page.locator('#demoAdm .da-t button', { hasText: '分享' }).click();
   await page.waitForSelector('#demoAdm .da-down');
   await shot(page, 'admin-shares');
   page.once('dialog', (d) => d.accept());

@@ -28,7 +28,7 @@ test('API keys are in a closed Advanced fold with a purpose line each; values st
     await page.waitForSelector('#cfgAdv');
     const adv = page.locator('#cfgAdv');
     assert.equal(await adv.evaluate((d) => d.open), false, 'closed by default');
-    assert.match(await page.locator('#cfgAdv > summary').innerText(), /^高级 · Advanced/);
+    assert.match(await page.locator('#cfgAdv > summary').innerText(), /^高级/);
     assert.equal(await page.locator('#cfgAdv > summary').evaluate((s) => s.classList.contains('pa-new')), true, 'new-feature dot on first sight');
     for (const k of ['tavily_key', 'exa_key', 'firecrawl_key', 'agentmail_key', 'google_client_id', 'google_client_secret']) {
       assert.equal(await page.locator(`#cfgAdv [data-ck="${k}"]`).count(), 1, `${k} is in the fold`);
@@ -37,7 +37,7 @@ test('API keys are in a closed Advanced fold with a purpose line each; values st
     assert.equal(await page.locator('#nodeCfgList [data-ck="max_concurrent"]').isVisible(), true);
     await page.click('#cfgAdv > summary');
     assert.equal(await page.locator('#cfgAdv [data-ck="tavily_key"]').isVisible(), true);
-    assert.match(await page.locator('#cfgAdv [data-cpurpose="tavily_key"]').innerText(), /[一-鿿].* · [A-Za-z]/, 'a bilingual purpose line');
+    assert.match(await page.locator('#cfgAdv [data-cpurpose="tavily_key"]').innerText(), /^[一-鿿][^A-Za-z]*$/, 'a purpose line, in 中文 on a 中文 device');
     await page.fill('#cfgAdv [data-ck="tavily_key"]', 'tvly-test-0000');
     await page.click('#cfgAdv [data-cs="tavily_key"]');
     await page.waitForSelector('#cfgAdv [data-cc="tavily_key"]');

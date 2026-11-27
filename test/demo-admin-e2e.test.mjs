@@ -18,6 +18,7 @@ import { startStubSupabase, listen } from './helpers-demo-sb.mjs';
 import { AUTH_HEADER } from '../lib/demo-auth.mjs';
 import { ADMIN_LABELS } from '../lib/demo-admin-ui.mjs';
 import { SIGNIN_LABELS } from '../lib/demo-boot.mjs';
+import { zh } from './helpers-lang.mjs';
 
 const REPO = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PHONE = process.env.PA_E2E_ENGINE === 'webkit';
@@ -77,7 +78,7 @@ test('the admin opens ⋯ → Demo admin: people, apps, trend; Reset frees the b
     if (!(await moreTip.isVisible())) break;
     await moreTip.click();
   }
-  assert.equal((await page.locator('#demoAdminItem').textContent()).trim(), ADMIN_LABELS.item);
+  assert.equal((await page.locator('#demoAdminItem').textContent()).trim(), zh(ADMIN_LABELS.item));
   await page.locator('.pat-tip[data-tip="tip:demo-admin"]').waitFor({ state: 'visible', timeout: 5000 })
     .catch(async () => { throw new Error('the first-use tip beside the menu row did not show: ' + await page.evaluate(() => [...document.querySelectorAll('.pat-tip')].map((t) => t.dataset.tip + ':' + t.textContent).join(' / ') + ' tipsShell=' + !!window.PATipsShell)); });
   await shot(page, 'menu-tip');
@@ -115,7 +116,7 @@ test('a member (not in admin_emails) gets no Demo admin row, and the sign-in pop
   const anon = await browser.newContext(VIEW); const p2 = await anon.newPage();
   await p2.goto(`http://127.0.0.1:${port}/`); await settled(p2);
   await tap(p2, 'header #demoSignin');
-  assert.equal((await p2.locator('#demoAuthPriv').textContent()), SIGNIN_LABELS.privacy);
+  assert.equal((await p2.locator('#demoAuthPriv').textContent()), zh(SIGNIN_LABELS.privacy));
   await shot(p2, 'signin-privacy');
   await anon.close();
 });

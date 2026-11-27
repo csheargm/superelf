@@ -101,7 +101,7 @@ for (const [name, vp] of [['iPhone', { width: 390, height: 844 }], ['desktop', {
     const go = page.locator('.sp-row .sp-go').last();
     assert.equal(await go.count(), 1, `Publish under the reply; the reply was: ${await page.locator('#log .msg').last().textContent()}`);
     const reply = await page.locator('#log .msg').last().textContent();
-    assert.match(reply, /可以发布 · Ready to publish — 改了 1 个文件 · 1 file\(s\) changed; 测试 1\/1 通过/);
+    assert.match(reply, /可以发布.*测试 1\/1 通过/);
     assert.match(reply, /Rendered at iPhone width \(390\)/); assert.match(reply, /merges only on green CI/);
     assert.match(reply, /I made the home title 26px/); assert.doesNotMatch(reply, /PA_CHANGE_SUPERELF|已上线|fixed/);
     assert.equal(gh.st.requests.length, sent, 'nothing reached GitHub before the tap');
@@ -110,12 +110,12 @@ for (const [name, vp] of [['iPhone', { width: 390, height: 844 }], ['desktop', {
     await page.locator('#pubSheet #spFiles').waitFor({ timeout: 30000 });
     assert.match(await page.locator('#spFiles').textContent(), /web\/home-v2\.css/);
     await page.waitForFunction(() => document.querySelectorAll('#spShots img').length === 2, null, { timeout: 30000 });
-    assert.match(await page.locator('#spChecks').textContent(), /测试 1\/1 通过.*iPhone width \(390\): before \/ after.*Privacy scan clean/s);
+    assert.match(await page.locator('#spChecks').textContent(), /测试 1\/1 通过.*iPhone 宽度（390）截图：改前 \/ 改后.*隐私检查通过/s);
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `selfpub-preview-${name}.png`) });
     await page.click('#pubSheet #pubGo');
     // Released, then waiting for deploy; or already Live: this test node runs the repo's real version, which is past the
     // fixture's v5.1.0, and a running version at or past the release counts as live (lib/selfpub/run.mjs versionAtLeast).
-    await page.waitForFunction(() => /Released v\d+\.\d+\.\d+ — waiting for deploy|已上线 v\d+\.\d+\.\d+ · Live/.test((document.querySelector('.sp-row:last-of-type .sp-state') || document.querySelector('#spSheetState') || {}).textContent || '')
+    await page.waitForFunction(() => /Released v\d+\.\d+\.\d+ — waiting for deploy|已上线 v\d+\.\d+\.\d+/.test((document.querySelector('.sp-row:last-of-type .sp-state') || document.querySelector('#spSheetState') || {}).textContent || '')
       || [...document.querySelectorAll('.sp-state')].some((e) => /Released v|已上线 v/.test(e.textContent)), null, { timeout: 90000 });
     const pr = gh.st.pulls[gh.st.pulls.length - 1];
     assert.match(pr.head, /^self\/\d{8}-[a-z0-9]+$/); assert.match(String(gh.files(pr)['web/home-v2.css']), /header h1\{font-size:26px\}/);
@@ -134,7 +134,7 @@ for (const [name, vp] of [['iPhone', { width: 390, height: 844 }], ['desktop', {
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `selfpub-typed-publish-${name}.png`) });
     const sw = await page.evaluate(() => document.documentElement.scrollWidth); assert.ok(sw <= vp.width, `no sideways scroll (${sw})`);
     await page.click('#pubSheet [data-sp="discard"]');   // the owner says no: the checkout is clean for the next run
-    await page.waitForFunction(() => /已丢弃 · Discarded/.test(document.querySelectorAll('.sp-row')[2].textContent), null, { timeout: 15000 });
+    await page.waitForFunction(() => /已丢弃/.test(document.querySelectorAll('.sp-row')[2].textContent), null, { timeout: 15000 });
     await ctx.close();
   });
 }

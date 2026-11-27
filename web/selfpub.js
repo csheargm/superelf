@@ -74,7 +74,7 @@ const PASelfPub=(()=>{
     const files=p.files.map(f=>`<li><code>${esc(f.path)}</code> (${f.bytes} B)${f.security?' <b>⚠ 安全相关 · security-relevant</b>':''}</li>`).join('')+p.deletes.map(d=>`<li><code>${esc(d)}</code> 删除 · deleted</li>`).join('');
     const s=PAPublish.sheet(`<p id="spWhat"><b>发布这个 superelf 改动 · Publish this change to superelf</b></p><p id="spTitle">公开的 PR 标题 · Public PR title: <code>${esc(p.title||'')}</code></p>${checksHtml(p)}`
       // Files and the diff BEFORE the shots: two tall phone shots pushed the list below the fold, so the card looked like one file (owner 2026-11-26).
-      +`<p><b>改动的文件 · Files changed (${p.files.length+p.deletes.length})</b></p><ul id="spFiles">${files}</ul>`
+      +`<p><b>改动的文件（${p.files.length+p.deletes.length}） · Files changed (${p.files.length+p.deletes.length})</b></p><ul id="spFiles">${files}</ul>`
       +(p.refused.length?`<p id="spRefused"><b>含不允许发布的文件 · Has files that are never published:</b> ${p.refused.map(x=>esc(x.file)).join(', ')}</p>`:'')
       +`<details><summary>改动内容 · The diff</summary><pre id="spDiff" style="white-space:pre-wrap;word-break:break-all;font-size:11px">${esc(p.diff)}</pre></details>`
       +`<div id="spShots" style="display:flex;gap:8px"></div><p>会在 <code>${esc(p.repo||'')}</code> 开 PR；CI 通过后合并、发版，节点约 10 分钟内自动更新。 · Opens a PR on <code>${esc(p.repo||'')}</code>; on green CI it merges and releases, and the node updates itself within about 10 min.</p><p id="spSheetState" data-id="${esc(String(id))}"></p><button type="button" data-sp="discard" class="plain" style="min-height:44px">丢弃这个改动 · Discard this change</button>`,

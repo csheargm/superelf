@@ -6,7 +6,7 @@
 // case — drop the conversation, keep the note.
 //
 // The dangerous part is not the deletion, it is the MENU. It was two fixed labels dispatched by
-// POSITION, so inserting a conditional entry above "Delete 删除" renumbered it: on exactly the
+// POSITION, so inserting a conditional entry above "删除 · Delete" renumbered it: on exactly the
 // rows that show the new entry, picking it would have deleted the whole note. The menu is now
 // built as a list of actions that carry their own behaviour, and that is what these tests pin.
 import { test } from 'node:test';
@@ -53,16 +53,16 @@ test('a note WITH a chat is offered the entry, and picking it deletes only the c
   const run = menuModule();
   const { did, item } = withCalls((d) => ({ onDeleteAi: async () => d.push('deleted the chat') }));
   const r = await run(item, (labels) => labels.findIndex((l) => /AI chat/.test(l)));
-  assert.deepEqual(r.offered, ['Rename 重命名', 'Delete AI chat 删除 AI 对话', 'Delete 删除']);
+  assert.deepEqual(r.offered, ['重命名 · Rename', '删除 AI 对话 · Delete AI chat', '删除 · Delete']);
   assert.ok(did.includes('deleted the chat'), 'the chat went');
   assert.ok(!did.includes('DELETED THE NOTE'), 'and the note did NOT — this is the whole scar');
 });
 
-test('"Delete 删除" still deletes the note when the AI entry sits above it', async () => {
+test('"删除 · Delete" still deletes the note when the AI entry sits above it', async () => {
   // The other half of the renumbering bug: the entry that moved must still do its own job.
   const run = menuModule();
   const { did, item } = withCalls((d) => ({ onDeleteAi: async () => d.push('deleted the chat') }));
-  await run(item, (labels) => labels.indexOf('Delete 删除'));
+  await run(item, (labels) => labels.indexOf('删除 · Delete'));
   assert.ok(did.includes('DELETED THE NOTE'));
   assert.ok(!did.includes('deleted the chat'));
 });
@@ -72,8 +72,8 @@ test('a note with NO chat is never offered it', async () => {
   // conversation that is not there.
   const run = menuModule();
   const { did, item } = withCalls(() => ({}));
-  const r = await run(item, (labels) => labels.indexOf('Delete 删除'));
-  assert.deepEqual(r.offered, ['Rename 重命名', 'Delete 删除']);
+  const r = await run(item, (labels) => labels.indexOf('删除 · Delete'));
+  assert.deepEqual(r.offered, ['重命名 · Rename', '删除 · Delete']);
   assert.ok(did.includes('DELETED THE NOTE'), 'and Delete is still where the user expects it');
 });
 

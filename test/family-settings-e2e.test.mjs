@@ -108,9 +108,9 @@ test('Add member labels read 中文 first; a waiting row has no Reset password b
   const { ctx, page } = await openSettings();
   try {
     const ph = (s) => page.getAttribute(s, 'placeholder');
-    assert.equal(await ph('#nId'), '用户名（如 mia）· id');
-    assert.equal(await ph('#nName'), '名字 · Name');
-    assert.equal(await ph('#nYear'), '出生年份 · Birth year');
+    assert.equal(await ph('#nId'), '用户名（如 mia）');
+    assert.equal(await ph('#nName'), '名字');
+    assert.equal(await ph('#nYear'), '出生年份');
     await page.waitForSelector('[data-approve="zed"]');
     assert.equal(await page.locator('[data-pw="zed"]').count(), 0, 'pending: nothing to reset yet');
     assert.equal(await page.locator('[data-del="zed"]').count(), 1, 'pending: can still be removed');

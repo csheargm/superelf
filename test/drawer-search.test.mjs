@@ -11,13 +11,13 @@ test('a row the index names is shown with the hit snippet and a where-chip, thou
   const D = await drawer(async () => ({ ok: true, hits: [hit('entry-2.json')] }));
   await D.type('landlord');
   assert.deepEqual(ids(D.rows()), [], 'before the reply: nothing local matches "landlord"');
-  assert.match(D.rows(), /Searching… 搜索中/, 'while the node is owed a reply the list says so, not "No matches" (R13 round 2 #3)');
+  assert.match(D.rows(), /搜索中… · Searching…/, 'while the node is owed a reply the list says so, not "No matches" (R13 round 2 #3)');
   assert.doesNotMatch(D.rows(), /No matches/);
   await tick(SETTLE_MS);
   assert.deepEqual(D.calls, ['landlord'], 'the node was asked once');
   assert.deepEqual(ids(D.rows()), ['b'], 'the hit row appears; the no-doc row c and the unmatched row a do not');
   assert.match(D.rows(), /pac-lprev">…met the #landlord about…</, 'the snippet replaces the preview');
-  assert.match(D.rows(), /pac-lchip pac-lwhere">Tag 标签</, 'the where-chip uses PANote.SEARCH_TXT');
+  assert.match(D.rows(), /pac-lchip pac-lwhere">标签 · Tag</, 'the where-chip uses PANote.SEARCH_TXT');
   assert.equal(D.msg(), '', 'no failure text');
 });
 
@@ -28,7 +28,7 @@ test('the local filter still works on its own, and a hit joins it rather than re
   await tick(SETTLE_MS);
   assert.deepEqual(ids(D.rows()), ['a', 'b'], 'both: local a (newer) and hit b');
   assert.match(D.rows(), /pac-lprev">typed about the roof</, 'a local row keeps its own preview');
-  assert.match(D.rows(), /Text 文本/, 'a typed hit says so');
+  assert.match(D.rows(), /文本 · Text/, 'a typed hit says so');
 });
 
 test('CONTROL: a row without `doc` is never a hit, and without PANote nothing is asked', async () => {
@@ -111,19 +111,19 @@ test('`doc` is passed through by listDrawer and the chat list, and both hosts su
 test('"No matches" waits for the reply: an empty answer says it, a failure says it under the failure line', async () => {
   const D = await drawer(async () => ({ ok: true, hits: [] }));
   await D.type('zzz');
-  assert.match(D.rows(), /Searching… 搜索中/);
+  assert.match(D.rows(), /搜索中… · Searching…/);
   await tick(SETTLE_MS);
-  assert.match(D.rows(), /No matches 无匹配/, 'the empty reply arrived: now it is a verdict');
+  assert.match(D.rows(), /无匹配 · No matches/, 'the empty reply arrived: now it is a verdict');
   assert.doesNotMatch(D.rows(), /Searching/);
   const F = await drawer(async () => ({ ok: false, error: 'boom' }));
   await F.type('zzz');
-  assert.match(F.rows(), /Searching… 搜索中/);
+  assert.match(F.rows(), /搜索中… · Searching…/);
   await tick(SETTLE_MS);
-  assert.match(F.rows(), /No matches 无匹配/, 'a failure is an answer too: the local filter\'s verdict stands');
+  assert.match(F.rows(), /无匹配 · No matches/, 'a failure is an answer too: the local filter\'s verdict stands');
   assert.equal(F.msg(), 'boom');
   const P = await drawer(null);
   await P.type('zzz');
-  assert.match(P.rows(), /No matches 无匹配/, 'CONTROL: without PANote nothing is pending, the local verdict is immediate');
+  assert.match(P.rows(), /无匹配 · No matches/, 'CONTROL: without PANote nothing is pending, the local verdict is immediate');
 });
 
 // R13 round 2 #4: a NEW query clears the previous failure line at once and supersedes the one in flight.
@@ -136,7 +136,7 @@ test('typing on clears the failure line at once and drops a late reply to the su
   await D.type('roofs');                       // inside the debounce window of the new query
   release(); await tick(20);                   // the OLD query's failure lands now
   assert.equal(D.msg(), '', 'a reply to a superseded query writes nothing');
-  assert.match(D.rows(), /Searching… 搜索中/, 'and the new query is still pending');
+  assert.match(D.rows(), /搜索中… · Searching…/, 'and the new query is still pending');
   await tick(SETTLE_MS);
   assert.deepEqual(D.calls, ['roof', 'roofs']);
   assert.deepEqual(ids(D.rows()), ['b']);
@@ -186,13 +186,13 @@ test('pages still being transcribed are said under the box with the count; an in
   await D.type('pollen'); await tick(SETTLE_MS);
   assert.equal(D.msg(), '正在识别 12 页 · Transcribing 12 pages', 'the count fills {n} in both languages');
   assert.deepEqual(ids(D.rows()), ['b']);
-  assert.match(D.rows(), /pac-lchip pac-lwhere">Ink 手写</, 'an ink hit says so');
+  assert.match(D.rows(), /pac-lchip pac-lwhere">手写 · Ink</, 'an ink hit says so');
   pending = 0;
   await D.type('pollen count'); await tick(SETTLE_MS);
   assert.equal(D.msg(), '', 'nothing owed: the line goes away');
   const P = await drawer(async () => ({ ok: true, hits: [hit('entry-1.json', 'photo', 'receipt total')], pending: 0, ocr: 'ready' }));
   await P.type('receipt'); await tick(SETTLE_MS);
-  assert.match(P.rows(), /pac-lchip pac-lwhere">Photo 图片</);
+  assert.match(P.rows(), /pac-lchip pac-lwhere">图片 · Photo</);
   assert.equal(P.msg(), '');
 });
 

@@ -29,7 +29,7 @@ test('composer placeholder is 中文 first and its Chinese clause fits at phone 
     return { ph, zhW: c.measureText(zh).width, enW: c.measureText(`${zh} · ${en}`).width, inner, overflow: cs.textOverflow };
   });
   assert.match(m.ph, /^[一-鿿]/, `placeholder starts with Chinese: ${m.ph}`);
-  assert.match(m.ph, / · [A-Za-z]/, 'and carries the English after " · "');
+  assert.doesNotMatch(m.ph, / · [A-Za-z]/, 'one language on a 中文 device: no English half');
   assert.ok(m.zhW <= m.inner, `Chinese clause ${m.zhW}px fits the ${m.inner}px box`);
   assert.ok(m.enW > m.inner, 'CONTROL: the full pair does not fit, so the check can see overflow');
   assert.equal(m.overflow, 'ellipsis', 'the cut-off English tail ends in an ellipsis, not a hard clip');

@@ -53,7 +53,7 @@ test('Google sign-in: Settings shows the account name; reply style is empty', { 
 test('email sign-in: empty name box with a type-your-name hint, never the placeholder name', { skip }, async () => {
   const { ctx, page } = await settings({ sub: 'e-user', email: 'bo@example.com', user_metadata: {} });
   assert.equal(await page.inputValue('#pName'), '');
-  assert.match(await page.getAttribute('#pName', 'placeholder'), /name/i);
+  assert.match(await page.getAttribute('#pName', 'placeholder'), /名字/);
   assert.equal(await page.inputValue('#pPrefs'), '');
   await ctx.close();
 });

@@ -90,7 +90,7 @@ test('a reply to a superseded query is marked stale', async () => {
 
 test('the where-labels are exported once, bilingual, with phase 2\'s names reserved', () => {
   const P = loadSearch(undefined);
-  assert.deepEqual(P.SEARCH_TXT, { transcript: '转写 · Transcript', tag: 'Tag 标签', typed: 'Text 文本', ink: 'Ink 手写', photo: 'Photo 图片', failed: '搜索不可用 · Search unavailable', searching: 'Searching… 搜索中', more: '仅显示最相关的笔记 · Only the best matches are shown',
+  assert.deepEqual(P.SEARCH_TXT, { transcript: '转写 · Transcript', tag: '标签 · Tag', typed: '文本 · Text', ink: '手写 · Ink', photo: '图片 · Photo', failed: '搜索不可用 · Search unavailable', searching: '搜索中… · Searching…', more: '仅显示最相关的笔记 · Only the best matches are shown',
     pending: '正在识别 {n} 页 · Transcribing {n} pages', noOcr: '手写搜索需要 Mac 节点 · Handwriting search needs the Mac node', ocrFailed: '本机手写识别失败 · Handwriting transcription failed on this node' });
   assert.equal((ENGINE.match(/SEARCH_TXT=/g) || []).length, 1);
   assert.match(ENGINE, /\n    search:searchNotes, SEARCH_TXT,\n/, 'both on the PANote export');

@@ -67,7 +67,7 @@ test('the header title is a Home control: mouse, Enter, tap; from a chat, an app
   const { ctx, page, errors } = await signIn({ viewport: { width: 1000, height: 800 }, hasTouch: true });
   try {
     const t = page.locator('#hTitle');
-    assert.equal(await t.getAttribute('aria-label'), '回到主页 · Home');
+    assert.equal(await t.getAttribute('aria-label'), '回到主页');
     assert.equal(await t.evaluate((e) => getComputedStyle(e).cursor), 'pointer');
     await page.waitForFunction(() => document.body.classList.contains('home-on'), null, { timeout: 5000 }).catch(() => {});
     assert.ok(await atHome(page), 'starts at Home');

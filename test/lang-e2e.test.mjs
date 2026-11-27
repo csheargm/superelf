@@ -36,8 +36,7 @@ function startOllamaStub() {
 before(async () => {
   ollama = await startOllamaStub();
   port = await freePort();
-  // ui_lang_default '': the real product default (the device decides), not the harness's both-at-once.
-  root = mkWebRoot({ port, extraConfig: { ui_lang_default: '', ollama_url: `http://127.0.0.1:${ollama.address().port}`, chat_models: MODELS, task_timeout_minutes: 1 } });
+  root = mkWebRoot({ port, extraConfig: { ollama_url: `http://127.0.0.1:${ollama.address().port}`, chat_models: MODELS, task_timeout_minutes: 1 } });
   fs.cpSync(path.join(REPO, 'workspace.example', 'apps'), path.join(root, 'workspace', 'apps'), { recursive: true });
   web = startWeb(root); await waitReady(port);
   if (skip) return;
@@ -192,4 +191,22 @@ test('the account refuses a junk language loudly and "" goes back to the device'
   assert.equal(bad.status, 400);
   await profile({ lang: 'zh' }); assert.equal((await profile()).lang, 'zh');
   await profile({ lang: '' }); assert.equal((await profile()).lang, '');
+});
+
+test('the drawer switch fits and is tappable on the iPad (820×1180) and the desktop (1280)', { skip, timeout: 90000 }, async () => {
+  const sess = (await (await fetch(`http://127.0.0.1:${port}/api/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: OWNER_TOKEN }) })).json()).token;
+  for (const [width, height, hasTouch] of [[820, 1180, true], [1280, 800, false]]) {
+    await profile({ lang: 'en' });   // a known start: the tap below must change it
+    const c = await browser.newContext({ viewport: { width, height }, hasTouch, locale: 'en-US' });
+    try {
+      await c.addInitScript((t) => { try { localStorage.setItem('pa_session', t); } catch { /* sandboxed frame */ } }, sess);
+      const page = await c.newPage(); await page.goto(`http://127.0.0.1:${port}/`); await page.waitForSelector('#hStart .st');
+      await openDrawer(page);
+      const m = await page.evaluate(() => { const sw = document.getElementById('langSw'), dr = document.getElementById('drawer'), b = sw.getBoundingClientRect(), d = dr.getBoundingClientRect();
+        const hit = document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2);
+        return { b: { x: b.x, y: b.y, w: b.width, h: b.height }, d: { w: d.width }, inView: b.y >= 0 && b.y + b.height <= innerHeight, inDrawer: b.x >= d.x && b.x + b.width <= d.x + d.width, hit: !!hit && sw.contains(hit), noHScroll: dr.scrollWidth <= dr.clientWidth }; });
+      assert.ok(m.inView && m.inDrawer && m.hit && m.noHScroll && m.b.h >= 44, `${width}: ${JSON.stringify(m)}`);
+      await page.click('#langSw [data-l="zh"]'); assert.equal(await lang(page), 'zh', `${width}: a real tap switches`);
+    } finally { await c.close(); }
+  }
 });

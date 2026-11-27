@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { freePort, mkWebRoot, startWeb, stopWeb, waitReady, api, OWNER_TOKEN } from './helpers-web.mjs';
 import { agentCapabilities, appContract, OVERRIDABLE_PROMPT_MAX } from '../lib/config.mjs';
+import { REPLY_IN } from '../lib/ui-lang.mjs';
 import { APPEND_SYSTEM_PROMPT_MAX } from '../lib/runner.mjs';
 import { APP_ORIGIN_HEADER, APP_ORIGIN_VALUE } from '../lib/agent-origin.mjs';
 import { ROOT } from './helpers-app.mjs';
@@ -118,4 +119,13 @@ test('CONTROL: the owner\'s own chat is NOT told it is confined, and gets the wh
   const sp = await promptFor('/api/chat', OWNER_TOKEN, { message: 'hi' });
   assert.ok(!sp.includes('confined lane'), 'the owner is not confined');
   assert.ok(sp.endsWith(agentCapabilities('owner', CONTRACT)), `the owner's capability text arrives whole (${sp.length} chars)`);
+});
+
+test('the app ask carries the reply-language line: the page\'s word, else the account; a bilingual page follows the writer', async () => {
+  const en = await promptFor('/api/ask', MEMBER_TOKEN, { message: 'hi', lang: 'en' }, APP_HEADERS);
+  assert.equal(en, agentCapabilities('member', CONTRACT, REPLY_IN.en), 'English sent: the English line leads');
+  const zh = await promptFor('/api/ask', MEMBER_TOKEN, { message: 'hi', lang: 'zh' }, APP_HEADERS);
+  assert.ok(zh.startsWith(REPLY_IN.zh), 'zh sent: the 中文 line');
+  const both = await promptFor('/api/ask', MEMBER_TOKEN, { message: 'hi', lang: 'both' }, APP_HEADERS);
+  assert.equal(both, agentCapabilities('member', CONTRACT), 'a bilingual page: the follow-the-writer rule (CONTROL)');
 });
