@@ -1,4 +1,13 @@
 {
+  "v5.38.12": {
+    "date": "2026-11-27",
+    "time": "2026-11-27T22:49:38.667Z",
+    "features": [],
+    "fixes": [
+      "合并：修复 v5.38.11 的 CI · Merge: v5.38.11 CI fixes (tip off its own anchor, Windows lock test, iPhone bar slide wait)"
+    ],
+    "through": "8558829d9807253603163a40ce1046d7df973084"
+  },
   "v5.38.11": {
     "date": "2026-11-27",
     "time": "2026-11-27T22:22:14.766Z",
