@@ -1,4 +1,13 @@
 {
+  "v5.37.1": {
+    "date": "2026-11-26",
+    "time": "2026-11-27T04:06:21.074Z",
+    "features": [],
+    "fixes": [
+      "合并：前进重载后返回键稳定、两指滚动测试有足够空间 · Merge: Back stays reliable after a Forward reload; two-finger pan test gets real room"
+    ],
+    "through": "42f2a295c7b2d1c45b6595e77243949541eb1f62"
+  },
   "v5.37.0": {
     "date": "2026-11-26",
     "time": "2026-11-27T03:04:43.525Z",
