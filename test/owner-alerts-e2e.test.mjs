@@ -55,6 +55,13 @@ test('owner: amber dot on ☰ → card with the problem, its meaning and the tip
   const camTip = page.locator('.pat-tip[data-tip="tip:main-chat-camera"] .pat-x');   // web/shell-cam.js's priority tip shows first on a fresh account
   if (await camTip.waitFor({ timeout: 5000 }).then(() => true, () => false)) { await camTip.click(); await page.evaluate(() => window.PATips.whenIdle()); }
   await page.click('#hmore'); await page.click('#menu'); await page.waitForSelector('#oaCard');
+  // The home ⋯ menu's language-row tip (web/lang-switch.js) may take the one tip slot first: close it, as a user would.
+  const either = page.locator('.pat-tip[data-tip="tip:lang-switch"], .pat-tip[data-tip="tip:owner-alerts"]').first();
+  await either.waitFor({ timeout: 10000 });
+  if (await page.locator('.pat-tip[data-tip="tip:lang-switch"]').count()) {
+    await page.evaluate(() => PATips.dismiss()); await page.evaluate(() => PATips.whenIdle());
+    await page.reload(); await page.waitForSelector('#menu .oa-dot', { state: 'attached' }); await page.click('#hmore'); await page.click('#menu'); await page.waitForSelector('#oaCard');
+  }
   const text = await page.locator('#oaCard').innerText();
   assert.match(text, /需要处理/);
   assert.match(text, /系统盘已用 92%/);
