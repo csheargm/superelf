@@ -882,6 +882,9 @@ let LINK_APPS=new Set();
 let FORK_APPS=new Set();   // own apps copied from another (meta.json forkedFrom): web/publish.js item()
 let OWNBAR_APPS=new Set();   // own apps whose page draws its own Home + A-/A+ (meta.json ownBar, ADR 0032)
 const NO_APP_TEXT='未打开应用 · no app in view';   // every refusal of a request that names no app (R3)
+// Settles once the boot profile fetch has (ME). An app frame can ask for its settings before that; an answer from an
+// empty ME showed dismissed tips again, and a write from it would replace every other app's prefs. TODO(R4 seam): boot state → its own part.
+let profileLoaded; const PROFILE_READY=new Promise((r)=>{ profileLoaded=r; });
 // ME is the profile fetched at boot (settings.js loadProfile, which sets ME={} if the fetch
 // fails). ONE accessor, so a profile that failed to load reads as "nothing remembered" in every
 // caller rather than each of them repeating the guard.
@@ -2211,11 +2214,13 @@ window.addEventListener('message',async(e)=>{
       // different lanes. AWAITED, so a refused or failed write is what the app is told (R5).
       reply(await setAppModel(appSlug, m.model));
     } else if(m.kind==='app-settings'){
+      await PROFILE_READY;   // never answer from the not-yet-loaded profile
       // Read, SCOPED: only this app's preferences and its system prompt leave the shell. The app
       // must never see the rest of the profile, and the slug is the one the SHELL derives from
       // the frame, never one the app supplies.
       reply({ok:true, ...appSettingsOf(appSlug, m.appPrompt)});
     } else if(m.kind==='set-app-settings'){
+      await PROFILE_READY;   // the write replaces appPrefs whole: built from an empty ME it would drop the other apps' prefs
       const saved=await saveAppSettings(appSlug, m.prefs, m.systemPrompt, m.appPrompt); reply(saved);
       if(saved.ok) sendAppPrefs(false);   // the app prefs a host reads (openAi) reach the frame now, not on the next load
     } else if(m.kind==='notes-list'){
@@ -2741,6 +2746,7 @@ PAShellCam.bind({atts:()=>attachments,render:renderChips,say:(t)=>PAShellCam.say
   // Fetch the profile (ME, incl. appOrder) in parallel; gate only the app grid on it so the
   // saved My-Apps order applies on first paint, while convos/family load concurrently.
   const profileReady=loadProfile().then(()=>PADrawerSections.paint());   // the account's remembered sections
+  profileReady.then(()=>profileLoaded(),()=>profileLoaded());   // settled either way (a paint error included): the app broker never hangs
   PATipsShell.ready(profileReady);   // the shell's tips read their 'seen' list from the profile (web/tips-store.js)
   await Promise.allSettled([profileReady.finally(loadApps), loadFamilyApps(), loadConvos(), convoId?openConvo(convoId):Promise.resolve()]);
   if(!convoId) showEmptyState();

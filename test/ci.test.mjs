@@ -93,7 +93,9 @@ test('guard as a command: exit 0 on a clean run, exit 1 on an untagged skip or a
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pa-ci-guard-'));
   try {
     const f = path.join(dir, 'out.txt');
-    const cmd = (min) => spawnSync(process.execPath, [GUARD, f], { env: { ...process.env, MIN_TESTS: String(min) }, encoding: 'utf8' });
+    // Hermetic: the e2e jobs set CI_FORBID_SKIP=no-browser, which would turn this fixture's [no-browser] skips red.
+    const env = { ...process.env }; delete env.CI_FORBID_SKIP;
+    const cmd = (min) => spawnSync(process.execPath, [GUARD, f], { env: { ...env, MIN_TESTS: String(min) }, encoding: 'utf8' });
     fs.writeFileSync(f, SKIPS + tap(GOOD));
     const hi = cmd(3500);
     assert.equal(hi.status, 0, hi.stdout + hi.stderr);

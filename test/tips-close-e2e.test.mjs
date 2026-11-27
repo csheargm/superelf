@@ -129,6 +129,21 @@ test('chromium iphone: blocked localStorage AND a refused account write — the 
   await ctx.close();
 });
 
+// Regression (CI 2026-11-26, under load): an app opened before the shell's boot profile fetch settled got its
+// settings from an empty ME, so its dismissed tip showed again. Here that fetch is held back on purpose.
+test('chromium iphone: an app opened while the profile is still loading keeps its dismissed tip closed', { skip, timeout: 120000 }, async () => {
+  await fresh(); await put({ tipsSeen: ['tip:home-more'], appPrefs: { notes: { tipsSeen: ['app-own-bar'] } } });
+  const ctx = await context('chromium', 'iphone');
+  let hold = true;
+  await ctx.route('**/api/profile', async (r) => { if (r.request().method() === 'GET' && hold) await new Promise((res) => setTimeout(res, 2500)); return r.continue(); });
+  const { page } = await shell(ctx);
+  const f = await openApp(page, 'notes'); hold = false;
+  const t = await tipIn(f);
+  assert.notEqual(t && t.id, 'app-own-bar', 'the dismissed tip stays closed while the profile loads');
+  assert.ok(t, 'CONTROL: a tip not yet dismissed still shows (R14)');
+  await ctx.close();
+});
+
 for (const engine of ['chromium', 'webkit']) for (const dev of ['iphone', 'ipad']) {
   test(`${engine} ${dev}: every app tip (Notes, Bible) closes, covers no control, and stays closed on a second device`, { skip: skip || skipIf(engine === 'webkit' && wkOff, 'other-engine', wkOff) || skipIf(engine === 'webkit' && !webkit, 'no-browser', 'this Playwright has no WebKit'), timeout: 300000 }, async () => {
     await fresh(); await put({ tipsSeen: ['tip:home-more', CAM_TIP] });   // the shell's own tip is tested above
