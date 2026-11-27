@@ -120,7 +120,7 @@ for (const [dev, viewport] of Object.entries(DEVICES)) {
       await fr.click('.pan-hmore').catch(async (e) => { throw new Error(`${e.message}\nlayout: ${JSON.stringify(await whereIs(page, fr, '.pan-hmore'))}`); }); await page.waitForTimeout(400);
       if (phone) {
         const rows = await fr.$$eval('.pan-ovf.on [data-ovf]', (bs) => bs.map((b) => b.dataset.ovf));
-        assert.deepEqual(rows, ['paper', 'photo', 'print'], 'the phone ⋯ menu holds what the header folded away');
+        assert.deepEqual(rows, ['read', 'paper', 'photo', 'print'], 'the phone ⋯ menu holds Read view, then what the header folded away');
         judge(`${dev} notes ⋯ menu`, await checkSurface(fr), bad);
         await fr.click('.pan-ovf [data-ovf=paper]'); await page.waitForTimeout(400);
       }

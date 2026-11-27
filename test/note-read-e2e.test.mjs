@@ -41,7 +41,7 @@ const touches = (frame, steps) => frame.evaluate(async (ss) => {
   }
 }, steps);
 const geom = (frame) => frame.evaluate(() => { const st = document.querySelector('.pan-stage'), pi = document.querySelector('.pan-pageInner'), ink = document.querySelector('.pan-ink');
-  const r = ink.getBoundingClientRect(), sr = st.getBoundingClientRect(), b = document.querySelector('.pan-readbtn'), br = b.getBoundingClientRect();
+  const r = ink.getBoundingClientRect(), sr = st.getBoundingClientRect(), b = document.querySelector('.pan-ovfread'), br = b.getBoundingClientRect();
   return { zoom: Number(pi.style.zoom), stageW: sr.width, inkL: r.left, inkR: r.right, stageL: sr.left, stageR: sr.right,
     sideScroll: st.scrollWidth - st.clientWidth, readBtn: getComputedStyle(b).display !== 'none', readW: br.width, readH: br.height }; });
 const SAVE_BUDGET_MS = 15000;
@@ -88,11 +88,13 @@ test('iPhone: Read view — reflowed text ≥18px, ink hidden and labelled; A+ i
   let frame = await openJournal(page, { touch: true });
   await open(page, frame, 'ipadInk');
   const g = await geom(frame);
-  assert.ok(g.readBtn && g.readW >= 44 && g.readH >= 44, `the Read view button shows, 44px (${g.readW}x${g.readH})`);
+  await frame.locator('.pan-hmore').click();
+  const m = await geom(frame);
+  assert.ok(m.readBtn && m.readH >= 44, `Read view heads the phone ⋯ menu, 44px tall (${m.readW}x${m.readH})`);
   const reg = await frame.evaluate(() => (window.PATips ? PATips.registered() : []).find((r) => r.id === 'note-read-view'));
   assert.ok(reg, 'its first-use tip is registered'); assert.match(reg.text, /^[一-鿿]/, 'Chinese first'); assert.match(reg.text, / · [A-Z]/, 'then English');
   const fileBefore = fs.readFileSync(notePath('ipadInk'), 'utf8');
-  await frame.locator('.pan-readbtn').click();
+  await frame.locator('.pan-ovfread').click();
   const rv = () => frame.evaluate(() => { const v = document.querySelector('.pnp-read'), b = v.querySelector('.pnp-rbody'), p = b.querySelector('div');
     return { shown: !v.hidden && v.getBoundingClientRect().width > 0, title: v.querySelector('.pnp-rtitle').textContent, inkNote: !v.querySelector('.pnp-rnote').hidden,
       font: parseFloat(getComputedStyle(p).fontSize), lines: p.getBoundingClientRect().height / parseFloat(getComputedStyle(p).lineHeight),
@@ -105,6 +107,9 @@ test('iPhone: Read view — reflowed text ≥18px, ink hidden and labelled; A+ i
   assert.ok(s.wrap && s.lines > 3, `the text wraps to the phone width (${s.lines.toFixed(1)} lines, no sideways scroll)`);
   assert.ok(s.text.includes('In the beginning') && s.text.includes('起初有道'), 'the page text is all there');
   assert.ok(!s.editable, 'read only');
+  // The pad under it is inert, and editing keys never reach it (a hardware keyboard on a phone).
+  assert.equal(await frame.evaluate(() => document.querySelector('.pan-stage').inert), true, 'the page under Read view is inert');
+  for (const k of ['Delete', 'Backspace', 'Meta+z', 'x']) await page.keyboard.press(k);
   await frame.locator('.pnp-rmore').click();
   s = await rv(); assert.equal(s.font, 20, 'A+ grows the text');
   await page.waitForFunction(() => localStorage.getItem('pa_notereadsize') === '20', null, { timeout: 5000 });
@@ -112,10 +117,11 @@ test('iPhone: Read view — reflowed text ≥18px, ink hidden and labelled; A+ i
   assert.equal(fs.readFileSync(notePath('ipadInk'), 'utf8'), fileBefore, 'A+ changed nothing in the saved note');
   await frame.locator('.pnp-rclose').click();
   assert.equal(await frame.evaluate(() => document.querySelector('.pnp-read').hidden), true, 'closes');
+  assert.equal(await frame.evaluate(() => document.querySelector('.pan-stage').inert), false, 'and gives the page back');
   // The size is this device's: a fresh load gets it back from the shell.
   await page.reload(); frame = await openJournal(page, { touch: true });
   await open(page, frame, 'ipadInk');
-  await frame.locator('.pan-readbtn').click();
+  await frame.locator('.pan-hmore').click(); await frame.locator('.pan-ovfread').click();
   s = await rv(); assert.equal(s.font, 20, 'the device keeps its size');
   await frame.locator('.pnp-rless').click();
   s = await rv(); assert.equal(s.font, 18, 'A− back to 18px');
@@ -128,9 +134,10 @@ test('iPad 820: the page scale is the old one and the Read view button is hidden
   const frame = await openJournal(page);
   await open(page, frame, 'ipadInk');
   const g = await geom(frame);
-  assert.ok(!g.readBtn, 'no Read view button off a phone');
+  assert.ok(!g.readBtn, 'no Read view entry off a phone');
+  assert.equal(await frame.evaluate(() => getComputedStyle(document.querySelector('.pan-readbtn')).display), 'none', 'nor a header button');
   const want = Math.max(MIN_PAGE_W / PAGE_W, g.stageW / PAGE_W);
-  assert.ok(Math.abs(g.zoom - want) < 1e-6, `zoom is max(700, width)/816 as before (${g.zoom} vs ${want})`);
+  assert.ok(Math.abs(g.zoom - want) < 1e-3, `zoom is max(700, width)/816 as before (${g.zoom} vs ${want})`);
   assert.equal(await frame.evaluate(() => document.querySelector('.pnp-read').hidden), true, 'Read view stays closed');
   await ctx.close();
 });

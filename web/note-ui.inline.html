@@ -1799,11 +1799,11 @@
     // page to the screen (no MIN_PAGE_W floor), so an iPad note shows every stroke. Decided once per
     // opened page, so the first stroke on a blank page never re-scales it mid-writing. Off a phone this
     // is the old expression exactly. TODO(R4 seam): belongs with fitTextToView in a note-open part.
-    let fitKey='', fitWide=false;
+    let fitKey='', fitWide=false, fitNB=null;   // fitNB: a load REPLACES NB, so a reopened page is decided afresh
     function kFitOf(rw){
       if(!phoneOn()||!window.PANotePhone) return Math.max(MIN_PAGE_W/PAGE_W, rw/PAGE_W);
       const pg=page(), key=(NB&&NB.id)+'\n'+(pg&&pg.id)+'\n'+cur;
-      if(key!==fitKey){ fitKey=key; fitWide=!!(pg&&(hasRealInk(pg)||(pg.images||[]).length)); }
+      if(key!==fitKey||fitNB!==NB){ fitKey=key; fitNB=NB; fitWide=!!(pg&&(hasRealInk(pg)||(pg.images||[]).length)); }
       return window.PANotePhone.fitK(rw,PAGE_W,MIN_PAGE_W,fitWide);
     }
     function fitTextToView(){
@@ -3572,8 +3572,8 @@
     const readView=(window.PANotePhone&&window.PANotePhone.readView)?window.PANotePhone.readView({host,textLayer,
       btn:q('.pan-readbtn'),txt:READ_TXT,hasInk:()=>{ const pg=page(); return !!(pg&&hasRealInk(pg)); },listen:listenG,
       onSize:readSize=>{ try{ parent.postMessage({pa:'req',id:'panreadpref',kind:'pref',readSize},'*'); }catch(_){ /* no shell (standalone/harness): the size holds this session */ } }}):null;
-    if(readView) listenG(window,'message',e=>{ const m=e.data; if(m&&m.pa==='prefs'&&Number.isFinite(m.readSize)) readView.setSize(m.readSize); });
-    if(window.PATips&&readView) window.PATips.register({id:'note-read-view',anchor:()=>q('.pan-readbtn'),text:READ_TXT.tip,when:phoneOn});
+    if(readView) listenG(window,'message',e=>{ const m=e.data; if(e.source===parent&&m&&m.pa==='prefs'&&Number.isFinite(m.readSize)) readView.setSize(m.readSize); });
+    if(window.PATips&&readView) window.PATips.register({id:'note-read-view',anchor:()=>(q('.pan-top')?paperBtn:q('.pan-readbtn')),text:READ_TXT.tip,when:phoneOn});
     function onDown(e){
       if(flipping){ pdec('refused-flipping',e); return; }
       // (No closePops here: with a popover open, the outside tap is swallowed by onPopOutside
@@ -4312,7 +4312,9 @@
     // Print — instead of Page settings alone; each row runs the SAME handler its hidden button runs.
     if(topBar&&paperBtn.classList.contains('pan-hmore')){
       const ovf=document.createElement('div'); ovf.className='pan-pop pan-ovf'; ovf.setAttribute('role','menu');
-      ovf.innerHTML='<button type="button" data-ovf="paper">'+ico('more')+'页面设置 · Page settings</button>'+
+      // Read view heads the menu on a phone (its header button stays hidden: the title keeps its room).
+      ovf.innerHTML=(q('.pan-top .pan-readbtn')?'<button type="button" class="pan-ovfread" data-ovf="read">'+ico('read')+READ_TXT.btn+'</button>':'')+
+        '<button type="button" data-ovf="paper">'+ico('more')+'页面设置 · Page settings</button>'+
         (photoBtn&&photoBtn.classList.contains('pan-hphoto')?'<button type="button" data-ovf="photo">'+ico('photo')+'插入图片 · Insert photo</button>':'')+
         (q('.pan-hprint')?'<button type="button" data-ovf="print">'+ico('print')+'打印 · Print</button>':'');
       host.appendChild(ovf);
@@ -4321,7 +4323,7 @@
         e.stopImmediatePropagation(); togglePop(ovf,paperBtn); },true);
       ovf.addEventListener('click',(e)=>{ const b=e.target.closest('[data-ovf]'); if(!b) return; closePops();
         const k=b.dataset.ovf;
-        if(k==='paper') togglePop(paperPop,paperBtn); else if(k==='photo') photoBtn.click(); else q('.pan-hprint').click(); });
+        if(k==='read') q('.pan-readbtn').click(); else if(k==='paper') togglePop(paperPop,paperBtn); else if(k==='photo') photoBtn.click(); else q('.pan-hprint').click(); });
     }
     undoBtn.addEventListener('click',undo);
     redoBtn.addEventListener('click',redo);

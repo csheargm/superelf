@@ -126,8 +126,10 @@ test('the page has a minimum readable width, and a finger can reach the rest', (
   // The page no longer TAKES the screen's width, so the floor moved from the width to the SCALE:
   // below it the page stops shrinking and the stage pans instead — which is what this test has
   // always been about (text size follows the page, so a shrunken page is unreadable text).
-  assert.match(code, /Math\.max\(MIN_PAGE_W\/PAGE_W, r\.width\/PAGE_W\)/,
+  // kFitOf (journal-iphone step 2): off a phone it IS this expression; a phone ink page fits the width.
+  assert.match(code, /if\(!phoneOn\(\)\|\|!window\.PANotePhone\) return Math\.max\(MIN_PAGE_W\/PAGE_W, rw\/PAGE_W\);/,
     'the readable floor is applied to the fit scale');
+  assert.match(code, /const kFit=kFitOf\(r\.width\)/, 'and the page scale is that fit');
   assert.match(code, /el\.style\.width=W\+'px'/, 'the page carries its width explicitly so the stage can scroll to it');
   assert.match(code, /\.pan-ink\.pan-canpan\{touch-action:pan-x pan-y\}/, 'a finger may pan when it is not drawing');
 });
