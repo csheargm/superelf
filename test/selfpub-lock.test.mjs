@@ -7,11 +7,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 import { acquireLock, lockVerdict, lockOptions, hostIdentity, DEFAULT_LOCK_MAX_MS, MIN_LOCK_MAX_MS } from '../lib/selfpub/lock.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
 
-const LOCK_MODULE = fileURLToPath(new URL('../lib/selfpub/lock.mjs', import.meta.url));
+// A file:// URL, not a path: on Windows `import 'D:\\...'` is read as a URL with scheme d: (CI 2026-11-27).
+const LOCK_MODULE = new URL('../lib/selfpub/lock.mjs', import.meta.url).href;
 const tmp = () => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'selfpub-lock-')));
 const lockFile = (d) => path.join(d, '.lock');
 const writeRec = (d, rec) => fs.writeFileSync(lockFile(d), JSON.stringify(rec));
