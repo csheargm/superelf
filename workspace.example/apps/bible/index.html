@@ -909,10 +909,11 @@ function followSelection(){
 // One control per action, context-aware: with verses selected it acts on them (the old fab-note /
 // fab-ai paths, unchanged); with nothing selected an open pane closes. Narrow screens have no
 // rail, so paneOpen() is false there and a tap opens the full-screen surface as before.
-// TODO(R4 seam): top-bar toggles + their tips belong in a Bible top-bar block when this host splits.
+// TODO(R4 seam): top-bar toggles + their tips (and chatFsUp + its observer, by aiChat) belong in a Bible top-bar block when this host splits.
 const TOP={note:document.getElementById('top-note'),chat:document.getElementById('top-ai')};
 const paneOpen=(k)=>!!(rail&&rail.isOpen()&&!rail.isCollapsed(k));
-function syncTopBtns(){ for(const k in TOP){ const on=paneOpen(k); TOP[k].classList.toggle('on',on); TOP[k].setAttribute('aria-pressed',on?'true':'false'); } }
+// Ask AI is pressed while its FULL-SCREEN chat is up too (a phone has no rail; owner 2026-11-27): see aiChat below.
+function syncTopBtns(){ for(const k in TOP){ const on=paneOpen(k)||(k==='chat'&&chatFsUp()); TOP[k].classList.toggle('on',on); TOP[k].setAttribute('aria-pressed',on?'true':'false'); } }
 async function topToggle(k,openIt){
   if(paneOpen(k)&&!selV.size) rail.collapse(k); else await openIt();
   syncTopBtns();
@@ -1231,6 +1232,10 @@ const aiChat=PAChat.fullscreen(Object.assign({}, chatData, {
   // draw pad — it sits at the same z-level later in the DOM and would otherwise cover the chat.
   onShow:async()=>{ if(typeof drawPad!=='undefined'&&drawPad.isOpen&&drawPad.isOpen()) await drawPad.hide(); },
 }));
+// The full-screen chat opens and closes from many places (Ask AI, a long press, a ☰ row, a verse link, ✕), so
+// Ask AI's pressed state watches the overlay itself rather than each caller (one fact, one reader).
+function chatFsUp(){ return !!(aiChat.isOpen&&aiChat.isOpen()); }
+if(typeof MutationObserver==='function'&&aiChat.el) new MutationObserver(syncTopBtns).observe(aiChat.el,{attributes:true,attributeFilter:['class']});
 // Rename / delete of a listed note. Hoisted out of the listAugment literal so they are named,
 // testable units (R6) rather than closures nothing can reach. Both read-then-write the WHOLE
 // chapter file, so both are exactly the shape V1 destroys: readChapterOrRefuse returns null on

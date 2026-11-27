@@ -666,7 +666,7 @@ test('the rail renders no title bar of its own', () => {
 test('the ✕ that closes the rail lives in the chat header, beside ＋', () => {
   // The button and its reveal are chat-ui's, not new UI: it is hidden until a host supplies
   // onClose. Both Bibles supply one that closes the rail.
-  assert.match(CHAT_SRC, /<button class="pac-new pac-close" title="Close" style="display:none">✕<\/button>/,
+  assert.match(CHAT_SRC, /<button class="pac-new pac-close" title="关闭 · Close" aria-label="关闭 · Close" style="display:none">✕<\/button>/,
     'the header carries a ✕ next to ＋, hidden by default');
   assert.match(CHAT_SRC, /if\(opts\.onClose\) el\.closes\.forEach\(b=>\{ b\.style\.display=''/,
     'and a host that passes onClose reveals it');

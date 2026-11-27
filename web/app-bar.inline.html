@@ -15,6 +15,9 @@
      TOUCH ONLY (owner 2026-11-23, F2-06): it hides by itself (idle, forward scroll) only while the reader is
      on touch; after a mouse / trackpad input (or on a hover device that has not been touched) it stays.
      All listeners passive, no preventDefault; a Pencil (pointerType 'pen' / touchType 'stylus') never pulls.
+     A PICK IN THE BAR HOLDS IT (owner 2026-11-27, iPhone): a changed field in the bar (the Bible's chapter / book
+     picker) keeps the bar shown until the reader next presses anywhere outside it — the idle clock used to take
+     Note / Ask AI away seconds after the new chapter opened. That next press hands the bar back to the clock.
      Driven by test/app-bar.test.mjs (no browser) and test/app-own-bar-e2e.test.mjs (Playwright). -->
 <style id="paab-style">
 /* PA_BAR_HANDLE_CSS */
@@ -42,7 +45,7 @@
   const TOUCH_MQ='(hover:none)';          // a phone / iPad with no mouse: touch until a mouse is used
   const touchFirst=()=>{ try{ return matchMedia(TOUCH_MQ).matches; }catch(_){ return false; /* no matchMedia: assume a mouse, the bar stays */ } };
   const TIP='主页和字号在这里；几秒后自动隐藏，下拉或点顶部把手返回 · Home and text size live here now — the bar hides after a few seconds; pull down or tap the top handle to bring it back';
-  const S={lift:null,cfg:null,on:false,touch:false,bar:null,hidden:false,handle:null,idle:0,lastY:0,mark:0,t0:null,pen:false,ptrs:new Set(),touches:0,held:false,inputAt:0};
+  const S={lift:null,cfg:null,on:false,touch:false,bar:null,hidden:false,handle:null,idle:0,lastY:0,mark:0,t0:null,pen:false,ptrs:new Set(),touches:0,held:false,picked:false,inputAt:0};
   const el=(v)=>typeof v==='function'?v():v;
   const post=(type,d)=>{ try{ parent.postMessage({pa:'shell',type,d:d||0},'*'); }
     catch(_){ /* no parent (page opened on its own): nothing to tell, and nothing was drawn */ } };
@@ -54,7 +57,7 @@
     try{ if(f&&b.contains(f)&&f.matches(FOCUS_HOLDS)) return true; }
     catch(_){ /* an engine without :focus-visible: fall back to the field check alone */ if(f&&b.contains(f)&&f.matches('select,input,textarea')) return true; }
     if(b.querySelector('[aria-expanded="true"]')) return true;
-    if(S.held) return true;
+    if(S.held||S.picked) return true;
     try{ return !!(S.cfg.keepOpen&&S.cfg.keepOpen()); }
     catch(_){ return true; /* a broken check must never strand the user without the bar: keep it */ }
   }
@@ -144,6 +147,7 @@
     place(); narrow.addEventListener('change',place);
     // Any use of the bar restarts the idle clock.
     for(const ev of ['pointerdown','click','keydown','focusin','change']) bar.addEventListener(ev,arm,{passive:true,capture:true});
+    bar.addEventListener('change',()=>{ S.picked=true; setHidden(false); },{passive:true,capture:true});   // a pick holds it (header)
     const h=S.handle=document.createElement('button'); h.type='button'; h.className='paab-handle';
     h.title='显示栏 · Show the bar'; h.setAttribute('aria-label','Show the bar');
     // A Pencil resting near the top must not pull the bar over the page: finger / mouse only.
@@ -166,12 +170,14 @@
     if(S.mark<-PULL_PX){ S.mark=0; setHidden(false); }
     else if(S.mark>PULL_PX){ S.mark=0; if(S.touch&&(S.touches>0||Date.now()-S.inputAt<USER_SCROLL_MS)) setHidden(true); }
   }
+  // The reader pressed outside the bar after a pick: the bar is the idle clock's again (header).
+  function releasePick(t){ if(!S.picked||(S.bar&&t&&t.nodeType===1&&S.bar.contains(t))) return; S.picked=false; arm(); }
   // A finger pulled down PULL_PX (more down than across) shows the bar — also at the very top, where
   // nothing scrolls. Passive capture listeners: a stroke or a scroll is never taken, only watched.
   function bindPull(){
     const o={passive:true,capture:true};
     // Touch pointers are counted by the touch events below, not here (pointercancel ≠ finger lifted).
-    addEventListener('pointerdown',(e)=>{ S.pen=e.pointerType==='pen'; S.touch=e.pointerType!=='mouse'; if(e.pointerType!=='touch') S.ptrs.add(e.pointerId); },o);
+    addEventListener('pointerdown',(e)=>{ S.pen=e.pointerType==='pen'; S.touch=e.pointerType!=='mouse'; if(e.pointerType!=='touch') S.ptrs.add(e.pointerId); releasePick(e.target); },o);
     for(const ev of ['pointerup','lostpointercapture']) addEventListener(ev,(e)=>{ S.ptrs.delete(e.pointerId); },o);
     addEventListener('pointercancel',(e)=>{ if(e.pointerType!=='touch') S.ptrs.delete(e.pointerId); },o);
     // A mouse released outside the frame sends no pointerup here: a move with no button down ends it.
@@ -180,7 +186,7 @@
     addEventListener('blur',clearDown);
     document.addEventListener('visibilitychange',()=>{ if(document.hidden) clearDown(); });
     addEventListener('touchstart',(e)=>{
-      S.touches=e.touches?e.touches.length:S.touches+1; S.touch=true;
+      S.touches=e.touches?e.touches.length:S.touches+1; S.touch=true; releasePick(e.target);
       const t=e.touches&&e.touches[0];
       S.t0=(e.touches.length===1&&t&&t.touchType!=='stylus'&&!S.pen)?{x:t.clientX,y:t.clientY}:null; },o);
     addEventListener('touchmove',(e)=>{
