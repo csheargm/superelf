@@ -1,4 +1,13 @@
 {
+  "v5.37.0": {
+    "date": "2026-11-26",
+    "time": "2026-11-27T03:04:43.525Z",
+    "features": [
+      "手机工具条与底部面板 · phone tool strip + one bottom sheet + list closes on open (journal-iphone step 3)"
+    ],
+    "fixes": [],
+    "through": "2a1ec7282deff76f0bb4da79c4ab5974be7ac2d1"
+  },
   "v5.36.0": {
     "date": "2026-11-26",
     "time": "2026-11-27T01:26:45.113Z",
