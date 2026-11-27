@@ -31,7 +31,7 @@ function startOllamaStub() {
       const searched = msgs.some((m) => m.role === 'system' && (m.content.startsWith('Web search results') || m.content.startsWith('Web search is not available')));
       const text = (mode === 'search' || mode === 'search-plan') && !apply ? (!searched ? `${SEARCH_MARKER} weather today` : mode === 'search' ? 'The weather answer from search.' : `I will show today's weather in the header.\n${PLAN_MARKER}`)
         : mode === 'search-empty' && !apply ? `${SEARCH_MARKER} weather today`
-        : mode === 'search-apply-only' && !apply ? (searched ? PLAN_MARKER : `${SEARCH_MARKER} weather today`)
+        : mode === 'search-apply-only' && !apply ? (searched ? `<invoke>x</invoke>\n${PLAN_MARKER}` : `${SEARCH_MARKER} weather today`)
         : apply && mode === 'bad' ? 'no page blocks here'
         : apply && (mode === 'same' || mode === 'verbatim') ? `Kept it.\n\n\`\`\`html\n${mode === 'same' ? PAGE : withOwnPolicy(ensureAskAi(PAGE, 'Calendar Planner'))}\n\`\`\`` : mode === 'marker' && !apply ? `${APP_MARKER} {"edit":"calendar-planner","title":"Calendar Planner","request":"make the title red"}`
         : apply ? `I added it.\n\n\`\`\`html\n${pageWith(nextExtra)}\n\`\`\`\n\n\`\`\`json\n{"title":"Calendar Planner"}\n\`\`\``
@@ -178,9 +178,15 @@ test('GPT review: an answer that is only another search marker is a failed turn,
   const ev = await chat(v, { message: 'what is the weather today?' });
   assert.ok(!done(ev) || done(ev).ok === false, JSON.stringify(ev));
   assert.ok(ev.some((e) => e.type === 'error'), 'the failure is said');
+  mode = 'plan';
+  const ev1 = await chat(v, { message: ASK });
+  const convoId = ev1.find((e) => e.type === 'convo').id;
+  assert.ok(confirmOf(ev1));
   mode = 'search-apply-only';
-  const ev2 = await chat(v, { message: 'show the weather' });
+  const ev2 = await chat(v, { message: 'show the weather', convoId });
   assert.ok(!confirmOf(ev2) && ev2.some((e) => e.type === 'error'), `a bare Apply marker after a search offers no Apply: ${JSON.stringify(ev2)}`);
+  const ev3 = await chat(v, { message: 'yes', convoId });
+  assert.ok(!ev3.some((e) => e.type === 'app-edit' && e.applied), 'a later yes never applies the superseded plan');
   mode = 'plan';
 });
 
