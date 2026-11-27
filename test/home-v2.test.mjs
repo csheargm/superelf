@@ -11,7 +11,7 @@ import { skip, chromium } from './helpers-note-link.mjs';
 import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, waitFor, OWNER_TOKEN } from './helpers-web.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
 import { startStubSupabase } from './helpers-demo-sb.mjs';
-import { demoHomeHide } from '../lib/demo-boot.mjs';
+import { demoHomeHide, SIGNIN_EVENT } from '../lib/demo-boot.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (f) => fs.readFileSync(path.join(REPO, f), 'utf8');
@@ -21,7 +21,7 @@ const { PAHome, PAIcons } = ctx;
 const app = (name, title, extra = {}) => ({ name, title, ...extra });
 const OWN = [app('allergy', '花粉 Allergy & Pollen'), app('bible', '圣经 Bible'), app('bible-values', '圣经价值观 Biblical Values'),
   app('diabetes', '糖尿病 Diabetes'), app('notes', '手写 Journal'), app('tasks', '待办 Tasks', { face: { value: '3', label: 'open' } })];
-const names = (xs) => [...xs].map((s) => (s.make ? '+make' : (s.app || s).name));
+const names = (xs) => [...xs].map((s) => (s.make ? (s.signin ? '+signin' : '+make') : (s.app || s).name));
 
 test('titles split into 中文 and English; old built-in titles still read bilingual', () => {
   assert.deepEqual([...PAHome.label('花粉 Allergy & Pollen')], ['花粉', 'Allergy & Pollen']);
@@ -31,9 +31,9 @@ test('titles split into 中文 and English; old built-in titles still read bilin
   for (const t of ['constructor', '__proto__', 'toString']) assert.deepEqual([...PAHome.label(t)], [t, ''], `${t}: no inherited lookup`);
 });
 
-test('layout: guest starts with Bible, Journal, Make an app; no app twice; hidden slugs never shown', () => {
+test('layout: guest starts with Bible, Journal, Sign in to build; no app twice; hidden slugs never shown', () => {
   const g = PAHome.layout(OWN, [], { guest: true, hide: ['diabetes'] });
-  assert.deepEqual(names(g.start), ['bible', 'notes', '+make']);
+  assert.deepEqual(names(g.start), ['bible', 'notes', '+signin'], 'a guest cannot build: the third tile is Sign in to build');
   const all = [...names(g.start), ...names(g.dock)];
   assert.equal(new Set(all).size, all.length, 'no app repeated');
   assert.ok(!all.includes('diabetes'), 'the demo hides Diabetes');
@@ -158,7 +158,7 @@ test('USER FLOW member: own greeting, no owner chips, Start here opens an app, t
   } finally { await c.close(); }
 });
 
-test('USER FLOW demo guest: welcome, Sign in in the header, Diabetes hidden, Make an app starts the ask box, phone fits, reduced motion', { skip, timeout: 60000 }, async () => {
+test('USER FLOW demo guest: welcome, Sign in in the header, Diabetes hidden, copy and tile send building to sign-in, phone fits, reduced motion', { skip, timeout: 60000 }, async () => {
   const c = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' }); const page = await c.newPage();
   try {
     await page.goto(`http://127.0.0.1:${dport}/`);
@@ -169,9 +169,19 @@ test('USER FLOW demo guest: welcome, Sign in in the header, Diabetes hidden, Mak
     assert.equal(await page.isVisible('#hAvatar'), false);
     assert.deepEqual((await homeApps(page)).slice(0, 2), ['bible', 'notes']);
     assert.ok(!(await homeApps(page)).includes('diabetes'), 'demo.home_hide');
-    await page.click('[data-make]');
-    assert.match(await page.inputValue('#box'), /^帮我做一个应用/);
-    assert.equal(await page.evaluate(() => document.activeElement.id), 'box');
+    // Building needs sign-in (AI sign-in only): the guest copy says what works now and that signing in builds apps.
+    await page.evaluate(() => PALang.bilingual(true));   // both sides on screen (the home re-draws on PALang.on)
+    assert.match(await page.textContent('#hWelcome'), /试用.*try it/, 'the welcome is drawn from T');
+    assert.doesNotMatch(await page.textContent('#hWelcome'), /做|make|build|create/i, 'the welcome says what works now, never "ask below for a new one"');
+    for (const s of ['#hKeep', '#hPh .ph-l', '#hPh .ph-s', '[data-signin]']) {
+      const t = await page.textContent(s); assert.match(t, /登录/, `${s} 中文: ${t}`); assert.match(t, /Sign in/, `${s} English: ${t}`);
+      assert.ok(t.indexOf('登录') < t.indexOf('Sign in'), `${s}: 中文 first`);
+    }
+    assert.doesNotMatch(await page.textContent('#hHello'), /make|做/i, 'the guest greeting no longer asks what to make');
+    assert.equal(await page.locator('[data-make]').count(), 0, 'no Make an app tile for a guest');
+    await page.click('[data-signin]');
+    await page.waitForSelector('#demoAuth #demoGoogle');   // the tile opens the demo sign-in
+    assert.equal(await page.inputValue('#box'), '', 'the tile does not start a build prompt');
     assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('header .mark .spark')).animationName), 'none', 'reduced motion: no twinkle');
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no sideways scroll at 390');
     const clipped = await page.evaluate(() => [...document.querySelectorAll('#eApps .dk b')].filter((b) => b.scrollWidth > b.parentElement.clientWidth + 12).length);
@@ -181,4 +191,40 @@ test('USER FLOW demo guest: welcome, Sign in in the header, Diabetes hidden, Mak
 
 test('member ask box placeholder is about CREATING an app, 中文 first', () => {
   assert.deepEqual([...PAHome.T.phMember], ['问我，或让我做一个应用', 'Ask anything, or create an app']);
+});
+
+// Regression (owner 2026-11-27): the signed-out demo home invited guests to build apps, but building needs sign-in.
+test('guest copy: every line that mentions building also says Sign in; signed-in copy unchanged', () => {
+  const T = PAHome.T;
+  assert.doesNotMatch(T.welcome.join(' '), /做|make|build|create/i, 'the welcome: what a guest can do now');
+  for (const k of ['keep', 'phGuest', 'phGuestShort', 'makeGuest']) {
+    const [zh, en] = T[k]; assert.match(zh, /登录/, `${k} 中文`); assert.match(en, /Sign in/, `${k} English`);
+  }
+  assert.doesNotMatch(T.guestHi.join(' '), /make|做/i);
+  assert.deepEqual([...T.make], ['做个应用', 'Make an app']); assert.deepEqual([...T.starter], ['帮我做一个应用，它能', 'Make me an app that ']);
+  assert.deepEqual(names(PAHome.layout([], [], { guest: false }).start), ['+make'], 'a signed-in visitor keeps Make an app');
+});
+
+test('R3: the guest welcome and keep lines live only in web/home-v2.js, not also in web/index.html', () => {
+  const html = read('web/index.html');
+  assert.match(html, /<p class="home-sub" id="hWelcome" hidden><\/p>/); assert.match(html, /<p class="home-keep" id="hKeep" hidden><a href="#"><\/a><\/p>/);
+  assert.doesNotMatch(html, /在下方让我做一个新应用|ask below for a new one/);
+  assert.ok(read('web/home-v2.js').includes(`SIGNIN_EVENT='${SIGNIN_EVENT}'`), 'the home fires the demo boot\'s sign-in event');
+});
+
+test('USER FLOW demo signed in: the member ask copy, no guest welcome, no sign-in tile', { skip, timeout: 60000 }, async () => {
+  const c = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  await c.addInitScript((s) => { if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('sb_session', s); } },
+    JSON.stringify({ a: sb.jwt({ sub: 'home-user', email: 'home@example.com', user_metadata: {} }), r: 'refresh', e: Math.floor(Date.now() / 1000) + 3600 }));
+  const page = await c.newPage();
+  try {
+    await page.goto(`http://127.0.0.1:${dport}/`);
+    await waitFor(() => page.evaluate(() => performance.getEntriesByType('navigation')[0].type === 'reload' && !!document.querySelector('#hStart .st')).catch(() => false), 'the boot reload');
+    await page.waitForSelector('#demoDel', { state: 'attached' });
+    await page.waitForSelector('#hStart .st');
+    assert.equal(await page.isVisible('#hWelcome'), false); assert.equal(await page.isVisible('#hKeep'), false);
+    assert.equal(await page.locator('[data-signin]').count(), 0);
+    const ph = await page.textContent('#hPh .ph-l');
+    assert.match(ph, /^问我，或让我做一个应用/, 'the member line (in the chosen language)'); assert.doesNotMatch(ph, /登录|Sign in/);
+  } finally { await c.close(); }
 });
