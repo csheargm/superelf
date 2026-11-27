@@ -98,3 +98,20 @@ test('GPT r1: a pinch belongs to the note it started on; a pen mid-gesture freez
   assert.match(NU, /zoom:\(z,cx,cy\)=>\{ if\(penId!==null\|\|!NB\|\|NB\.id!==zoomId\) return;/);
   assert.match(NU, /const gestUp=e\.pointerType==='touch'&&!!phoneGest&&phoneGest\.up\(e\);[^\n]*\n\s+if\(tool==='select'\)\{/, 'a lift in Select still reaches the tracker');
 });
+
+test('fitK: a wide page fits the width on a phone only; everything else keeps the MIN_PAGE_W floor', () => {
+  const P = load(true), D = load(false);
+  assert.equal(P.fitK(390, 816, 700, true), 390 / 816, 'phone + ink page: fit the width, no floor');
+  assert.equal(P.fitK(390, 816, 700, false), 700 / 816, 'phone + text page: the old floor');
+  assert.equal(D.fitK(390, 816, 700, true), 700 / 816, 'not a phone: the old floor even for an ink page');
+  assert.equal(D.fitK(1000, 816, 700, true), 1000 / 816, 'wide screen: unchanged');
+  assert.equal(P.fitK(0, 816, 700, true), 1, 'unsized: a safe 1');
+});
+
+test('Read view sizes: 18px floor, fixed steps, anything else falls back to 18', () => {
+  const P = load(true);
+  assert.equal(P.READ_SIZES[0], 18);
+  assert.equal(P.readSize(20), 20); assert.equal(P.readSize(19), 18); assert.equal(P.readSize('x'), 18); assert.equal(P.readSize(undefined), 18);
+  assert.equal(P.stepSize(18, -1), 18, 'never under 18'); assert.equal(P.stepSize(18, 1), 20);
+  const top = P.READ_SIZES[P.READ_SIZES.length - 1]; assert.equal(P.stepSize(top, 1), top, 'capped at the largest');
+});

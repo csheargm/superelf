@@ -101,7 +101,7 @@ test('the page fills the screen, and stays crisp by rendering at device resoluti
   // Fit the WIDTH in both views. Fitting both axes kept the whole sheet visible but stranded a
   // narrow page between two wide margins in landscape — the screen-waste report in the other
   // orientation. A document viewer fills the width and scrolls.
-  assert.match(E, /const kFit=Math\.max\(MIN_PAGE_W\/PAGE_W, r\.width\/PAGE_W\), k=kFit\*zoomNow\(\);/, 'width, always (times the phone pinch zoom, 1 elsewhere)');
+  assert.match(E, /const kFit=kFitOf\(r\.width\), k=kFit\*zoomNow\(\);/, 'width, always (times the phone pinch zoom, 1 elsewhere)');
 });
 
 test('the canvas budget is a data-loss guard, not tuning', () => {
