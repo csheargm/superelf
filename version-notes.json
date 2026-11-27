@@ -1,4 +1,13 @@
 {
+  "v5.38.9": {
+    "date": "2026-11-27",
+    "time": "2026-11-27T18:45:26.720Z",
+    "features": [],
+    "fixes": [
+      "合并：抬头标题与弹窗跟随所选语言，提示关闭测试只等它关的那条 · Merge: header title and pop-ups follow the chosen language; tips-close waits on the closed tip"
+    ],
+    "through": "7eb21c73436f01d96524029bd088000e1c910dca"
+  },
   "v5.38.8": {
     "date": "2026-11-27",
     "time": "2026-11-27T17:50:12.182Z",
