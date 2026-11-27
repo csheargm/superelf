@@ -42,7 +42,6 @@ const state = (frame) => frame.evaluate(() => { const st = document.querySelecto
   const r = b.getBoundingClientRect(), row = document.querySelector('.pan-fingerrow');
   return { zoom: Number(pi.style.zoom), top: st.scrollTop, left: st.scrollLeft, btn: getComputedStyle(b).display !== 'none', btnH: r.height, btnW: r.width,
     pressed: b.getAttribute('aria-pressed'), row: getComputedStyle(row).display !== 'none', phone: document.querySelector('.pan').classList.contains('pan-phone') }; });
-<<<<<<< HEAD
 const settle = (page) => page.waitForTimeout(1500);   // the note's save debounce: only for "nothing was saved" checks
 // A stroke that SHOULD save: wait for it on disk (a slow CI runner can take longer than one debounce).
 const SAVE_BUDGET_MS = 15000;
@@ -51,11 +50,6 @@ async function strokesReach(id, n) {
   while ((got = strokesOnDisk(id)) !== n && Date.now() < end) await new Promise((r) => setTimeout(r, 100));
   return got;
 }
-=======
-const settle = (page) => page.waitForTimeout(1500);   // the note's save debounce: long enough for a stroke that must NOT appear
-// A stroke that MUST appear: poll the disk (a slow CI runner saves later than the debounce).
-const saved = async (page, id, n) => { for (let i = 0; i < 40 && strokesOnDisk(id) !== n; i++) await page.waitForTimeout(250); return strokesOnDisk(id); };
->>>>>>> phone-ink-s1-fix-1126
 
 before(async () => { await setup({ slugs: ['notes'] }); if (!skip) { root = serverRoot(); seed(); } });
 after(teardown);
@@ -96,11 +90,7 @@ test('iPhone: the pen toggle replaces the checkbox, is on by default and 44px; o
   assert.equal(s.pressed, 'true', 'a phone with no stored choice and no pen inks with the finger');
   const n0 = strokesOnDisk('phoneA');
   await touches(frame, [['pointerdown', 11, 120, 400, true], ['pointermove', 11, 150, 420], ['pointermove', 11, 190, 440], ['pointerup', 11, 190, 440]]);
-<<<<<<< HEAD
   assert.equal(await strokesReach('phoneA', n0 + 1), n0 + 1, 'the one-finger stroke saved as ink');
-=======
-  assert.equal(await saved(page, 'phoneA', n0 + 1), n0 + 1, 'the one-finger stroke saved as ink');
->>>>>>> phone-ink-s1-fix-1126
   // Off: a finger no longer inks.
   await frame.locator('.pan-fingerbtn').click();
   assert.equal((await state(frame)).pressed, 'false', 'the toggle turns finger ink off');
@@ -155,11 +145,7 @@ test('iPhone: two fingers pan with no new ink; a pinch zooms, is clamped to 3x a
   assert.ok(Object.keys(stored).some((k) => k.endsWith('\nphoneA')), 'the zoom is stored per note on this device');
   // One finger still inks after all that.
   await touches(frame, [['pointerdown', 61, 120, 400, true], ['pointermove', 61, 150, 420], ['pointermove', 61, 190, 440], ['pointerup', 61, 190, 440]]);
-<<<<<<< HEAD
   assert.equal(await strokesReach('phoneA', n0 + 1), n0 + 1, 'one finger inks at 2x');
-=======
-  assert.equal(await saved(page, 'phoneA', n0 + 1), n0 + 1, 'one finger inks at 2x');
->>>>>>> phone-ink-s1-fix-1126
   await ctx.close();
 });
 
