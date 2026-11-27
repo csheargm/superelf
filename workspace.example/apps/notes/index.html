@@ -846,11 +846,16 @@ async function boot(){
   // Land with the list OPEN and that note marked, so the journal opens on "here is everything
   // you have written, and here is where you were" rather than on a single page with no context.
   // Only when there is something to show: an empty drawer over an empty pad is two empty things.
-  if(last) drawer.open();
+  // Awaited, so boot is done only once the list is on screen (PANotesBoot below). A list that cannot open is told,
+  // never a boot failure: the note itself loaded, so writes must not be blocked for it.
+  if(last) try{ await drawer.open(); }catch(err){ paNotice('列表打不开 · Could not open the list — '+((err&&err.message)||err),'','drawer'); }
 }
 // A throw here must not white-screen the app — but it must not look healthy either: writes stay
 // blocked until a read succeeds, and the reason is on the notice (R5: never a bare catch).
-(async()=>{ try{ await boot(); }
+// window.PANotesBoot settles when boot has finished, the docked list included: a test that taps the page waits on it,
+// or the list (drawer.open awaits its refresh) docks after the test looked and covers the tool strip (CI webkit 2026-11-27).
+// TODO(R4): this file is over budget — boot() and its index-wipe guard are the seam to split into notes-boot.js.
+window.PANotesBoot=(async()=>{ try{ await boot(); }
   catch(err){ DATA.blockAll('启动失败 · boot failed');
     paNotice('无法启动 · Could not start — '+((err&&err.message)||err)+WRITES_BLOCKED,'','boot');
     try{ await pad.open(); }catch(_){ /* the pad itself is gone; the notice above is the only surface left */ } } })();

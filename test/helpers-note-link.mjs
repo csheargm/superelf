@@ -100,6 +100,7 @@ export async function openJournal(page, { touch = false, slug = 'notes' } = {}) 
   for (let i = 0; i < 100 && !frame; i++) { frame = page.frames().find((f) => f.url().includes(`/app/owner/${slug}/`)) || null; if (!frame) await page.waitForTimeout(50); }
   assert.ok(frame, 'the Journal frame loaded');
   await frame.waitForFunction(() => window.PANote && document.querySelector('.pan-mtext') && !document.querySelector('.pan-lock.on'));
+  await frame.evaluate(() => window.PANotesBoot);                            // boot done, the docked list included: it used to dock AFTER the check below and cover the strip (CI webkit)
   await page.waitForTimeout(300);                                            // the note's load settles
   // These flows test links, not the bar: hold it shown so its idle hide (ADR 0035, which gives the bar's
   // height back and moves the page) cannot shift a word between measuring it and tapping it.
