@@ -430,12 +430,14 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
   <div style="text-align:center;margin-top:6px;font-size:12px"><a href="#" id="toTok" style="color:var(--muted)">尚无密码：用访问令牌登录 · No password yet: sign in with access token</a></div>
 </form></dialog>
 <script>
+/* PA_LANG_JS */
 /* PA_ICONS_JS */
 /* PA_HOME_LOOK_JS */
 /* PA_DRAWER_SECTIONS_JS */
 /* PA_HOME_V2_JS */
+/* PA_LANG_SWITCH_JS */
 const $=(s)=>document.querySelector(s);
-PAIcons.hydrate(); PAHomeLook.bindAa(); PAHome.bind();
+PAIcons.hydrate(); PAHomeLook.bindAa(); PAHome.bind(); PALangSwitch.mount();
 let T=localStorage.getItem('pa_session')||'';
 let API_BASE='';   // '' = this page's origin; the home node's name while the public one is away (web/offline-origin.js PAOrigin). TODO(R4 seam): with api() into web/api.js
 const api=(p,opt={})=>fetch(API_BASE+p,{...opt,headers:{...(opt.headers||{}),authorization:'Bearer '+T}});
@@ -798,7 +800,7 @@ async function ensureToken(){
   }
   $('#dot').classList.add('ok');
 }
-async function logout(){ try{ await api('/api/logout',{method:'POST'}); }catch{} try{ await swSignedOut(window.caches,(u)=>fetch(u,{method:'POST',credentials:'same-origin'})); }catch(err){ alert('未能清除已保存的应用页面 · Could not clear saved app pages — '+(err&&err.message||err)); } localStorage.removeItem('pa_session'); try{ localStorage.removeItem(SW_FAMILY_KEY); }catch{ /* blocked storage: nothing was kept */ } location.reload(); }
+async function logout(){ try{ await api('/api/logout',{method:'POST'}); }catch{} try{ await swSignedOut(window.caches,(u)=>fetch(u,{method:'POST',credentials:'same-origin'})); }catch(err){ alert('未能清除已保存的应用页面 · Could not clear saved app pages — '+(err&&err.message||err)); } localStorage.removeItem('pa_session'); try{ localStorage.removeItem(SW_FAMILY_KEY); localStorage.removeItem('pa_lang'); }catch{ /* blocked storage: nothing was kept */ } location.reload(); }   // pa_lang: web/lang.js KEY — the next account starts from its own choice
 
 /* ── New-feature key registry: maps feature-key → version added ── */
 // Update this when shipping new UI features; markNew() + PANewDot.mark() use these keys.
@@ -964,7 +966,7 @@ async function saveAppSettings(slug,prefs,systemPrompt,appSent){
 // app-side handlers are idempotent; newFeatureKeys ride the second push only, so the blue dots are
 // announced once.
 function sendAppPrefs(withModels=true){ const fw=$('#fr').contentWindow; if(!(fw&&$('#fr').src!=='about:blank')) return;
-  const m={pa:'prefs',fontScale:FS_STEPS[fsIdx],fingerDraw:localStorage.getItem('pa_fingerdraw')==='1',fingerDrawSet:localStorage.getItem('pa_fingerdraw')!==null,noteZoom:noteZoomsOf(frameSlug()),readSize:Number(localStorage.getItem('pa_notereadsize'))||0,seamless:localStorage.getItem('pa_seamless')==='1',printInk:localStorage.getItem('pa_printink')!=='0',noFlip:localStorage.getItem('pa_noflip')==='1',openAi:(appPrefsMap()[frameSlug()]||{}).openAi===true,uploadMaxBytes:RELAY_LIMITS.upload,chatMaxBytes:RELAY_LIMITS.chat,ownBar:frameOwnBar(),fsTitles:[fsTitle(-1),fsTitle(1)]};
+  const m={pa:'prefs',fontScale:FS_STEPS[fsIdx],fingerDraw:localStorage.getItem('pa_fingerdraw')==='1',fingerDrawSet:localStorage.getItem('pa_fingerdraw')!==null,noteZoom:noteZoomsOf(frameSlug()),readSize:Number(localStorage.getItem('pa_notereadsize'))||0,seamless:localStorage.getItem('pa_seamless')==='1',printInk:localStorage.getItem('pa_printink')!=='0',noFlip:localStorage.getItem('pa_noflip')==='1',openAi:(appPrefsMap()[frameSlug()]||{}).openAi===true,uploadMaxBytes:RELAY_LIMITS.upload,chatMaxBytes:RELAY_LIMITS.chat,ownBar:frameOwnBar(),lang:typeof frameLang==='function'?frameLang():undefined,fsTitles:[fsTitle(-1),fsTitle(1)]};
   if(withModels) Object.assign(m,{models:CHAT_MODELS,wantModel:appModel(frameSlug()),newFeatureKeys:Object.keys(window._PA_NEW_KEYS||{}).filter(k=>!_SEEN.has(k))});
   fw.postMessage(m,'*'); }
 // Per-note pinch zoom, per device: pa_notezoom = {"<slug>\n<note id>": z}, the newest NOTE_ZOOM_MAX kept.
@@ -1222,6 +1224,7 @@ async function loadApps(){
   LINK_APPS=new Set(ownApps.filter(a=>a.links===true).map(a=>a.name));
   const wasOwnBar=frameOwnBar();
   OWNBAR_APPS=new Set(ownApps.filter(a=>a.ownBar===true).map(a=>a.name));
+  window.PA_BILINGUAL_APPS=new Set(apps.filter(a=>a.bilingual===true).map(a=>a.uid+'/'+a.name));   // frameLang (broker block)
   if(!wasOwnBar&&frameOwnBar()) sendAppPrefs(false);   // an app opened before this list arrived got ownBar:false and drew no bar (F3-02). TODO(R4): moves with the app-frame seam
   FORK_APPS=new Set(ownApps.filter(a=>!!a.forkedFrom).map(a=>a.name));   // PAPublish.item: a copy is not published
   const fresh=noteNewApps(ownApps.map(a=>a.name));
@@ -1928,6 +1931,9 @@ function notifyAtBoot(){
 notifyAtBoot();
 
 /* ── Broker (for sandboxed apps) ── */
+// The open app's language (lib/ui-lang.mjs): a bilingual app ('uid/slug' in PA_BILINGUAL_APPS, from /api/apps) keeps both.
+// No PALang on the page (a test harness cut of this block): no language is sent, and the server uses the account's.
+function frameLang(){ if(!window.PALang) return undefined; const b=window.PA_BILINGUAL_APPS; return b&&b.has(frameUid()+'/'+frameSlug())?'both':PALang.get(); }
 // In-flight 'chat' relays: broker id → that relay's AbortController. It is what chat-cancel looks
 // a chat up by, and an entry lives exactly as long as its relay runs.
 const relayChats=new Map();
@@ -2048,7 +2054,7 @@ window.addEventListener('message',async(e)=>{
       // oneShot: ONE answer for a component (PAChat.complete), not a conversation turn — the server
       // then answers without extended thinking and kills the job when this request closes. Only the
       // literal true is forwarded, so no other value an app sends can switch either behaviour on.
-      const body=JSON.stringify({message:String(m.message||''),convoId:m.convoId||null,attachments:m.attachments,app:fr.edit?undefined:appSlug,edit:fr.edit?appSlug:undefined,label:m.label,model:m.model||undefined,system:m.system||undefined,assess:m.assess||undefined,oneShot:m.oneShot===true||undefined});
+      const body=JSON.stringify({message:String(m.message||''),convoId:m.convoId||null,attachments:m.attachments,app:fr.edit?undefined:appSlug,edit:fr.edit?appSlug:undefined,label:m.label,model:m.model||undefined,system:m.system||undefined,assess:m.assess||undefined,oneShot:m.oneShot===true||undefined,lang:frameLang()});
       // A failed chat must SAY so inside the app's chat UI. PAChat renders only
       // convo/status/delta/done/assess events (web/chat-ui.inline.html:575-588), and a
       // delta APPENDS to what has streamed so far — so the failure is delivered as a delta
@@ -2611,7 +2617,7 @@ async function sendTurn(q){
   // Bytes, not characters: BODY_LIMITS.chat counts what goes on the wire, and a text
   // attachment is spliced into `message` here (handleFiles reads .md/.json/.csv/… inline),
   // so a rejection must be able to name the real size.
-  const body=JSON.stringify({message:msg,convoId,attachments:fileAtts,model:SHELL_CURMODEL||undefined,assess:shellVerifyOn||undefined});
+  const body=JSON.stringify({message:msg,convoId,attachments:fileAtts,model:SHELL_CURMODEL||undefined,assess:shellVerifyOn||undefined,lang:typeof PALang!=='undefined'?PALang.get():undefined});   // the ONE language setting (web/lang.js); a harness cut has none
   const sentBytes=relayBodyBytes(body);
   try{
     const res=await api('/api/chat',{method:'POST',headers:{'content-type':'application/json'},body});
@@ -2758,7 +2764,7 @@ PAShellCam.bind({atts:()=>attachments,render:renderChips,say:(t)=>PAShellCam.say
   await refreshChatModels();   // also sets the main chat's lane and chooser (syncShellModel)
   // Fetch the profile (ME, incl. appOrder) in parallel; gate only the app grid on it so the
   // saved My-Apps order applies on first paint, while convos/family load concurrently.
-  const profileReady=loadProfile().then(()=>PADrawerSections.paint());   // the account's remembered sections
+  const profileReady=loadProfile().then(()=>{ PALangSwitch.fromProfile(); PADrawerSections.paint(); });   // the account's language, then its remembered sections   // the account's remembered sections
   profileReady.then(()=>profileLoaded(),()=>profileLoaded());   // settled either way (a paint error included): the app broker never hangs
   PATipsShell.ready(profileReady);   // the shell's tips read their 'seen' list from the profile (web/tips-store.js)
   await Promise.allSettled([profileReady.finally(loadApps), loadFamilyApps(), loadConvos(), convoId?openConvo(convoId):Promise.resolve()]);

@@ -161,3 +161,11 @@ dialog input, dialog textarea, dialog select{ border-radius:var(--r-ctl); }
   #pubScrim{ background:rgba(0,0,0,.62); }
   #pubSheet{ box-shadow:0 0 0 1px rgba(255,255,255,.12),0 8px 40px rgba(0,0,0,.7); }
 }
+/* The ☰ drawer's ONE language switch (web/lang-switch.js): 中 | EN, the chosen side filled. 44px tall (phone taps). */
+.dlang{ flex:none; padding:8px 14px calc(8px + env(safe-area-inset-bottom)); }
+#langSw{ display:inline-flex; gap:0; padding:3px; min-height:44px; border:1px solid var(--line); border-radius:22px; background:none; }
+#langSw>span{ display:inline-flex; align-items:center; justify-content:center; min-width:44px; padding:0 12px; border-radius:18px; font-size:14px; font-weight:600; color:var(--muted); }
+#langSw>span.on{ background:var(--accent); color:#fff; }
+/* PALang pairs (web/lang.js pairClass): <b>中文</b><span class="en">English</span> shows one side once a language is chosen. */
+html[data-pa-pairs][data-pa-lang="zh"] .en:not(.pa-keep){display:none!important}   /* .pa-keep: an .en line already in the chosen language (the home date) */
+html[data-pa-pairs][data-pa-lang="en"] .pa-lz{display:none!important}

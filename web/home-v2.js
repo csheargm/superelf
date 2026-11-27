@@ -7,13 +7,16 @@
    - hidden slugs: demo config demo.home_hide (lib/demo-boot.mjs passes it as PADemoAuth.conf.hide). */
 const PAHome=(function(){
   const MORE_TIP='tip:home-more';
+  // The ONE language setting (web/lang.js PALang): a [中文, English] pair → the chosen side, or both.
+  const lang=()=>(window.PALang?PALang.get():'both');
+  const L=(p)=>(window.PALang?PALang.t(p):(p[0]&&p[1]?p[0]+' · '+p[1]:p[0]||p[1]));
   const T={
     guestHi:['嗨，','想做点什么？','Hi — what shall we make?'],
     demo:['这是演示版 · 点任一应用试试，或在下方让我做一个新应用','This is the demo — open any app, or ask below for a new one.'],
     keep:['登录后可保存','Sign in to keep your work'],
     phGuest:['试试：“给孩子做个背经文的小游戏”','Try: “make a verse game for my kids”'], phGuestShort:['让我做个应用','Ask me to make an app'],
     phMember:['问我，或让我做一个应用','Ask anything, or create an app'],
-    make:['做个应用','Make an app'], starter:'帮我做一个应用，它能',
+    make:['做个应用','Make an app'], starter:['帮我做一个应用，它能','Make me an app that '],
     more:'更多应用 · More apps', shelf:'家庭书架 · Family shelf',
     tip:'新：字号、刷新和设置都在这里 · New: text size, refresh and settings are here',
   };
@@ -59,11 +62,13 @@ const PAHome=(function(){
   const GRADS=['g1','g2','g3'];
   const dockIcon=(a)=>{ const {icon,color}=PAIcons.appIcon(a); return `<span class="dk-ic" style="--c:${color}">${PAIcons.svg(icon)}</span>`; };
   const updDot=(a,esc)=>a.hasUpdate?`<span class="update-dot" data-update="${esc(a.name)}" data-title="${esc(a.title)}" title="有新版本 · Update available"></span>`:'';
-  const name2=(zh,en,esc)=>`${esc(zh||en)}${zh&&en?`<small>${esc(en)}</small>`:''}`;
+  const name2=(zh,en,esc)=>lang()!=='both'?esc(L([zh,en])):`${esc(zh||en)}${zh&&en?`<small>${esc(en)}</small>`:''}`;
+  // A tile's two lines: both languages, or the chosen one alone.
+  const two=(zh,en,esc)=>lang()!=='both'?`<span class="zh">${esc(L([zh,en]))}</span>`:`<span class="zh">${esc(zh||en)}</span>${zh&&en?`<span class="en">${esc(en)}</span>`:''}`;
   function tileHtml(s,i,uid,esc){
-    if(s.make) return `<button type="button" class="st g3" data-make>${PAIcons.svg('spark')}<span class="zh">${T.make[0]}</span><span class="en">${T.make[1]}</span></button>`;
+    if(s.make) return `<button type="button" class="st g3" data-make>${PAIcons.svg('spark')}${two(T.make[0],T.make[1],(x)=>x)}</button>`;
     const a=s.app, [zh,en]=label(a.title);
-    return `<button type="button" class="st ${GRADS[i%3]} ecard" data-eu="${esc(uid)}" data-es="${esc(a.name)}" data-et="${esc(a.title)}">${updDot(a,esc)}${PAIcons.svg(PAIcons.appIcon(a).icon)}<span class="zh">${esc(zh||en)}</span>${zh&&en?`<span class="en">${esc(en)}</span>`:''}</button>`;
+    return `<button type="button" class="st ${GRADS[i%3]} ecard" data-eu="${esc(uid)}" data-es="${esc(a.name)}" data-et="${esc(a.title)}">${updDot(a,esc)}${PAIcons.svg(PAIcons.appIcon(a).icon)}${two(zh,en,esc)}</button>`;
   }
   function dockHtml(lay,uid,esc){
     const card=(u,a,badge)=>{ const [zh,en]=label(a.title);
@@ -74,18 +79,25 @@ const PAHome=(function(){
   }
   const guest=()=>!!(window.PADemoAuth&&!(PADemoAuth.session&&PADemoAuth.session()));
   const hideList=()=>{ const h=window.PADemoAuth&&PADemoAuth.conf&&PADemoAuth.conf.hide; return Array.isArray(h)?h:[]; };
-  let NAME='';
+  let NAME='', LAST=null;
   const $=(s)=>document.querySelector(s);
-  function render({own,shelf,uid,esc}){
+  // A language flip re-draws the home from the last data (no request): PALang.on → rerender.
+  function rerender(){ if(LAST) render(LAST); }
+  function hello(g,esc){ const l=lang(), [gz,ge]=PAHomeLook.greeting(), [dz,de]=PAHomeLook.dateLine();
+    if(g) return l==='en'?`<span class="grad">${T.guestHi[2]}</span>`:`${T.guestHi[0]}<span class="grad">${T.guestHi[1]}</span>${l==='both'?`<span class="en">${T.guestHi[2]}</span>`:''}`;
+    const nm=`<span class="grad">${esc(NAME||'')}</span>`;
+    if(l==='en') return `${esc(ge)}, ${nm}<span class="en">${esc(de)}</span>`;
+    if(l==='zh') return `${esc(gz)}，${nm}<span class="en pa-keep">${esc(dz)}</span>`;
+    return `${esc(gz)}，${nm}<span class="en">${esc(ge)} · ${esc(dz)} · ${esc(de)}</span>`; }
+  function render(args){
+    LAST=args; const {own,shelf,uid,esc}=args;
     const g=guest(), lay=layout(own,shelf,{guest:g,hide:hideList(),mru:(typeof ME!=='undefined'&&ME&&ME.appOrder)||[]});
-    const [gz,ge]=PAHomeLook.greeting(), [dz,de]=PAHomeLook.dateLine();
-    $('#hHello').innerHTML=g
-      ?`${T.guestHi[0]}<span class="grad">${T.guestHi[1]}</span><span class="en">${T.guestHi[2]}</span>`
-      :`${esc(gz)}，<span class="grad">${esc(NAME||'')}</span><span class="en">${esc(ge)} · ${esc(dz)} · ${esc(de)}</span>`;
-    $('#hChips').innerHTML=g?'':chips(own).map((c)=>`<button type="button" class="chip-t" data-eu="${esc(uid)}" data-es="${esc(c.app.name)}" data-et="${esc(c.app.title)}">${esc(c.zh)}${c.en?` · ${esc(c.en)}`:''}</button>`).join('');
+    $('#hHello').innerHTML=hello(g,esc);
+    $('#hChips').innerHTML=g?'':chips(own).map((c)=>`<button type="button" class="chip-t" data-eu="${esc(uid)}" data-es="${esc(c.app.name)}" data-et="${esc(c.app.title)}">${esc(lang()==='en'?c.en||c.zh:lang()==='zh'?c.zh:c.zh+(c.en?' · '+c.en:''))}</button>`).join('');
     $('#hWelcome').hidden=!g; $('#hKeep').hidden=!g;
     const ph=g?T.phGuest:T.phMember, sh=g?T.phGuestShort:ph;   // phone: the short line, so the ring never cuts it
-    $('#hPh').innerHTML=`<span class="ph-l">${ph[0]}<small>${ph[1]}</small></span><span class="ph-s">${sh[0]}<small>${sh[1]}</small></span>`; PH_LABEL=ph[0]+' · '+ph[1]; if(docked) $('#box').setAttribute('aria-label',PH_LABEL);
+    const phl=(p)=>lang()==='both'?`${p[0]}<small>${p[1]}</small>`:L(p);
+    $('#hPh').innerHTML=`<span class="ph-l">${phl(ph)}</span><span class="ph-s">${phl(sh)}</span>`; PH_LABEL=L(ph); if(docked) $('#box').setAttribute('aria-label',PH_LABEL);
     $('#hStart').innerHTML=lay.start.map((s,i)=>tileHtml(s,i,uid,esc)).join('');
     $('#hDockHead').hidden=!(lay.dock.length||lay.shelf.length);
     $('#eApps').innerHTML=dockHtml(lay,uid,esc);
@@ -113,7 +125,7 @@ const PAHome=(function(){
     else { box.placeholder=chatPh; box.removeAttribute('aria-label'); anchor.before(row); if(att) chipAnchor.before(att); }
     if(typing){ box.focus(); box.setSelectionRange(sel[0],sel[1]); }
   }
-  function startMake(){ const i=$('#box'); i.value=T.starter; i.focus(); i.setSelectionRange(i.value.length,i.value.length); i.dispatchEvent(new Event('input')); }
+  function startMake(){ const i=$('#box'); i.value=lang()==='en'?T.starter[1]:T.starter[0]; i.focus(); i.setSelectionRange(i.value.length,i.value.length); i.dispatchEvent(new Event('input')); }
   function closeMore(){ const m=$('#hmenu'); if(m&&!m.hidden){ m.hidden=true; $('#hmore').setAttribute('aria-expanded','false'); } }
   function bind(){
     $('#hmore').onclick=(e)=>{ e.stopPropagation(); const m=$('#hmenu'); m.hidden=!m.hidden; if(!m.hidden) placeMenu(m,$('#hmore')); $('#hmore').setAttribute('aria-expanded',String(!m.hidden)); };   // the press on ⋯ also closes its tip (PATips)
@@ -136,5 +148,5 @@ const PAHome=(function(){
       if(!_SEEN.has(MORE_TIP)) PATipsShell.tip(MORE_TIP,'#hmore',T.tip);   // the ONE tip mechanism (✕, Escape, outside tap); an old device-only dismissal still counts
       const s=$('#demoSignin'); if(s){ s.classList.add('h-signin'); $('#hmore').before(s); } syncHeader(); });
   }
-  return {label,layout,chips,render,setName,bind,startMake,dockInput,T};
+  return {label,layout,chips,render,rerender,setName,bind,startMake,dockInput,T};
 })();
