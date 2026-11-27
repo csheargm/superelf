@@ -146,6 +146,26 @@ for (const dev of DEVICES) {
   });
 }
 
+// CI flake v5.37.2: the outside-tap listener was armed on a 0ms timer, so a tap that came before the timer
+// ran (a busy runner, a quick finger) did not close the menu. Pinned with no gap at all: the menu opens and
+// the outside press lands in the SAME task, before any timer could run.
+for (const dev of DEVICES) test(`${dev.name}: an outside press right after a menu opens closes it (no arming gap)`, { skip }, async () => {
+  const { ctx, page } = await signIn(dev);
+  try {
+    await page.evaluate(() => openDrawer());
+    if ((await page.getAttribute('#secApps .dsec-head', 'aria-expanded')) !== 'true') await page.click('#secApps .dsec-head');   // closed by default
+    await page.locator('[data-appmenu="todo"]').waitFor({ state: 'attached' });   // the click below is the page's own: no hit test
+    const left = await page.evaluate(() => {
+      document.querySelector('[data-appmenu="todo"]').click();
+      const opened = !!document.querySelector('#appMenu');
+      document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'touch', isPrimary: true, button: 0 }));
+      return { opened, open: !!document.querySelector('#appMenu') };
+    });
+    assert.ok(left.opened, 'CONTROL: the click opened the menu');
+    assert.equal(left.open, false, 'the outside press closed it at once');
+  } finally { await ctx.close(); }
+});
+
 // 分享/发布窗口要醒目 · The sheet stands out (owner 2026-11-26): a dimming scrim covers the page AND the app
 // frame behind it, a tap above the sheet lands on the scrim, focus is in the modal dialog, and every
 // close path takes the scrim with it (no invisible layer left eating taps).
