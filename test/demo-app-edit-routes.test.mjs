@@ -13,6 +13,7 @@ import { UNDO_HINT } from '../lib/demo-app-edit.mjs';
 import { SAME_PAGE } from '../lib/app-edit-lane.mjs';
 import { APP_MARKER, withOwnPolicy } from '../lib/demo-app.mjs';
 import { ensureAskAi } from '../lib/demo-askai.mjs';
+import { SEARCH_MARKER } from '../lib/demo-search.mjs';
 import { waitBuilt } from './helpers-demo-build.mjs';
 
 const MODELS = [{ id: 'fast', label: 'Fast', provider: 'ollama', model: 'fake-fast' }, { id: 'smart', label: 'Smart · 智能', provider: 'ollama', model: 'fake-smart' }];
@@ -26,7 +27,10 @@ function startOllamaStub() {
   return new Promise((r) => { const srv = http.createServer((req, res) => {
     let b = ''; req.on('data', (c) => { b += c; }).on('end', () => {
       const msgs = JSON.parse(b).messages, apply = msgs.some((m) => m.role === 'user' && m.content.startsWith('Change this app:'));
-      const text = apply && (mode === 'same' || mode === 'verbatim') ? `Kept it.\n\n\`\`\`html\n${mode === 'same' ? PAGE : withOwnPolicy(ensureAskAi(PAGE, 'Calendar Planner'))}\n\`\`\`` : mode === 'marker' && !apply ? `${APP_MARKER} {"edit":"calendar-planner","title":"Calendar Planner","request":"make the title red"}`
+      const searched = msgs.some((m) => m.role === 'system' && (m.content.startsWith('Web search results') || m.content.startsWith('Web search is not available')));
+      const text = mode === 'search' && !apply ? (searched ? 'The weather answer from search.' : `${SEARCH_MARKER} weather today`)
+        : apply && mode === 'bad' ? 'no page blocks here'
+        : apply && (mode === 'same' || mode === 'verbatim') ? `Kept it.\n\n\`\`\`html\n${mode === 'same' ? PAGE : withOwnPolicy(ensureAskAi(PAGE, 'Calendar Planner'))}\n\`\`\`` : mode === 'marker' && !apply ? `${APP_MARKER} {"edit":"calendar-planner","title":"Calendar Planner","request":"make the title red"}`
         : apply ? `I added it.\n\n\`\`\`html\n${pageWith(nextExtra)}\n\`\`\`\n\n\`\`\`json\n{"title":"Calendar Planner"}\n\`\`\``
         : mode === 'lie' ? LIE : `I will add a Day / Week / Month / Year switcher above the calendar.\n${PLAN_MARKER}`;
       res.writeHead(200, { 'content-type': 'application/x-ndjson' });
@@ -136,6 +140,27 @@ test('GPT review r2: a page that is the same once the demo\'s own additions are 
   }
   const evU = await chat(v, { message: 'undo' });
   assert.equal(evU.find((e) => e.type === 'app-edit').undone, undefined, 'no Undo step was made');
+  mode = 'plan';
+});
+
+test('nightly review: an ordinary question in the guest\'s own app chat still gets the web search step', async () => {
+  const v = await visit('198.51.100.28'); const file = seedApp(v); mode = 'search';
+  const ev = await chat(v, { message: 'what is the weather today?' });
+  assert.ok(ev.some((e) => e.type === 'status'), 'the search step ran (searching, or said why it could not)');
+  assert.ok(done(ev).text.includes('The weather answer from search.') && !done(ev).text.includes(SEARCH_MARKER));
+  assert.equal(fs.readFileSync(file, 'utf8'), PAGE);
+  mode = 'plan';
+});
+
+test('nightly review: a rewrite that fails both attempts is a failed turn, not a saved success', async () => {
+  const v = await visit('198.51.100.29'); seedApp(v); mode = 'plan';
+  const ev1 = await chat(v, { message: ASK });
+  const convoId = ev1.find((e) => e.type === 'convo').id;
+  mode = 'bad';
+  const ev2 = await chat(v, { message: confirmOf(ev1).message, convoId });
+  assert.equal(done(ev2).ok, false);
+  const saved = await (await req(v, `/api/convos/${convoId}`)).json();
+  assert.equal(saved.messages[saved.messages.length - 1].failed, true, 'saved as failed, so later turns do not see it as an answer');
   mode = 'plan';
 });
 
