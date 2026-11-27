@@ -1,4 +1,13 @@
 {
+  "v5.38.2": {
+    "date": "2026-11-27",
+    "time": "2026-11-27T16:19:14.631Z",
+    "features": [],
+    "fixes": [
+      "合并：语言开关移到 ⋯ 菜单 · Merge: the language switch moves to the ⋯ menu"
+    ],
+    "through": "288bf60d8bc1d8a5bdd52581342d4c8711e22967"
+  },
   "v5.38.1": {
     "date": "2026-11-27",
     "time": "2026-11-27T08:07:17.364Z",
