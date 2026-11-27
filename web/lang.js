@@ -15,6 +15,7 @@
        - in the shell only (pairClass), a <span class="en"> after its 中文 sibling is the English half.
        Never switched: inputs' values, textareas' text (their title/placeholder/aria-label are), contenteditable in any state, the note text layer, scripts, the chat logs (#log, .pac-log:
        what people wrote and what the AI said) and anything inside [data-pa-lang-skip].
+     Native alert / confirm / prompt messages are switched the same way (wrapped once, below).
      PALang.get() → 'zh' | 'en' | 'both'; choice() → 'zh' | 'en'; stored() → this device's saved choice or ''; set(l) → applied now, kept on this device;
      bilingual(on); on(fn) → called on every change; device() → the device's default.
      Driven by test/lang.test.mjs (unit, over this file in a vm) and test/lang-e2e.test.mjs (browsers).
@@ -117,6 +118,10 @@
   window.PALang={KEY,get,choice:()=>chosen,t,split,set,bilingual,device,apply,stored,
     on:(f)=>{ subs.add(f); return ()=>subs.delete(f); },
     pairClass:(c)=>{ pairs=String(c||''); if(document.documentElement) document.documentElement.toggleAttribute('data-pa-pairs',!!pairs); apply(); }};
+  // Native pop-ups (alert / confirm / prompt) show the chosen side of a "中文 · English" message too, for every
+  // caller at once (R3). Only the message: prompt's default value (a sign-in code) is the person's, never switched.
+  for(const k of ['alert','confirm','prompt']){ const f=window[k]; if(typeof f!=='function') continue;
+    window[k]=function(msg,...rest){ return f.call(window,msg==null?msg:t(msg),...rest); }; }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',apply,{once:true}); else apply();
   if(document.documentElement) document.documentElement.setAttribute('data-pa-lang',get());
 })();

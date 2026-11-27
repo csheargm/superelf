@@ -99,9 +99,11 @@ test('the header title is a Home control: mouse, Enter, tap; from a chat, an app
   } finally { await ctx.close(); }
 });
 
-test('the apostrophe in "<name>’s 管家" sits flush: no gap wider than a space either side', { skip, timeout: 60000 }, async () => {
-  const { ctx, page } = await signIn({ viewport: { width: 1000, height: 800 } });
+test('the apostrophe in "<name>’s agent" sits flush: no gap wider than a space either side', { skip, timeout: 60000 }, async () => {
+  const { ctx, page } = await signIn({ viewport: { width: 1000, height: 800 }, locale: 'en-US' });
   try {
+    await page.evaluate(() => PALang.set('en'));
+    await page.waitForFunction(() => document.querySelector('header h1').textContent === 'Ada’s agent');
     const m = await page.evaluate(() => {
       const h = document.querySelector('header h1'); const txt = h.textContent; const i = txt.indexOf('’');
       const node = [...h.querySelectorAll('*'), h].flatMap((e) => [...e.childNodes]).find((n) => n.nodeType === 3 && n.data.includes('’'));
@@ -111,7 +113,7 @@ test('the apostrophe in "<name>’s 管家" sits flush: no gap wider than a spac
       return { txt, i, apW: ap.width, before: ap.left - prev.right, after: sL.left - ap.right, fs: parseFloat(getComputedStyle(h).fontSize), space: sw,
         nameFont: getComputedStyle(node.parentElement).fontFamily };
     });
-    assert.equal(m.txt.replace(/\s+/g, ' '), 'Ada’s 管家');
+    assert.equal(m.txt.replace(/\s+/g, ' '), 'Ada’s agent');
     assert.ok(m.apW < m.fs * 0.45, `apostrophe glyph is ${m.apW.toFixed(1)}px at ${m.fs}px font (a full-width CJK glyph is ~1em)`);
     assert.ok(Math.abs(m.before) < 1 && Math.abs(m.after) < 1, `no gap around the apostrophe: ${m.before}/${m.after}`);
     // The mechanism: the name part's stack lists Latin fonts (Segoe UI for Windows) before any CJK font (YaHei drew ’ full-width).

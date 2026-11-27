@@ -590,7 +590,7 @@ function convoMenu(id, convoEl, anchor){
   placeMenu(m,anchor);
   m.onclick=async(ev)=>{ const b=ev.target.closest('button'); if(!b) return; const a=b.dataset.a; closeConvoMenu();
     if(a==='rename') startRename(convoEl, id);
-    else if(a==='delete'){ if(confirm('Delete this chat?')){ await api('/api/convos/'+encodeURIComponent(id),{method:'DELETE'}); if(id===convoId) newConvo(); else loadConvos(); } }
+    else if(a==='delete'){ if(confirm('删除这个对话？ · Delete this chat?')){ await api('/api/convos/'+encodeURIComponent(id),{method:'DELETE'}); if(id===convoId) newConvo(); else loadConvos(); } }
   };
   armMenuPop(anchor);
 }
@@ -616,29 +616,36 @@ function closeDrawer(){ $('#drawer').classList.remove('open'); $('#backdrop').cl
 $('#menu').onclick=openDrawer; $('#backdrop').onclick=closeDrawer;
 $('#newChat').onclick=newConvo; $('#goHome').onclick=goHome;
 
-/* ── Header name (F4-8) ── "Mara’s 管家" when it fits; on a narrow phone just "Mara" — the product word
-   goes first, never the name cut to "M…". Re-fitted whenever the header's width changes. */
+/* ── Header name (F4-8) ── "Mara’s agent" (English) or "Mara的管家" (中文) when it fits — the chosen language
+   (PALang, web/lang.js), never the two mixed; on a narrow phone just "Mara" — the name goes first, never cut to "M…".
+   Re-fitted whenever the header's width or the language changes. */
+// A brand title (the demo's data-product="superelf", lib/demo-boot.mjs) is one word in every language: "Sam’s superelf".
+const HEADER_PRODUCT=['管家','agent'];
+function headerFull(name,brand){ const zh=!brand&&PALang.choice()==='zh';
+  const product=brand||(zh?HEADER_PRODUCT[0]:HEADER_PRODUCT[1]);
+  return name?{name:zh?name:name+'’s',product,join:zh?'的':' '}:{name:'',product,join:''}; }
 function setHeaderName(name){
   const h1=document.querySelector('header h1'); if(!h1) return;
-  const product=h1.dataset.product||'管家';
-  h1.dataset.full=name?name+'’s '+product:product; h1.dataset.short=name||product;
+  h1.dataset.name=name||''; h1.dataset.full='1';
   PAHome.setName(name);
   fitHeaderName();
 }
 function fitHeaderName(){
   const h1=document.querySelector('header h1'); if(!h1||!h1.dataset.full) return;
-  showHeaderName(h1,h1.dataset.full);
-  if(h1.scrollWidth>h1.clientWidth) showHeaderName(h1,h1.dataset.short);
+  const name=h1.dataset.name||'', f=headerFull(name,h1.dataset.product||'');
+  showHeaderName(h1,f);
+  if(h1.scrollWidth>h1.clientWidth&&name) showHeaderName(h1,{name,product:'',join:''});
 }
 // The name part ("Ada’s") goes in its own span with a Latin-first font stack (.hn): with the shell's CJK-first fallback
 // a Windows machine drew ’ from Microsoft YaHei as a full-width glyph — "Ada’  s 管家" (owner 2026-11-25).
 // DOM nodes, not innerHTML: the name is the user's own text.
-function showHeaderName(h1,text){
-  const product=h1.dataset.product||'管家', at=text.lastIndexOf(' '+product);
-  if(at<0||!text.endsWith(' '+product)){ h1.textContent=text; return; }
-  const hn=document.createElement('span'); hn.className='hn'; hn.lang='en'; hn.textContent=text.slice(0,at);
-  h1.replaceChildren(hn,' '+product);
+function showHeaderName(h1,f){
+  if(!f.name){ h1.textContent=f.product; return; }
+  const hn=document.createElement('span'); hn.className='hn'; hn.textContent=f.name;
+  if(/^[\x00-\u024f’\s]+$/.test(f.name)) hn.lang='en';
+  h1.replaceChildren(...(f.product?[hn,f.join+f.product]:[hn]));
 }
+PALang.on(fitHeaderName);
 // The header title (sparkle + name) is a Home control too — the SAME goHome as every other Home (R3), so Back behaves alike.
 $('#hTitle').onclick=goHome;
 $('#hTitle').onkeydown=(e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); goHome(); } };
@@ -1287,7 +1294,7 @@ function appMenu(name, anchor){
       const g=await relayJson(api('/api/apps/'+encodeURIComponent(name)+'/bump',{method:'POST'}),'request');
       if(g.ok) loadApps(); else alert(g.text);
     }
-    else if(a==='delete'){ if(confirm(`Delete "${name}"?`)){ await api('/api/apps/'+encodeURIComponent(name),{method:'DELETE'}); loadApps(); } }
+    else if(a==='delete'){ if(confirm(`删除「${name}」？ · Delete "${name}"?`)){ await api('/api/apps/'+encodeURIComponent(name),{method:'DELETE'}); loadApps(); } }
   };
   if(ROLE==='owner'){ PAAppEdit.armTip(); PAPublish.armTip(name); }
   armMenuPop(anchor);
@@ -1373,7 +1380,7 @@ $('#dFamily').onclick=async(e)=>{
   const ob=e.target.closest('[data-fopen]');
   if(ob){ openApp(ob.dataset.fopen,ob.dataset.fslug,ob.dataset.ftitle); return; }
   const fb=e.target.closest('[data-ffork]');
-  if(fb){ if(!confirm(`Fork "${fb.dataset.fslug}"?`)) return; const g=await relayJson(api('/api/apps/fork',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({fromUid:fb.dataset.ffork,slug:fb.dataset.fslug})}),'request');
+  if(fb){ if(!confirm(`复制「${fb.dataset.fslug}」？ · Fork "${fb.dataset.fslug}"?`)) return; const g=await relayJson(api('/api/apps/fork',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({fromUid:fb.dataset.ffork,slug:fb.dataset.fslug})}),'request');
     if(g.ok&&g.data&&g.data.ok){loadApps();loadFamilyApps();} else alert(g.ok?(g.data.error||'复制被拒绝。 · Fork refused'):g.text); }
 };
 $('#back').onclick=goHome;   // the button says Home, so it goes Home (it used to open the drawer)
