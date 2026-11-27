@@ -13,7 +13,7 @@
 // While a menu anchored in the app bar is open the bar does not hide itself (menuInBar(), index.html).
 // #hmenu (home ⋯, web/home-v2.js) is a fixed element with its own close; #pubSheet is a sheet with ✕.
 const MENU_WATCH_MS=150;
-let _menuOutside=null, _menuAnchor=null, _menuWatch=0;
+let _menuOutside=null, _menuAnchor=null, _menuWatch=0, _menuArmedAt=0;
 const MENU_SEL='.cmenu-pop:not(#hmenu):not(#pubSheet)';
 function menuOpen(){ return !!document.querySelector(MENU_SEL); }
 function menuInBar(){ return menuOpen()&&!!_menuAnchor&&!!_menuAnchor.closest('#frame .bar'); }
@@ -31,7 +31,7 @@ function anchorGone(a){
 }
 function menuKey(e){ if(e.key==='Escape'&&menuOpen()){ e.preventDefault(); e.stopImmediatePropagation(); closeMenuPop(true); } }   // one Escape closes one layer
 // A keyboard Enter / Space on an outside control (a click with no press, detail 0) closes the menu and does only that.
-function menuKeyClick(ev){ if(ev.detail!==0||ev.target.closest('.cmenu-pop')) return; ev.stopPropagation(); ev.preventDefault(); closeMenuPop(); }
+function menuKeyClick(ev){ if(ev.timeStamp<_menuArmedAt||ev.detail!==0||ev.target.closest('.cmenu-pop')) return; ev.stopPropagation(); ev.preventDefault(); closeMenuPop(); }
 function menuBlur(){ closeMenuPop(); }
 // The click that follows the closing pointerdown is swallowed, so it never reaches what is underneath (the drawer
 // backdrop's close, a row that would open): the first outside tap only closes the menu. The swallower lives until
@@ -61,8 +61,12 @@ function closeMenuPop(refocus){
 function armMenuPop(anchor){
   _menuAnchor=anchor||null;
   // iOS Safari fires no click for a tap on a plain element (a title, text): the outside tap is seen at pointerdown.
-  _menuOutside=(ev)=>{ if(ev.button>0||ev.target.closest('.cmenu-pop')) return; ev.stopPropagation(); closeMenuPop(); swallowClick(ev.target); };   // primary button / touch / pen only
-  setTimeout(()=>{ if(_menuOutside){ document.addEventListener('pointerdown',_menuOutside,true); document.addEventListener('click',menuKeyClick,true); } },0);
+  // Armed AT ONCE, not on a 0ms timer: on a busy device a quick outside tap landed before the timer ran and
+  // was lost (CI flake v5.37.2, #appMenu on iPhone). The press that opened the menu is older than the
+  // arming, so it is told apart by its timeStamp, not by waiting.
+  _menuArmedAt=performance.now();
+  _menuOutside=(ev)=>{ if(ev.timeStamp<_menuArmedAt||ev.button>0||ev.target.closest('.cmenu-pop')) return; ev.stopPropagation(); closeMenuPop(); swallowClick(ev.target); };   // primary button / touch / pen only
+  document.addEventListener('pointerdown',_menuOutside,true); document.addEventListener('click',menuKeyClick,true);
   addEventListener('keydown',menuKey,true); addEventListener('blur',menuBlur);
   if(_menuAnchor) _menuWatch=setInterval(()=>{ if(_menuAnchor&&anchorGone(_menuAnchor)) closeMenuPop(); },MENU_WATCH_MS);
 }
