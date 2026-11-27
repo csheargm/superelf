@@ -1,4 +1,15 @@
 {
+  "v5.38.11": {
+    "date": "2026-11-27",
+    "time": "2026-11-27T22:22:14.766Z",
+    "features": [],
+    "fixes": [
+      "合并：演示首页未登录文案 · Merge: demo home signed-out copy says sign in first",
+      "合并：自发布锁修复 · Merge: self-publish stale lock (PID 1) reclaimed, held lock never stolen",
+      "合并：iPhone 圣经修复 · Merge: iPhone Bible fixes (bar stays after pick, 关闭 · Close, Ask AI pressed)"
+    ],
+    "through": "05a5dea205becc63eb916878da92d6e514e010b4"
+  },
   "v5.38.10": {
     "date": "2026-11-27",
     "time": "2026-11-27T19:26:46.470Z",
