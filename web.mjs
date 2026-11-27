@@ -815,6 +815,8 @@ const PA_COMPONENTS = [
   { marker: PA_SNAP_MARKER, file: 'snap.inline.html' },
   // PANotePhone, phone mode for PANote — finger ink, two-finger pan, pinch zoom: note-ui carries its marker. Appended last.
   { marker: '<!--PA_NOTE_PHONE_UI-->', file: 'note-phone.inline.html' },
+  // PAPhoneUI, the ONE phone bottom sheet and the phone list sizes (journal-iphone step 3): chat-ui carries its marker. Appended last.
+  { marker: '<!--PA_PHONE_UI-->', file: 'phone-ui.inline.html' },
 ];
 // Injected into EVERY served app page, unconditionally. The shell broadcasts the user's A-/A+
 // scale to each app (sendAppPrefs -> pa:'prefs'), but only chat-ui.inline.html ever applied it,

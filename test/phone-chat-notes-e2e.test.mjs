@@ -121,17 +121,22 @@ for (const [dev, viewport] of Object.entries(DEVICES)) {
       if (phone) {
         const rows = await fr.$$eval('.pan-ovf.on [data-ovf]', (bs) => bs.map((b) => b.dataset.ovf));
         assert.deepEqual(rows, ['read', 'paper', 'photo', 'print'], 'the phone ⋯ menu holds Read view, then what the header folded away');
-        judge(`${dev} notes ⋯ menu`, await checkSurface(fr), bad);
+        // A phone's menus open as the bottom sheet (journal-iphone step 3): it covers the page bar by design, and a tap
+        // outside it closes it, so the page bar under an open sheet is not what a finger reaches (as the page is not).
+        judge(`${dev} notes ⋯ menu`, await checkSurface(fr, { skip: '.pan-pages' }), bad);
         await fr.click('.pan-ovf [data-ovf=paper]'); await page.waitForTimeout(400);
       }
       for (const [what, sel] of [['page settings', '.pan-paperpop'], ['ink', '.pan-inkpop']]) {
-        if (what === 'ink') { await fr.evaluate(() => document.querySelectorAll('.pan-pop.on').forEach((p) => p.classList.remove('on'))); await fr.click('.pan-mdraw'); await page.waitForTimeout(400); await fr.click('.pan-inkbtn'); await page.waitForTimeout(400); }
+        if (what === 'ink') { await fr.evaluate(() => document.querySelectorAll('.pan-pop.on').forEach((p) => p.classList.remove('on'))); await fr.click('.pan-mdraw'); await page.waitForTimeout(400);
+          // A phone's strip keeps pen · eraser · undo · redo; colour/size is a row of its ⋯ sheet (journal-iphone step 3).
+          if (phone) { await fr.click('.pan-toolmore'); await page.waitForTimeout(300); await fr.click('.pan-toolsheet [data-k=ink]'); } else await fr.click('.pan-inkbtn');
+          await page.waitForTimeout(400); }
         const r = await fr.evaluate((s) => { const p = document.querySelector(s); const pr = p.getBoundingClientRect();
           return { on: p.classList.contains('on'), top: pr.top, bottom: pr.bottom, head: document.querySelector('.pan-top').getBoundingClientRect().bottom, H: innerHeight }; }, sel);
         assert.ok(r.on, `${what} opened`);
         if (r.top < r.head) bad.push(`${dev} ${what}: popover top ${Math.round(r.top)} under the header (${Math.round(r.head)}) — audit #6 #7`);
         if (r.bottom > r.H) bad.push(`${dev} ${what}: popover runs off the bottom`);
-        judge(`${dev} notes ${what}`, await checkSurface(fr, { skip: '.pan-stage' }), bad);   // the page under an open popover is not what a finger reaches
+        judge(`${dev} notes ${what}`, await checkSurface(fr, { skip: phone ? '.pan-stage,.pan-pages' : '.pan-stage' }), bad);   // the page under an open popover is not what a finger reaches
       }
       await fr.evaluate(() => document.querySelectorAll('.pan-pop.on').forEach((p) => p.classList.remove('on')));
       // ☰ notes list: 44px rows and actions, 13px meta, 14px previews (#16).

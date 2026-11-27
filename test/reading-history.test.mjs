@@ -139,7 +139,7 @@ test('pins: both Bible copies carry the marker and the thin wiring; web.mjs regi
   }
   const web = read('web.mjs');
   const list = web.slice(web.indexOf('const PA_COMPONENTS = ['), web.indexOf('];', web.indexOf('const PA_COMPONENTS = [')));
-  assert.match(list, /\{ marker: '<!--PA_READING_HISTORY_UI-->', file: 'reading-history\.inline\.html' \},\n  \/\/[^\n]*\n  \/\/[^\n]*\n  \{ marker: '<!--PA_INK_FRAME_UI-->', file: 'ink-frame\.inline\.html' \},\n  \/\/[^\n]*\n  \{ marker: PA_SNAP_MARKER, file: 'snap\.inline\.html' \},\n  \/\/[^\n]*\n  \{ marker: '<!--PA_NOTE_PHONE_UI-->', file: 'note-phone\.inline\.html' \},\n$/);
+  assert.match(list, /\{ marker: '<!--PA_READING_HISTORY_UI-->', file: 'reading-history\.inline\.html' \},\n  \/\/[^\n]*\n  \/\/[^\n]*\n  \{ marker: '<!--PA_INK_FRAME_UI-->', file: 'ink-frame\.inline\.html' \},\n  \/\/[^\n]*\n  \{ marker: PA_SNAP_MARKER, file: 'snap\.inline\.html' \},\n  \/\/[^\n]*\n  \{ marker: '<!--PA_NOTE_PHONE_UI-->', file: 'note-phone\.inline\.html' \},\n  \/\/[^\n]*\n  \{ marker: '<!--PA_PHONE_UI-->', file: 'phone-ui\.inline\.html' \},\n$/);
 });
 
 // Behaviour of the Bible's boot/load wiring, run from the real source with fakes for everything around it.
