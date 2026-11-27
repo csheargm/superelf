@@ -97,6 +97,8 @@ test('findings left unverified by the verify limit get a short line', () => {
   const out = renderEmail([reviewed([f('medium', 'x')], { unverified })], { date: 'd' });
   assert.match(above(out.body), /- 3 not checked \(verify limit\)\./);
   assert.match(out.html, /3 not checked \(verify limit\)/);
+  assert.match(above(out.body), /- 1 not checked \(the check failed\)\./, 'a failed verifier is said too (GPT r1, R14)');
+  assert.match(out.html, /1 not checked \(the check failed\)/);
   const none = renderEmail([reviewed([], { unverified })], { date: 'd' });
   assert.match(above(none.body), /3 not checked \(verify limit\)/);
   assert.doesNotMatch(renderEmail([reviewed([f('medium', 'x')])], { date: 'd' }).body, /not checked/);

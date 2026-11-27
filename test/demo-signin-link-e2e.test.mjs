@@ -128,5 +128,17 @@ test('Google keeps the email link usable: each flow has its own verifier; the bo
   await page.locator('#hAvatar').waitFor({ state: 'visible' });
   assert.deepEqual(tried, [kept[1], 'email-ver'], 'the second verifier is tried after the first is refused');
   assert.equal(await page.evaluate(() => localStorage.getItem('sb_pkce')), kept[1], 'the other flow\'s verifier stays for its own link');
+  assert.equal(await page.evaluate(() => localStorage.getItem('sb_pkce_g')), null, 'the verifier used is cleared');
+  // GPT r1: the Google verifier's success clears IT (the index once picked the email key).
   await ctx.close();
+  const c2 = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await c2.addInitScript(() => { if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('sb_pkce_g', 'email-ver'); localStorage.setItem('sb_pkce', 'keep-me'); } });
+  const p2 = await c2.newPage(); tried.length = 0;
+  await c2.route(`${sb.url}/auth/v1/token?grant_type=pkce`, (r) => { const v = JSON.parse(r.request().postData()).code_verifier; tried.push(v);
+    return r.fulfill({ status: v === 'email-ver' ? 200 : 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' },
+      body: JSON.stringify(v === 'email-ver' ? { access_token: sb.jwt({ sub: 'g-ok' }), refresh_token: 'r', expires_at: Math.floor(Date.now() / 1000) + 3600 } : { error_code: 'bad_code_verifier' }) }); });
+  await p2.goto(`http://127.0.0.1:${port}/?code=abc`);
+  await p2.locator('#hAvatar').waitFor({ state: 'visible' });
+  assert.deepEqual(await p2.evaluate(() => [localStorage.getItem('sb_pkce'), localStorage.getItem('sb_pkce_g')]), ['keep-me', null], 'Google\'s success clears its own verifier, never the email one');
+  await c2.close();
 });

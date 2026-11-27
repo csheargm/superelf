@@ -178,7 +178,7 @@
     const LINE_PX=40, PAGE_SHARE=0.9;
     const SCROLL_BY={ArrowUp:()=>-LINE_PX,ArrowDown:()=>LINE_PX,PageUp:()=>-body.clientHeight*PAGE_SHARE,PageDown:()=>body.clientHeight*PAGE_SHARE,
       Home:()=>-body.scrollHeight,End:()=>body.scrollHeight,' ':e=>(e.shiftKey?-1:1)*body.clientHeight*PAGE_SHARE};
-    const onButton=e=>!!(e.target&&e.target.closest&&e.target.closest('button,a'));
+    const onButton=e=>!!(e.target&&e.target.closest&&e.target.closest('button'));   // Space presses a button; on a link (Enter opens it) it scrolls
     const hold=e=>{ if(el.hidden) return;
       if(e.type==='keydown'&&e.key==='Escape'){ close(); e.preventDefault(); e.stopImmediatePropagation(); return; }
       if(e.type==='keydown'&&SCROLL_BY[e.key]&&!e.metaKey&&!e.ctrlKey&&!e.altKey&&!(e.key===' '&&el.contains(e.target)&&onButton(e))){
