@@ -129,7 +129,7 @@ const PAHome=(function(){
   function closeMore(){ const m=$('#hmenu'); if(m&&!m.hidden){ m.hidden=true; $('#hmore').setAttribute('aria-expanded','false'); } }
   function bind(){
     $('#hmore').onclick=(e)=>{ e.stopPropagation(); const m=$('#hmenu'); m.hidden=!m.hidden; if(!m.hidden) placeMenu(m,$('#hmore')); $('#hmore').setAttribute('aria-expanded',String(!m.hidden)); };   // the press on ⋯ also closes its tip (PATips)
-    $('#hmenu').addEventListener('click',(e)=>{ if(e.target.closest('button')&&!e.target.closest('.aa')) closeMore(); });
+    $('#hmenu').addEventListener('click',(e)=>{ if(e.target.closest('button')&&!e.target.closest('.aa,#langSw')) closeMore(); });   // the language row (#langSw) keeps the menu open: it re-labels in place
     // pointerdown as well as click: iOS Safari sends no click for a tap on plain text, so the menu stayed (web/popover.js).
     for(const ev of ['pointerdown','click']) document.addEventListener(ev,(e)=>{ if(!e.target.closest('#hmenu,#hmore')) closeMore(); },true);   // + click: a keyboard Enter outside
     document.addEventListener('keydown',(e)=>{ if(e.key==='Escape'&&!$('#hmenu').hidden){ closeMore(); $('#hmore').focus(); } });

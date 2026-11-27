@@ -8,7 +8,11 @@ Every label showed 中文 · English at once. The owner asked for ONE setting fo
 ## Decision
 - One choice, 'zh' | 'en'. Default: the device (navigator.language zh* → 中文, else English). Kept on the account
   (profile.lang, PUT /api/profile, junk refused with 400) so the iPhone and the iPad match, with a device copy
-  (localStorage pa_lang). One 中 | EN switch at the foot of the ☰ drawer (web/lang-switch.js), with a first-use tip.
+  (localStorage pa_lang). One control (web/lang-switch.js): a row in the home header's ⋯ menu, right after Text size,
+  that names the OTHER language ("中文" in English, "English" in 中文); a tap switches live and the menu stays
+  open, re-labelled. Its first-use tip points at ⋯. (v5.38.0 put a 中 | EN switch at the foot of the ☰ drawer;
+  the owner could not find it on the iPhone, so v5.38.2 moved it to ⋯ and removed the drawer one: one control.)
+  The app bar has no shared ⋯ menu (#fmore is the open app's own), so the row lives on the home ⋯ only.
 - One shared mechanism, web/lang.js (PALang), in the shell AND on every app page (web.mjs places its
   marker first). It switches the house-style "中文 · English" strings in place, live, with a MutationObserver,
   so no call site changes; the shell's `.en` sibling pairs follow too. Apps get the choice by {pa:'prefs', lang}.

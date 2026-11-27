@@ -75,7 +75,7 @@ test('owner: ⋯ → Publish (with its one-time tip) → files sheet → Publish
   const { ctx, page } = await openMenu(port, OWNER_TOKEN);
   try {
     // One tip at a time (PATips): Change this app's first, closed by Escape; the next open shows Publish's beside its item.
-    // The drawer's language-switch tip (web/lang-switch.js) may take the one slot first: close it, as a user would.
+    // The ⋯ menu's language-row tip (web/lang-switch.js) may take the one slot first: close it, as a user would.
     await page.locator('.pat-tip[data-tip="tip:app-edit"], .pat-tip[data-tip="tip:lang-switch"]').first().waitFor({ timeout: 5000 });
     if (await page.locator('.pat-tip[data-tip="tip:lang-switch"]').count()) {
       await page.evaluate(() => PATips.dismiss()); await page.evaluate(() => PATips.whenIdle()); await reopenMenu(page, port);
