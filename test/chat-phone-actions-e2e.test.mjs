@@ -11,7 +11,7 @@ import path from 'node:path';
 import http from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { missingReason, resolveSkip } from './helpers-e2e-gate.mjs';
-import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, OWNER_TOKEN } from './helpers-web.mjs';
+import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, OWNER_TOKEN, shellAppFrame } from './helpers-web.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
 import { checkChatText, chatTextFailures, composerClearance, clearanceFailures, PAC_CLEAR_SEL } from './helpers-phone-check.mjs';
 
@@ -45,7 +45,7 @@ for (const [w, h] of SIZES) test(`phone ${w}x${h}: action icons are real SVG gly
     await page.waitForFunction(() => typeof openApp === 'function' && document.querySelector('#dot.ok'), null, { timeout: 20000 });
     await page.evaluate(() => openApp('owner', 'school', 'School Helper'));
     const app = page.frameLocator('#fr'); await app.locator('.pac-inp').waitFor();
-    const fr = page.frame({ url: /\/app\/owner\/school\// });
+    const fr = await shellAppFrame(page);
     for (const [i, ask] of ['What can you do', 'Can you change the app'].entries()) {
       await app.locator('.pac-inp').fill(ask); await app.locator('.pac-go').tap();
       await fr.waitForFunction((k) => document.querySelectorAll('.pac-m.ai.pac-md').length > k, i, { timeout: 20000 });

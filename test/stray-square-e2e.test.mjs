@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { skip, chromium } from './helpers-note-link.mjs';
-import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, OWNER_TOKEN } from './helpers-web.mjs';
+import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, OWNER_TOKEN, shellAppFrame } from './helpers-web.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
 import { hashPassword } from '../lib/auth.mjs';
 
@@ -56,7 +56,7 @@ for (const vp of VIEWPORTS) test(`no stray square over an app or the Change-this
   const { ctx, page } = await openApp(vp);
   try {
     const box = await page.frameLocator('#fr').locator('#t').boundingBox();
-    assert.equal(await page.frame({ url: /\/app\/owner\/todo\// }).evaluate(() => document.elementFromPoint(document.getElementById('t').getBoundingClientRect().left + 3, document.getElementById('t').getBoundingClientRect().top + 5)?.id), 't', 'the app input is on top at its left padding');
+    assert.equal(await (await shellAppFrame(page)).evaluate(() => document.elementFromPoint(document.getElementById('t').getBoundingClientRect().left + 3, document.getElementById('t').getBoundingClientRect().top + 5)?.id), 't', 'the app input is on top at its left padding');
     assert.ok(box.x < 60, 'the input sits at the left edge');
     assert.deepEqual(await leaks(page.mainFrame()), [], 'the closed shell drawer paints nothing');
     await page.waitForTimeout(SETTLE_MS);   // the bar slides away over a freshly opened app

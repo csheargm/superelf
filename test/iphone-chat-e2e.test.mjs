@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
 import { skip, chromium as engine } from './helpers-note-link.mjs';
-import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, OWNER_TOKEN } from './helpers-web.mjs';
+import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, OWNER_TOKEN, shellAppFrame } from './helpers-web.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
 import { hashPassword } from '../lib/auth.mjs';
 
@@ -66,7 +66,7 @@ for (const pwa of [false, true]) test(`iPhone${pwa ? ' home-screen PWA' : ''}: a
     const slug = pwa ? 'redflags-pwa' : 'redflags';
     await page.tap(`.ecard[data-es="${slug}"]`);
     const app = page.frameLocator('#fr'); await app.locator('.pac-fs.on .pac-inp').waitFor();
-    const fr = page.frame({ url: new RegExp(`/app/owner/${slug}/`) });
+    const fr = await shellAppFrame(page);
     n = 0;   // each case starts at the short reply (the fake model answers in ONE chunk, so .pac-md means finished)
     for (const [ask, , mark] of TURNS) {
       const k = await app.locator('.pac-fs.on .pac-m.me').count();
