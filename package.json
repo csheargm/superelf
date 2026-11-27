@@ -1,6 +1,6 @@
 {
   "name": "personal-agent",
-  "version": "5.34.6",
+  "version": "5.35.0",
   "description": "Personal and family AI superapp you host yourself — a mobile web app driving Claude Code on an always-on machine",
   "type": "module",
   "scripts": {

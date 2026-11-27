@@ -1,4 +1,13 @@
 {
+  "v5.35.0": {
+    "date": "2026-11-26",
+    "time": "2026-11-27T00:14:20.644Z",
+    "features": [
+      "合并：手机上一指书写、两指滚动、捏合缩放（笔开关） · Merge: phone finger ink, two-finger pan, pinch zoom (pen toggle)"
+    ],
+    "fixes": [],
+    "through": "56118e3b96f9641991725d18db67ec2c8d49c718"
+  },
   "v5.34.6": {
     "date": "2026-11-26",
     "time": "2026-11-26T23:32:08.566Z",
