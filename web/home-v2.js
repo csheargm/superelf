@@ -7,7 +7,7 @@
    - hidden slugs: demo config demo.home_hide (lib/demo-boot.mjs passes it as PADemoAuth.conf.hide). */
 const PAHome=(function(){
   const MORE_TIP='tip:home-more';
-  // The ONE language setting (web/lang.inline.html PALang): a [中文, English] pair → the chosen side, or both.
+  // The ONE language setting (web/lang.js PALang): a [中文, English] pair → the chosen side, or both.
   const lang=()=>(window.PALang?PALang.get():'both');
   const L=(p)=>(window.PALang?PALang.t(p):(p[0]&&p[1]?p[0]+' · '+p[1]:p[0]||p[1]));
   const T={

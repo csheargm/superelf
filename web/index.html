@@ -429,8 +429,8 @@ dialog a{ display:inline-block; padding:6px 4px; }        /* the small links wer
   <div style="text-align:center;margin-top:10px;font-size:14px"><a href="#" id="toReg" style="color:var(--accent)">Create an account</a></div>
   <div style="text-align:center;margin-top:6px;font-size:12px"><a href="#" id="toTok" style="color:var(--muted)">尚无密码：用访问令牌登录 · No password yet: sign in with access token</a></div>
 </form></dialog>
-<!--PA_LANG_UI-->   <!-- PALang (web/lang.inline.html): the ONE 中文/English setting, before the shell script uses it -->
 <script>
+/* PA_LANG_JS */
 /* PA_ICONS_JS */
 /* PA_HOME_LOOK_JS */
 /* PA_DRAWER_SECTIONS_JS */
@@ -883,7 +883,6 @@ const frameUid=()=>decodeURIComponent((frameRef().match(/\/app\/([^/]+)\//)||[])
 let LINK_APPS=new Set();
 let FORK_APPS=new Set();   // own apps copied from another (meta.json forkedFrom): web/publish.js item()
 let OWNBAR_APPS=new Set();   // own apps whose page draws its own Home + A-/A+ (meta.json ownBar, ADR 0032)
-let BILINGUAL_APPS=new Set();   // 'uid/slug' of apps that keep both languages (/api/apps bilingual, lib/ui-lang.mjs)
 const NO_APP_TEXT='未打开应用 · no app in view';   // every refusal of a request that names no app (R3)
 // Settles once the boot profile fetch has (ME). An app frame can ask for its settings before that; an answer from an
 // empty ME showed dismissed tips again, and a write from it would replace every other app's prefs. TODO(R4 seam): boot state → its own part.
@@ -966,10 +965,8 @@ async function saveAppSettings(slug,prefs,systemPrompt,appSent){
 // PAChat does not take its lane from a stale list), then everything once the list settles. The
 // app-side handlers are idempotent; newFeatureKeys ride the second push only, so the blue dots are
 // announced once.
-// The open app's language: a bilingual app (lib/ui-lang.mjs, /api/apps bilingual) keeps both. TODO(R4): app-frame seam.
-function frameLang(){ return BILINGUAL_APPS.has(frameUid()+'/'+frameSlug())?'both':PALang.get(); }
 function sendAppPrefs(withModels=true){ const fw=$('#fr').contentWindow; if(!(fw&&$('#fr').src!=='about:blank')) return;
-  const m={pa:'prefs',fontScale:FS_STEPS[fsIdx],fingerDraw:localStorage.getItem('pa_fingerdraw')==='1',fingerDrawSet:localStorage.getItem('pa_fingerdraw')!==null,noteZoom:noteZoomsOf(frameSlug()),readSize:Number(localStorage.getItem('pa_notereadsize'))||0,seamless:localStorage.getItem('pa_seamless')==='1',printInk:localStorage.getItem('pa_printink')!=='0',noFlip:localStorage.getItem('pa_noflip')==='1',openAi:(appPrefsMap()[frameSlug()]||{}).openAi===true,uploadMaxBytes:RELAY_LIMITS.upload,chatMaxBytes:RELAY_LIMITS.chat,ownBar:frameOwnBar(),lang:frameLang(),fsTitles:[fsTitle(-1),fsTitle(1)]};
+  const m={pa:'prefs',fontScale:FS_STEPS[fsIdx],fingerDraw:localStorage.getItem('pa_fingerdraw')==='1',fingerDrawSet:localStorage.getItem('pa_fingerdraw')!==null,noteZoom:noteZoomsOf(frameSlug()),readSize:Number(localStorage.getItem('pa_notereadsize'))||0,seamless:localStorage.getItem('pa_seamless')==='1',printInk:localStorage.getItem('pa_printink')!=='0',noFlip:localStorage.getItem('pa_noflip')==='1',openAi:(appPrefsMap()[frameSlug()]||{}).openAi===true,uploadMaxBytes:RELAY_LIMITS.upload,chatMaxBytes:RELAY_LIMITS.chat,ownBar:frameOwnBar(),lang:typeof frameLang==='function'?frameLang():undefined,fsTitles:[fsTitle(-1),fsTitle(1)]};
   if(withModels) Object.assign(m,{models:CHAT_MODELS,wantModel:appModel(frameSlug()),newFeatureKeys:Object.keys(window._PA_NEW_KEYS||{}).filter(k=>!_SEEN.has(k))});
   fw.postMessage(m,'*'); }
 // Per-note pinch zoom, per device: pa_notezoom = {"<slug>\n<note id>": z}, the newest NOTE_ZOOM_MAX kept.
@@ -1227,7 +1224,7 @@ async function loadApps(){
   LINK_APPS=new Set(ownApps.filter(a=>a.links===true).map(a=>a.name));
   const wasOwnBar=frameOwnBar();
   OWNBAR_APPS=new Set(ownApps.filter(a=>a.ownBar===true).map(a=>a.name));
-  BILINGUAL_APPS=new Set(apps.filter(a=>a.bilingual===true).map(a=>a.uid+'/'+a.name));
+  window.PA_BILINGUAL_APPS=new Set(apps.filter(a=>a.bilingual===true).map(a=>a.uid+'/'+a.name));   // frameLang (broker block)
   if(!wasOwnBar&&frameOwnBar()) sendAppPrefs(false);   // an app opened before this list arrived got ownBar:false and drew no bar (F3-02). TODO(R4): moves with the app-frame seam
   FORK_APPS=new Set(ownApps.filter(a=>!!a.forkedFrom).map(a=>a.name));   // PAPublish.item: a copy is not published
   const fresh=noteNewApps(ownApps.map(a=>a.name));
@@ -1934,6 +1931,9 @@ function notifyAtBoot(){
 notifyAtBoot();
 
 /* ── Broker (for sandboxed apps) ── */
+// The open app's language (lib/ui-lang.mjs): a bilingual app ('uid/slug' in PA_BILINGUAL_APPS, from /api/apps) keeps both.
+// No PALang on the page (a test harness cut of this block): no language is sent, and the server uses the account's.
+function frameLang(){ if(!window.PALang) return undefined; const b=window.PA_BILINGUAL_APPS; return b&&b.has(frameUid()+'/'+frameSlug())?'both':PALang.get(); }
 // In-flight 'chat' relays: broker id → that relay's AbortController. It is what chat-cancel looks
 // a chat up by, and an entry lives exactly as long as its relay runs.
 const relayChats=new Map();
@@ -2617,7 +2617,7 @@ async function sendTurn(q){
   // Bytes, not characters: BODY_LIMITS.chat counts what goes on the wire, and a text
   // attachment is spliced into `message` here (handleFiles reads .md/.json/.csv/… inline),
   // so a rejection must be able to name the real size.
-  const body=JSON.stringify({message:msg,convoId,attachments:fileAtts,model:SHELL_CURMODEL||undefined,assess:shellVerifyOn||undefined,lang:PALang.get()});
+  const body=JSON.stringify({message:msg,convoId,attachments:fileAtts,model:SHELL_CURMODEL||undefined,assess:shellVerifyOn||undefined,lang:typeof PALang!=='undefined'?PALang.get():undefined});   // the ONE language setting (web/lang.js); a harness cut has none
   const sentBytes=relayBodyBytes(body);
   try{
     const res=await api('/api/chat',{method:'POST',headers:{'content-type':'application/json'},body});

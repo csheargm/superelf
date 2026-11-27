@@ -1,6 +1,6 @@
-<!-- PALang — the ONE language setting（界面语言）: 中文 or English for all of superelf, instead of every label
+/*  PALang — the ONE language setting（界面语言）: 中文 or English for all of superelf, instead of every label
      showing both (owner 2026-11-26). The SAME file runs in the shell (SHELL_PARTS, before the shell script) and
-     on every app page (web.mjs places its marker ahead of the first script), so one change covers the drawer,
+     on every app page (web.mjs puts it in a script tag ahead of the first script), so one change covers the drawer,
      the home, the app bar, PANote / PAChat and every first-use tip (R3: shared components).
      WHERE THE CHOICE LIVES: the account (profile.lang, so the iPhone and the iPad match), a device copy
      (localStorage pa_lang) for before sign-in and when the account write fails, and the device's language
@@ -17,14 +17,10 @@
        what people wrote and what the AI said) and anything inside [data-pa-lang-skip].
      PALang.get() → 'zh' | 'en' | 'both'; choice() → 'zh' | 'en'; set(l) → applied now, kept on this device;
      bilingual(on); on(fn) → called on every change; device() → the device's default.
-     Driven by test/lang.test.mjs (unit, over this file in a vm) and test/lang-e2e.test.mjs (browsers). -->
-<style id="pa-lang-style">
-html[data-pa-pairs][data-pa-lang="zh"] .en{display:none!important}
-html[data-pa-pairs][data-pa-lang="en"] .pa-lz{display:none!important}
-</style>
-<script id="pa-lang-script">
+     Driven by test/lang.test.mjs (unit, over this file in a vm) and test/lang-e2e.test.mjs (browsers).
+   (The shell pairing CSS lives in web/shell-look.css.) */
 (function(){
-  if(window.PALang) return;
+  if(typeof window==='undefined'||typeof document==='undefined'||window.PALang) return;   // no page (a script run outside a browser): nothing to switch
   const KEY='pa_lang', SEP=' · ';
   const CJK=/[　-〿㐀-鿿豈-﫿＀-￯]/, LATIN=/[A-Za-z]/;
   const ATTRS=['title','aria-label','placeholder','alt'];
@@ -116,4 +112,3 @@ html[data-pa-pairs][data-pa-lang="en"] .pa-lz{display:none!important}
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',apply,{once:true}); else apply();
   if(document.documentElement) document.documentElement.setAttribute('data-pa-lang',get());
 })();
-</script>

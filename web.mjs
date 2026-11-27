@@ -696,7 +696,7 @@ const PA_BROKER_MARKER = '<!--PA_BROKER_UI-->';
 const PA_BUSY_MARKER = '<!--PA_BUSY_UI-->';
 const PA_SNAP_MARKER = '<!--PA_SNAP_UI-->';
 // PALang (web/lang.inline.html): the ONE 中文/English setting, on every app page ahead of its first script (lib/ui-lang.mjs).
-const PA_LANG_MARKER = '<!--PA_LANG_UI-->', PA_LANG_BOTH = '/*PA_LANG_BOTH*/false';
+const PA_LANG_MARKER = '<!--PA_LANG_UI-->', PA_LANG_BOTH = '/*PA_LANG_BOTH*/false', PA_LANG_JS_FILE = 'lang.js';
 // The shared palette (web/theme-tokens.css, also inlined into the shell): placed at the END of <head>, after the
 // app's own <style>, so every app that names --bg/--card/--text/--accent… gets the one look (no per-app fork).
 // Kept OUT of PA_COMPONENTS (that list is append-only and its order is pinned); it is in appStamp below.
@@ -820,8 +820,6 @@ const PA_COMPONENTS = [
   { marker: '<!--PA_NOTE_PHONE_UI-->', file: 'note-phone.inline.html' },
   // PAPhoneUI, the ONE phone bottom sheet and the phone list sizes (journal-iphone step 3): chat-ui carries its marker. Appended last.
   { marker: '<!--PA_PHONE_UI-->', file: 'phone-ui.inline.html' },
-  // PALang, the ONE language setting: sendAppHtml places its marker on EVERY app page, first. Appended last.
-  { marker: PA_LANG_MARKER, file: 'lang.inline.html' },
 ];
 // Injected into EVERY served app page, unconditionally. The shell broadcasts the user's A-/A+
 // scale to each app (sendAppPrefs -> pa:'prefs'), but only chat-ui.inline.html ever applied it,
@@ -857,7 +855,7 @@ function appStamp(file) {
   let k;
   try { const st = fs.statSync(file); k = file + ':' + st.mtimeMs + ':' + st.size; }
   catch { return null; }                                  // unreadable: fall through to the live path
-  for (const c of [...PA_COMPONENTS, { file: PA_THEME_FILE }, { file: PA_TOUCH_FILE }, { file: PA_REPLY_CLEAN_FILE }]) {
+  for (const c of [...PA_COMPONENTS, { file: PA_THEME_FILE }, { file: PA_TOUCH_FILE }, { file: PA_REPLY_CLEAN_FILE }, { file: PA_LANG_JS_FILE }]) {
     try { const st = fs.statSync(path.join(ROOT, 'web', c.file)); k += '|' + c.file + ':' + st.mtimeMs + ':' + st.size; }
     catch { return null; }
   }
@@ -872,7 +870,8 @@ function sendAppHtml(res, file, type, extra, bilingual = false) {
       const hasNote = html.includes(PA_NOTE_MARKER);   // decided BEFORE inlining replaces the marker
     // Before the first script, or at the end of <head>: whichever comes first. A page with neither
     // has no script element, so it gets none of PATwoTap, PAStore, PALeave and PA (ADR 0018 known gaps).
-    html = html.replace(/<\/head>|<script\b/i, (m) => PA_LANG_MARKER + PA_TWO_TAP_MARKER + PA_STORE_MARKER + PA_LEAVE_MARKER + PA_BROKER_MARKER + PA_BUSY_MARKER + PA_SNAP_MARKER + m);
+    html = html.replace(/<\/head>|<script\b/i, (m) => PA_TWO_TAP_MARKER + PA_STORE_MARKER + PA_LEAVE_MARKER + PA_BROKER_MARKER + PA_BUSY_MARKER + PA_SNAP_MARKER + m);
+    html = html.replace(/<\/head>|<script\b/i, (m) => PA_LANG_MARKER + m);   // PALang: after those, still ahead of the app's own first script
     let theme = '';
     try { theme = [PA_THEME_FILE, PA_TOUCH_FILE].map((f) => fs.readFileSync(path.join(ROOT, 'web', f), 'utf8')).join('\n'); }
     catch (e) { return send(res, 500, 'text/plain', 'component unavailable'); }   // fail loud, like a missing component (R5)
@@ -894,6 +893,13 @@ function sendAppHtml(res, file, type, extra, bilingual = false) {
     }
     // web/reply-clean.js, what a bubble may show of a reply (lib/reply-clean.mjs runs the same file): inside chat-ui's
     // script, so after the components; never a PA_COMPONENTS entry (those pin their order, append-only).
+    // web/lang.js (PALang), the same way: the shell inlines the same file (R3).
+    // Not a PA_COMPONENTS entry (those pin their order): its own marker, placed above, gets the file in a script tag.
+    if (html.includes(PA_LANG_MARKER)) {
+      let lj; try { lj = fs.readFileSync(path.join(ROOT, 'web', PA_LANG_JS_FILE), 'utf8'); }
+      catch { return send(res, 500, 'text/plain', 'component unavailable'); }   // fail loud (R5)
+      html = html.split(PA_LANG_MARKER).join('<script id="pa-lang-script">' + lj + '</script>');
+    }
     if (html.includes(PA_REPLY_CLEAN_MARKER)) {
       let rc; try { rc = fs.readFileSync(path.join(ROOT, 'web', PA_REPLY_CLEAN_FILE), 'utf8'); }
       catch { return send(res, 500, 'text/plain', 'component unavailable'); }   // fail loud, as for any component (R5)

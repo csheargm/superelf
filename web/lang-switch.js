@@ -1,5 +1,5 @@
 /* PALangSwitch（语言切换）— the shell's ONE 中 / EN switch, at the foot of the ☰ drawer (owner 2026-11-26:
-   one language setting for all of superelf). PALang (web/lang.inline.html) applies the choice; this file
+   one language setting for all of superelf). PALang (web/lang.js) applies the choice; this file
    mounts the control, keeps the choice on the ACCOUNT (profile.lang, so the iPhone and the iPad match) and
    tells the rest of the shell: the home re-draws, the open app frame gets {pa:'prefs', lang} at once.
    A refused account write keeps the choice on this device and says so (R5 b). Kept out of web/index.html

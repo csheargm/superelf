@@ -1,4 +1,4 @@
-// The ONE language setting · 界面语言 (lib/ui-lang.mjs, web/lang.inline.html): unit checks on the server
+// The ONE language setting · 界面语言 (lib/ui-lang.mjs, web/lang.js): unit checks on the server
 // rules and on PALang's string helpers (run in a vm, no DOM). The browser flows are test/lang-e2e.test.mjs.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,8 +12,7 @@ import { REPLY_LANGUAGE_RULE, agentCapabilities } from '../lib/config.mjs';
 import { SHELL_PARTS } from '../lib/shellhtml.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SRC = fs.readFileSync(path.join(REPO, 'web/lang.inline.html'), 'utf8');
-const script = SRC.slice(SRC.indexOf('<script id="pa-lang-script">') + 28, SRC.lastIndexOf('</script>'));
+const script = fs.readFileSync(path.join(REPO, 'web/lang.js'), 'utf8');
 
 function palang({ language = 'en-US', stored = null, both = false, dflt = '' } = {}) {
   const store = new Map(stored ? [['pa_lang', stored]] : []);
@@ -89,8 +88,8 @@ test('server: profile values, bilingual apps, the reply rule', () => {
 });
 
 test('the shell and every app page carry the SAME lang file', () => {
-  assert.ok(SHELL_PARTS.some(([m, f]) => m === '<!--PA_LANG_UI-->' && f === 'lang.inline.html'));
+  assert.ok(SHELL_PARTS.some(([m, f]) => m === '/* PA_LANG_JS */' && f === 'lang.js'));
   const web = fs.readFileSync(path.join(REPO, 'web.mjs'), 'utf8');
-  assert.match(web, /marker: PA_LANG_MARKER, file: 'lang\.inline\.html'/);
-  assert.match(web, /\(m\) => PA_LANG_MARKER \+ PA_TWO_TAP_MARKER/, 'on every app page, first');
+  assert.match(web, /html\.split\(PA_LANG_MARKER\)\.join\('<script id="pa-lang-script">' \+ lj/, 'app pages get web/lang.js itself');
+  assert.match(web, /\(m\) => PA_LANG_MARKER \+ m\)/, 'on every app page, ahead of its own first script');
 });
