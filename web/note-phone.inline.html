@@ -16,6 +16,9 @@
        PANotePhone.fitK(rw,pageW,minW,wide) → the page scale: on a phone a WIDE page (ink or photos) fits the
                                           screen width with no floor (适配宽度); otherwise max(minW,rw)/pageW
                                           exactly as before. Stored ink stays in pageW units either way.
+       PANotePhone.toolSheet(c)         → the phone tool strip's ⋯ sheet（工具面板, step 3 rule 5）: on a phone the strip keeps
+         pen · eraser · undo · redo (and the pen toggle); every other drawing control is a row here that presses
+         the control it stands for. c = {doc, rows:[{key, btn, icon}], onPick(btn)}. → {el, sync()}; labels: SHEET_TXT.
        PANotePhone.readView(c)          → Read view（阅读视图）: the page's typed text reflowed at this device's
          text size, ink hidden. c = {host, textLayer, btn, txt, hasInk(), listen, onSize(px), openLink(href)}. → {open(), close(), isOpen()}
          c.onSize(px) reports an A−/A+ change; the host stores it on THIS device (the shell's pa_notereadsize,
@@ -33,6 +36,17 @@
 /* Where the header's ⋯ is a menu (note-ui OVF_MQ, 600px) Read view is its first row and the header button hides. */
 .pan-ovf .pan-ovfread{display:none}
 @media (max-width:600px){ .pan-phone .pan-top .pan-readbtn{display:none} .pan-phone .pan-ovf .pan-ovfread{display:flex} }
+/* The phone tool strip (step 3): pen, eraser, undo, redo and ⋯ (plus the pen toggle), every tap 44px; the rest
+   moves into the ⋯ sheet. Off a phone the ⋯ is hidden and the strip is exactly what it was. */
+.pan-toolmore{display:none}
+.pan-phone .pan-tools .pan-toolmore{display:flex}
+.pan-phone .pan-tools>.pan-tbtn,.pan-phone .pan-tools>.pan-grip{min-width:44px;min-height:44px}
+.pan-phone .pan-tools>.pan-tool:not([data-tool=pen]):not([data-tool=erase]),.pan-phone .pan-tools>.pan-inkbtn,.pan-phone .pan-tools>.pan-paperbtn,
+.pan-phone .pan-tools>.pan-photo,.pan-phone .pan-tools>.pan-readbtn,.pan-phone .pan-tools>.pan-sep{display:none}
+.pan-toolsheet{gap:2px;padding:6px}
+.pan-toolsheet button{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 12px;border:none;background:none;border-radius:9px;
+  font:inherit;font-size:15px;color:var(--text,#111);text-align:left;cursor:pointer;white-space:nowrap}
+.pan-toolsheet button[aria-pressed=true]{background:color-mix(in srgb,var(--accent,#0f6355) 14%,transparent);color:var(--accent,#0f6355)}
 .pnp-read{position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;background:var(--pan-paper,#fffdf8);color:#1c1e1d}
 .pnp-read[hidden]{display:none}
 .pnp-rhead{display:flex;align-items:center;gap:6px;padding:6px 8px;padding-top:max(6px,env(safe-area-inset-top));border-bottom:1px solid rgba(0,0,0,.12);background:inherit}
@@ -175,6 +189,21 @@
     if(mq&&mq.addEventListener) add(mq,'change',()=>{ if(!isPhone()) close(); });
     return {open,close,isOpen:()=>!el.hidden,size:()=>size,setSize:px=>{ size=readSize(px); applySize(); }};
   }
-  window.PANotePhone={PHONE_MQ,ZOOM_MIN,ZOOM_MAX,PINCH_SLOP,READ_SIZES,isPhone,watch,clampZoom,gesture,fitK,readSize,stepSize,readView};
+  // ── The tool strip's ⋯ sheet（工具面板）── labels 中文 first; `more` is the ⋯ itself, `tip` its first-use tip.
+  const SHEET_TXT={more:'更多工具 · More tools',marker:'马克笔 · Marker',highlighter:'荧光笔 · Highlighter',select:'选择 · Select',
+    text:'文字 · Text',ink:'颜色与粗细 · Colour & size',paper:'纸张与背景 · Paper & background',photo:'插入图片 · Insert photo',read:'阅读视图 · Read view',
+    tip:'更多工具：马克笔、荧光笔、选择、颜色与粗细 · More tools: marker, highlighter, select, colour & size'};
+  function toolSheet(c){
+    const doc=c.doc||document, el=doc.createElement('div');
+    el.className='pan-pop pan-toolsheet pa-sheet'; el.setAttribute('role','menu'); el.setAttribute('aria-label',SHEET_TXT.more);
+    const rows=c.rows.filter(r=>r.btn&&SHEET_TXT[r.key]);
+    for(const r of rows){ const b=doc.createElement('button'); b.type='button'; b.dataset.k=r.key; b.setAttribute('role','menuitem');
+      b.innerHTML=r.icon||''; b.appendChild(doc.createTextNode(SHEET_TXT[r.key])); r.row=b;
+      b.addEventListener('click',()=>c.onPick(r.btn)); el.appendChild(b); }
+    // The row of the tool in use reads as pressed, so a tool picked here is still visible as the one on.
+    const sync=()=>{ for(const r of rows) r.row.setAttribute('aria-pressed',String(r.btn.classList.contains('on'))); };
+    return {el,sync};
+  }
+  window.PANotePhone={PHONE_MQ,ZOOM_MIN,ZOOM_MAX,PINCH_SLOP,READ_SIZES,SHEET_TXT,isPhone,watch,clampZoom,gesture,fitK,readSize,stepSize,readView,toolSheet};
 })();
 </script>

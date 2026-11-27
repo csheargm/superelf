@@ -458,10 +458,18 @@
     ov.addEventListener('click',e=>{ if(e.target===ov)done(false); }); escCloses(ov,()=>done(false)); }); }
   // With an anchor element, the menu opens as a POPOVER next to it (clamped to the viewport,
   // outside-tap closes — no Cancel row needed); without one it stays the classic bottom sheet.
-  function pacSheet(host,optsArr,anchor){ return new Promise(res=>{
+  // Open ⋯ sheets, so a chat taking the screen can close them (audit #7: the list's ⋯ floated over Ask AI).
+  // TODO(R4 seam): pacSheet + closeSheets → web/drawer-ui.inline.html with buildDrawer (this file is over budget).
+  const _sheets=new Set();
+  function closeSheets(){ for(const f of [..._sheets]) f(); }
+  function pacSheet(host,optsArr,anchor){ return new Promise(resolve=>{
+    // A phone gets the ONE bottom sheet (web/phone-ui.inline.html), never a popover pinned to a 44px ⋯.
+    const phone=!!(window.PAPhoneUI&&window.PAPhoneUI.isPhone()); if(phone) anchor=null;
+    let shut=null; const res=v=>{ _sheets.delete(shut); resolve(v); };
     const ov=document.createElement('div'); ov.className='pac-modal'+(anchor?'':' pac-msheet');
+    shut=()=>{ ov.remove(); res(-1); }; _sheets.add(shut);
     if(anchor) ov.style.background='transparent';
-    const box=document.createElement('div'); box.className='pac-mbox';
+    const box=document.createElement('div'); box.className='pac-mbox'+(phone?' pa-sheet':'');
     optsArr.forEach((o,i)=>{ const b=document.createElement('button'); b.className='pac-mopt'+(o.del?' del':''); b.textContent=o.label; b.onclick=()=>{ov.remove();res(i);}; box.appendChild(b); });
     if(!anchor){ const c=document.createElement('button'); c.className='pac-mopt'; c.textContent='Cancel'; c.onclick=()=>{ov.remove();res(-1);}; box.appendChild(c); }
     ov.appendChild(box); ov.addEventListener('click',e=>{ if(e.target===ov){ov.remove();res(-1);} }); host.appendChild(ov); escCloses(ov,()=>{ov.remove();res(-1);});
@@ -801,6 +809,8 @@
       // current query, never stored on the row.
       const it=itemOf(sel), hit=hitFor(it,(qi.value||'').toLowerCase().trim());
       if(it.onOpen) it.onOpen(sel, hit?{page:hit.page,boxes:hit.boxes||[],terms:_hitTerms}:undefined);
+      // …except on a phone, where the list covers the note it just opened (audit #6): there it closes.
+      if(window.PAPhoneUI&&window.PAPhoneUI.isPhone()) close();
     });
     // The typed query also goes to the node's index when PANote.search exists (feature-detected: a
     // page without PANote keeps the local filter alone). Debounced; a reply for an older query is
@@ -1087,7 +1097,7 @@
     // opened thread (e.g. a picture ask) can stop instead of writing into whatever thread is shown now.
     let _openP, _closeN=0;   // _closeN: ✕ taps (full-screen and rail alike)
     function open(k){
-      el.inp.focus(); drawer.close();
+      el.inp.focus(); drawer.close(); closeSheets();
       if(k===loadedKey){ const c=_closeN; return Promise.resolve(_openP).then(r=>r===false||_closeN!==c?false:r); }     // same thread shown or still loading — keep it, and resolve when it is ready
       const c=_closeN; const p=(_openP=openNow(k)); return p.then(r=>r===false||_closeN!==c?false:r);
     }
@@ -1646,6 +1656,7 @@
   })();
 })();
 </script>
+<!--PA_PHONE_UI-->
 <!--PA_DRAWER_SUMMARY_UI-->
 <!--PA_DRAWER_TAGS_UI-->
 <!--PA_DRAWER_GROUPS_UI-->

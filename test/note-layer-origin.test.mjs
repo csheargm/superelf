@@ -56,7 +56,8 @@ test('the clearance is measured in the unzoomed frame it is applied in', () => {
   const zoomed = /for\(const el of \[pageInner,flip\]\)\{[\s\S]*?\}/.exec(E)[0];
   // …and BECAUSE it is on the zoomed page, it is divided by k — an offset on a zoomed element is
   // scaled with it, measured at 60px landing on 48 at k=0.8, the same correction `left` needs.
-  assert.match(E, /const c=barClearance\(\), k=pageK\(\)\|\|1, t=Math\.round\(c\/k\);/,
+  // (A phone reads toolsClearance(), which is barClearance() unless the bar is hidden: step 3 gives a hidden bar's room back.)
+  assert.match(E, /const c=host\.classList\.contains\('pan-phone'\)\?toolsClearance\(\):barClearance\(\), k=pageK\(\)\|\|1, t=Math\.round\(c\/k\);/,
     'the clearance is read once and converted into the page\'s own units');
 });
 
@@ -99,7 +100,7 @@ test('the scroller is told its top is occupied, not just the page', () => {
   // From the SAME measurement that offsets the page — two sources would drift, and the symptom
   // of drift is exactly this bug in one direction or the other.
   const fn = /function syncStageClear\(\)\{[\s\S]*?\n    \}/.exec(E)[0];
-  assert.match(fn, /const c=barClearance\(\)/, 'one reading');
+  assert.match(fn, /const c=host\.classList\.contains\('pan-phone'\)\?toolsClearance\(\):barClearance\(\)/, 'one reading (iPad/desktop: the bar; a phone: the bar unless it is hidden)');
   assert.ok(fn.includes("el.style.top=t+'px'") && fn.includes('scrollPaddingTop=c'),
     'both the page offset and the scroll padding come from it');
   // In SCREEN px, unlike the page offset: the stage is not zoomed, the page is.

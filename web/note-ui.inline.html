@@ -1541,6 +1541,8 @@
         '<button class="pan-tbtn pan-undo" title="Undo" aria-label="Undo">'+ico('undo')+'</button>'+
         '<button class="pan-tbtn pan-redo" title="Redo" aria-label="Redo">'+ico('redo')+'</button>'+
         (imgHooks&&!hasTop?'<span class="pan-sep"></span><button class="pan-tbtn pan-photo" title="Add photo" aria-label="Add photo">'+ico('photo')+'</button>':'')+
+        /* The phone strip's ⋯ (web/note-phone.inline.html): display:none unless .pan-phone. */
+        (window.PANotePhone?'<button class="pan-tbtn pan-toolmore" aria-haspopup="menu" title="'+PANotePhone.SHEET_TXT.more+'" aria-label="'+PANotePhone.SHEET_TXT.more+'">'+ico('more')+'</button>':'')+
       '</div>'+
       '<div class="pan-pop pan-inkpop">'+
         '<div class="pan-swgrid">'+
@@ -1725,6 +1727,10 @@
     // The header's copy in fullscreen, the drawing row's in mount mode — where there is no header
     // to promote it to. One variable, so the wiring below is written once (as with paperBtn).
     const undoBtn=q('.pan-undo'), redoBtn=q('.pan-redo'), photoBtn=q('.pan-hphoto')||q('.pan-photo');
+    const toolMore=q('.pan-toolmore'), toolSheet=toolMore?window.PANotePhone.toolSheet({doc:document,onPick:b=>{ closePops(); b.click(); },
+      rows:[...toolBtns.filter(b=>b.dataset.tool!=='pen'&&b.dataset.tool!=='erase').map(b=>({key:b.dataset.tool,btn:b,icon:b.innerHTML})),
+        {key:'ink',btn:inkBtn,icon:inkBtn.innerHTML},{key:'paper',btn:q('.pan-paperbtn'),icon:ico('paper')},{key:'photo',btn:q('.pan-photo'),icon:ico('photo')},
+        {key:'read',btn:q('.pan-tools .pan-readbtn'),icon:ico('read')}]}):null;   // the phone strip's ⋯ (web/note-phone.inline.html)
     const fingerCb=q('.pan-fingercb');
     let fingerDraw=false;
     // The toggle persists at DEVICE level via the shell (like the font scale): a change is
@@ -2002,7 +2008,8 @@
     // reason `left` is: an offset on a zoomed element is scaled with it (60px at k=0.8 lands
     // at 48).
     function syncStageClear(){
-      const c=barClearance(), k=pageK()||1, t=Math.round(c/k);
+      // A phone gives the page the room of a hidden bar back (step 3: no empty strip above the page); iPad/desktop unchanged.
+      const c=host.classList.contains('pan-phone')?toolsClearance():barClearance(), k=pageK()||1, t=Math.round(c/k);
       for(const el of [pageInner,flip]) if(el) el.style.top=t+'px';
       // …and tell the SCROLLER that the top of its port is occupied. Placing the page below the
       // bar is only half of it: the bar OVERLAYS the scroll port, so every automatic scroll —
@@ -4113,7 +4120,7 @@
     // Popovers: the trigger button carries .on while its popover is open (the .pan-tbtn.on accent
     // is the "this icon opened this panel" indication), and the panel opens NEXT TO its button —
     // below it when the toolbar is docked/moved to the top half, else the classic bottom anchor.
-    const syncPopBtns=()=>{ inkBtn.classList.toggle('on',inkPop.classList.contains('on')); paperBtn.classList.toggle('on',paperPop.classList.contains('on')); if(photoBtn&&photoPop) photoBtn.classList.toggle('on',photoPop.classList.contains('on')); };
+    const syncPopBtns=()=>{ inkBtn.classList.toggle('on',inkPop.classList.contains('on')); if(toolMore) toolMore.classList.toggle('on',!!(toolSheet&&toolSheet.el.classList.contains('on'))); paperBtn.classList.toggle('on',paperPop.classList.contains('on')); if(photoBtn&&photoPop) photoBtn.classList.toggle('on',photoPop.classList.contains('on')); };
     // A control folded into the phone header's ⋯ (audit #4) has no box: its popover anchors at that ⋯.
     // NEVER UNDER THE HEADER (audit #6 #7): the header (z-index 12) paints over a popover (7), so a popover
     // opens below the header's bottom — not just below its button, which may sit on the header's 1st row —
@@ -4129,7 +4136,7 @@
       const pr=pop.getBoundingClientRect(), room=Math.floor(below?hr.bottom-8-pr.top:pr.bottom-head-8);
       if(pr.height>room) pop.style.maxHeight=Math.max(POP_MIN_ROOM,room)+'px'; };
     const closePops=()=>{ inkPop.classList.remove('on'); paperPop.classList.remove('on'); if(photoPop) photoPop.classList.remove('on');
-      for(const sel of ['.pan-stylepop','.pan-tablepop','.pan-ovf']){ const el=q(sel); if(el) el.classList.remove('on'); }
+      for(const sel of ['.pan-stylepop','.pan-tablepop','.pan-ovf','.pan-toolsheet']){ const el=q(sel); if(el) el.classList.remove('on'); }
       for(const s2 of ['.pan-imgpop','.pan-selpop']){ const el=q(s2); if(el) el.classList.remove('on'); }
       syncPopBtns(); };   // only one popover open at a time
     // A tap OUTSIDE an open popover closes it and is SWALLOWED — it must never fall through and
@@ -4139,7 +4146,7 @@
       const open=[...host.querySelectorAll(POPS_OPEN)];
       if(!open.length) return;
       if(open.some(p=>p.contains(e.target))) return;             // interacting inside the panel
-      if(e.target.closest&&e.target.closest('.pan-inkbtn,.pan-paperbtn,.pan-hmore,.pan-hphoto,.pan-fhl,.pan-fstyle,.pan-ftable,.pan-photo,.pac-lb')) return;   // togglers manage themselves; .pac-lb = PAChat's lightbox over a popover (信纸 draft zoom): closing it keeps the popover
+      if(e.target.closest&&e.target.closest('.pan-inkbtn,.pan-paperbtn,.pan-hmore,.pan-hphoto,.pan-fhl,.pan-fstyle,.pan-ftable,.pan-photo,.pan-toolmore,.pac-lb')) return;   // togglers manage themselves; .pac-lb = PAChat's lightbox over a popover (信纸 draft zoom): closing it keeps the popover
       open.forEach(p=>p.classList.remove('on')); syncPopBtns();
       e.preventDefault(); e.stopPropagation(); };
     document.addEventListener('pointerdown',onPopOutside,true);
@@ -4311,7 +4318,7 @@
     // PHONE ⋯ · 手机⋯菜单 (audit #4): under OVF_MQ the header's ⋯ opens a short menu — Page settings, Photo,
     // Print — instead of Page settings alone; each row runs the SAME handler its hidden button runs.
     if(topBar&&paperBtn.classList.contains('pan-hmore')){
-      const ovf=document.createElement('div'); ovf.className='pan-pop pan-ovf'; ovf.setAttribute('role','menu');
+      const ovf=document.createElement('div'); ovf.className='pan-pop pan-ovf pa-sheet'; ovf.setAttribute('role','menu');   // pa-sheet: the phone's bottom sheet (web/phone-ui.inline.html), nothing off a phone
       // Read view heads the menu on a phone (its header button stays hidden: the title keeps its room).
       ovf.innerHTML=(q('.pan-top .pan-readbtn')?'<button type="button" class="pan-ovfread" data-ovf="read">'+ico('read')+READ_TXT.btn+'</button>':'')+
         '<button type="button" data-ovf="paper">'+ico('more')+'页面设置 · Page settings</button>'+
@@ -4325,6 +4332,13 @@
         const k=b.dataset.ovf;
         if(k==='read') q('.pan-readbtn').click(); else if(k==='paper') togglePop(paperPop,paperBtn); else if(k==='photo') photoBtn.click(); else q('.pan-hprint').click(); });
     }
+    // TODO(R4 seam): the phone tool sheet wiring → the popover part, with togglePop/closePops.
+    // PHONE TOOL ⋯ · 手机工具面板 (step 3, rule 5): the rows press the strip's own hidden controls, so each keeps
+    // its one handler; the colour/size, paper and photo panels open as the same bottom sheet on a phone.
+    for(const p of [inkPop,paperPop,photoPop]) if(p) p.classList.add('pa-sheet');
+    if(toolMore&&toolSheet){ host.appendChild(toolSheet.el);
+      toolMore.addEventListener('click',()=>{ toolSheet.sync(); togglePop(toolSheet.el,toolMore); });
+      if(window.PATips) window.PATips.register({id:'note-tool-more',anchor:()=>toolMore,text:window.PANotePhone.SHEET_TXT.tip,when:phoneOn}); }
     undoBtn.addEventListener('click',undo);
     redoBtn.addEventListener('click',redo);
     prevBtn.addEventListener('click',async()=>{ await flipTo(cur-1); });
@@ -4439,6 +4453,9 @@
     // The host hiding / showing the bar (data-paab-hidden) moves the page and the floating tools with it.
     if(topBar&&window.MutationObserver) new MutationObserver(()=>{ applyTextMetrics(); syncToolsTop(); })
       .observe(topBar,{attributes:true,attributeFilter:['data-paab-hidden']});
+    // On a phone the tool row leaving or joining the bar (a mode tab, a collapse) moves the page with it (step 3: no empty strip).
+    if(topBar&&window.MutationObserver&&q('.pan-tools')) new MutationObserver(()=>{ if(host.classList.contains('pan-phone')) requestAnimationFrame(syncStageClear); })
+      .observe(q('.pan-tools'),{attributes:true,attributeFilter:['class']});
 
     // Global listeners (flush the debounced save when the app is hidden/closed so the last
     // strokes aren't lost; re-fit canvases on resize; keep the formatting bar tracking the

@@ -48,7 +48,7 @@ test('served: chat-ui carries the tips marker after the app-prefs one; web.mjs r
   assert.ok(read('web/chat-ui.inline.html').trimEnd().endsWith('<!--PA_APP_PREFS_UI-->\n<!--PA_TIPS_UI-->'));
   const web = read('web.mjs'), list = web.slice(web.indexOf('const PA_COMPONENTS = ['), web.indexOf('\n];', web.indexOf('const PA_COMPONENTS = [')));
   const files = [...list.matchAll(/file: '([^']+)'/g)].map((m) => m[1]);
-  assert.deepEqual(files.slice(-8), ['tips.inline.html', 'panel-window.inline.html', 'app-bar.inline.html', 'bar-handle.css', 'reading-history.inline.html', 'ink-frame.inline.html', 'snap.inline.html', 'note-phone.inline.html']);
+  assert.deepEqual(files.slice(-9), ['tips.inline.html', 'panel-window.inline.html', 'app-bar.inline.html', 'bar-handle.css', 'reading-history.inline.html', 'ink-frame.inline.html', 'snap.inline.html', 'note-phone.inline.html', 'phone-ui.inline.html']);
 });
 
 test('first visit shows ONE tip beside the anchor, inside the viewport; dismiss stores the id and keeps the override', async () => {
