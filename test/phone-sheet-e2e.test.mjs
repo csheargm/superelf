@@ -100,7 +100,7 @@ test('iPhone: ⋯, colour/size and the header ⋯ open as one bottom sheet; a sh
   assert.deepEqual(await frame.evaluate(() => [...document.querySelectorAll('.pan-tool.on')].map((e) => e.dataset.tool)), ['marker'], 'the Marker row picked the marker');
   assert.equal((await box(frame, '.pan-toolsheet')).on, false, 'and the sheet closed');
   await frame.locator('.pan-toolmore').click();
-  assert.equal(await frame.evaluate(() => document.querySelector('.pan-toolsheet [data-k=marker]').getAttribute('aria-pressed')), 'true', 'the tool in use reads as pressed');
+  assert.equal(await frame.evaluate(() => document.querySelector('.pan-toolsheet [data-k=marker]').getAttribute('aria-checked')), 'true', 'the tool in use reads as checked');
   await frame.locator('.pan-toolsheet [data-k=ink]').click();
   b = await box(frame, '.pan-inkpop');
   assert.ok(b.on && b.pos === 'fixed' && Math.abs(b.b - b.vh) < 1 && Math.abs(b.w - b.vw) < 1, `colour/size is the same bottom sheet (${b.l}-${b.r}, ${b.t}-${b.b})`);

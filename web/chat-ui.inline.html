@@ -465,11 +465,11 @@
   function pacSheet(host,optsArr,anchor){ return new Promise(resolve=>{
     // A phone gets the ONE bottom sheet (web/phone-ui.inline.html), never a popover pinned to a 44px ⋯.
     const phone=!!(window.PAPhoneUI&&window.PAPhoneUI.isPhone()); if(phone) anchor=null;
-    let shut=null; const res=v=>{ _sheets.delete(shut); resolve(v); };
+    let shut=null, unMq=null; const res=v=>{ _sheets.delete(shut); if(unMq) unMq(); resolve(v); };
     const ov=document.createElement('div'); ov.className='pac-modal'+(anchor?'':' pac-msheet');
     shut=()=>{ ov.remove(); res(-1); };
     // Phone sheets only (iPad/desktop popovers keep their old life); leaving phone mode or the list closing ends one.
-    if(phone){ _sheets.add(shut); try{ const mq=matchMedia(window.PAPhoneUI.MQ), off=()=>{ if(!mq.matches){ mq.removeEventListener('change',off); if(ov.isConnected) shut(); } }; mq.addEventListener('change',off); }catch(_){ /* no matchMedia change events: the sheet still closes on tap, Cancel or Escape */ } }
+    if(phone){ _sheets.add(shut); try{ const mq=matchMedia(window.PAPhoneUI.MQ), off=()=>{ if(!mq.matches&&ov.isConnected) shut(); }; mq.addEventListener('change',off); unMq=()=>mq.removeEventListener('change',off); }catch(_){ /* no matchMedia change events: the sheet still closes on tap, Cancel or Escape */ } }
     if(anchor) ov.style.background='transparent';
     const box=document.createElement('div'); box.className='pac-mbox'+(phone?' pa-sheet':'');
     optsArr.forEach((o,i)=>{ const b=document.createElement('button'); b.className='pac-mopt'+(o.del?' del':''); b.textContent=o.label; b.onclick=()=>{ov.remove();res(i);}; box.appendChild(b); });

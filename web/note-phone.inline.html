@@ -49,7 +49,7 @@
 .pan-toolsheet{gap:2px;padding:6px}
 .pan-toolsheet button{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 12px;border:none;background:none;border-radius:9px;
   font:inherit;font-size:15px;color:var(--text,#111);text-align:left;cursor:pointer;white-space:nowrap}
-.pan-toolsheet button[aria-pressed=true]{background:color-mix(in srgb,var(--accent,#0f6355) 14%,transparent);color:var(--accent,#0f6355)}
+.pan-toolsheet button[aria-checked=true]{background:color-mix(in srgb,var(--accent,#0f6355) 14%,transparent);color:var(--accent,#0f6355)}
 .pnp-read{position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;background:var(--pan-paper,#fffdf8);color:#1c1e1d}
 .pnp-read[hidden]{display:none}
 .pnp-rhead{display:flex;align-items:center;gap:6px;padding:6px 8px;padding-top:max(6px,env(safe-area-inset-top));border-bottom:1px solid rgba(0,0,0,.12);background:inherit}
@@ -200,11 +200,11 @@
     const doc=c.doc||document, el=doc.createElement('div');
     el.className='pan-pop pan-toolsheet pa-sheet'; el.setAttribute('role','menu'); el.setAttribute('aria-label',SHEET_TXT.more);
     const rows=c.rows.filter(r=>r.btn&&SHEET_TXT[r.key]);
-    for(const r of rows){ const b=doc.createElement('button'); b.type='button'; b.dataset.k=r.key; b.setAttribute('role','menuitem');
+    for(const r of rows){ const b=doc.createElement('button'); b.type='button'; b.dataset.k=r.key; b.setAttribute('role','menuitemradio');
       b.innerHTML=r.icon||''; b.appendChild(doc.createTextNode(SHEET_TXT[r.key])); r.row=b;
       b.addEventListener('click',()=>c.onPick(r.btn)); el.appendChild(b); }
     // The row of the tool in use reads as pressed, so a tool picked here is still visible as the one on.
-    const sync=()=>{ for(const r of rows) r.row.setAttribute('aria-pressed',String(r.btn.classList.contains('on'))); };
+    const sync=()=>{ for(const r of rows) r.row.setAttribute('aria-checked',String(r.btn.classList.contains('on'))); };
     return {el,sync};
   }
   window.PANotePhone={PHONE_MQ,ZOOM_MIN,ZOOM_MAX,PINCH_SLOP,READ_SIZES,SHEET_TXT,isPhone,watch,clampZoom,gesture,fitK,readSize,stepSize,readView,toolSheet};
