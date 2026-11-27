@@ -22,13 +22,15 @@ const ASK = 'can you allow user to select day, week, month and year view?';
 const LIE = 'Done — the Calendar Planner now has a Day / Week / Month / Year view switcher at the top.';
 const PAGE = '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><h1>Calendar Planner</h1><div id="cal"></div></body></html>';
 const pageWith = (extra) => PAGE.replace('<div id="cal">', `${extra}<div id="cal">`);
-let mode = 'plan', nextExtra = '';
+let mode = 'plan', nextExtra = '', searches = 0;
 function startOllamaStub() {
   return new Promise((r) => { const srv = http.createServer((req, res) => {
     let b = ''; req.on('data', (c) => { b += c; }).on('end', () => {
+      if (req.url === '/api/web_search') { searches++; res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ results: [{ title: 'Weather', url: 'https://weather.example/today', content: 'sunny' }] })); return; }
       const msgs = JSON.parse(b).messages, apply = msgs.some((m) => m.role === 'user' && m.content.startsWith('Change this app:'));
       const searched = msgs.some((m) => m.role === 'system' && (m.content.startsWith('Web search results') || m.content.startsWith('Web search is not available')));
-      const text = mode === 'search' && !apply ? (searched ? 'The weather answer from search.' : `${SEARCH_MARKER} weather today`)
+      const text = (mode === 'search' || mode === 'search-plan') && !apply ? (!searched ? `${SEARCH_MARKER} weather today` : mode === 'search' ? 'The weather answer from search.' : `I will show today's weather in the header.\n${PLAN_MARKER}`)
+        : mode === 'search-empty' && !apply ? `${SEARCH_MARKER} weather today`
         : apply && mode === 'bad' ? 'no page blocks here'
         : apply && (mode === 'same' || mode === 'verbatim') ? `Kept it.\n\n\`\`\`html\n${mode === 'same' ? PAGE : withOwnPolicy(ensureAskAi(PAGE, 'Calendar Planner'))}\n\`\`\`` : mode === 'marker' && !apply ? `${APP_MARKER} {"edit":"calendar-planner","title":"Calendar Planner","request":"make the title red"}`
         : apply ? `I added it.\n\n\`\`\`html\n${pageWith(nextExtra)}\n\`\`\`\n\n\`\`\`json\n{"title":"Calendar Planner"}\n\`\`\``
@@ -42,12 +44,14 @@ let ollama, demo;
 before(async () => {
   ollama = await startOllamaStub();
   const port = await freePort();
-  const root = mkWebRoot({ port, extraConfig: { ollama_url: `http://127.0.0.1:${ollama.address().port}`, chat_models: MODELS, users: [], demo: DEMO } });
+  const base = `http://127.0.0.1:${ollama.address().port}`;
+  const root = mkWebRoot({ port, extraConfig: { ollama_url: base, chat_models: MODELS, users: [], demo: { ...DEMO, web_search_url: `${base}/api/web_search` } } });
   fs.mkdirSync(path.join(root, 'workspace.example', 'apps'), { recursive: true });
+  process.env.OLLAMA_API_KEY = 'test-key-not-real';   // inherited by the web.mjs child only
   demo = { port, root, web: startWeb(root) };
   await waitReady(port);
 });
-after(async () => { if (demo) { await stopWeb(demo.web); rmTemp(demo.root); } ollama.close(); });
+after(async () => { if (demo) { await stopWeb(demo.web); rmTemp(demo.root); } ollama.close(); delete process.env.OLLAMA_API_KEY; });
 
 async function visit(ip) {
   const r = await fetch(`http://127.0.0.1:${demo.port}/api/demo/start`, { method: 'POST', headers: { 'content-type': 'application/json', 'cf-connecting-ip': ip } });
@@ -143,16 +147,54 @@ test('GPT review r2: a page that is the same once the demo\'s own additions are 
   mode = 'plan';
 });
 
-test('nightly review: an ordinary question in the guest\'s own app chat still gets the web search step', async () => {
-  const v = await visit('198.51.100.28'); const file = seedApp(v); mode = 'search';
+const quota = (v) => { const c = JSON.parse(fs.readFileSync(path.join(demo.root, 'demo-quota.json'), 'utf8')).counts; return Object.fromEntries(Object.entries(c).filter(([k]) => k.includes(v.uid))); };
+test('an ordinary question in the guest\'s own app chat gets the web search step, each call charged', async () => {
+  const v = await visit('198.51.100.28'); const file = seedApp(v); mode = 'search'; const was = searches;
   const ev = await chat(v, { message: 'what is the weather today?' });
-  assert.ok(ev.some((e) => e.type === 'status'), 'the search step ran (searching, or said why it could not)');
-  assert.ok(done(ev).text.includes('The weather answer from search.') && !done(ev).text.includes(SEARCH_MARKER));
+  assert.equal(searches, was + 1, 'the search endpoint was really called');
+  assert.ok(ev.some((e) => e.type === 'status'), 'the search step is said');
+  const t = done(ev).text;
+  assert.ok(t.includes('The weather answer from search.') && t.includes('https://weather.example/today') && !t.includes(SEARCH_MARKER), t);
+  assert.equal(t.split('weather.example/today').length, 2, 'the sources footer is shown once');
+  const q = quota(v);
+  assert.equal(q[`user:${v.uid}`], 2, `the chat call and the answer call are both charged: ${JSON.stringify(q)}`);
+  assert.ok(Object.entries(q).some(([k, n]) => k !== `user:${v.uid}` && n === 1), `the search is charged: ${JSON.stringify(q)}`);
   assert.equal(fs.readFileSync(file, 'utf8'), PAGE);
   mode = 'plan';
 });
 
-test('nightly review: a rewrite that fails both attempts is a failed turn, not a saved success', async () => {
+test('GPT review: a plan given after a search keeps its Apply button', async () => {
+  const v = await visit('198.51.100.30'); seedApp(v); mode = 'search-plan';
+  const ev = await chat(v, { message: 'show the weather in the header' });
+  assert.equal(confirmOf(ev) && confirmOf(ev).label, APPLY_LABEL, JSON.stringify(ev));
+  assert.ok(!done(ev).text.includes(PLAN_MARKER));
+  mode = 'plan';
+});
+
+test('GPT review: an answer that is only another search marker is a failed turn, never an empty success', async () => {
+  const v = await visit('198.51.100.31'); seedApp(v); mode = 'search-empty';
+  const ev = await chat(v, { message: 'what is the weather today?' });
+  assert.ok(!done(ev) || done(ev).ok === false, JSON.stringify(ev));
+  assert.ok(ev.some((e) => e.type === 'error'), 'the failure is said');
+  mode = 'plan';
+});
+
+test('GPT review: a rewrite the final checks roll back is a failed turn, not a saved success', async () => {
+  const v = await visit('198.51.100.32'); const file = seedApp(v); mode = 'plan';
+  const ev1 = await chat(v, { message: ASK });
+  const convoId = ev1.find((e) => e.type === 'convo').id;
+  nextExtra = '<script>function ( {</script>';
+  const ev2 = await chat(v, { message: confirmOf(ev1).message, convoId });
+  const ed = ev2.find((e) => e.type === 'app-edit');
+  assert.ok(ed && ed.changed && !ed.applied, JSON.stringify(ev2));
+  assert.equal(done(ev2).ok, false);
+  const saved = await (await req(v, `/api/convos/${convoId}`)).json();
+  assert.equal(saved.messages[saved.messages.length - 1].failed, true);
+  assert.equal(fs.readFileSync(file, 'utf8'), PAGE, 'rolled back');
+  nextExtra = ''; mode = 'plan';
+});
+
+test('a rewrite that fails both attempts is a failed turn, not a saved success', async () => {
   const v = await visit('198.51.100.29'); seedApp(v); mode = 'plan';
   const ev1 = await chat(v, { message: ASK });
   const convoId = ev1.find((e) => e.type === 'convo').id;
