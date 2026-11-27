@@ -12,7 +12,7 @@ import path from 'node:path';
 import http from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { missingReason, resolveSkip } from './helpers-e2e-gate.mjs';
-import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, OWNER_TOKEN } from './helpers-web.mjs';
+import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, OWNER_TOKEN, shellAppFrame } from './helpers-web.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
 import { ROMANS } from './helpers-md-sample.mjs';
 
@@ -60,7 +60,7 @@ for (const r of RUNS) test(`${r.name}: bullets sit tight and the answer fills th
     await page.waitForFunction(() => typeof openApp === 'function' && document.querySelector('#dot.ok'), null, { timeout: 20000 });
     await page.evaluate(() => openApp('owner', 'mdl', 'MD Lists'));
     const app = page.frameLocator('#fr'); await app.locator('.pac-inp').waitFor();
-    const fr = page.frame({ url: /\/app\/owner\/mdl\// });
+    const fr = await shellAppFrame(page);
     await app.locator('.pac-inp').fill('罗马书 7:1-6 的婚姻比喻是什么意思？'); await app.locator('.pac-go').click();
     await fr.waitForFunction(() => document.querySelector('.pac-m.ai.pac-md li'), null, { timeout: 20000 });
     await fr.evaluate(() => document.querySelectorAll('.pat-tip').forEach((e) => e.remove()));

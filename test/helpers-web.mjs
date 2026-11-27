@@ -287,3 +287,13 @@ export const api = (port, p, opts = {}) => fetch(`http://127.0.0.1:${port}${p}`,
   ...opts,
   headers: { 'content-type': 'application/json', authorization: `Bearer ${OWNER_TOKEN}`, ...(opts.headers || {}) },
 });
+
+// The page in the shell's app frame (#fr), by its ELEMENT: on the srcdoc route (WebKit, web/sw-client.js)
+// its URL is about:srcdoc, so a lookup by URL found nothing and a test read null (CI flake v5.37.1).
+// Call after waiting for something inside the app: the app loads into a fresh #fr (web/app-frame.js).
+export async function shellAppFrame(page) {
+  const el = await page.$('#fr');
+  const fr = el && await el.contentFrame();
+  if (!fr) throw new Error('no page in #fr');
+  return fr;
+}

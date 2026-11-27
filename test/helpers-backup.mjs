@@ -63,7 +63,10 @@ case "$1" in
   pause-signals) kill -TERM "$(ps -o ppid= -p $PPID | tr -d ' ')";;
 esac\n`, { mode: 0o755 });
   const calls = () => (fs.existsSync(`${base}/box.calls`) ? fs.readFileSync(`${base}/box.calls`, 'utf8').trim().split('\n') : []);
-  const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, SUPERELF_BACKUP_PLATFORM: linux ? 'Linux' : 'Darwin' };
+  // Each node its own gpg home: parallel test files on a fresh runner raced to create ~/.gnupg
+  // ("can't create directory: File exists", CI flake v5.37.1), and a test never writes the real one.
+  fs.mkdirSync(`${base}/gnupg`, { mode: 0o700 });
+  const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, GNUPGHOME: `${base}/gnupg`, SUPERELF_BACKUP_PLATFORM: linux ? 'Linux' : 'Darwin' };
   const run = (script, args = [], input, more = {}) => spawnSync('bash', [path.join(node, script), ...args], { env: { ...env, ...more }, encoding: 'utf8', input });
   const runAsync = (script) => new Promise((res) => {
     const c = spawn('bash', [path.join(node, script)], { env });
