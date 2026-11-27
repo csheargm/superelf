@@ -19,7 +19,7 @@ const PAGE_W = 816, MIN_PAGE_W = 700;
 const IPAD_INK = [{ p: [[0.05, 0.05, 0.5], [0.5, 0.06, 0.5]], c: '#1c1e1d', w: 0.004, t: 'pen' },
   { p: [[0.6, 0.12, 0.5], [0.98, 0.14, 0.5]], c: '#1c1e1d', w: 0.004, t: 'pen' }];
 const WORDS = 'In the beginning was the Word and the Word was with God and the Word was God. ';
-const HTML = '<div>' + WORDS.repeat(6) + '</div><div>起初有道，道与神同在，道就是神。</div>';
+const HTML = '<div>' + WORDS.repeat(6) + '</div><div>起初有道，道与神同在，道就是神。</div><div><a href="https://example.com/read">a link</a></div>';
 let root;
 const notePath = (id) => path.join(root, 'workspace', 'data', 'notes', `entry-${id}.json`);
 const readNote = (id) => { try { return JSON.parse(fs.readFileSync(notePath(id), 'utf8')); } catch { return null; /* mid-write: read again */ } };
@@ -110,11 +110,19 @@ test('iPhone: Read view — reflowed text ≥18px, ink hidden and labelled; A+ i
   // The pad under it is inert, and editing keys never reach it (a hardware keyboard on a phone).
   assert.equal(await frame.evaluate(() => document.querySelector('.pan-stage').inert), true, 'the page under Read view is inert');
   for (const k of ['Delete', 'Backspace', 'Meta+z', 'x']) await page.keyboard.press(k);
-  await frame.locator('.pnp-rmore').click();
-  s = await rv(); assert.equal(s.font, 20, 'A+ grows the text');
+  await frame.locator('.pnp-rmore').focus(); await page.keyboard.press('Enter');
+  s = await rv(); assert.equal(s.font, 20, 'A+ grows the text (Enter on it works: its own keys pass)');
   await page.waitForFunction(() => localStorage.getItem('pa_notereadsize') === '20', null, { timeout: 5000 });
   await page.waitForTimeout(1500);                         // a save, had one been triggered, would be on disk now
   assert.equal(fs.readFileSync(notePath('ipadInk'), 'utf8'), fileBefore, 'A+ changed nothing in the saved note');
+  // A link goes through the pad's own opener (here spied at its first hop), not the browser's default.
+  await frame.evaluate(() => { window.__opened = []; const P = window.PASummaryRefs || (window.PASummaryRefs = { parseLink: () => null });
+    const o = P.open; P.open = (raw) => { window.__opened.push(raw); return true; }; window.__restore = () => { P.open = o; }; });
+  await frame.locator('.pnp-rbody a').click();
+  assert.deepEqual(await frame.evaluate(() => window.__opened), ['https://example.com/read'], 'the link is routed through the pad');
+  assert.equal(await frame.evaluate(() => document.querySelector('.pnp-read').hidden), true, 'and the view closed for it');
+  await frame.evaluate(() => window.__restore());
+  await frame.locator('.pan-hmore').click(); await frame.locator('.pan-ovfread').click();
   await frame.locator('.pnp-rclose').click();
   assert.equal(await frame.evaluate(() => document.querySelector('.pnp-read').hidden), true, 'closes');
   assert.equal(await frame.evaluate(() => document.querySelector('.pan-stage').inert), false, 'and gives the page back');
@@ -139,5 +147,17 @@ test('iPad 820: the page scale is the old one and the Read view button is hidden
   const want = Math.max(MIN_PAGE_W / PAGE_W, g.stageW / PAGE_W);
   assert.ok(Math.abs(g.zoom - want) < 1e-3, `zoom is max(700, width)/816 as before (${g.zoom} vs ${want})`);
   assert.equal(await frame.evaluate(() => document.querySelector('.pnp-read').hidden), true, 'Read view stays closed');
+  await ctx.close();
+});
+
+test('coarse 650px (phone mode, but the header ⋯ is not a menu): Read view is a header button', { skip }, async () => {
+  const ctx = await newContext({ ...PHONE, viewport: { width: 650, height: 900 } }); const page = await ctx.newPage();
+  const frame = await openJournal(page, { touch: true });
+  await open(page, frame, 'ipadInk');
+  const b = await frame.evaluate(() => { const e = document.querySelector('.pan-top .pan-readbtn'), r = e.getBoundingClientRect();
+    return { shown: getComputedStyle(e).display !== 'none', w: r.width, h: r.height, inView: r.right <= innerWidth }; });
+  assert.ok(b.shown && b.inView && b.w >= 44, `the header Read button shows (${b.w}x${b.h})`);
+  await frame.locator('.pan-top .pan-readbtn').click();
+  assert.equal(await frame.evaluate(() => document.querySelector('.pnp-read').hidden), false, 'and opens Read view');
   await ctx.close();
 });

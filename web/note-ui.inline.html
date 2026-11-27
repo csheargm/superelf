@@ -3570,7 +3570,7 @@
       if(W) setupCanvases(); },listenG); }
     // Read view（阅读视图）: web/note-phone.inline.html owns it; the pad only lends its text layer.
     const readView=(window.PANotePhone&&window.PANotePhone.readView)?window.PANotePhone.readView({host,textLayer,
-      btn:q('.pan-readbtn'),txt:READ_TXT,hasInk:()=>{ const pg=page(); return !!(pg&&hasRealInk(pg)); },listen:listenG,
+      btn:q('.pan-readbtn'),txt:READ_TXT,hasInk:()=>{ const pg=page(); return !!(pg&&hasRealInk(pg)); },listen:listenG,openLink,
       onSize:readSize=>{ try{ parent.postMessage({pa:'req',id:'panreadpref',kind:'pref',readSize},'*'); }catch(_){ /* no shell (standalone/harness): the size holds this session */ } }}):null;
     if(readView) listenG(window,'message',e=>{ const m=e.data; if(e.source===parent&&m&&m.pa==='prefs'&&Number.isFinite(m.readSize)) readView.setSize(m.readSize); });
     if(window.PATips&&readView) window.PATips.register({id:'note-read-view',anchor:()=>(q('.pan-top')?paperBtn:q('.pan-readbtn')),text:READ_TXT.tip,when:phoneOn});

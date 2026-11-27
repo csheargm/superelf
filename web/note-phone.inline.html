@@ -17,7 +17,7 @@
                                           screen width with no floor (适配宽度); otherwise max(minW,rw)/pageW
                                           exactly as before. Stored ink stays in pageW units either way.
        PANotePhone.readView(c)          → Read view（阅读视图）: the page's typed text reflowed at this device's
-         text size, ink hidden. c = {host, textLayer, btn, txt, hasInk(), listen}. → {open(), close(), isOpen()}
+         text size, ink hidden. c = {host, textLayer, btn, txt, hasInk(), listen, onSize(px), openLink(href)}. → {open(), close(), isOpen()}
          c.onSize(px) reports an A−/A+ change; the host stores it on THIS device (the shell's pa_notereadsize,
          a sandboxed app has no storage of its own) and hands it back with view.setSize(px). Never in the note.
      Driven by test/note-phone.test.mjs (the tracker) and test/note-phone-e2e.test.mjs (WebKit iPhone). -->
@@ -30,9 +30,9 @@
 .pan-fingerbtn .pan-fon,.pan-fingerbtn.on .pan-foff{display:none}
 .pan-readbtn{display:none}
 .pan-phone .pan-readbtn{display:flex;min-width:44px;min-height:44px}
-.pan-phone .pan-top .pan-readbtn{display:none}   /* in the header it is a row of the ⋯ menu (.pan-ovfread) instead */
+/* Where the header's ⋯ is a menu (note-ui OVF_MQ, 600px) Read view is its first row and the header button hides. */
 .pan-ovf .pan-ovfread{display:none}
-.pan-phone .pan-ovf .pan-ovfread{display:flex}
+@media (max-width:600px){ .pan-phone .pan-top .pan-readbtn{display:none} .pan-phone .pan-ovf .pan-ovfread{display:flex} }
 .pnp-read{position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;background:var(--pan-paper,#fffdf8);color:#1c1e1d}
 .pnp-read[hidden]{display:none}
 .pnp-rhead{display:flex;align-items:center;gap:6px;padding:6px 8px;padding-top:max(6px,env(safe-area-inset-top));border-bottom:1px solid rgba(0,0,0,.12);background:inherit}
@@ -152,13 +152,17 @@
     // While it is open the pad under it is INERT (no focus, no taps) and the keys that edit it are
     // held at the window, ahead of the pad's own document handlers, so nothing changes the note unseen.
     const setInert=on=>{ for(const n of c.host.children) if(n!==el) n.inert=on; };
-    const hold=e=>{ if(el.hidden) return; if(e.type==='keydown'&&e.key==='Escape') close(); e.stopImmediatePropagation(); if(e.type!=='keydown'||e.key!=='Tab') e.preventDefault(); };
+    // Tab / Enter / Space on the view's OWN controls pass, so A−, A+, ✕ and links work from a keyboard.
+    const OWN_KEYS={Tab:1,Enter:1,' ':1};
+    const hold=e=>{ if(el.hidden) return;
+      if(e.type==='keydown'&&e.key==='Escape'){ close(); e.preventDefault(); e.stopImmediatePropagation(); return; }
+      if(e.type==='keydown'&&OWN_KEYS[e.key]&&(e.key==='Tab'||el.contains(e.target))) return;
+      e.stopImmediatePropagation(); e.preventDefault(); };
     for(const ty of ['keydown','paste','cut']) add(window,ty,hold,true);
-    // A link in the copy is routed to the SAME link in the text layer, so it takes the pad's own
-    // handling (a note reference, the shell's link opener) instead of a popup the sandbox blocks.
+    // A link in the copy goes through the pad's own opener (c.openLink: a note reference, or the shell's
+    // checked URL opener), never the browser's default, which the sandbox blocks.
     body.addEventListener('click',e=>{ const a=e.target&&e.target.closest&&e.target.closest('a'); if(!a) return;
-      e.preventDefault(); const i=[...body.querySelectorAll('a')].indexOf(a), src=c.textLayer.querySelectorAll('a')[i];
-      if(src){ close(); src.click(); } });
+      e.preventDefault(); const href=a.getAttribute('href'); if(href&&c.openLink){ close(); c.openLink(href); } });
     function open(){ applySize(); fill(); el.hidden=false; setInert(true); sync(true);
       if(!obs&&window.MutationObserver){ obs=new MutationObserver(fill); obs.observe(c.textLayer,{childList:true,subtree:true,characterData:true}); } }
     function close(){ el.hidden=true; setInert(false); sync(false); if(obs){ obs.disconnect(); obs=null; } }
