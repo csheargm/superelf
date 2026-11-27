@@ -1,4 +1,13 @@
 {
+  "v5.38.7": {
+    "date": "2026-11-27",
+    "time": "2026-11-27T17:30:06.375Z",
+    "features": [],
+    "fixes": [
+      "合并：主页提示不出界、日期带年份、免责声明单语 · Merge: home tip fits, date shows the year, one-language disclaimer"
+    ],
+    "through": "4713905346dc8ac944cb2891403120b7ed8a1730"
+  },
   "v5.38.6": {
     "date": "2026-11-27",
     "time": "2026-11-27T17:26:19.640Z",
