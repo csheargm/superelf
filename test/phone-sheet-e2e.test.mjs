@@ -138,17 +138,21 @@ test('iPhone: opening a note from the list closes the list; the list ⋯ is the 
   await ctx.close();
 });
 
-test('iPhone: no empty strip above the page once the bar hides; no "Tap to type" in Draw mode', { skip }, async () => {
+test('iPhone: no empty grey strip above the page once the bar hides; no "Tap to type" in Draw mode', { skip }, async () => {
   const ctx = await newContext(PHONE); const page = await ctx.newPage();
   const frame = await openJournal(page, { touch: true });
   await open(page, frame, 'blankB'); await drawOn(frame);
   const ph = await frame.evaluate(() => getComputedStyle(document.querySelector('.pan-textlayer'), '::before').content);
   assert.ok(ph === 'none' || ph === 'normal' || ph === '', `no placeholder in Draw mode (${ph})`);
+  const top0 = await frame.evaluate(() => document.querySelector('.pan-pageInner').getBoundingClientRect().top);
   await frame.evaluate(() => { PAAppBar.hold(false); PAAppBar.hide(); });
-  await frame.waitForFunction(() => document.querySelector('.pan-top').getAttribute('data-paab-hidden') === '1');
-  await frame.waitForFunction(() => document.querySelector('.pan-pageInner').getBoundingClientRect().top < 30, null, { timeout: 5000 });
-  await frame.evaluate(() => PAAppBar.hold(true));
-  await frame.waitForFunction(() => { const t = document.querySelector('.pan-top').getBoundingClientRect().bottom, p = document.querySelector('.pan-pageInner').getBoundingClientRect().top; return Math.abs(p - t) < 2; }, null, { timeout: 5000 });
+  await frame.waitForFunction(() => document.querySelector('.pan-top').getAttribute('data-paab-hidden') === '1'); await page.waitForTimeout(400);
+  assert.equal(await frame.evaluate(() => document.querySelector('.pan-pageInner').getBoundingClientRect().top), top0, 'the text stays put (owner 2026-11-23)');
+  // The room above the page is the note's paper, not the grey desk: no empty grey strip.
+  const bg = await frame.evaluate(() => { const st = document.querySelector('.pan-stage'), c = document.createElement('canvas').getContext('2d'); c.fillStyle = getComputedStyle(st).backgroundColor; const a = c.fillStyle;
+    c.fillStyle = getComputedStyle(document.querySelector('.pan')).getPropertyValue('--pan-paperc').trim(); return [a, c.fillStyle]; });
+  assert.equal(bg[0], bg[1], `the strip above the page wears the paper (${bg})`);
+  assert.notEqual(bg[0], '#eceded', 'not the grey desk');
   await ctx.close();
 });
 
@@ -170,6 +174,7 @@ test('iPad 820: the strip, popovers, list menus and page offset are what they we
   await frame.waitForFunction(() => document.querySelector('.pan-top').getAttribute('data-paab-hidden') === '1');
   await page.waitForTimeout(400);
   assert.equal(await frame.evaluate(() => document.querySelector('.pan-pageInner').getBoundingClientRect().top), top0, 'the page does not move');
+  assert.equal(await frame.evaluate(() => getComputedStyle(document.querySelector('.pan-stage')).backgroundColor), 'rgb(236, 237, 237)', 'the iPad stage keeps its grey desk');
   await frame.evaluate(() => PAAppBar.hold(true));
   // The list: ⋯ is the anchored popover, and opening a row keeps the list.
   await frame.evaluate(() => drawer.open()); await frame.waitForSelector('.pac-drawerhost.on .pac-dmore');

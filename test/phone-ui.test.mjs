@@ -42,10 +42,11 @@ test('chat-ui: only a phone turns a menu into the sheet or closes the list on a 
 });
 
 test('the phone strip: ⋯ and the hidden controls are phone-only CSS; sheet labels are 中文 first', () => {
-  assert.match(NP, /\.pan-toolmore\{display:none\}\n\.pan-phone \.pan-tools \.pan-toolmore\{display:flex\}/);
+  assert.match(NP, /\.pan-toolmore\{display:none\}\n\.pan-phone \.pan-tools:not\(\.collapsed\) \.pan-toolmore\{display:flex\}/);
   for (const rule of NP.match(/^\.pan-phone[^\n]*$/gm).filter((l) => /display:none/.test(l) && /pan-tools/.test(l))) assert.match(rule, /^\.pan-phone /);
   const txt = /const SHEET_TXT=\{([\s\S]*?)\};/.exec(NP)[1];
   for (const [, k, v] of txt.matchAll(/(\w+):'([^']*)'/g)) assert.match(v, /^[一-鿿].* · [A-Z]/, `${k} is 中文 first`);
   assert.match(NU, /PANotePhone\.SHEET_TXT\.tip,when:phoneOn/, 'its first-use tip is phone-only');
-  assert.match(NU, /const c=host\.classList\.contains\('pan-phone'\)\?toolsClearance\(\):barClearance\(\)/, 'only a phone gives the hidden bar room back');
+  assert.match(NU, /drawPaper\(\); host\.style\.setProperty\('--pan-paperc',paperColor\(\)\);/, 'the pad hands its paper colour to the CSS');
+  assert.match(NP, /\.pan-phone \.pan-stage\{background:var\(--pan-paperc,/, 'only a phone stage wears it: the page itself never moves (owner 2026-11-23)');
 });

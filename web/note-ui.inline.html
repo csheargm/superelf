@@ -2008,8 +2008,7 @@
     // reason `left` is: an offset on a zoomed element is scaled with it (60px at k=0.8 lands
     // at 48).
     function syncStageClear(){
-      // A phone gives the page the room of a hidden bar back (step 3: no empty strip above the page); iPad/desktop unchanged.
-      const c=host.classList.contains('pan-phone')?toolsClearance():barClearance(), k=pageK()||1, t=Math.round(c/k);
+      const c=barClearance(), k=pageK()||1, t=Math.round(c/k);
       for(const el of [pageInner,flip]) if(el) el.style.top=t+'px';
       // …and tell the SCROLLER that the top of its port is occupied. Placing the page below the
       // bar is only half of it: the bar OVERLAYS the scroll port, so every automatic scroll —
@@ -2071,7 +2070,7 @@
     function redrawPage(){
       if(!bgCtx) return;
       fitTextToView();
-      drawPaper();
+      drawPaper(); host.style.setProperty('--pan-paperc',paperColor());   // a phone's stage wears the paper (web/note-phone.inline.html)
       inkCtx.clearRect(0,0,W,H);
       if(committedCtx) inkCtx.drawImage(committed,0,0,W,H);   // O(1) blit of committed strokes
       else { const pg=page(); drawImages(pg); for(const s of pg.strokes) if(s.t==='highlighter') drawStroke(inkCtx,s.p.map(denorm),s.c,s.w*W,s.t,s.a); for(const s of pg.strokes) if(s.t!=='highlighter') drawStroke(inkCtx,s.p.map(denorm),s.c,s.w*W,s.t); }
@@ -3573,6 +3572,7 @@
     // .pan-phone on the pad (the toggle's CSS reads it); crossing the breakpoint re-fits the page, since
     // zoomNow() is 1 off a phone. The first call is the attach itself: nothing to re-fit yet.
     { let first=true; if(window.PANotePhone) window.PANotePhone.watch(host,on=>{ if(first){ first=false; return; }
+      if(!on) closePops();   // a phone sheet (the tool ⋯ with its trigger) never outlives phone mode
       if(!on&&fingerDefaulted){ fingerDraw=false; fingerDefaulted=false; showFinger(); syncPan(); }   // the phone default leaves with the phone
       if(W) setupCanvases(); },listenG); }
     // Read view（阅读视图）: web/note-phone.inline.html owns it; the pad only lends its text layer.
@@ -4146,7 +4146,7 @@
       const open=[...host.querySelectorAll(POPS_OPEN)];
       if(!open.length) return;
       if(open.some(p=>p.contains(e.target))) return;             // interacting inside the panel
-      if(e.target.closest&&e.target.closest('.pan-inkbtn,.pan-paperbtn,.pan-hmore,.pan-hphoto,.pan-fhl,.pan-fstyle,.pan-ftable,.pan-photo,.pan-toolmore,.pac-lb')) return;   // togglers manage themselves; .pac-lb = PAChat's lightbox over a popover (信纸 draft zoom): closing it keeps the popover
+      if(e.target.closest&&e.target.closest('.pan-inkbtn,.pan-paperbtn,.pan-hmore,.pan-hphoto,.pan-fhl,.pan-fstyle,.pan-ftable,.pan-toolmore,.pan-photo,.pac-lb')) return;   // togglers manage themselves; .pac-lb = PAChat's lightbox over a popover (信纸 draft zoom): closing it keeps the popover
       open.forEach(p=>p.classList.remove('on')); syncPopBtns();
       e.preventDefault(); e.stopPropagation(); };
     document.addEventListener('pointerdown',onPopOutside,true);
@@ -4229,7 +4229,7 @@
     function setStationery(ref){ NB.stationery=ref; NB.template='plain'; NB.updated=Date.now(); drawPaper(); applyTextMetrics(); scheduleSave(); }
     // studio: the host's {store, ai, upload} when it offers AI design and pictures (Journal); else thumbnails only.
     if(STN) stPick=STN.picker(q('.pst-list'),{current:()=>NB.stationery||null,choose:setStationery,changed:()=>{ if(bgCtx){ drawPaper(); applyTextMetrics(); } },paper:paperColor,studio:opts.stationery});
-    function setBg(c){ NB.bgColor=c; NB.updated=Date.now(); drawPaper(); scheduleSave(); }
+    function setBg(c){ NB.bgColor=c; NB.updated=Date.now(); drawPaper(); host.style.setProperty('--pan-paperc',paperColor()); scheduleSave(); }
     host.querySelectorAll('.pan-tpl').forEach(b=>b.addEventListener('click',()=>setTemplate(b.dataset.tpl)));
     host.querySelectorAll('.pan-bgsw').forEach(b=>b.addEventListener('click',()=>setBg(b.dataset.bg)));
     // Shared helper (R3): drag a bar by its grip to reposition it (overriding its default
@@ -4453,9 +4453,6 @@
     // The host hiding / showing the bar (data-paab-hidden) moves the page and the floating tools with it.
     if(topBar&&window.MutationObserver) new MutationObserver(()=>{ applyTextMetrics(); syncToolsTop(); })
       .observe(topBar,{attributes:true,attributeFilter:['data-paab-hidden']});
-    // On a phone the tool row leaving or joining the bar (a mode tab, a collapse) moves the page with it (step 3: no empty strip).
-    if(topBar&&window.MutationObserver&&q('.pan-tools')) new MutationObserver(()=>{ if(host.classList.contains('pan-phone')) requestAnimationFrame(syncStageClear); })
-      .observe(q('.pan-tools'),{attributes:true,attributeFilter:['class']});
 
     // Global listeners (flush the debounced save when the app is hidden/closed so the last
     // strokes aren't lost; re-fit canvases on resize; keep the formatting bar tracking the

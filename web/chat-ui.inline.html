@@ -467,7 +467,9 @@
     const phone=!!(window.PAPhoneUI&&window.PAPhoneUI.isPhone()); if(phone) anchor=null;
     let shut=null; const res=v=>{ _sheets.delete(shut); resolve(v); };
     const ov=document.createElement('div'); ov.className='pac-modal'+(anchor?'':' pac-msheet');
-    shut=()=>{ ov.remove(); res(-1); }; _sheets.add(shut);
+    shut=()=>{ ov.remove(); res(-1); };
+    // Phone sheets only (iPad/desktop popovers keep their old life); leaving phone mode or the list closing ends one.
+    if(phone){ _sheets.add(shut); try{ const mq=matchMedia(window.PAPhoneUI.MQ), off=()=>{ if(!mq.matches){ mq.removeEventListener('change',off); if(ov.isConnected) shut(); } }; mq.addEventListener('change',off); }catch(_){ /* no matchMedia change events: the sheet still closes on tap, Cancel or Escape */ } }
     if(anchor) ov.style.background='transparent';
     const box=document.createElement('div'); box.className='pac-mbox'+(phone?' pa-sheet':'');
     optsArr.forEach((o,i)=>{ const b=document.createElement('button'); b.className='pac-mopt'+(o.del?' del':''); b.textContent=o.label; b.onclick=()=>{ov.remove();res(i);}; box.appendChild(b); });
@@ -770,7 +772,7 @@
     // A tap outside closes the docked list on CLICK, not pointerdown: closing reflows the page beside it, and a
     // reflow between press and release moved the header out from under the pointer, so that first click was lost (F3-01).
     let _docClose=null;
-    function close(){ if(_multi) setMulti(false); host.classList.remove('on'); list.classList.remove('on'); backdrop.classList.remove('on'); dockOff(host); if(_docClose){ document.removeEventListener('click',_docClose,true); _docClose=null; } }
+    function close(){ if(_multi) setMulti(false); closeSheets(); host.classList.remove('on'); list.classList.remove('on'); backdrop.classList.remove('on'); dockOff(host); if(_docClose){ document.removeEventListener('click',_docClose,true); _docClose=null; } }
     async function open(){ sel=c.activeId?c.activeId():sel; await refresh(); host.classList.add('on'); list.classList.add('on'); backdrop.classList.add('on'); dockOn(host); if(!_docClose){ _docClose=e=>{ if(!host.contains(e.target)) close(); }; document.addEventListener('click',_docClose,true); } }
     // setActive(id): re-mark the ONE active row; redraws now if open, else the next open()
     // re-reads activeId() anyway.

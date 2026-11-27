@@ -39,10 +39,13 @@
 /* The phone tool strip (step 3): pen, eraser, undo, redo and ⋯ (plus the pen toggle), every tap 44px; the rest
    moves into the ⋯ sheet. Off a phone the ⋯ is hidden and the strip is exactly what it was. */
 .pan-toolmore{display:none}
-.pan-phone .pan-tools .pan-toolmore{display:flex}
+.pan-phone .pan-tools:not(.collapsed) .pan-toolmore{display:flex}
 .pan-phone .pan-tools>.pan-tbtn,.pan-phone .pan-tools>.pan-grip{min-width:44px;min-height:44px}
 .pan-phone .pan-tools>.pan-tool:not([data-tool=pen]):not([data-tool=erase]),.pan-phone .pan-tools>.pan-inkbtn,.pan-phone .pan-tools>.pan-paperbtn,
 .pan-phone .pan-tools>.pan-photo,.pan-phone .pan-tools>.pan-readbtn,.pan-phone .pan-tools>.pan-sep{display:none}
+/* No empty grey strip on a phone (step 3): the page stays put when the bar hides (owner 2026-11-23: text never
+   moves), so the room above it wears the note's own paper instead of the grey desk. */
+.pan-phone .pan-stage{background:var(--pan-paperc,var(--pan-bg,#eceded))}
 .pan-toolsheet{gap:2px;padding:6px}
 .pan-toolsheet button{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 12px;border:none;background:none;border-radius:9px;
   font:inherit;font-size:15px;color:var(--text,#111);text-align:left;cursor:pointer;white-space:nowrap}
