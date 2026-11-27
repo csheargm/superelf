@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { freePort, mkWebRoot, startWeb, stopWeb, waitReady, waitFor } from './helpers-web.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
 import { skip, chromium } from './helpers-note-link.mjs';
+import { zh } from './helpers-lang.mjs';
 import { DEFAULT_HOME_URL, HOME_LABEL, demoHomeUrl, injectDemoBoot } from '../lib/demo-boot.mjs';
 
 const REPO = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -61,7 +62,7 @@ test('demo: the drawer ends with "About superelf" linking to demo.home_url, top-
   await page.evaluate(() => openDrawer());
   const row = page.locator('#drawer > a#demoHome');
   await row.waitFor({ state: 'visible' });
-  assert.equal(await row.textContent(), HOME_LABEL);
+  assert.equal(await row.textContent(), zh(HOME_LABEL), 'one language (an English-first pair is split too)');
   assert.equal(await row.getAttribute('href'), HOME);
   assert.equal(await row.getAttribute('target'), '_top');
   const [rowBottom, drawerBottom] = await page.evaluate(() => [document.getElementById('demoHome').getBoundingClientRect().bottom, document.getElementById('drawer').getBoundingClientRect().bottom]);
@@ -97,6 +98,6 @@ test('CONTROL / owner node: no such row', { skip }, async () => {
   await page.goto(`http://127.0.0.1:${owner.port}/`);
   await page.locator('#drawer').waitFor({ state: 'attached' });
   assert.equal(await page.locator('#demoHome').count(), 0);
-  assert.equal(await page.locator(`text=${HOME_LABEL}`).count(), 0);
+  assert.equal(await page.locator(`text=${zh(HOME_LABEL)}`).count(), 0);
   await ctx.close();
 });

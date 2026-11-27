@@ -7,7 +7,7 @@
    (over the R4 budget). Its first-use tip points at the ⋯ button (ADR 0030, ADR 0048). */
 const PALangSwitch=(()=>{
   const TIP='tip:lang-switch';
-  const TIP_TEXT='新：在 ⋯ 里切换语言 · New: switch the language in ⋯';
+  const TIP_TEXT='新：在右上角的 ⋯ 菜单里切换语言 · New: switch the language in the ⋯ menu';   // ⋯ mid-sentence: at the end it read as cut-off text
   const OTHER={zh:'English',en:'中文'};   // the row's label: the language a tap switches TO
   const TOAST_MS=3000;
   let btn=null;

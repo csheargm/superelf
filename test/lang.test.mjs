@@ -41,7 +41,11 @@ test('t() picks the chosen side of a pair or a "中文 · English" string', () =
   assert.equal(L.t('Tue · Nov 24'), 'Tue · Nov 24', 'no 中文 side: unchanged');
   assert.equal(L.t('圣经 · 和合本'), '圣经 · 和合本', 'no English side: unchanged');
   assert.equal(L.t(['', 'Only English']), 'Only English');
+  assert.equal(L.t('AI answers come from cloud models. · AI 回答来自云端模型。'), 'AI answers come from cloud models.', 'English-first pair (the live demo notice)');
+  assert.equal(L.t('Sign-in is not set up yet · 登录尚未配置'), 'Sign-in is not set up yet');
+  assert.equal(L.t('Tue · Nov 24 · 周二'), 'Tue · Nov 24', 'English-first, several English parts');
   L.set('zh');
+  assert.equal(L.t('AI answers come from cloud models. · AI 回答来自云端模型。'), 'AI 回答来自云端模型。');
   assert.equal(L.t(['主页', 'Home']), '主页');
   assert.equal(L.t('新：在这里切换语言 · New: switch the language here'), '新：在这里切换语言');
   assert.equal(L.t(['', 'Only English']), 'Only English', 'a missing side falls back to the other');

@@ -88,9 +88,9 @@ test('the ⋯ menu language row flips home, drawer, menu, tips and an open app l
     assert.equal(await page.locator('#drawer #langSw, .dlang').count(), 0, 'one control: no drawer-foot switch');
     const tip = page.locator('.pat-tip[data-tip="tip:lang-switch"]');
     await tip.waitFor({ state: 'attached', timeout: 8000 });   // the row's first-use tip, on the ⋯ button (ADR 0030)
-    assert.equal((await tip.innerText()).replace('✕', '').trim(), 'New: switch the language in ⋯', 'the new tip, in English only');
+    assert.equal((await tip.innerText()).replace('✕', '').trim(), 'New: switch the language in the ⋯ menu', 'the new tip, in English only');
     await page.evaluate(() => PALangSwitch.choose('zh'));
-    assert.equal((await tip.innerText()).replace('✕', '').trim(), '新：在 ⋯ 里切换语言', 'the tip on screen flips too');
+    assert.equal((await tip.innerText()).replace('✕', '').trim(), '新：在右上角的 ⋯ 菜单里切换语言', 'the tip on screen flips too');
     await page.evaluate(() => PALangSwitch.choose('en'));
     await page.locator('.pat-tip .pat-x').click();
     await openMore(page);
