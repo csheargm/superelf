@@ -115,6 +115,7 @@ test('Journal: own bar; a pen stroke inks and leaves the bar as it was; the hand
     await page.waitForFunction(() => document.querySelector('#frame').classList.contains('ownbar'));
     assert.equal((await shellBar(page)).bar, 'none');
     assert.ok(await frame.evaluate(() => document.querySelector('.pan-top').firstElementChild.classList.contains('paab-home')), 'Home is the leftmost control');
+    await frame.evaluate(() => window.PANotesBoot);   // the list docks at the end of boot: look only after it (helpers-note-link.mjs)
     if (await frame.evaluate(() => !!document.querySelector('.pac-drawerhost.on'))) {   // a docked list closes on the first page tap
       const b = await page.locator('#fr').boundingBox(); await page.mouse.click(b.x + b.width - 40, b.y + b.height / 2);
       await frame.waitForFunction(() => !document.querySelector('.pac-drawerhost.on'));
