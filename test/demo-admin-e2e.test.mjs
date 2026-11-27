@@ -70,8 +70,8 @@ const tap = (page, sel) => (PHONE ? page.tap(sel) : page.click(sel));
 test('the admin opens ⋯ → Demo admin: people, apps, trend; Reset frees the blocked network', { skip, timeout: 90000 }, async () => {
   const { ctx, page } = await signedIn('owner-sub', ADMIN);
   await page.waitForSelector('#demoAdminItem', { state: 'attached' });
-  const moreTip = page.locator('.pat-tip:is([data-tip="tip:home-more"],[data-tip="tip:main-chat-camera"]) .pat-x');   // the shell's own tips (camera, ⋯) come first on a fresh browser
-  for (let i = 0; i < 4; i++) {   // a fresh browser shows the shell's own camera and ⋯ tips first; once it is closed, ours shows beside the row
+  const moreTip = page.locator('.pat-tip:is([data-tip="tip:home-more"],[data-tip="tip:main-chat-camera"],[data-tip="tip:lang-switch"]) .pat-x');   // the shell's own tips (camera, ⋯, the ⋯ language row) come first on a fresh browser
+  for (let i = 0; i < 5; i++) {   // a fresh browser shows the shell's own camera and ⋯ tips first; once it is closed, ours shows beside the row
     if (!(await page.locator('#demoAdminItem').isVisible())) await tap(page, '#hmore');
     await page.locator('#demoAdminItem').waitFor({ state: 'visible' });
     await page.waitForTimeout(800);   // two frames + the tips' profile read
