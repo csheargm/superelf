@@ -50,6 +50,29 @@ async function until(fn) { const end = Date.now() + SAVE_BUDGET_MS; let v; while
 before(async () => { await setup({ slugs: ['notes'] }); if (!skip) { root = serverRoot(); seed(); } });
 after(teardown);
 
+// FIRST: tips are stored on the account, and any later press dismisses the one on screen for good.
+test('iPhone: Read view has its one-time bilingual tip, 中文 first, and it shows', { skip }, async () => {
+  const ctx = await newContext(PHONE); const page = await ctx.newPage();
+  let frame = await openJournal(page, { touch: true });
+  await open(page, frame, 'ipadInk');
+  let shown = false;
+  for (let i = 0; i < 8 && !shown; i++) {
+    await frame.evaluate(() => PATips.check()); await page.waitForTimeout(400);
+    const cur = await frame.evaluate(() => PATips.current());
+    if (cur === 'note-read-view') { shown = true; break; }
+    if (cur) await frame.evaluate(() => document.querySelector('.pat-x').click());
+    else { await frame.evaluate(() => location.reload()).catch(() => { /* the frame navigated away mid-call */ });
+      await page.waitForTimeout(1500); frame = page.frames().find((f) => f.url().includes('/app/owner/notes/'));
+      await frame.waitForFunction(() => window.PATips && window.PANote && document.querySelector('.pan-readbtn'));
+      await open(page, frame, 'ipadInk'); }
+    await page.waitForTimeout(600);
+  }
+  assert.ok(shown, 'the Read view tip shows on the phone');
+  const text = await frame.evaluate(() => document.querySelector('.pat-tip, [class*=pat-]') && PATips.registered().find((r) => r.id === 'note-read-view').text);
+  assert.match(text, /^阅读视图/, 'Chinese first'); assert.match(text, / · Read view/, 'then English');
+  await ctx.close();
+});
+
 test('iPhone: an iPad ink note fits the screen width — every stroke shows, no sideways cut-off', { skip }, async () => {
   const ctx = await newContext(PHONE); const page = await ctx.newPage();
   const frame = await openJournal(page, { touch: true });
