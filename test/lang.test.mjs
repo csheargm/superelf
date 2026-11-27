@@ -7,19 +7,19 @@ import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
-import { langOf, appIsBilingual, replyLanguageRule, turnLang, withLangDefault, REPLY_IN, BILINGUAL_APPS } from '../lib/ui-lang.mjs';
+import { langOf, appIsBilingual, replyLanguageRule, turnLang, REPLY_IN, BILINGUAL_APPS } from '../lib/ui-lang.mjs';
 import { REPLY_LANGUAGE_RULE, agentCapabilities } from '../lib/config.mjs';
 import { SHELL_PARTS } from '../lib/shellhtml.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const script = fs.readFileSync(path.join(REPO, 'web/lang.js'), 'utf8');
 
-function palang({ language = 'en-US', stored = null, both = false, dflt = '' } = {}) {
+function palang({ language = 'en-US', stored = null, both = false } = {}) {
   const store = new Map(stored ? [['pa_lang', stored]] : []);
   const ctx = { navigator: { language, languages: [language] }, localStorage: { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) },
     document: { readyState: 'complete', documentElement: null }, addEventListener() {}, setTimeout };
   ctx.window = ctx;
-  const src = withLangDefault(script.split('/*PA_LANG_BOTH*/false').join(String(both)), { ui_lang_default: dflt });
+  const src = script.split('/*PA_LANG_BOTH*/false').join(String(both));
   vm.runInNewContext(src, ctx);
   return { L: ctx.PALang, store };
 }
@@ -55,13 +55,12 @@ test('set() refuses junk, keeps the choice on the device and tells listeners', (
   assert.deepEqual(seen, ['zh']);
 });
 
-test('a bilingual page and a both-default node show both until a choice', () => {
+test('a bilingual page shows both; no node-wide both-at-once default exists', () => {
   const b = palang({ both: true }).L;
   assert.equal(b.get(), 'both'); assert.equal(b.t(['圣经', 'Bible']), '圣经 · Bible');
   b.set('en'); assert.equal(b.get(), 'both', 'a bilingual app stays bilingual whatever is chosen');
-  const d = palang({ dflt: 'both' }).L;
-  assert.equal(d.get(), 'both'); d.set('en'); assert.equal(d.get(), 'en', 'the first choice ends the both-default');
-  assert.equal(palang({ dflt: 'both', stored: 'zh' }).L.get(), 'zh');
+  assert.ok(!script.includes('PA_LANG_DEFAULT'), 'the test-only both-default is gone: tests run what real nodes run');
+  assert.ok(!fs.readFileSync(path.join(REPO, 'test/helpers-web.mjs'), 'utf8').includes('ui_lang_default'), 'the harness config matches a real node');
 });
 
 test('server: profile values, bilingual apps, the reply rule', () => {
@@ -97,4 +96,18 @@ test('the shell and every app page carry the SAME lang file', () => {
   const web = fs.readFileSync(path.join(REPO, 'web.mjs'), 'utf8');
   assert.match(web, /html\.split\(PA_LANG_MARKER\)\.join\('<script id="pa-lang-script">' \+ lj/, 'app pages get web/lang.js itself');
   assert.match(web, /\(m\) => PA_LANG_MARKER \+ m\)/, 'on every app page, ahead of its own first script');
+});
+
+test('the research job phrases its answer in the owner\'s language: the tool hands the user to the lane, the lane adds the line', async () => {
+  const { makeRunner } = await import('../lib/jobs/run.mjs');
+  const { buildResearchPrompt } = await import('../lib/research.mjs');
+  const seen = [];
+  const run = makeRunner(undefined, { research: async (q, model, user) => { seen.push([q, model, user && user.id]); return { ok: true, text: 'answer' }; } });
+  await run({ id: 'u1' }, { name: 'j', plan: { kind: 'tool', tool: 'research', args: { question: 'q?' } } });
+  assert.deepEqual(seen, [['q?', null, 'u1']], 'the user reaches the research lane');
+  assert.ok(buildResearchPrompt({ question: 'q', sources: [], guide: REPLY_IN.en }).includes(REPLY_IN.en), 'the line rides as the guide');
+  const web = fs.readFileSync(path.join(REPO, 'web.mjs'), 'utf8');
+  assert.match(web, /guide: user \? userLangRule\(user\) : ''/, 'web.mjs: the job lane uses the account language');
+  assert.match(web, /model: lane\.model, guide: langRule,/, 'web.mjs: the chat research lane uses the turn language');
+  assert.match(web, /runCodexLane\(\{[^}]*langRule,/, 'web.mjs: the Codex lane gets the line');
 });

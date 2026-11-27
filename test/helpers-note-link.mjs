@@ -27,7 +27,21 @@ async function loadChromium() {
   if (spec) return (await import(pathToFileURL(spec).href))[ENGINE];   // asked for, so a failure is loud
   try { return (await import('playwright'))[ENGINE]; } catch { return null; /* reported by missingReason() below */ }
 }
-export const chromium = await loadChromium();
+// THE DEVICE LANGUAGE (ADR 0048): a real node shows ONE language, the device's unless the account chose. The suites
+// run as a 中文 device (zh-CN) unless a context names its own locale, and assert the 中文 side they see. No node-wide
+// both-at-once switch exists for tests to lean on (feedback: test harness fidelity).
+export const E2E_LOCALE = 'zh-CN';
+const withLocale = (o) => ({ locale: E2E_LOCALE, ...(o || {}) });
+export function localed(engine) {   // also for a suite that loads another engine itself
+  if (!engine) return engine;
+  const wrapBrowser = (b) => { const nc = b.newContext.bind(b), np = b.newPage.bind(b);
+    b.newContext = (o) => nc(withLocale(o)); b.newPage = (o) => np(withLocale(o)); return b; };
+  return new Proxy(engine, { get(t, k) {
+    if (k === 'launch') return async (...a) => wrapBrowser(await t.launch(...a));
+    if (k === 'launchPersistentContext') return (dir, o) => t.launchPersistentContext(dir, withLocale(o));
+    const v = t[k]; return typeof v === 'function' ? v.bind(t) : v; } });
+}
+export const chromium = localed(await loadChromium());
 export const skip = resolveSkip(await missingReason(chromium));
 
 export const TARGET = 'https://example.com/';           // never fetched: the context routes it to a stub

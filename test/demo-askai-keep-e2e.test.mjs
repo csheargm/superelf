@@ -110,7 +110,7 @@ for (const [name, viewport] of [['desktop', { width: 1280, height: 800 }], ['iph
       await page.locator('#aeUndoItem').waitFor();
       await shot(page, `${name}-2-menu-undo.png`);
       await page.locator('#aeUndoItem').click();
-      await page.locator('#aeSay').getByText(/Undone/).waitFor({ timeout: 20000 });
+      await page.locator('#aeSay').getByText(/已撤销/).waitFor({ timeout: 20000 });
       await waitFor(async () => (await page.frameLocator('#fr').locator('#views').count().catch(() => 1)) === 0, 'the app back to before');
       assert.equal(await page.frameLocator('#fr').locator('#cal').innerText(), 'May');
       await shot(page, `${name}-3-undone.png`);

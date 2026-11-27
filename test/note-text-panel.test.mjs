@@ -25,7 +25,7 @@ function el(tag) {
     set textContent(v) { e._t = String(v); }, get textContent() { return e._t; } };
   return e;
 }
-const WHERE = { ink: 'Ink 手写', photo: 'Photo 图片', transcript: '转写 · Transcript' };   // the title is PANote's ONE constant (R3)
+const WHERE = { ink: '手写 · Ink', photo: '图片 · Photo', transcript: '转写 · Transcript' };   // the title is PANote's ONE constant (R3)
 // One attached panel over a fake host. `answer` plays the node (PAStore.ask); `doc` is the host's.
 function panel({ answer, doc = () => ({ path: 'entry-1.json', scope: '' }) } = {}) {
   const src = TEXT.slice(TEXT.indexOf('>', TEXT.indexOf('<script id="pnt-script">')) + 1, TEXT.indexOf('</script>', TEXT.indexOf('<script id="pnt-script">')));
@@ -54,9 +54,9 @@ test('open asks the node for THIS note\'s pages (src + labels, by path and scope
   assert.ok(P.p.isOpen());
   assert.equal(P.state(), P.TXT.ready);
   const b = P.body();
-  assert.match(b, /<div class="pan-trpg">第 1 页 · Page 1<\/div><div class="pan-trsrc">Ink 手写<\/div><div>line one\nline two #ores<\/div>/, 'page numbers are 1-based; the heading is PANote\'s own where-label');
+  assert.match(b, /<div class="pan-trpg">第 1 页 · Page 1<\/div><div class="pan-trsrc">手写 · Ink<\/div><div>line one\nline two #ores<\/div>/, 'page numbers are 1-based; the heading is PANote\'s own where-label');
   assert.doesNotMatch(b, /Page 2/, 'a typed-only page has no transcript');
-  assert.match(b, /第 3 页 · Page 3<\/div><div class="pan-trsrc">Photo 图片<\/div><div>Receipt &lt;total&gt; 12.50<\/div><div class="pan-trsrc">图片标签 · Picture labels<\/div><div>document · receipt<\/div>/, 'escaped, labels joined');
+  assert.match(b, /第 3 页 · Page 3<\/div><div class="pan-trsrc">图片 · Photo<\/div><div>Receipt &lt;total&gt; 12.50<\/div><div class="pan-trsrc">图片标签 · Picture labels<\/div><div>document · receipt<\/div>/, 'escaped, labels joined');
   P.close();
   assert.equal(P.p.isOpen(), false);
 });

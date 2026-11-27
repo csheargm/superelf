@@ -54,7 +54,7 @@ for (const [name, opts] of SIZES) {
     const cam = page.locator('#cam');
     await cam.waitFor();
     await page.waitForFunction(() => document.querySelector('#homeForm #cam') && document.querySelector('#cam svg'));   // the composer row sits in the home ask box
-    assert.equal(await cam.getAttribute('aria-label'), '截取当前画面 · Capture the screen as it looks now');
+    assert.equal(await cam.getAttribute('aria-label'), '截取当前画面');
     const plus = await page.locator('#plus').boundingBox(), c = await cam.boundingBox(), send = await page.locator('#send').boundingBox(), box = await page.locator('#box').boundingBox();
     assert.ok(c.width >= 44 && c.height >= 44, `44px tap target: ${c.width}x${c.height}`);
     assert.ok(Math.abs(c.y - plus.y) < 6 && c.x > plus.x && c.x < box.x, `the camera sits between ＋ and the input: ${JSON.stringify({ plus, c, box })}`);

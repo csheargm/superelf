@@ -14,10 +14,11 @@ Every label showed 中文 · English at once. The owner asked for ONE setting fo
   so no call site changes; the shell's `.en` sibling pairs follow too. Apps get the choice by {pa:'prefs', lang}.
 - Bilingual apps keep both: lib/ui-lang.mjs BILINGUAL_APPS (by slug, since installed copies keep old meta.json)
   or meta.json "bilingual": true. The server writes it into the page (PA_LANG_BOTH).
-- AI turns: the chosen language replaces the follow-the-writer rule on the fast and agent lanes (replyLanguageRule);
+- AI turns: the chosen language replaces the follow-the-writer rule on every lane — fast, agent, Codex (the line
+  leads the prompt: Codex has no system channel), the app ask and the research job (replyLanguageRule);
   bilingual apps keep the old rule.
-- config "ui_lang_default": "both" keeps the old look until a person chooses. The test harness sets it so suites
-  written against bilingual labels stay valid; test/lang-e2e.test.mjs runs with the real default.
+- No node-wide both-at-once default (v5.38.1 removed the test-only "ui_lang_default"): the test harness runs what
+  real nodes run, and browser suites assert the chosen language (the device's, or one they set).
 
 ## Consequences
 Rewriting text in place can touch app-authored text of the same shape; known limits are in docs/TODO.md.

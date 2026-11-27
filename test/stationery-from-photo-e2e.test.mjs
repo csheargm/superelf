@@ -11,6 +11,7 @@ import path from 'node:path';
 import { execSync } from 'node:child_process';
 import { skip, setup, teardown, newContext, openJournal, flashText, port } from './helpers-note-link.mjs';
 import { waitFor } from './helpers-web.mjs';
+import { zh } from './helpers-lang.mjs';
 
 const ENGINE = process.env.PA_E2E_ENGINE || 'chromium';
 const DEVICES = ENGINE === 'webkit'
@@ -48,7 +49,7 @@ async function addPhoto(page, frame) {
   const [fc] = await Promise.all([page.waitForEvent('filechooser', { timeout: 10000 }), frame.locator('[data-photo="library"]').click()])
     .catch(async (e) => { if (process.env.E2E_DEBUG) await page.screenshot({ path: process.env.E2E_DEBUG }); throw e; });
   await fc.setFiles([{ name: 'photo.png', mimeType: 'image/png', buffer: await photoPng(page) }]);
-  await frame.getByText('原图 · Skip', { exact: true }).click({ timeout: 15000 });   // one photo opens the scanner: keep it as is
+  await frame.getByText('原图', { exact: true }).click({ timeout: 15000 });   // one photo opens the scanner: keep it as is
 }
 async function openImageMenu(page, frame, root, before) {
   let im = null; await waitFor(() => (im = latestImage(root)) && JSON.stringify(im) !== before, 'the photo is saved on the page', { timeoutMs: 15000 })
@@ -91,11 +92,11 @@ for (const dev of DEVICES) {
     if (dev === DEVICES[0]) assert.ok(showing, 'a fresh account sees the tip the first time');   // (R14: not vacuous)
     if (showing) assert.match(await frame.locator('.pat-tip').textContent(), /做成信纸|Make this picture a page stationery/);
     const item = frame.locator('.pan-imgpop [data-img="tpl"]');
-    assert.equal((await item.textContent()).trim(), MAKE);
+    assert.equal((await item.textContent()).trim(), zh(MAKE));
     await item.click();
     await frame.waitForFunction(() => document.querySelector('.pan-paperpop.on .pst-pic.on canvas.pst-prev.on'), null, { timeout: 15000 });
-    await frame.locator('.pst-pic.on button', { hasText: '作为背景 · Use as background' }).click();
-    await frame.waitForFunction((t) => [...document.querySelectorAll('.pst-pic .pst-msg')].some((e) => e.textContent === t), SAVED, { timeout: 20000 });
+    await frame.locator('.pst-pic.on button', { hasText: '作为背景' }).click();
+    await frame.waitForFunction((t) => [...document.querySelectorAll('.pst-pic .pst-msg')].some((e) => e.textContent === t), zh(SAVED), { timeout: 20000 });
     const items = readPics(root).filter((x) => !listed.some((y) => y.id === x.id));
     assert.equal(items.length, 1, 'templates/pictures.json lists the new picture'); assert.match(items[0].id, /^[A-Za-z0-9_./-]+$/);
     // Another note: its stationery list carries the picture.
@@ -133,8 +134,8 @@ test(`${ENGINE}: a refused list write says the picture was not added to the list
     await openImageMenu(page, frame, root, was);
     await frame.locator('.pan-imgpop [data-img="tpl"]').click();
     await frame.waitForFunction(() => document.querySelector('.pst-pic.on canvas.pst-prev.on'), null, { timeout: 15000 });
-    await frame.locator('.pst-pic.on button', { hasText: '作为背景 · Use as background' }).click();
-    await frame.waitForFunction((t) => [...document.querySelectorAll('.pst-pic .pst-msg.err')].some((e) => e.textContent.startsWith(t)), NOT_LISTED, { timeout: 20000 })
+    await frame.locator('.pst-pic.on button', { hasText: '作为背景' }).click();
+    await frame.waitForFunction((t) => [...document.querySelectorAll('.pst-pic .pst-msg.err')].some((e) => e.textContent.startsWith(t)), zh(NOT_LISTED), { timeout: 20000 })
       .catch(async (e) => { throw new Error(`${e.message}; panel says: ${await panelMsg(frame)}; flash: ${await flashText(frame)}`); });
     assert.equal(fs.readFileSync(picsFile(root), 'utf8'), before, 'the list on disk is unchanged');
   } finally { fs.chmodSync(dir, 0o755); await ctx.close(); }

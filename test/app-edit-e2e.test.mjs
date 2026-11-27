@@ -167,16 +167,16 @@ test('long-press the title → panel docks beside the app with its picture; a ch
   assert.equal(fs.readFileSync(path.join(root, 'workspace', 'apps', 'todo', 'index.html'), 'utf8'), PAGE, 'no confirm, no write');
   // A change request: the plan and ONE 改 · Apply button; the app is unchanged until the tap.
   await sendInPanel(page, 'make it red');
-  await p.locator('.pac-change-app', { hasText: '改 · Apply' }).waitFor({ timeout: 20000 });
+  await p.locator('.pac-change-app', { hasText: '改' }).waitFor({ timeout: 20000 });
   assert.equal(fs.readFileSync(path.join(root, 'workspace', 'apps', 'todo', 'index.html'), 'utf8'), PAGE, 'the plan alone changes nothing');
   assert.equal(await p.locator('text=[[apply]]').count(), 0, 'the marker is not shown');
   await shot(page, 'uac-plan');
-  await p.locator('.pac-change-app', { hasText: '改 · Apply' }).click();
+  await p.locator('.pac-change-app', { hasText: '改' }).click();
   await page.locator('#aeUndo').waitFor({ state: 'visible', timeout: 20000 });
-  assert.deepEqual(await p.locator('.pac-m.me').evaluateAll((els) => els.map((e) => e.textContent.trim()).filter((t) => t.startsWith('改'))), ['改 · Apply'], 'the tap shows as 改 · Apply, never its confirm id');
-  await p.locator('text=已完成 · Done').waitFor({ timeout: 15000 });   // said only after the reload loaded
-  await p.locator('text=改动：1 行 · Changed: 1 line').waitFor();   // the server's plain account, from the diff (self-test F4: no code)
-  await assertStatusClear(p, '已完成 · Done');
+  assert.deepEqual(await p.locator('.pac-m.me').evaluateAll((els) => els.map((e) => e.textContent.trim()).filter((t) => t.startsWith('改'))), ['改 · Apply'], 'the tap shows as 改 · Apply, never its confirm id (the chat log is never switched)');
+  await p.locator('text=已完成').waitFor({ timeout: 15000 });   // said only after the reload loaded
+  await p.locator('text=改动：1 行').waitFor();   // the server's plain account, from the diff (self-test F4: no code)
+  await assertStatusClear(p, '已完成');
   await page.frameLocator('#fr').locator('#t').waitFor();
   for (let i = 0; i < 50 && (await titleColor(page)) !== 'rgb(200, 0, 0)'; i++) await page.waitForTimeout(200);
   assert.equal(await titleColor(page), 'rgb(200, 0, 0)', 'the app reloaded in place with the change');
@@ -189,8 +189,8 @@ test('long-press the title → panel docks beside the app with its picture; a ch
   await shot(page, 'cta-undone-desktop');
   // A change that breaks the app is not applied, and the reply says so.
   await sendInPanel(page, 'break it');
-  await p.locator('.pac-change-app:not([disabled])', { hasText: '改 · Apply' }).waitFor({ timeout: 20000 });
-  await p.locator('.pac-change-app:not([disabled])', { hasText: '改 · Apply' }).click();
+  await p.locator('.pac-change-app:not([disabled])', { hasText: '改' }).waitFor({ timeout: 20000 });
+  await p.locator('.pac-change-app:not([disabled])', { hasText: '改' }).click();
   await p.locator('text=未应用').first().waitFor({ timeout: 20000 });
   assert.equal(fs.readFileSync(path.join(root, 'workspace', 'apps', 'todo', 'index.html'), 'utf8'), PAGE, 'the broken page was rolled back');
   await shot(page, 'cta-not-applied');
@@ -206,7 +206,7 @@ test('⋯ on the open app lists 改这个应用 first with a one-time tip; phone
   const { ctx, page } = await signIn({ width: 390, height: 844 });
   await openMore(page);
   const first = page.locator('#frameMenu button').first();
-  assert.match(await first.textContent(), /^改这个应用 · Change this app/);
+  assert.match(await first.textContent(), /^改这个应用/);
   assert.match(await page.locator('.pat-tip[data-tip="tip:app-edit"]').innerText({ timeout: 5000 }), /^长按标题可修改此应用/, 'the tip (PATips) shows the first time');
   await shot(page, 'cta-menu-phone');
   await first.click();
@@ -232,10 +232,10 @@ test('a member changes their OWN copy through the same chat: plan → Apply → 
   const p = page.frameLocator('#aefr');
   await p.locator('.pac-inp').waitFor();
   await sendInPanel(page, 'make it red');
-  await p.locator('.pac-change-app', { hasText: '改 · Apply' }).waitFor({ timeout: 20000 });
+  await p.locator('.pac-change-app', { hasText: '改' }).waitFor({ timeout: 20000 });
   assert.doesNotMatch(fs.readFileSync(kidPage, 'utf8'), /200, 0, 0/, 'nothing changes before the tap');
-  await p.locator('.pac-change-app', { hasText: '改 · Apply' }).click();
-  await p.locator('text=已完成 · Done').waitFor({ timeout: 20000 });
+  await p.locator('.pac-change-app', { hasText: '改' }).click();
+  await p.locator('text=已完成').waitFor({ timeout: 20000 });
   for (let i = 0; i < 50 && (await titleColor(page)) !== 'rgb(200, 0, 0)'; i++) await page.waitForTimeout(200);
   assert.equal(await titleColor(page), 'rgb(200, 0, 0)', "the member's own app reloaded with the change");
   assert.equal(fs.readFileSync(path.join(root, 'workspace', 'apps', 'todo', 'index.html'), 'utf8'), PAGE, "the owner's app of the same name is untouched");

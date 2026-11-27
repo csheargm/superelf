@@ -554,7 +554,7 @@ async function loadFamily(){
       ${u.id!=='owner'?`${u.status==='pending'?'':`<button class="plain" data-pw="${esc(u.id)}">重设密码 · Reset password</button>`}<button class="plain" data-del="${esc(u.id)}">×</button>`:''}
     </div>`).join('')+
     `<div style="margin-top:10px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px">
-      <input id="nId" placeholder="用户名（如 mia）· id" style="${FIELD}">
+      <input id="nId" placeholder="用户名（如 mia） · id" style="${FIELD}">
       <input id="nName" placeholder="名字 · Name" style="${FIELD}">
       <input id="nYear" placeholder="出生年份 · Birth year" inputmode="numeric" style="${FIELD}">
       <input id="nPass" type="password" autocomplete="new-password" placeholder="初始密码 · Password" title="初始密码（可选）· Starting password (optional)" style="${FIELD}">

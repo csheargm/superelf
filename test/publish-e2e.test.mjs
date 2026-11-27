@@ -75,12 +75,12 @@ test('owner: ⋯ → Publish (with its one-time tip) → files sheet → Publish
   const { ctx, page } = await openMenu(port, OWNER_TOKEN);
   try {
     // One tip at a time (PATips): Change this app's first, closed by Escape; the next open shows Publish's beside its item.
-    assert.match(await page.locator('.pat-tip[data-tip="tip:app-edit"]').innerText({ timeout: 5000 }), /^长按标题.* · Long-press/);
+    assert.match(await page.locator('.pat-tip[data-tip="tip:app-edit"]').innerText({ timeout: 5000 }), /^长按标题/);
     await page.keyboard.press('Escape'); await page.evaluate(() => PATips.whenIdle());
     await reopenMenu(page, port);
     const item = page.locator('#pubItem');
-    assert.match(await item.innerText(), /^发布到公开仓库 · Publish/);
-    assert.match(await page.locator('.pat-tip[data-tip="tip:publish"]').innerText({ timeout: 5000 }), /^新：.* · New:/, 'one-time bilingual tip beside the item');
+    assert.match(await item.innerText(), /^发布到公开仓库/);
+    assert.match(await page.locator('.pat-tip[data-tip="tip:publish"]').innerText({ timeout: 5000 }), /^新：.*/, 'one-time bilingual tip beside the item');
     await item.click();
     await page.waitForSelector('#pubFiles');
     assert.match(await page.locator('#pubFiles').innerText(), /workspace\.example\/apps\/myapp\/index\.html/);
@@ -91,7 +91,7 @@ test('owner: ⋯ → Publish (with its one-time tip) → files sheet → Publish
     await page.waitForTimeout(300);
     assert.equal(starts.length, 1, 'one tap = one publish request');
     await page.waitForSelector('#pubDone', { timeout: 30000 });
-    assert.match(await page.locator('#pubDone').innerText(), /^已发布 v5\.1\.0 · Published PR$/);
+    assert.match(await page.locator('#pubDone').innerText(), /^已发布 v5\.1\.0/);
     assert.equal(gh.st.pulls[0].merged, true);
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'no horizontal scroll');
   } finally { await ctx.close(); }
@@ -103,7 +103,7 @@ test('owner without a token sees the token-needed steps', { skip, timeout: 60000
   try {
     await page.click('#pubItem');
     await page.waitForSelector('#pubToken');
-    assert.equal(await page.locator('#pubToken').innerText(), '需要 GitHub 令牌 · GitHub token needed');
+    assert.equal(await page.locator('#pubToken').innerText(), '需要 GitHub 令牌');
     assert.equal(await page.locator('#pubSheet ol li').count(), 3);
   } finally { await ctx.close(); }
 });
@@ -135,13 +135,13 @@ test('sheet buttons look like buttons; wait text says "you can close"; result sh
     assert.ok(close.narrow && go.right > close.right, 'Publish sits right of Close');
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'confirm-light.png') });
     await page.click('#pubGo'); await page.waitForSelector('#pubWait');
-    assert.match(await page.locator('#pubWait').innerText(), /CI 约需 5–10 分钟。可以关闭.* · Publishing — CI takes about 5–10 minutes\. You can close this/);
+    assert.match(await page.locator('#pubWait').innerText(), /CI 约需 5–10 分钟。可以关闭/);
     assert.equal(await page.locator('#pubGo').count(), 0, 'no second Publish on the wait sheet');
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'waiting-light.png') });
     await page.click('#pubClose'); assert.equal(await page.locator('#pubSheet').count(), 0);
     gh2.st.checks = 'failure';
     await page.waitForSelector('#pubFail', { timeout: 30000 });     // after Close: the watcher still tells
-    assert.match(await page.locator('#pubFail').innerText(), /CI is red/);
+    assert.match(await page.locator('#pubFail').innerText(), /CI 未通过/);
     await reopenMenu(page, port);                                   // already seen: not shown again
     await page.waitForTimeout(500);
     assert.equal(await page.locator('#pubSheet').count(), 0, 'a seen result is not shown again');
@@ -175,18 +175,18 @@ test('⋯ Publish line: not in repo / up to date (disabled) / N changes; the she
   const line = async () => { await page.waitForFunction(() => document.querySelector('#pubState')?.textContent); return page.locator('#pubState').innerText(); };
   const shot = (n) => SHOTS && page.screenshot({ path: path.join(SHOTS, n) });
   try {
-    assert.equal(await line(), '分享为公开应用（所有人可见） · Share as a public app (everyone can see it)');
+    assert.equal(await line(), '分享为公开应用（所有人可见）');
     assert.equal(await page.locator('#pubItem').isDisabled(), false);
     await shot('menu-not-in-repo.png');
     const bottom = await page.evaluate(() => document.querySelector('#appMenu').getBoundingClientRect().bottom);
     assert.ok(bottom <= 820, 'the menu stays on screen after the line arrives');
     await page.click('#pubItem'); await page.waitForSelector('#pubWhat');
-    assert.match(await page.locator('#pubWhat').innerText(), /^发布会先检查隐私.*pull request on GitHub.*CI checks pass it merges.*everyone.*demo after the next deploy/);
+    assert.match(await page.locator('#pubWhat').innerText(), /^发布会先检查隐私.*GitHub.*合并请求.*CI 检查通过后自动合并.*所有人可见.*演示站/);
     const repo = path.join(root, 'workspace.example', 'apps', 'myapp'); fs.mkdirSync(repo, { recursive: true });
     fs.writeFileSync(path.join(repo, 'index.html'), '<h1>My App</h1>\n'); fs.writeFileSync(path.join(repo, 'meta.json'), JSON.stringify({ title: 'My App' }, null, 2) + '\n');
     await page.waitForTimeout(10100);                                // past the status cache
     await reopenMenu(page, port);
-    assert.equal(await line(), '已是最新 · Already up to date');
+    assert.equal(await line(), '已是最新');
     assert.equal(await page.locator('#pubItem').isDisabled(), true, 'nothing to publish: greyed out');
     await page.locator('#pubState').click({ force: true }); await page.waitForTimeout(300);
     assert.equal(await page.locator('#pubSheet').count(), 0, 'a tap on the greyed line opens nothing');
@@ -194,7 +194,7 @@ test('⋯ Publish line: not in repo / up to date (disabled) / N changes; the she
     fs.writeFileSync(path.join(repo, 'index.html'), '<h1>Old</h1>\n');
     await page.waitForTimeout(10100);
     await reopenMenu(page, port);
-    assert.equal(await line(), '有 1 处改动未发布 · 1 change not yet published');
+    assert.equal(await line(), '有 1 处改动未发布');
     assert.equal(await page.locator('#pubItem').isDisabled(), false);
     await shot('menu-changed.png');
   } finally { await ctx.close(); }

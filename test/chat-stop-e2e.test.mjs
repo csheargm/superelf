@@ -41,20 +41,20 @@ test('while a turn runs the send button is Stop; Stop ends it with 已取消 · 
   await page.fill('#luser', 'owner'); await page.fill('#lpin', 'owner-pass-123'); await page.click('#loginBtn');
   await page.waitForFunction(() => !document.querySelector('#login[open]'));
   const btn = () => page.evaluate(() => { const b = document.querySelector('#send'); return { stop: b.classList.contains('stop'), icon: !!b.querySelector('svg'), title: b.title }; });
-  assert.deepEqual(await btn(), { stop: false, icon: true, title: '发送 · Send' });   // icons are inline SVG (web/icons.js), not ↑ / ■
+  assert.deepEqual(await btn(), { stop: false, icon: true, title: '发送' });   // icons are inline SVG (web/icons.js), not ↑ / ■
   await page.fill('#box', 'a slow question'); await page.press('#box', 'Enter');
-  await page.waitForFunction(() => document.querySelector('#send').title === '停止 · Stop');
-  assert.deepEqual(await btn(), { stop: true, icon: true, title: '停止 · Stop' });
+  await page.waitForFunction(() => document.querySelector('#send').title === '停止');
+  assert.deepEqual(await btn(), { stop: true, icon: true, title: '停止' });
   await page.fill('#box', 'typing a follow-up');
-  assert.equal((await btn()).title, '发送 · Send', 'with text in the composer the button sends (queues)');
+  assert.equal((await btn()).title, '发送', 'with text in the composer the button sends (queues)');
   await page.fill('#box', '');
-  assert.equal((await btn()).title, '停止 · Stop');
+  assert.equal((await btn()).title, '停止');
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'chat-stop.png') });
   const t0 = Date.now();
   await page.click('#send');
   await page.waitForFunction(() => document.querySelector('#log').textContent.includes('已取消 · Cancelled'), null, { timeout: 8000 });
   assert.ok(Date.now() - t0 < 8000);
-  await page.waitForFunction(() => document.querySelector('#send').title === '发送 · Send');
+  await page.waitForFunction(() => document.querySelector('#send').title === '发送');
   assert.ok(!(await page.locator('#log').textContent()).includes('SLOW ANSWER'));
   await ctx.close();
 });

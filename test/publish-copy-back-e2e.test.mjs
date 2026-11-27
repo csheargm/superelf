@@ -74,18 +74,18 @@ for (const [name, vp] of [['phone', { width: 390, height: 844 }], ['iPad', { wid
     await openMore(page, 'schoolwork');   // School Helper (owner report): another user's app — a plain line, no Publish
     await page.locator('#frameMenu #pubFork').waitFor({ timeout: 15000 });
     assert.equal(await page.locator('#frameMenu #pubItem').count(), 0);
-    assert.match(await page.locator('#pubFork').textContent(), /^这是 Kid 的应用的副本.*copy of Kid's app.*Make an app/);
+    assert.match(await page.locator('#pubFork').textContent(), /^这是 Kid 的应用的副本/);
     if (process.env.PA_SHOTS) await page.screenshot({ path: path.join(process.env.PA_SHOTS, `copy-other-${name}.png`) });
     await page.keyboard.press('Escape'); await page.mouse.click(5, vp.height - 5);
     await page.evaluate(() => document.querySelector('#back').click());
     await openMore(page, 'tasks-mine');
     const state = page.locator('#pubItem #pubState');
     await page.waitForFunction(() => /Updates the shared app/.test((document.querySelector('#pubItem #pubState') || {}).textContent || ''), null, { timeout: 15000 });
-    assert.match(await state.textContent(), /^更新共享应用 待办 Tasks · Updates the shared app 待办 Tasks/);
+    assert.match(await state.textContent(), /^更新共享应用 待办 Tasks/);
     assert.equal(await page.locator('#pubFork').count(), 0);
     await page.click('#frameMenu #pubItem');
     const copy = page.locator('#pubSheet #pubCopy'); await copy.waitFor({ timeout: 15000 });
-    assert.equal(await copy.textContent(), '更新共享应用 待办 Tasks · Updates the shared app 待办 Tasks');
+    assert.equal(await copy.textContent(), '更新共享应用 待办 Tasks · Updates the shared app 待办 Tasks');   // its English half names a 中文 title: it stays both (docs/TODO.md known limits)
     assert.match(await page.locator('#pubFiles').textContent(), /shared-apps\/tasks\/index\.html/);
     if (process.env.PA_SHOTS) await page.screenshot({ path: path.join(process.env.PA_SHOTS, `copy-back-${name}.png`) });
     await ctx.close();

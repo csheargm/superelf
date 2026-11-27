@@ -16,6 +16,7 @@ import { startStubSupabase } from './helpers-demo-sb.mjs';
 import { SIGNIN_LABELS } from '../lib/demo-boot.mjs';
 import { POP_TITLES } from '../lib/demo-pop.mjs';
 import { JOIN_EVENT } from '../lib/demo-waitlist-ui.mjs';
+import { zh } from './helpers-lang.mjs';
 
 const REPO = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SHELL = fs.readFileSync(path.join(REPO, 'web/index.html'), 'utf8');
@@ -47,15 +48,18 @@ test('the question stays in the chat with an inline sign-in button; the popover 
   try {
     await page.goto(`http://127.0.0.1:${port}/`);
     await settled(page);
+    // The home ⋯ tip (top-most, PATips) would sit over the popover's ✕ at 390 on a 中文 device: close it first (docs/TODO.md).
+    const tip = page.locator('.pat-tip[data-tip="tip:home-more"] .pat-x');
+    if (await tip.waitFor({ timeout: 5000 }).then(() => true, () => false)) { await tip.click(); await page.evaluate(() => window.PATips.whenIdle()); }
     await page.fill('#box', 'make me an app for my groceries');
     await page.keyboard.press('Enter');
     const ans = page.locator('#log .msg button.demo-answer');
     await ans.waitFor();
-    assert.equal(await ans.innerText(), SIGNIN_LABELS.answer);
+    assert.equal(await ans.innerText(), SIGNIN_LABELS.answer);   // inside #log: the chat log is never switched (docs/TODO.md known limits)
     assert.match(await page.locator('#log .msg.me').last().innerText(), /make me an app for my groceries/, 'the typed question stays in the chat');
     const pop = page.locator('#demoAuth');
     await pop.waitFor();   // the refusal still opens the sign-in popover by itself
-    assert.equal(await pop.locator('.demo-pop-h span').innerText(), POP_TITLES.signin);
+    assert.equal(await pop.locator('.demo-pop-h span').innerText(), zh(POP_TITLES.signin));
     assert.ok(await filled(pop.locator('button[type=submit]')), 'the send button is a filled button, not plain text');
     await pop.locator('.demo-pop-x').click();
     await pop.waitFor({ state: 'detached' });
@@ -73,7 +77,7 @@ test('the waiting-list popover has a title, ✕ and a real button too', { skip, 
     await page.evaluate((ev) => dispatchEvent(new Event(ev)), JOIN_EVENT);
     const pop = page.locator('#demoWait');
     await pop.waitFor();
-    assert.equal(await pop.locator('.demo-pop-h span').innerText(), POP_TITLES.join);
+    assert.equal(await pop.locator('.demo-pop-h span').innerText(), zh(POP_TITLES.join));
     assert.ok(await filled(pop.locator('button[type=submit]')));
     await pop.locator('.demo-pop-x').click();
     await pop.waitFor({ state: 'detached' });

@@ -4,7 +4,8 @@
 // fallback result never carries a session id (web.mjs would store it as the CLAUDE session).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { runCodexLane, codexFallback, CODEX_WORKING_STATUS, CODEX_ALSO_FAILED } from '../lib/lane-codex.mjs';
+import { runCodexLane, codexFallback, withLangRule, CODEX_WORKING_STATUS, CODEX_ALSO_FAILED } from '../lib/lane-codex.mjs';
+import { REPLY_IN } from '../lib/ui-lang.mjs';
 import { CLAUDE_SIGNIN_EXPIRED, CODEX_FALLBACK_PREFIX } from '../lib/claude-auth.mjs';
 import { REAL_401_REVOKED } from './helpers-claude-auth.mjs';
 
@@ -50,4 +51,14 @@ test('codexFallback: Codex failing too surfaces both errors; no Codex lane surfa
   assert.equal(none.ok, false);
   assert.ok(none.text.startsWith(CLAUDE_SIGNIN_EXPIRED));
   assert.ok(!none.text.includes(CODEX_FALLBACK_PREFIX));
+});
+
+test('the reply-language line leads every Codex prompt (no system channel), fresh and resumed, and through the fallback', async () => {
+  const calls = [];
+  const runCodex = async (o) => { calls.push(o); return { ok: true, text: 'A', sessionId: 's' }; };
+  await runCodexLane({ convo: { codexSessionId: 'old' }, prompt: 'hi', cwd: '/w', timeoutMs: 5, runCodex, enqueue, langRule: REPLY_IN.en });
+  assert.equal(calls[0].prompt, `${REPLY_IN.en}\n\nhi`, 'a resumed session too: the choice may have changed since');
+  await codexFallback({ chatModels: LANES, claudeError: 'x', convo: {}, prompt: 'yo', cwd: '/w', timeoutMs: 5, runCodex, enqueue, langRule: REPLY_IN.zh });
+  assert.equal(calls[1].prompt, `${REPLY_IN.zh}\n\nyo`);
+  assert.equal(withLangRule('', 'plain'), 'plain', 'no line: the prompt unchanged (CONTROL)');
 });

@@ -407,9 +407,10 @@
     const d=new Date(ms), now=new Date();
     const s=x=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime();
     const diff=Math.round((s(now)-s(d))/86400000);
-    if(diff<=0) return 'Today 今天'; if(diff===1) return 'Yesterday 昨天';
-    const wd=['Sun 周日','Mon 周一','Tue 周二','Wed 周三','Thu 周四','Fri 周五','Sat 周六'][d.getDay()];
-    return wd+' · '+(d.getMonth()+1)+'月'+d.getDate()+'日'; }
+    if(diff<=0) return '今天 · Today'; if(diff===1) return '昨天 · Yesterday';
+    // "中文 · English", each side whole, so PALang (web/lang.js) can show one side.
+    const wd=d.getDay(), m=d.getMonth();
+    return '周'+'日一二三四五六'[wd]+' '+(m+1)+'月'+d.getDate()+'日 · '+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][wd]+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m]+' '+d.getDate(); }
   // The row's own last-modified TIME, because the DAY is already the header above it.
   //
   // This replaced a relative label ("now"/"12m"/"4h"/"9/8"), which contradicted that header every
@@ -546,8 +547,8 @@
     host.innerHTML=
       '<div class="pac-list">'+
         '<div class="pac-top"><div class="pac-title pac-dtitle" style="flex:1;text-align:left" role="button" tabindex="0" title="收起 · Collapse" aria-label="收起 · Collapse"></div>'+
-          (c.onNew?'<button class="pac-new pac-dnew" title="New chat 新对话">'+esc(c.newLabel||'＋')+'</button>':'')+
-          (c.onNew2?'<button class="pac-new pac-dnew2" title="New note 新笔记">'+esc(c.newLabel2||'📝')+'</button>':'')+
+          (c.onNew?'<button class="pac-new pac-dnew" title="新对话 · New chat">'+esc(c.newLabel||'＋')+'</button>':'')+
+          (c.onNew2?'<button class="pac-new pac-dnew2" title="新笔记 · New note">'+esc(c.newLabel2||'📝')+'</button>':'')+
           '<span class="pac-dhead"></span>'+   // PADrawerSummary mounts Summarize · 总结 here (owner 2026-11-11: the header shows ＋, Summarize and ⋯ only)
           '<button class="pac-new pac-dmore" title="更多 · More" aria-label="更多 · More">⋯</button>'+
         '</div>'+
@@ -618,7 +619,7 @@
       if(groups) groups.sync();   // the jump strip follows the rows (and leaves while the box has text)
       // While the node's reply is owed, an empty local filter is "Searching…", not a verdict: a definite
       // "No matches" for the debounce + round trip (+ the first scan) made users close the drawer (R13 round 2 #3).
-      if(!shown.length){ rows.innerHTML='<div class="pac-lempty">'+(f?(_pending?whereLabel('searching'):'No matches 无匹配'):'Nothing here yet 还没有内容')+'</div>'; return; }
+      if(!shown.length){ rows.innerHTML='<div class="pac-lempty">'+(f?(_pending?whereLabel('searching'):'无匹配 · No matches'):'还没有内容 · Nothing here yet')+'</div>'; return; }
       const rowHtml=it=>{
         const menu=(it.onRename||it.onDelete||it.onDeleteAi||it.onPin)?'<button class="pac-lmenu" data-menu="'+esc(it.id)+'" aria-label="更多 · More">⋯</button>':'';
         // A row with no onDelete cannot be bulk-deleted, so it gets no box — offering a tick
@@ -661,8 +662,8 @@
     async function rowMenu(id,anchor){
       const it=itemOf(id);
       const acts=[];
-      if(it.onRename) acts.push({ label:'Rename 重命名',
-        run:async()=>{ const t=await pacPrompt(host,'Rename 重命名',it.title||'');
+      if(it.onRename) acts.push({ label:'重命名 · Rename',
+        run:async()=>{ const t=await pacPrompt(host,'重命名 · Rename',it.title||'');
           if(t!=null) await it.onRename(t.trim()||it.title||''); } });
       // Bookmark · 收藏 (plan D): a reader's mark, kept in the row's own app data, never in the note.
       // Offered only on a row with an onPin, exactly as Rename is; the label reads the same `pin`
@@ -671,10 +672,10 @@
         run:async()=>{ await it.onPin(!it.pin); } });
       // Offered ONLY on a row that has one — the ✨ badge and this entry read the same flag, so
       // the menu can never promise to delete a conversation that is not there.
-      if(it.onDeleteAi) acts.push({ label:'Delete AI chat 删除 AI 对话', del:true,
-        run:async()=>{ if(await pacConfirm(host,'Delete this note\'s AI chat? The note itself is kept. 删除这条笔记的 AI 对话？笔记本身保留。')) await it.onDeleteAi(); } });
-      if(it.onDelete) acts.push({ label:'Delete 删除', del:true,
-        run:async()=>{ if(await pacConfirm(host,'Delete this entry? 删除这条？')) await it.onDelete(); } });
+      if(it.onDeleteAi) acts.push({ label:'删除 AI 对话 · Delete AI chat', del:true,
+        run:async()=>{ if(await pacConfirm(host,'删除这条笔记的 AI 对话？笔记本身保留。 · Delete this note\'s AI chat? The note itself is kept.')) await it.onDeleteAi(); } });
+      if(it.onDelete) acts.push({ label:'删除 · Delete', del:true,
+        run:async()=>{ if(await pacConfirm(host,'删除这条？ · Delete this entry?')) await it.onDelete(); } });
       if(!acts.length) return;
       const pick=await pacSheet(host,acts.map(a=>({label:a.label,del:a.del})),anchor);
       if(pick==null||!acts[pick]) return;
@@ -744,8 +745,8 @@
       const ids=[..._picked];
       if(!ids.length) return;
       if(!await pacConfirm(host, ids.length===1
-        ? 'Delete this entry? 删除这条？'
-        : `Delete ${ids.length} entries? 删除这 ${ids.length} 条？`)) return;
+        ? '删除这条？ · Delete this entry?'
+        : `删除这 ${ids.length} 条？ · Delete ${ids.length} entries?`)) return;
       bulkDel.disabled=true;
       let ok=0; const failed=[];
       for(const id of ids){

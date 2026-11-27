@@ -15,6 +15,7 @@ import { skip, chromium } from './helpers-note-link.mjs';
 import { startStubSupabase } from './helpers-demo-sb.mjs';
 import { SIGNIN_LABELS } from '../lib/demo-boot.mjs';
 import { DEMO_DELETE_PATH } from '../lib/demo.mjs';
+import { zh } from './helpers-lang.mjs';
 
 const REPO = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 let sb, web, root, port, browser;
@@ -58,7 +59,7 @@ test('signed out: one Sign in in the header (like its buttons), an email popover
   await settled(page);
   const b = page.locator('header #demoSignin');
   await b.waitFor();
-  assert.equal(await b.textContent(), SIGNIN_LABELS.in);
+  assert.equal(await b.textContent(), zh(SIGNIN_LABELS.in));
   assert.match(await b.getAttribute('class'), /^ibtn h-signin$/, 'a header button (the Sign in pill), not a box');
   assert.equal(await page.locator('#logoutBtn').isVisible(), false);
   assert.equal(await page.locator('text=Delete my account').count(), 0);
@@ -92,7 +93,7 @@ test('Delete my account in Settings asks first, deletes, then signs out fully', 
   page.once('dialog', (d) => d.dismiss());
   await page.click('#demoDel');
   assert.equal(node.length, 0, 'cancel deletes nothing');
-  page.once('dialog', (d) => { assert.equal(d.message(), SIGNIN_LABELS.delAsk); d.accept(); });
+  page.once('dialog', (d) => { assert.equal(d.message(), zh(SIGNIN_LABELS.delAsk)); d.accept(); });
   await Promise.all([page.waitForEvent('load'), page.click('#demoDel')]);
   assert.ok(node[0].endsWith(DEMO_DELETE_PATH) && node.some((u) => u.endsWith('/api/logout')), node.join());
   await waitFor(() => sb.calls.some((c) => c.url === '/auth/v1/logout' && c.auth === `Bearer ${a}`), 'Supabase revoke');
@@ -145,7 +146,7 @@ test('the build pill sits below the header at phone width, also once the header 
   const tip = await page.evaluate(() => document.querySelector('.pat-tip').getBoundingClientRect().top - document.getElementById('demoBuild').getBoundingClientRect().bottom);
   assert.ok(tip >= 0, 'the tip sits under the pill');
   await page.locator('.pat-tip .pat-x').click();   // dismissed: the app tip now raises the input bar, so the grid scrolls the card under it
-  await page.locator('text=Allergy & Pollen').last().click();   // an open app: its bar (← Home, A-, A+) is a header too
+  await page.getByText('花粉', { exact: true }).last().click();   // an open app: its bar (← Home, A-, A+) is a header too
   await waitFor(async () => page.evaluate(() => document.getElementById('demoBuild').getBoundingClientRect().top >= document.querySelector('#frame .bar').getBoundingClientRect().bottom), 'the pill below the app bar');
   await page.evaluate(() => { document.querySelector('header').style.paddingBottom = ''; });   // header back to size: only the slide can move the pill now
   await page.waitForTimeout(4500);   // past one poll. An invariant pin: the shell header (behind the app) is as tall as the bar, so this holds even without transitionend
@@ -184,7 +185,7 @@ test('the demo drawer keeps Family Apps with the private-hosting note, muted, an
   await page.click('#secFamily .dsec-head');   // closed by default since the drawer redesign (web/drawer-sections.js)
   const note = page.locator('#secFamily #dFamilyDemo');
   await note.waitFor({ state: 'visible' });
-  assert.equal(await note.textContent(), '家庭应用仅在私有部署的 superelf 上可用 · Family Apps are available on a privately hosted superelf');
+  assert.equal(await note.textContent(), '家庭应用仅在私有部署的 superelf 上可用');
   assert.equal(await page.locator('#secFamily >> text=None shared yet.').count(), 0);
   const [c, m] = await note.evaluate((e) => [getComputedStyle(e).color, (() => { const p = document.createElement('span'); p.style.color = 'var(--muted)'; document.body.appendChild(p); const v = getComputedStyle(p).color; p.remove(); return v; })()]);
   assert.equal(c, m, 'muted, not an error colour');

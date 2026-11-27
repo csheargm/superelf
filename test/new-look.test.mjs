@@ -40,7 +40,7 @@ test('chats group by day; 5 recent then 更多 · More with the hidden count', (
   assert.equal(g.groups[0].items[0].id, 'c0', 'newest first, whatever order the list came in');
   const html = PAHomeLook.convosHtml(list, 'c1', false, esc, NOW);
   assert.equal((html.match(/class="convo/g) || []).length, 4, 'closed-up: only today + yesterday (4 of them)');
-  assert.match(html, /data-more-chats>更多 · More \(4\)</);
+  assert.match(html, /data-more-chats>更多（4） · More \(4\)</);
   assert.match(html, /class="convo active" data-id="c1"/);
   assert.match(html, /data-menu="c0"[^>]*><svg class="pi"/, 'the ⋯ is an icon, still carrying data-menu');
   const all = PAHomeLook.convosHtml(list, null, true, esc, NOW);
@@ -118,7 +118,7 @@ test('USER FLOW: tiles with icons, drawer 5 + More, one Aa, and the app page wea
     await page.click('#hmore'); await page.click('#menu');
     await page.waitForSelector('#convos .convo');
     assert.equal(await page.locator('#convos .convo').count(), 5);
-    assert.equal((await page.textContent('[data-more-chats]')).trim(), '更多 · More (3)');
+    assert.equal((await page.textContent('[data-more-chats]')).trim(), '更多（3）');
     await page.click('[data-more-chats]');
     assert.equal(await page.locator('#convos .convo').count(), 8);
     assert.equal(await page.isVisible('#drawer.open'), true, 'More keeps the drawer open');

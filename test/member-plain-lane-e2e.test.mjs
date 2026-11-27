@@ -71,7 +71,7 @@ test('the owner ticks "AI 工具 · Agent tools" in Settings; the member then re
   await page.click('#hmore'); await page.click('#settings');
   const box = page.locator('#family [data-agent="mara"]');
   await box.waitFor();
-  assert.match(await page.locator('#family label:has([data-agent="mara"])').textContent(), /AI 工具 · Agent tools/);
+  assert.match(await page.locator('#family label:has([data-agent="mara"])').textContent(), /AI 工具/);
   assert.equal(await page.locator('#family [data-agent="owner"]').count(), 0, 'no toggle on the owner');
   await box.check();
   await page.waitForFunction(async () => (await (await api('/api/admin/users')).json()).find((u) => u.id === 'mara').agent === true);

@@ -81,7 +81,7 @@ test('the ⋯ sheet: Bookmark on an unpinned row calls onPin(true); Unbookmark o
   const run = menuModule();
   const got = [];
   const offered = await run({ onRename: async () => {}, onDelete: async () => got.push('DELETED'), onPin: async (f) => got.push(f) }, (labels) => labels.indexOf('收藏 · Bookmark'));
-  assert.deepEqual(offered, ['Rename 重命名', '收藏 · Bookmark', 'Delete 删除']);
+  assert.deepEqual(offered, ['重命名 · Rename', '收藏 · Bookmark', '删除 · Delete']);
   assert.deepEqual(got, [true]);
   const again = await run({ pin: true, onPin: async (f) => got.push(f) }, (labels) => labels.indexOf('取消收藏 · Unbookmark'));
   assert.deepEqual(again, ['取消收藏 · Unbookmark'], 'the label reads the row\'s own flag');
@@ -90,8 +90,8 @@ test('the ⋯ sheet: Bookmark on an unpinned row calls onPin(true); Unbookmark o
 
 test('CONTROL: a row without onPin is offered no bookmark entry, and a list with nothing pinned shows no ★ and no ⋯ for a plain row', async () => {
   const run = menuModule();
-  assert.deepEqual(await run({ onRename: async () => {}, onDelete: async () => {} }, () => -1), ['Rename 重命名', 'Delete 删除']);
-  assert.deepEqual(await run({ pin: true, onRename: async () => {} }, () => -1), ['Rename 重命名'], 'pinned by data but no hook: the sheet cannot promise a toggle it has no way to make');
+  assert.deepEqual(await run({ onRename: async () => {}, onDelete: async () => {} }, () => -1), ['重命名 · Rename', '删除 · Delete']);
+  assert.deepEqual(await run({ pin: true, onRename: async () => {} }, () => -1), ['重命名 · Rename'], 'pinned by data but no hook: the sheet cannot promise a toggle it has no way to make');
   const D = await drawer({ items: () => rows().map(({ pin, ...r }) => r) });
   assert.equal(D.strip().innerHTML, '');
   assert.doesNotMatch(D.rows(), /pac-lstar|data-menu/);

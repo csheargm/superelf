@@ -53,7 +53,7 @@ test('Activity log: only what matters, plain sentences, local time; app change �
   // Only a successful sign-in so far: routine → the empty state.
   await openLog(page);
   await shot(page, 'empty');
-  assert.match(await page.locator('#activityLog .act-empty').textContent(), /只记安全事件、失败和应用改动 · Nothing needs you/);
+  assert.match(await page.locator('#activityLog .act-empty').textContent(), /Nothing needs you/);
   await page.click('#activityClose');
   // An app with one saved change (the request stored), as the Change-this-app turn leaves it.
   const ws = path.join(root, 'workspace'), app = path.join(ws, 'apps', 'notes'), vroot = path.join(ws, VERSIONS_DIR);
@@ -69,16 +69,16 @@ test('Activity log: only what matters, plain sentences, local time; app change �
   await openLog(page); await page.waitForSelector('#activityLog .act-row');
   await page.waitForSelector('#activityLog .pat-tip[data-tip="tip:activity-app-changes"]', { timeout: 5000 });   // the ONE tip mechanism, inside the dialog
   const text = await page.locator('#activityLog').textContent();
-  assert.match(text, /Mom 修改了应用「notes」 · Mom changed the app "notes"/);
+  assert.match(text, /Mom changed the app "notes"/);
   assert.match(text, /“rename the title”/);
-  assert.match(text, /任务「briefing」失败 · The job "briefing" failed/);
-  assert.match(text, /登录失败：stranger · Failed sign-in: stranger/);
-  assert.match(text, /新：应用改动可以在这里撤销或查看改动/, 'first-use tip beside the new buttons');
+  assert.match(text, /The job "briefing" failed/);
+  assert.match(text, /Failed sign-in: stranger/);
+  assert.match(text, /New: undo an app change or see the difference here/, 'first-use tip beside the new buttons');
   assert.doesNotMatch(text, /Builtin apps update|Job ran|任务运行|登录 · Sign-in/, 'routine rows are gone');
   await shot(page, 'log');
   const rows = await page.locator('#activityLog .act-row').allInnerTexts();
-  assert.match(rows[0], /节点健康检查发现问题/, 'critical failure pinned first');
-  assert.match(rows[0], /去处理 · Fix it/);
+  assert.match(rows[0], /The node health check found a problem/, 'critical failure pinned first');
+  assert.match(rows[0], /Fix it/);
   // Engines join date and time differently: assert the parsed parts. 08:12 PM Los Angeles; UTC would be 04:12 AM Nov 23.
   const times = [...text.matchAll(/Nov (\d+), (\d{4})(?:,| at) (\d{2}):(\d{2}) (AM|PM)/g)].map((m) => m.slice(1).join(' '));
   assert.ok(times.includes('22 2026 08 12 PM'), `the seeded rows in local (Los Angeles) time, not UTC: ${times}`);
@@ -90,7 +90,7 @@ test('Activity log: only what matters, plain sentences, local time; app change �
   await page.click('#activityBack'); await page.waitForSelector('#activityLog .act-undo');
   await page.click('#activityLog .act-undo');
   await page.waitForSelector('#activityLog .act-note');
-  assert.match(await page.locator('#activityLog .act-note').textContent(), /已撤销/);
+  assert.match(await page.locator('#activityLog .act-note').textContent(), /^Undone/);   // an en-US device: the English side
   assert.equal(fs.readFileSync(path.join(app, 'index.html'), 'utf8'), '<p>old title</p>\n', 'the app is back');
   assert.equal(await page.locator('#activityLog .act-undo').count(), 0, 'nothing left to undo on that row');
   // The tip shows once only.

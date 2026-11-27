@@ -3,7 +3,7 @@
 // loadChatUi) with a fake PANote; the drawer's own code decides.
 import { loadChatUi } from './helpers-stationery.mjs';
 
-export const WHERE = { tag: 'Tag 标签', typed: 'Text 文本', ink: 'Ink 手写', photo: 'Photo 图片', failed: '搜索不可用 · Search unavailable', searching: 'Searching… 搜索中', more: '仅显示最相关的笔记 · Only the best matches are shown',
+export const WHERE = { tag: '标签 · Tag', typed: '文本 · Text', ink: '手写 · Ink', photo: '图片 · Photo', failed: '搜索不可用 · Search unavailable', searching: '搜索中… · Searching…', more: '仅显示最相关的笔记 · Only the best matches are shown',
   pending: '正在识别 {n} 页 · Transcribing {n} pages', noOcr: '手写搜索需要 Mac 节点 · Handwriting search needs the Mac node', ocrFailed: '本机手写识别失败 · Handwriting transcription failed on this node' };
 export const rows = () => [
   { id: 'a', title: 'Roof', preview: 'typed about the roof', updated: 3, doc: { path: 'entry-1.json' } },

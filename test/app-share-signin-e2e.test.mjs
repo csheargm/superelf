@@ -98,7 +98,7 @@ test('an in-app browser (Gmail) shows Open in Safari', { skip, timeout: 60000 },
   const page = await ctx.newPage();
   await page.goto(share.url);
   await page.waitForSelector('#shInApp', { state: 'visible' });
-  assert.match(await page.textContent('#shInApp'), /在 Safari 中打开 · Open in Safari/);
+  assert.match(await page.textContent('#shInApp'), /在 Safari 中打开/);
   await ctx.close();
 });
 

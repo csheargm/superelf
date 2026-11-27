@@ -31,11 +31,10 @@
   const norm=(v)=>(v==='zh'||v==='en'?v:'');
   function device(){ try{ const l=String((navigator.languages&&navigator.languages[0])||navigator.language||''); return /^zh/i.test(l)?'zh':'en'; }catch(_){ return 'en'; } }
   function stored(){ try{ return norm(localStorage.getItem(KEY)); }catch(_){ return ''; } }   // an opaque app frame: storage throws; the shell's prefs bring the choice (R5 case c)
-  // unset: nothing chosen yet on a node whose default is both-at-once (lib/ui-lang.mjs withLangDefault).
-  let chosen=stored(), both=/*PA_LANG_BOTH*/false, pairs='', unset=!chosen&&/*PA_LANG_DEFAULT*/''==='both';
+  let chosen=stored(), both=/*PA_LANG_BOTH*/false, pairs='';
   if(!chosen) chosen=device();
   const subs=new Set();
-  const get=()=>(both||unset?'both':chosen);
+  const get=()=>(both?'both':chosen);
   // "中文 · English" → ['中文','English']: the 中文 parts first, then the parts with no 中文 at all. Else null.
   function split(s){
     const parts=String(s).split(SEP); if(parts.length<2) return null;
@@ -105,12 +104,12 @@
   }
   function set(l){ l=norm(l); if(!l) return false;
     try{ localStorage.setItem(KEY,l); }catch(_){ /* opaque frame or blocked storage: the account copy / the shell's prefs hold it */ }
-    if(l===chosen&&!unset) return true; chosen=l; unset=false; apply(); return true; }
+    if(l===chosen) return true; chosen=l; apply(); return true; }
   function bilingual(on){ on=!!on; if(on===both) return; both=on; apply(); }
   // The shell → this app page: {pa:'prefs', lang:'zh'|'en'|'both'} (web/index.html sendAppPrefs). Only the parent counts.
   addEventListener('message',(e)=>{ const m=e&&e.data; if(!m||m.pa!=='prefs'||typeof m.lang!=='string'||e.source!==window.parent||window.parent===window) return;
     if(m.lang==='both') bilingual(true); else { if(both&&!/*PA_LANG_BOTH*/false) bilingual(false); set(m.lang); } });
-  window.PALang={get,choice:()=>chosen,t,split,set,bilingual,device,apply,stored,
+  window.PALang={KEY,get,choice:()=>chosen,t,split,set,bilingual,device,apply,stored,
     on:(f)=>{ subs.add(f); return ()=>subs.delete(f); },
     pairClass:(c)=>{ pairs=String(c||''); if(document.documentElement) document.documentElement.toggleAttribute('data-pa-pairs',!!pairs); apply(); }};
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',apply,{once:true}); else apply();

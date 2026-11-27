@@ -12,13 +12,14 @@ import { skip, chromium } from './helpers-note-link.mjs';
 import { QUOTA_MESSAGES } from '../lib/demo-quota.mjs';
 import { LIMIT_LABELS } from '../lib/demo-boot.mjs';
 import { WAITLIST_LABELS } from '../lib/demo-waitlist-ui.mjs';
+import { zh } from './helpers-lang.mjs';
 
 const REPO = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const HOME = 'https://example.org/front';
 const SHOTS = process.env.PA_SHOTS || '';
 
 test('the new-visitor refusal reads 中文 first', () => {
-  assert.match(QUOTA_MESSAGES.new_user, /^今天来自你网络的新访客太多 · Too many new visitors today/);
+  assert.match(QUOTA_MESSAGES.new_user, /^今天来自你网络的新访客太多/);
 });
 
 let full, browser;
@@ -45,10 +46,10 @@ test('refused first visit: 中文-first card with sign-in, waiting list and tomo
   await page.goto(`http://127.0.0.1:${full.port}/`);
   const card = page.locator('#demoStop');
   await card.waitFor({ state: 'visible' });
-  assert.match(await card.innerText(), /^今天来自你网络的新访客太多 · Too many new visitors today/);
-  assert.equal(await page.locator('#demoStopJoin').innerText(), LIMIT_LABELS.join);
-  assert.equal(await page.locator('#demoStopSignin').innerText(), LIMIT_LABELS.signin);
-  assert.ok((await card.innerText()).includes(LIMIT_LABELS.tomorrow));
+  assert.match(await card.innerText(), /^今天来自你网络的新访客太多/);
+  assert.equal(await page.locator('#demoStopJoin').innerText(), zh(LIMIT_LABELS.join));
+  assert.equal(await page.locator('#demoStopSignin').innerText(), zh(LIMIT_LABELS.signin));
+  assert.ok((await card.innerText()).includes(zh(LIMIT_LABELS.tomorrow)));
   assert.ok(await page.locator('#drawer').count(), 'the shell stays in the page (no wiped body)');
   await page.waitForTimeout(800);
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'demo-limit-screen.png') });
@@ -66,7 +67,7 @@ test('refused first visit: the waiting-list button opens the form, which sends w
   assert.equal(await page.locator('#demoStop').count(), 0);
   await page.locator('#demoWait input[type=email]').fill('limit-visitor@example.org');
   await page.locator('#demoWait button[type=submit]').click();
-  await page.waitForFunction((t) => document.querySelector('#demoWait')?.textContent.includes(t), WAITLIST_LABELS.thanks);
+  await page.waitForFunction((t) => document.querySelector('#demoWait')?.textContent.includes(t), zh(WAITLIST_LABELS.thanks));
   assert.equal(await page.evaluate(() => localStorage.getItem('pa_session')), null, 'sent with no node session');
   await ctx.close();
 });

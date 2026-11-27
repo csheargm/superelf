@@ -56,13 +56,13 @@ test('owner: amber dot on ☰ → card with the problem, its meaning and the tip
   if (await camTip.waitFor({ timeout: 5000 }).then(() => true, () => false)) { await camTip.click(); await page.evaluate(() => window.PATips.whenIdle()); }
   await page.click('#hmore'); await page.click('#menu'); await page.waitForSelector('#oaCard');
   const text = await page.locator('#oaCard').innerText();
-  assert.match(text, /需要处理 · Needs attention/);
-  assert.match(text, /系统盘已用 92% · The system disk is 92% full/);
-  assert.match(text, /updates and saving can fail/);
-  assert.match(await page.locator('.pat-tip[data-tip="tip:owner-alerts"]').innerText({ timeout: 5000 }), /^新：.* · New:/, 'one-time tip (PATips, beside the card)');
+  assert.match(text, /需要处理/);
+  assert.match(text, /系统盘已用 92%/);
+  assert.match(text, /更新和保存可能失败/);
+  assert.match(await page.locator('.pat-tip[data-tip="tip:owner-alerts"]').innerText({ timeout: 5000 }), /^新：.*/, 'one-time tip (PATips, beside the card)');
   assert.doesNotMatch(text, /新：/, 'not a line inside the card');
   await page.click('#oaCard [data-oa="cleanup-disk"]');
-  await page.waitForFunction(() => /完成 · Done/.test(document.querySelector('#oaCard')?.innerText || ''), null, { timeout: 20000 });
+  await page.waitForFunction(() => /完成/.test(document.querySelector('#oaCard')?.innerText || ''), null, { timeout: 20000 });
   assert.equal(await page.$('#menu .oa-dot'), null, 'the check passed: no dot');
   assert.doesNotMatch(await page.locator('#oaCard').innerText(), /92%/);
   setHealth(FULL);
@@ -131,10 +131,10 @@ test('a full DATA box offers no prune (it frees only the system disk); a reload 
   await page.waitForFunction(() => !/Confirm/.test(document.querySelector('#oaCard [data-oa="rebuild-node"]').innerText));
   hostPaused = true;
   await page.click('#oaCard [data-oa="recheck"]');
-  await page.waitForFunction(() => /Working/.test(document.querySelector('#oaCard')?.innerText || ''));
+  await page.waitForFunction(() => /正在处理/.test(document.querySelector('#oaCard')?.innerText || ''));
   await page.reload(); await page.click('#hmore'); await page.click('#menu');
-  await page.waitForFunction(() => /Working/.test(document.querySelector('#oaCard')?.innerText || ''), null, { timeout: 10000 });
+  await page.waitForFunction(() => /正在处理/.test(document.querySelector('#oaCard')?.innerText || ''), null, { timeout: 10000 });
   hostPaused = false;
-  await page.waitForFunction(() => /完成 · Done/.test(document.querySelector('#oaCard')?.innerText || ''), null, { timeout: 20000 });
+  await page.waitForFunction(() => /完成/.test(document.querySelector('#oaCard')?.innerText || ''), null, { timeout: 20000 });
   await ctx.close();
 });

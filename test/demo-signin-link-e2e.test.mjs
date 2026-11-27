@@ -12,6 +12,7 @@ import { rmTemp } from './helpers-tmp.mjs';
 import { skip, chromium } from './helpers-note-link.mjs';
 import { startStubSupabase } from './helpers-demo-sb.mjs';
 import { SIGNIN_LABELS } from '../lib/demo-boot.mjs';
+import { zh } from './helpers-lang.mjs';
 
 const REPO = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SHOTS = process.env.PA_SHOT_DIR;
@@ -47,7 +48,7 @@ test('a link opened in another browser (no verifier): a clear notice, the email 
   const { ctx, page } = await openLink(null);
   await settled(page);
   await page.locator('#demoAuth input[type=email]').waitFor({ state: 'visible' });
-  assert.equal(await noteText(page), SIGNIN_LABELS.other);
+  assert.equal(await noteText(page), zh(SIGNIN_LABELS.other));
   assert.equal(new URL(page.url()).search, '', 'the ?code is cleaned from the URL');
   assert.ok(!sb.calls.some((c) => c.url.includes('grant_type=pkce')), 'no exchange without a verifier');
   await shot(page, 'other-browser.png');
@@ -59,7 +60,7 @@ test('an expired or used link: the reason in plain words and the email box', { s
   const { ctx, page } = await openLink('verifier-1');
   await settled(page);
   await page.locator('#demoAuth input[type=email]').waitFor({ state: 'visible' });
-  assert.equal(await noteText(page), SIGNIN_LABELS.bad);
+  assert.equal(await noteText(page), zh(SIGNIN_LABELS.bad));
   assert.ok(sb.calls.some((c) => c.url.includes('grant_type=pkce')), 'CONTROL: the exchange was tried');
   await shot(page, 'expired-link.png');
   delete sb.replies['/auth/v1/token?grant_type=pkce'];
@@ -88,7 +89,7 @@ test('asking for a link: 429 says "too many, about an hour"; success says open i
   await page.fill('#demoAuth input[type=email]', 'a@example.com');
   await page.click('#demoAuth button[type=submit]');
   await waitFor(async () => (await page.locator('#demoAuthNote').count()) > 0, 'the note');
-  assert.equal(await noteText(page), SIGNIN_LABELS.rate);
+  assert.equal(await noteText(page), zh(SIGNIN_LABELS.rate));
   assert.equal(await page.evaluate(() => localStorage.getItem('sb_pkce')), null, 'a refused send stores no verifier (an earlier link stays usable)');
   await shot(page, 'rate-limit.png');
   sb.replies['/auth/v1/otp'] = () => ({ status: 500, body: {} });
@@ -97,8 +98,8 @@ test('asking for a link: 429 says "too many, about an hour"; success says open i
   delete sb.replies['/auth/v1/otp'];
   await page.click('#demoAuth button[type=submit]');
   await page.locator('#demoAuthSame').waitFor();
-  assert.equal(await noteText(page), SIGNIN_LABELS.sent);
-  assert.equal(await page.locator('#demoAuthSame').textContent(), SIGNIN_LABELS.same);
+  assert.equal(await noteText(page), zh(SIGNIN_LABELS.sent));
+  assert.equal(await page.locator('#demoAuthSame').textContent(), zh(SIGNIN_LABELS.same));
   assert.ok(await page.evaluate(() => localStorage.getItem('sb_pkce')), 'a sent link stores its verifier');
   await shot(page, 'check-email.png');
   await ctx.close();

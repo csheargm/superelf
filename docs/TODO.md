@@ -3,20 +3,28 @@
 Problems found while doing an asked-for task, not needed for that task. One line each; the task
 that found it in brackets. Pick from here; do not open a side session per item.
 
-## One language setting · 界面语言 (ADR 0048, feat/one-language-switch, 2026-11-26) — known limits
+## One language setting · 界面语言 (ADR 0048, 2026-11-26) — known limits
 - Switched automatically: "中文 · English" text nodes and title/aria-label/placeholder/alt everywhere (shell + every
   app page), the shell's `<b>中文</b><span class="en">English</span>` pairs, and PAHome's own two-line tiles. NOT switched:
-  - strings joined another way: "中文 / English" (note-ui ~8, chat-ui ~2), "中文（English）", English-first pairs
-    ("Bible 圣经"), and halves split across elements other than a `.en` sibling (e.g. `<small>English</small>`);
-  - a pair whose English half contains 中文 (it stays both) — write the English half in English;
+  - a pair whose English half contains 中文, or a string with more than one pair in it ("作者 X · by X · 3 个旧版本 ·
+    3 old versions", web/settings.js shared rows) — it stays both; write one pair per text node;
   - app pages' own `.en` markup (the pairing runs in the shell only: an app's `.en` class is the app's business);
+  - text inside the chat logs (#log, .pac-log) — "Loading… 加载中" and the load-failure line in web/chat-ui.inline.html
+    stay both by design (the log is skipped);
+  - NEW_NOTE_LABEL "New Note 新笔记" (web/note-ui.inline.html, web.mjs): it is a saved title, so it is data, not UI;
   - user-typed text that happens to read "中文 · English" outside the skipped areas (inputs, textarea,
     contenteditable, #log, .pac-log, [data-pa-lang-skip]) is switched too — add data-pa-lang-skip where it matters;
   - the server's own bilingual error strings (`error: '... · ...'` in web.mjs) are switched only when the page
     puts them into the DOM as one text node;
-  - the Codex lane and the one-shot job lanes (web.mjs runAgent) still carry the follow-the-writer rule, not the setting.
+  - the note's T-tool placeholder picks its side when the tool opens; a flip while it is open shows on the next open.
 - An app frame has no storage: before the shell's first prefs post it shows the device language (one frame).
 - BILINGUAL_APPS (lib/ui-lang.mjs) is bible + sunday-study; other scripture apps opt in with meta.json "bilingual": true.
+- The job resolver asks (web.mjs resolvePrompt) return structured JSON, not prose, and carry no language line.
+- Demo at 390 on a 中文 device: the home ⋯ first-use tip (PATips, top-most z-index) covers the sign-in popover's ✕
+  until the tip is closed (test/demo-guest-ask-e2e.test.mjs closes it first). Hide tips while a demo popover is open.
+- The demo's inline "登录后获得回答 · Sign in to get an answer" button lives in #log, so it stays both.
+- R3: the weekday names ('日一二三四五六' / Sun..Sat) are spelled in web/chat-ui.inline.html listDay and web/index.html
+  schedText; one shared helper when either is next touched. (lang-gaps review)
 
 ## Ink on other fonts · 换字体后的手写 (fix/ink-reflow GPT review r1, 2026-11-25)
 - A font-size preference change on an open chapter now re-measures (memo keyed by font) and an enclosure accepts a font ratio up to 0.6, but an e2e at +20% to +40% still leaves some ovals at today's placement on some widths (the row breaks differ beyond the +/-3% tries); the font-independent anchor (character under each corner of the box) is the real fix.
@@ -204,8 +212,6 @@ Follow-ups:
   test; owner: the agent should combine its tools)
 - The resolver runs through the full claude CLI (web.mjs:1885): on a failure the model told the
   user to use "/schedule", a Claude Code command. Run it with no skills/tools. (2026-10-17 test)
-- The research job has no reply-language rule (lib/research.mjs:150): the scheduled run answered in
-  Chinese, Run now in English. (2026-10-17 test)
 - A job's briefing is headed "Research · 研究", not the job's own title (lib/jobs/tools.mjs:44).
   (2026-10-17 test)
 - "alert me if pollen is high" ignores "high": the pollen tool has no threshold input the model can

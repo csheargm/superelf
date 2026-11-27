@@ -77,16 +77,16 @@ async function ask(q) {
   return page.locator('#log .msg').last().textContent();
 }
 const discardOpen = async () => { await page.click('#pubSheet [data-sp="discard"]'); await page.waitForFunction(() => !document.getElementById('pubSheet')); };
-const discardRow = async () => { await page.click('.sp-row .sp-drop'); await page.waitForFunction(() => /已丢弃 · Discarded/.test(document.querySelector('.sp-row').textContent)); };
+const discardRow = async () => { await page.click('.sp-row .sp-drop'); await page.waitForFunction(() => /已丢弃/.test(document.querySelector('.sp-row').textContent)); };
 
 test('the version-line change: all 3 files listed ABOVE the shots, and After differs from Before', { skip, timeout: 300000 }, async () => {
   const reply = await ask('change superelf: add a version line on the home page');
-  assert.match(reply, /可以发布 · Ready to publish — 改了 3 个文件 · 3 file\(s\) changed/);
+  assert.match(reply, /可以发布/);
   assert.doesNotMatch(reply, /Change not visible/);
   await page.click('.sp-row .sp-go');
   await page.locator('#pubSheet #spFiles').waitFor({ timeout: 30000 });
   assert.deepEqual(await page.locator('#spFiles code').allTextContents(), VERLINE_FILES);
-  assert.match(await page.locator('#pubSheet').textContent(), /Files changed \(3\)/);
+  assert.match(await page.locator('#pubSheet').textContent(), /改动的文件（3）/);
   await page.waitForFunction(() => document.querySelectorAll('#spShots img').length === 2, null, { timeout: 30000 });
   const order = await page.evaluate(() => !!(document.getElementById('spFiles').compareDocumentPosition(document.getElementById('spShots')) & Node.DOCUMENT_POSITION_FOLLOWING));
   assert.ok(order, 'the file list comes before the shots, never below the fold under them');
@@ -98,18 +98,18 @@ test('the version-line change: all 3 files listed ABOVE the shots, and After dif
 
 test('a reply naming a file the change does not have: said plainly, no Publish', { skip, timeout: 300000 }, async () => {
   const reply = await ask('change superelf: claims more than it changed');
-  assert.match(reply, /^未通过检查 · Checks failed/);
-  assert.match(reply, /回复说改了 web\/settings\.js，但改动里没有，不能发布 · The reply names web\/settings\.js, which the change does not contain: cannot publish/);
+  assert.match(reply, /^未通过检查/);
+  assert.match(reply, /回复说改了 web\/settings\.js，但改动里没有，不能发布/);
   assert.equal(await page.locator('.sp-row .sp-go').count(), 0, 'no Publish button');
   await discardRow();
 });
 
 test('a change Home does not draw: "Change not visible in screenshots", and no pictures shown as proof', { skip, timeout: 300000 }, async () => {
   const reply = await ask('change superelf: invisible rule');
-  assert.match(reply, /改动在截图里看不出 · Change not visible in screenshots/);
+  assert.match(reply, /改动在截图里看不出/);
   await page.click('.sp-row .sp-go');
   await page.locator('#pubSheet #spFiles').waitFor({ timeout: 30000 });
-  assert.match(await page.locator('#spChecks').textContent(), /改动在截图里看不出 · Change not visible in screenshots/);
+  assert.match(await page.locator('#spChecks').textContent(), /改动在截图里看不出/);
   await page.waitForTimeout(1500);   // the shots would have loaded by now
   assert.equal(await page.locator('#spShots img').count(), 0);
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'selfpub-card-invisible.png') });

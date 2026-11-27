@@ -15,6 +15,7 @@ import { skip, chromium } from './helpers-note-link.mjs';
 import { makeQuotaStore } from '../lib/demo-quota.mjs';
 import { validateEntry, addToWaitlist, WAITLIST_FILE, WAITLIST_MAX, WAITLIST_PATH, WAITLIST_MESSAGES } from '../lib/demo-waitlist.mjs';
 import { WAITLIST_LABELS } from '../lib/demo-waitlist-ui.mjs';
+import { zh } from './helpers-lang.mjs';
 
 const REPO = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const entries = (root) => { const f = path.join(root, WAITLIST_FILE); return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []; };
@@ -104,16 +105,16 @@ test('real flow: ?join=1 opens the form, submit thanks the visitor, one line on 
     await page.goto(`http://127.0.0.1:${demo.port}/?join=1`);
     const form = page.locator('#demoWait form');
     await form.waitFor({ state: 'visible' });
-    assert.equal(await page.locator('#demoWait p').textContent(), WAITLIST_LABELS.hint);
+    assert.equal(await page.locator('#demoWait p').textContent(), zh(WAITLIST_LABELS.hint));
     await form.locator('input[type=email]').fill('E2E@Example.org');
     await form.locator('textarea').fill('for my family');
     await form.locator('button[type=submit]').click();
-    await page.locator('#demoWaitMsg', { hasText: WAITLIST_LABELS.thanks }).waitFor();
+    await page.locator('#demoWaitMsg', { hasText: zh(WAITLIST_LABELS.thanks) }).waitFor();
     return page;
   };
   const page = await send();
   await page.evaluate(() => openDrawer());
-  assert.equal(await page.locator('#drawer > #demoJoin').textContent(), WAITLIST_LABELS.line, 'the quiet drawer row');
+  assert.equal(await page.locator('#drawer > #demoJoin').textContent(), zh(WAITLIST_LABELS.line), 'the quiet drawer row');
   await send();
   await waitFor(() => entries(demo.root).some((e) => e.email === 'e2e@example.org'), 'entry on disk');
   const mine = entries(demo.root).filter((e) => e.email === 'e2e@example.org');

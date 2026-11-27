@@ -173,9 +173,6 @@ export function mkWebRoot({ port, extraConfig = {} }) {
     // (lib/note-ocr-queue.mjs), which on a Mac would compile and run tools/panote-ocr in the
     // background of every harness server. The fake answers the same contract deterministically.
     note_ocr_cmd: FAKE_OCR_CMD,
-    // The suites were written against the both-at-once labels: keep them until a person chooses (lib/ui-lang.mjs).
-    // test/lang-e2e.test.mjs passes ui_lang_default: '' to test the real device default.
-    ui_lang_default: 'both',
     ...extraConfig,
   }, null, 2));
   return root;

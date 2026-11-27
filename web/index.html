@@ -507,8 +507,8 @@ function renderJobDraft(d){
   el.appendChild(box);
   const l=$('#log'); l.scrollTop=l.scrollHeight;
 }
-const schedText=(s)=> !s||!s.time ? '—' : (s.day===undefined ? '每日 · daily '+s.time
-  : ['Sun 周日','Mon 周一','Tue 周二','Wed 周三','Thu 周四','Fri 周五','Sat 周六'][s.day]+' '+s.time);
+const schedText=(s)=> !s||!s.time ? '—' : (s.day===undefined ? '每日 '+s.time+' · daily '+s.time
+  : '周'+'日一二三四五六'[s.day]+' '+s.time+' · '+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][s.day]+' '+s.time);   // "中文 · English", each side whole (web/lang.js)
 function renderMsgs(msgs){ $('#log').innerHTML=''; let lastU=''; for(const m of (msgs||[])){ if(m.role==='md'){ const el=add('','',renderMd(m.text)); addActions(el,'response',m.text,lastU); addTook(el,m.ms,m.by); /* the stored duration — reopening a chat keeps it */ if(m.selfpub) PASelfPub.attach(el,m.selfpub); /* 发布 · Publish again on reopen (docs/adr/0044) */ } else { const el=add(m.role,m.text); if(m.role==='me'){ lastU=m.text; addActions(el,'prompt',m.text); renderAtts(el,m.attachments); } } } }
 let allConvos=[];
 async function loadConvos(){
@@ -800,7 +800,7 @@ async function ensureToken(){
   }
   $('#dot').classList.add('ok');
 }
-async function logout(){ try{ await api('/api/logout',{method:'POST'}); }catch{} try{ await swSignedOut(window.caches,(u)=>fetch(u,{method:'POST',credentials:'same-origin'})); }catch(err){ alert('未能清除已保存的应用页面 · Could not clear saved app pages — '+(err&&err.message||err)); } localStorage.removeItem('pa_session'); try{ localStorage.removeItem(SW_FAMILY_KEY); localStorage.removeItem('pa_lang'); }catch{ /* blocked storage: nothing was kept */ } location.reload(); }   // pa_lang: web/lang.js KEY — the next account starts from its own choice
+async function logout(){ try{ await api('/api/logout',{method:'POST'}); }catch{} try{ await swSignedOut(window.caches,(u)=>fetch(u,{method:'POST',credentials:'same-origin'})); }catch(err){ alert('未能清除已保存的应用页面 · Could not clear saved app pages — '+(err&&err.message||err)); } localStorage.removeItem('pa_session'); try{ localStorage.removeItem(SW_FAMILY_KEY); localStorage.removeItem(PALang.KEY); }catch{ /* blocked storage: nothing was kept */ } location.reload(); }   // PALang.KEY (web/lang.js) — the next account starts from its own choice
 
 /* ── New-feature key registry: maps feature-key → version added ── */
 // Update this when shipping new UI features; markNew() + PANewDot.mark() use these keys.
@@ -2143,8 +2143,8 @@ window.addEventListener('message',async(e)=>{
     } else if(m.kind==='ask'){
       // /api/ask answers 200 {ok,text} for both outcomes; relayCall adds a code when the
       // server itself says ok:false, and maps a transport failure the same as every kind.
-      // No slug: the server has no use for one since an app's agent writes nothing (ADR 0019).
-      reply(await relayCall('/api/ask',appAgentInit(JSON.stringify({message:String(m.message||'')})),'raw'));
+      // No slug: the server has no use for one since an app's agent writes nothing (ADR 0019). lang: the reply language ('both' = a bilingual app).
+      reply(await relayCall('/api/ask',appAgentInit(JSON.stringify({message:String(m.message||''),lang:frameLang()})),'raw'));
     } else if(m.kind==='meal-photo'){
       // Log a meal photo（拍照记录饮食）. The whole pipeline already existed — vision extraction,
       // storage, retention, and the 健康简报 Meals section — but was reachable ONLY by an iOS
