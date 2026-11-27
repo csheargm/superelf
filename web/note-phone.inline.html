@@ -116,9 +116,12 @@
       if(!pts.has(g.a)||!pts.has(g.b)) return true;           // one of the pair lifted: the rest only wait to lift
       if(e.pointerId!==g.a&&e.pointerId!==g.b) return true;
       // Measure only once BOTH fingers have reported since the last measure (or one moved twice: the
-      // other is resting), so the order the two moves arrive in never reads as a change of spread.
-      if(!g.moved.has(e.pointerId)){ g.moved.add(e.pointerId); if(g.moved.size<2) return true; }
-      g.moved.clear(); g.moved.add(e.pointerId);
+      // other is resting). After a both-moved measure start afresh: pairing the next move with the
+      // other finger's PREVIOUS frame would read the order the moves arrive in as a change of spread.
+      // After a resting measure keep this finger, so a one-finger pinch measures on every move.
+      const resting=g.moved.has(e.pointerId);
+      if(!resting){ g.moved.add(e.pointerId); if(g.moved.size<2) return true; }
+      g.moved.clear(); if(resting) g.moved.add(e.pointerId);
       const p=pair();
       c.pan(g.cx-p.cx, g.cy-p.cy); g.cx=p.cx; g.cy=p.cy;
       if(!g.pinch){ if(Math.abs(p.d/g.d0-1)<PINCH_SLOP) return true; g.pinch=true; g.d0=Math.max(1,p.d); }
@@ -171,8 +174,15 @@
     const setInert=on=>{ for(const n of c.host.children) if(n!==el) n.inert=on; };
     // Tab / Enter / Space on the view's OWN controls pass, so A−, A+, ✕ and links work from a keyboard.
     const OWN_KEYS={Tab:1,Enter:1,' ':1};
+    // Scroll keys scroll the copy, by hand: the same in every engine wherever focus sits, never the pad.
+    const LINE_PX=40, PAGE_SHARE=0.9;
+    const SCROLL_BY={ArrowUp:()=>-LINE_PX,ArrowDown:()=>LINE_PX,PageUp:()=>-body.clientHeight*PAGE_SHARE,PageDown:()=>body.clientHeight*PAGE_SHARE,
+      Home:()=>-body.scrollHeight,End:()=>body.scrollHeight,' ':e=>(e.shiftKey?-1:1)*body.clientHeight*PAGE_SHARE};
+    const onButton=e=>!!(e.target&&e.target.closest&&e.target.closest('button'));   // Space presses a button; on a link (Enter opens it) it scrolls
     const hold=e=>{ if(el.hidden) return;
       if(e.type==='keydown'&&e.key==='Escape'){ close(); e.preventDefault(); e.stopImmediatePropagation(); return; }
+      if(e.type==='keydown'&&SCROLL_BY[e.key]&&!e.metaKey&&!e.ctrlKey&&!e.altKey&&!(e.key===' '&&el.contains(e.target)&&onButton(e))){
+        body.scrollTop+=SCROLL_BY[e.key](e); e.preventDefault(); e.stopImmediatePropagation(); return; }
       if(e.type==='keydown'&&OWN_KEYS[e.key]&&(e.key==='Tab'||el.contains(e.target))) return;
       e.stopImmediatePropagation(); e.preventDefault(); };
     for(const ty of ['keydown','paste','cut']) add(window,ty,hold,true);

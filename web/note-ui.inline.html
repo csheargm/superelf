@@ -1790,7 +1790,8 @@
       if(m&&m.pa==='prefs'&&typeof m.printInk==='boolean'){ printInk=m.printInk; if(inkCb) inkCb.checked=m.printInk; }
       if(m&&m.pa==='prefs'&&typeof m.fingerDraw==='boolean'){ fingerDefaulted=m.fingerDrawSet===false&&!m.fingerDraw&&!penSeen&&phoneOn();
         fingerDraw=m.fingerDraw||fingerDefaulted; showFinger(); syncPan(); }
-      if(m&&m.pa==='prefs'&&m.noteZoom&&typeof m.noteZoom==='object') noteZooms=new Map(Object.entries(m.noteZoom));
+      if(m&&m.pa==='prefs'&&m.noteZoom&&typeof m.noteZoom==='object'){ const z0=zoomNow(); noteZooms=new Map(Object.entries(m.noteZoom));
+        if(W&&!liveZoom&&zoomNow()!==z0) setupCanvases(); }   // prefs can land after the note rendered: re-fit now, not on some later layout
       if(m&&m.pa==='prefs'&&typeof m.noFlip==='boolean'){ noFlip=m.noFlip; if(noFlipCb) noFlipCb.checked=m.noFlip; }
       if(m&&m.pa==='res'&&m.id===LINK_REQ&&m.ok===false) flash(m.text||m.error||LINK_TXT.failed); };   // the shell refused to open a link
     window.addEventListener('message',onPrefs);

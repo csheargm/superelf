@@ -27,7 +27,7 @@ const readNote = (id) => { try { return JSON.parse(fs.readFileSync(notePath(id),
 function seed() {
   const d = path.join(root, 'workspace', 'data', 'notes'); fs.mkdirSync(d, { recursive: true });
   const t = Date.now();
-  const notes = { ipadInk: { strokes: IPAD_INK, pageHtml: HTML }, plainText: { strokes: [], pageHtml: HTML } };
+  const notes = { ipadInk: { strokes: IPAD_INK, pageHtml: HTML }, plainText: { strokes: [], pageHtml: HTML }, longText: { strokes: [], pageHtml: ('<div>' + WORDS.repeat(4) + '</div>').repeat(30) } };
   for (const [id, pg] of Object.entries(notes)) fs.writeFileSync(notePath(id), JSON.stringify({ v: 2, id, created: t, updated: t, template: 'plain',
     pages: [{ id: 'p' + id, created: t, updated: t, images: [], ...pg }] }));
   fs.writeFileSync(path.join(d, 'journal.json'), JSON.stringify({ v: 1, entries: Object.keys(notes).map((id, i) => ({ id, title: id, created: t - i, updated: t - i, preview: '' })) }));
@@ -157,6 +157,30 @@ test('iPhone: Read view — reflowed text ≥18px, ink hidden and labelled; A+ i
   await frame.locator('.pnp-rless').click();
   s = await rv(); assert.equal(s.font, 18, 'A− back to 18px');
   assert.equal(await frame.evaluate(() => document.querySelector('.pnp-rless').disabled), true, 'A− stops at 18px: never under');
+  await ctx.close();
+});
+
+// Nightly review 2026-11-27: the key guard held EVERY key, so a hardware keyboard could not scroll a long note.
+test('iPhone: Read view scrolls from the keyboard (arrows, Page Down, End, Space) and the note stays unchanged', { skip }, async () => {
+  const ctx = await newContext(PHONE); const page = await ctx.newPage();
+  const frame = await openJournal(page, { touch: true });
+  await open(page, frame, 'longText');
+  const fileBefore = fs.readFileSync(notePath('longText'), 'utf8');
+  await frame.locator('.pan-hmore').click(); await frame.locator('.pan-ovfread').click();
+  const top = () => frame.evaluate(() => document.querySelector('.pnp-rbody').scrollTop);
+  assert.ok(await frame.evaluate(() => { const b = document.querySelector('.pnp-rbody'); return b.scrollHeight > b.clientHeight * 2; }), 'CONTROL: the note is long');
+  await page.keyboard.press('ArrowDown'); await page.waitForTimeout(300);
+  const a = await top(); assert.ok(a > 0, `ArrowDown scrolls (${a})`);
+  await page.keyboard.press('PageDown'); await page.waitForTimeout(300);
+  const b = await top(); assert.ok(b > a, `Page Down scrolls further (${b})`);
+  await page.keyboard.press('Space'); await page.waitForTimeout(300);
+  const c = await top(); assert.ok(c > b, `Space scrolls further (${c})`);
+  await page.keyboard.press('End'); await page.waitForTimeout(300);
+  assert.ok(await top() > c, 'End goes to the bottom');
+  await page.keyboard.press('Home'); await page.waitForTimeout(300);
+  assert.equal(await top(), 0, 'Home goes back to the top');
+  await page.waitForTimeout(1500);
+  assert.equal(fs.readFileSync(notePath('longText'), 'utf8'), fileBefore, 'scroll keys never edit the note');
   await ctx.close();
 });
 
