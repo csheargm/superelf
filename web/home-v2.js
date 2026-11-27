@@ -6,15 +6,17 @@
    - guest: a demo visitor with no sign-in (lib/demo-boot.mjs PADemoAuth with no session).
    - hidden slugs: demo config demo.home_hide (lib/demo-boot.mjs passes it as PADemoAuth.conf.hide). */
 const PAHome=(function(){
-  const MORE_TIP='tip:home-more';
+  const MORE_TIP='tip:home-more', SIGNIN_EVENT='pa-demo-signin';   // = DEMO_SIGNIN_EVENT (index.html), lib/demo-boot.mjs SIGNIN_EVENT
   // The ONE language setting (web/lang.js PALang): a [中文, English] pair → the chosen side, or both.
   const lang=()=>(window.PALang?PALang.get():'both');
   const L=(p)=>(window.PALang?PALang.t(p):(p[0]&&p[1]?p[0]+' · '+p[1]:p[0]||p[1]));
   const T={
-    guestHi:['嗨，','想做点什么？','Hi — what shall we make?'],
-    demo:['这是演示版 · 点任一应用试试，或在下方让我做一个新应用','This is the demo — open any app, or ask below for a new one.'],
-    keep:['登录后可保存','Sign in to keep your work'],
-    phGuest:['试试：“给孩子做个背经文的小游戏”','Try: “make a verse game for my kids”'], phGuestShort:['让我做个应用','Ask me to make an app'],
+    // A guest (signed out) can open and use the apps; AI — asking and building apps — needs sign-in (lib/demo-auth.mjs DEMO_SIGNIN).
+    guestHi:['嗨，','欢迎试用！','Hi — welcome to the demo'],
+    welcome:['这是演示版 · 点任一应用就能试用','This is the demo — open any app to try it.'],   // what works now; the sign-in line (keep) says what signing in adds
+    keep:['登录后可做自己的应用并保存','Sign in to build your own apps and keep your work'],
+    phGuest:['登录后可以问我，或让我做应用','Sign in to ask me or build an app'], phGuestShort:['登录后问我或做应用','Sign in to ask or build'],
+    makeGuest:['登录做应用','Sign in to build'],
     phMember:['问我，或让我做一个应用','Ask anything, or create an app'],
     make:['做个应用','Make an app'], starter:['帮我做一个应用，它能','Make me an app that '],
     more:'更多应用 · More apps', shelf:'家庭书架 · Family shelf',
@@ -41,11 +43,11 @@ const PAHome=(function(){
     const hidden=new Set(hide||[]); const keep=(a)=>!hidden.has(a.name);
     const mine=(own||[]).filter(keep), by=(n)=>mine.find((a)=>a.name===n);
     let start;
-    if(guest){ start=[by('bible'),by('notes')].filter(Boolean).map((a)=>({app:a})); start.push({make:true}); }
+    if(guest){ start=[by('bible'),by('notes')].filter(Boolean).map((a)=>({app:a})); start.push({make:true,signin:true}); }   // a guest's build tile opens sign-in
     else { const used=new Set(mru||[]), seen=mine.filter((a)=>used.has(a.name));   // most-used first, then the starters, then the rest
       const lead=[...seen,...FIRST.map(by).filter((a)=>a&&!used.has(a.name)),...mine.filter((a)=>!used.has(a.name)&&!FIRST.includes(a.name))];
       start=lead.slice(0,3).map((a)=>({app:a})); }
-    if(!start.length) start=[{make:true}];
+    if(!start.length) start=[{make:true,signin:!!guest}];
     const used=new Set(start.filter((s)=>s.app).map((s)=>s.app.name));
     return {start,dock:mine.filter((a)=>!used.has(a.name)),shelf:(shelf||[]).filter(keep)};
   }
@@ -66,7 +68,7 @@ const PAHome=(function(){
   // A tile's two lines: both languages, or the chosen one alone.
   const two=(zh,en,esc)=>lang()!=='both'?`<span class="zh">${esc(L([zh,en]))}</span>`:`<span class="zh">${esc(zh||en)}</span>${zh&&en?`<span class="en">${esc(en)}</span>`:''}`;
   function tileHtml(s,i,uid,esc){
-    if(s.make) return `<button type="button" class="st g3" data-make>${PAIcons.svg('spark')}${two(T.make[0],T.make[1],(x)=>x)}</button>`;
+    if(s.make){ const p=s.signin?T.makeGuest:T.make; return `<button type="button" class="st g3" ${s.signin?'data-signin':'data-make'}>${PAIcons.svg('spark')}${two(p[0],p[1],(x)=>x)}</button>`; }
     const a=s.app, [zh,en]=label(a.title);
     return `<button type="button" class="st ${GRADS[i%3]} ecard" data-eu="${esc(uid)}" data-es="${esc(a.name)}" data-et="${esc(a.title)}">${updDot(a,esc)}${PAIcons.svg(PAIcons.appIcon(a).icon)}${two(zh,en,esc)}</button>`;
   }
@@ -95,6 +97,8 @@ const PAHome=(function(){
     $('#hHello').innerHTML=hello(g,esc);
     $('#hChips').innerHTML=g?'':chips(own).map((c)=>`<button type="button" class="chip-t" data-eu="${esc(uid)}" data-es="${esc(c.app.name)}" data-et="${esc(c.app.title)}">${esc(lang()==='en'?c.en||c.zh:lang()==='zh'?c.zh:c.zh+(c.en?' · '+c.en:''))}</button>`).join('');
     $('#hWelcome').hidden=!g; $('#hKeep').hidden=!g;
+    if(g){ const sub=(p)=>lang()==='both'?`${p[0]}<span class="en">${p[1]}</span>`:L(p);   // T's own words only (no markup): safe as HTML
+      $('#hWelcome').innerHTML=sub(T.welcome); $('#hKeep').querySelector('a').textContent=L(T.keep); }
     const ph=g?T.phGuest:T.phMember, sh=g?T.phGuestShort:ph;   // phone: the short line, so the ring never cuts it
     const phl=(p)=>lang()==='both'?`${p[0]}<small>${p[1]}</small>`:L(p);
     $('#hPh').innerHTML=`<span class="ph-l">${phl(ph)}</span><span class="ph-s">${phl(sh)}</span>`; PH_LABEL=L(ph); if(docked) $('#box').setAttribute('aria-label',PH_LABEL);
@@ -135,8 +139,9 @@ const PAHome=(function(){
     document.addEventListener('keydown',(e)=>{ if(e.key==='Escape'&&!$('#hmenu').hidden){ closeMore(); $('#hmore').focus(); } });
     $('#hAvatar').onclick=()=>$('#settings').click();
     $('#homeForm').onsubmit=(e)=>{ e.preventDefault(); submitSend(); };   // Enter in #box, as #f does
-    $('#hKeep').querySelector('a').onclick=(e)=>{ e.preventDefault(); dispatchEvent(new Event('pa-demo-signin')); };   // = DEMO_SIGNIN_EVENT (index.html), lib/demo-boot.mjs SIGNIN_EVENT
+    $('#hKeep').querySelector('a').onclick=(e)=>{ e.preventDefault(); dispatchEvent(new Event(SIGNIN_EVENT)); };
     const open=(e)=>{ if(e.target.closest('[data-make]')){ startMake(); return; }
+      if(e.target.closest('[data-signin]')){ dispatchEvent(new Event(SIGNIN_EVENT)); return; }
       const dot=e.target.closest('.update-dot'); if(dot){ e.stopPropagation(); showUpdateSheet(dot.dataset.update,dot.dataset.title); return; }
       const c=e.target.closest('[data-es]'); if(c) openApp(c.dataset.eu,c.dataset.es,c.dataset.et); };
     $('#hStart').onclick=open; $('#hChips').onclick=open;
