@@ -1,4 +1,13 @@
 {
+  "v5.38.4": {
+    "date": "2026-11-27",
+    "time": "2026-11-27T17:14:57.587Z",
+    "features": [],
+    "fixes": [
+      "合并：演示应用聊天保留联网搜索，失败的改写记为失败 · Merge: demo app chat keeps web search; a failed rewrite is a failed turn"
+    ],
+    "through": "41e320f43956d70e3a398126855a03fb6962962a"
+  },
   "v5.38.3": {
     "date": "2026-11-27",
     "time": "2026-11-27T16:41:20.357Z",
