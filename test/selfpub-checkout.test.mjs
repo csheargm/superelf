@@ -6,7 +6,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { selfpubFixture, tgit } from './helpers-selfpub.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
-import { ensureCheckout, startBranch, collectChange, acquireLock, deniedPath, discardBranch, git } from '../lib/selfpub/checkout.mjs';
+import { ensureCheckout, startBranch, collectChange, deniedPath, discardBranch, git } from '../lib/selfpub/checkout.mjs';
+import { acquireLock } from '../lib/selfpub/lock.mjs';
 import { skipIf } from './helpers-skip.mjs';
 const POSIX_ONLY = skipIf(process.platform === 'win32', 'posix-only', 'the core lane runs on Linux/macOS nodes; its jail rule paths, fake CLI permissions and checkout are POSIX (docs/adr/0044)');
 
