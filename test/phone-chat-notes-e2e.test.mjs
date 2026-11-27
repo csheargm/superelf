@@ -70,7 +70,9 @@ async function notesFrame(page) {
   for (let i = 0; i < 40; i++) {
     await page.waitForTimeout(250);
     const fr = await (await page.$('#fr')).contentFrame();
-    if (fr && await fr.$('.pan-top .pan-hask').catch(() => null)) { await page.waitForTimeout(SETTLE_MS); await noTips(fr); return fr; }
+    if (fr && await fr.$('.pan-top .pan-hask').catch(() => null)) {
+      // Hold the app bar shown: its idle hide (IDLE_MS) took the header off screen mid-check on a slow CI runner.
+      await page.waitForTimeout(SETTLE_MS); await noTips(fr); await fr.evaluate(() => { if (window.PAAppBar && PAAppBar.state().mounted) PAAppBar.hold(true); }); return fr; }
   }
   throw new Error('the Journal never showed its header');
 }
