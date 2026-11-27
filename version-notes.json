@@ -1,4 +1,13 @@
 {
+  "v5.37.3": {
+    "date": "2026-11-26",
+    "time": "2026-11-27T04:51:40.912Z",
+    "features": [],
+    "fixes": [
+      "合并：菜单打开即可点外部关闭 · Merge: a menu's outside tap is armed at once"
+    ],
+    "through": "3eba77fc0f06f61d13c862185c2604b8d756aac5"
+  },
   "v5.37.2": {
     "date": "2026-11-26",
     "time": "2026-11-27T04:26:48.881Z",
