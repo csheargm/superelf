@@ -127,9 +127,9 @@ jobs:
       PLAYWRIGHT_VERSION: 1.58.2
       PA_E2E_ONLY: webkit
       PA_E2E_ENGINE: webkit   # the shared harness (test/helpers-note-link.mjs) launches WebKit too
-      # Measured 2026-11-26 on the owner's Mac: the iPhone WebKit suites pass 17 (2 skip); a selection bug that
-      # finds none or a handful must fail.
-      MIN_TESTS: 15
+      # Measured 2026-11-26 on the owner's Mac: the iPhone WebKit suites pass 17 (2 skip); 2026-11-27 the
+      # three suites with their own iPhone config add 8. A selection bug that finds none or a handful must fail.
+      MIN_TESTS: 22
       CI_FORBID_SKIP: no-browser
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -146,13 +146,14 @@ jobs:
           npm install --prefix "$RUNNER_TEMP/pw" --no-save --no-audit --no-fund "playwright@$PLAYWRIGHT_VERSION"
           "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps webkit
           echo "PA_PLAYWRIGHT=$RUNNER_TEMP/pw/node_modules/playwright/index.mjs" >> "$GITHUB_ENV"
-      # Only the iPhone suites: the files that launch WebKit themselves (`pw.webkit`) plus the phone
-      # files on the shared harness (*phone*e2e*, run in WebKit by PA_E2E_ENGINE). Mixed files skip
-      # their Chromium half as "[other-engine]". Everything else runs in Chromium on ubuntu.
+      # Only the iPhone suites: the files that launch WebKit themselves (`pw.webkit`), the files with
+      # their own iPhone config (`PA_E2E_ENGINE === 'webkit'`), plus the phone files on the shared
+      # harness (*phone*e2e*, run in WebKit by PA_E2E_ENGINE). Mixed files skip their Chromium half as
+      # "[other-engine]". Everything else runs in Chromium on ubuntu. test/ci-webkit-select.test.mjs pins it.
       - name: WebKit suites
         shell: bash
         run: |
-          files=$({ grep -lE 'pw\.webkit' test/*.test.mjs; ls test/*phone*e2e*.test.mjs; } | sort -u)
+          files=$({ grep -lE "pw\.webkit|PA_E2E_ENGINE === 'webkit'" test/*.test.mjs; ls test/*phone*e2e*.test.mjs; } | sort -u)
           echo "$files"
           node --test --test-concurrency=2 $files 2>&1 | tee "$RUNNER_TEMP/test-output.txt"
       - name: Guard against a vacuous run (R14)

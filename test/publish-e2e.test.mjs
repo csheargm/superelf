@@ -204,3 +204,30 @@ test('⋯ Publish line: not in repo / up to date (disabled) / N changes; the she
     await shot('menu-changed.png');
   } finally { await ctx.close(); }
 });
+
+// Nightly review 2026-11-27: the shell's model picker stayed clickable above the Publish sheet and its
+// scrim. The pill sits under the scrim; its open menu (z 50) did not: Publish opened without a shell
+// click (from an app, or a chat action) left the menu standing over the modal.
+test('owner: the Publish scrim covers the shell model picker, its pill and its open menu', { skip, timeout: 60000 }, async () => {
+  const { port } = await node({});
+  const { ctx, page } = await openMenu(port, OWNER_TOKEN);
+  const at = (b) => page.evaluate(([x, y]) => { const e = document.elementFromPoint(x, y); return e.closest('.pac-mmenu') ? 'menu' : e.closest('#pubSheet,#pubScrim') ? 'modal' : e.id; }, [b.x + b.width / 2, b.y + b.height / 2]);
+  try {
+    await page.goto(`http://127.0.0.1:${port}/`); await page.waitForFunction(() => document.querySelector('#dot.ok') && document.body.classList.contains('home-on'));
+    await page.evaluate(() => { document.body.classList.remove('home-on');   // the chat view, where the composer and its model pill show
+      CHAT_MODELS = [{ id: 'm-a', label: 'Model A' }, { id: 'm-b', label: 'Model B' }]; syncShellModel(); });
+    await page.click('#shellModel');
+    const menu = await page.locator('.pac-mmenu').boundingBox();
+    assert.ok(menu, 'CONTROL: the model menu is open');
+    assert.equal(await at(menu), 'menu', 'CONTROL: without the sheet a tap reaches the menu');
+    await page.evaluate(() => PAPublish.open('myapp')); await page.waitForSelector('#pubScrim');   // opened with no shell click
+    for (const [w, h] of [[390, 844], [820, 1180], [1280, 800], [1920, 1080]]) {
+      await page.setViewportSize({ width: w, height: h }); await page.waitForTimeout(200);
+      if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `pub-scrim-${w}.png`) });
+      assert.equal(await at(menu), 'modal', `at ${w}px the model menu's spot belongs to the modal`);
+      assert.equal(await page.locator('.pac-mmenu').count(), 0, 'the menu is closed');
+      const b = await page.locator('#shellModel').boundingBox();
+      assert.equal(await at(b), 'modal', `at ${w}px the pill is under the scrim`);
+    }
+  } finally { await ctx.close(); }
+});

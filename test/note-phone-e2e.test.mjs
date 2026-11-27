@@ -157,6 +157,23 @@ test('iPhone: two fingers pan with no new ink; a pinch zooms, is clamped to 3x a
   await ctx.close();
 });
 
+// Nightly review 2026-11-27: the shell's saved zooms can arrive AFTER the note rendered; they only
+// took effect on some later layout pass. Simulate the late prefs message and check the page at once.
+test('iPhone: a saved zoom that arrives after the note rendered applies straight away', { skip }, async () => {
+  const ctx = await newContext(PHONE); const page = await ctx.newPage();
+  const frame = await openJournal(page, { touch: true });
+  await open(page, frame, 'phoneB');
+  const z0 = (await state(frame)).zoom;
+  await frame.evaluate(() => window.postMessage({ pa: 'prefs', noteZoom: { phoneB: 2 } }, '*'));
+  await page.waitForTimeout(300);
+  const z1 = (await state(frame)).zoom;
+  assert.ok(Math.abs(z1 / z0 - 2) < 0.01, `the late zoom applies without another layout (${z0} → ${z1})`);
+  await frame.evaluate(() => window.postMessage({ pa: 'prefs', noteZoom: {} }, '*'));
+  await page.waitForTimeout(300);
+  assert.ok(Math.abs((await state(frame)).zoom - z0) < 1e-3, 'and a cleared one goes back to fit');
+  await ctx.close();
+});
+
 test('iPad 820: no phone mode — the checkbox stays, the toggle is hidden, two fingers do not zoom', { skip }, async () => {
   const ctx = await newContext(IPAD); const page = await ctx.newPage();
   const frame = await openJournal(page);                   // the docked list is put away with a click

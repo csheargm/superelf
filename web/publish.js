@@ -69,7 +69,8 @@ const PAPublish=(()=>{
     let s=$('#pubSheet'); if(!s){ s=document.createElement('div'); s.id='pubSheet'; s.className='cmenu-pop';
       s.setAttribute('role','dialog'); s.setAttribute('aria-modal','true'); s.tabIndex=-1;
       s.style.cssText='left:8px;right:8px;top:auto;bottom:calc(8px + env(safe-area-inset-bottom));max-height:60vh;overflow:auto;padding:12px;font-size:14px'; document.body.appendChild(s); }   // at the bottom: never over the app's header or its chips (owner report 2026-11-25)
-    if(!$('#pubScrim')){ const m=document.createElement('div'); m.id='pubScrim'; m.onclick=()=>s.remove(); document.body.insertBefore(m,s); }
+    if(!$('#pubScrim')){ const m=document.createElement('div'); m.id='pubScrim'; m.onclick=()=>s.remove(); document.body.insertBefore(m,s);
+      document.querySelectorAll('.pac-mmenu').forEach((x)=>x.remove()); }   // the shell's model menu (z 50) would stand over the modal: opened from an app or a chat action no shell click closed it
     s.innerHTML=html+'<div class="sheet-acts"><button data-pub="close" class="plain" id="pubClose">关闭 · Close</button>'+(withGo?'<button data-pub="go" id="pubGo" class="primary">发布 · Publish</button>':'')+'</div>';
     s.onclick=(e)=>{ const b=e.target.closest('[data-pub]'); if(b&&b.dataset.pub==='close') s.remove(); };
     s.onkeydown=trapTab;

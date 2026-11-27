@@ -115,3 +115,18 @@ test('Read view sizes: 18px floor, fixed steps, anything else falls back to 18',
   assert.equal(P.stepSize(18, -1), 18, 'never under 18'); assert.equal(P.stepSize(18, 1), 20);
   const top = P.READ_SIZES[P.READ_SIZES.length - 1]; assert.equal(P.stepSize(top, 1), top, 'capped at the largest');
 });
+
+// Nightly review 2026-11-27: after one measure, the NEXT finger's move was paired with the other's
+// position from the previous frame, so a zoomed-in pan (zoom above fit) read as a pinch.
+test('a two-finger pan while zoomed in keeps the zoom, whichever order the moves arrive in', () => {
+  const log = { zoom: [], pan: [0, 0] };
+  const g = load(true).gesture({ allowed: () => true, begin: () => true, zoomNow: () => 2, end() {},
+    pan: (dx, dy) => { log.pan[0] += dx; log.pan[1] += dy; }, zoom: (z) => log.zoom.push(z) });
+  g.down(ev('pointerdown', 1, 100, 300, true)); g.down(ev('pointerdown', 2, 200, 300));
+  for (let y = 240; y >= 0; y -= 60) { g.move(ev('pointermove', 1, 100, y)); g.move(ev('pointermove', 2, 200, y)); }
+  assert.ok(log.pan[1] > 200, 'CONTROL: it scrolled');
+  for (let y = 60; y <= 300; y += 60) { g.move(ev('pointermove', 2, 200, y)); g.move(ev('pointermove', 1, 100, y)); }
+  assert.deepEqual(log.zoom, [], 'a pan is not a pinch');
+  g.move(ev('pointermove', 1, 50, 300)); g.move(ev('pointermove', 2, 250, 300)); g.move(ev('pointermove', 1, 20, 300)); g.move(ev('pointermove', 2, 280, 300));
+  assert.ok(log.zoom.length, 'CONTROL: a real spread still zooms');
+});

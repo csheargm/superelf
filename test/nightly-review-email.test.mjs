@@ -101,3 +101,11 @@ test('findings left unverified by the verify limit get a short line', () => {
   assert.match(above(none.body), /3 not checked \(verify limit\)/);
   assert.doesNotMatch(renderEmail([reviewed([f('medium', 'x')])], { date: 'd' }).body, /not checked/);
 });
+
+// Nightly review 2026-11-27 (R14): every candidate unverified is NOT a clean night.
+test('all findings unverified: "review incomplete", never "no problems" or "all clear"', () => {
+  const out = renderEmail([reviewed([], { unverified: [f('medium', 'maybe broken'), { ...f('low', 'x'), reason: 'verifier failed: timeout' }] })], { date: '2026-11-27' });
+  assert.equal(out.subject, 'Nightly review: superelf review incomplete');
+  assert.match(out.body.split('\n')[0], /review incomplete for superelf: 2 findings could not be verified/);
+  assert.doesNotMatch(out.body.split('\n')[0], /no problems|All clear/i);
+});

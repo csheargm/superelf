@@ -104,3 +104,29 @@ test('asking for a link: 429 says "too many, about an hour"; success says open i
   await shot(page, 'check-email.png');
   await ctx.close();
 });
+
+// Nightly review 2026-11-27: Google and the email link shared ONE verifier key, so starting one flow
+// spent the other's outstanding link (and an email reply in another tab spoiled a Google round trip).
+test('Google keeps the email link usable: each flow has its own verifier; the boot tries both', { skip }, async () => {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } }); const page = await ctx.newPage();
+  await page.route(`${sb.url}/auth/v1/authorize**`, (r) => r.fulfill({ status: 200, contentType: 'text/html', body: 'google' }));
+  await page.goto(`http://127.0.0.1:${port}/`); await settled(page);
+  await page.evaluate(() => localStorage.setItem('sb_pkce', 'email-ver'));
+  await page.locator('header #demoSignin').click();
+  await page.click('#demoGoogle');
+  await page.waitForURL(/authorize/);
+  await page.goto(`http://127.0.0.1:${port}/`);   // back on the shell's origin, where the verifiers live
+  const kept = await page.evaluate(() => [localStorage.getItem('sb_pkce'), localStorage.getItem('sb_pkce_g')]);
+  assert.equal(kept[0], 'email-ver', 'starting Google leaves the email link verifier in place');
+  assert.ok(kept[1] && kept[1] !== 'email-ver', 'Google stores its own verifier');
+  const tried = [];
+  await page.route(`${sb.url}/auth/v1/token?grant_type=pkce`, (r) => { const v = JSON.parse(r.request().postData()).code_verifier; tried.push(v);
+    return v === 'email-ver' ? r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ access_token: sb.jwt({ sub: 'email-ok' }), refresh_token: 'r', expires_at: Math.floor(Date.now() / 1000) + 3600 }) })
+      : r.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ error_code: 'bad_code_verifier' }) }); });
+  await page.evaluate((g) => { localStorage.setItem('sb_pkce', g); localStorage.setItem('sb_pkce_g', 'email-ver'); }, kept[1]);   // the link's verifier is in EITHER key: the boot must try both
+  await page.goto(`http://127.0.0.1:${port}/?code=abc`);
+  await page.locator('#hAvatar').waitFor({ state: 'visible' });
+  assert.deepEqual(tried, [kept[1], 'email-ver'], 'the second verifier is tried after the first is refused');
+  assert.equal(await page.evaluate(() => localStorage.getItem('sb_pkce')), kept[1], 'the other flow\'s verifier stays for its own link');
+  await ctx.close();
+});
