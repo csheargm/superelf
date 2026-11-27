@@ -109,6 +109,8 @@ for (const [dev, viewport] of Object.entries(DEVICES)) {
     try {
       const fr = await notesFrame(page);
       judge(`${dev} notes`, await checkSurface(fr), bad);
+      // the header is painted (title + a visible button) before it is measured: a slow runner read it at 0px (CI webkit)
+      await fr.waitForFunction(() => document.querySelector('.pan-htitle')?.getBoundingClientRect().width > 0 && [...document.querySelectorAll('.pan-top button')].some((x) => x.offsetWidth), null, { timeout: 10000 }).catch(() => { /* measured below: a header that never paints fails there */ });
       const head = await fr.evaluate(() => { const t = document.querySelector('.pan-top'), b = [...t.querySelectorAll('button')].filter((x) => x.offsetWidth);
         return { title: document.querySelector('.pan-htitle').getBoundingClientRect().width, rows: new Set(b.map((x) => Math.round(x.getBoundingClientRect().top))).size,
           photo: !!document.querySelector('.pan-hphoto')?.offsetWidth, print: !!document.querySelector('.pan-hprint')?.offsetWidth }; });
