@@ -531,6 +531,7 @@
     paper:'M5 4h14v16H5zM8 9h8M8 12.5h8M8 16h5',
     undo:'M9.5 14.5L5 10l4.5-4.5M5 10h8.5a5 5 0 010 10H10',
     redo:'M14.5 14.5L19 10l-4.5-4.5M19 10h-8.5a5 5 0 000 10H14',
+    hand:'M8 12.5V6.5a1.5 1.5 0 013 0V11M11 10.5V5a1.5 1.5 0 013 0v5.5M14 10.5V6.5a1.5 1.5 0 013 0V14a6 6 0 01-6 6h-.5a6 6 0 01-4.9-2.6L3.8 14a1.5 1.5 0 012.4-1.8L8 14',
     photo:'M4.5 5h15v14h-15zM4.5 15.8l4.4-4.4 3 3 3.6-3.6 4 4M9.4 9.3a1.2 1.2 0 11-2.4 0 1.2 1.2 0 012.4 0z',
     prev:'M14.5 5.5l-6.5 6.5 6.5 6.5',
     next:'M9.5 5.5l6.5 6.5-6.5 6.5',
@@ -1472,6 +1473,9 @@
     };
   }
 
+  // The phone's pen toggle (web/note-phone.inline.html): its two states and its first-use tip. 中文 first.
+  const FINGER_TXT={on:'手指书写（两指滚动） · Finger writes (two fingers scroll)',off:'手指滚动 · Finger scrolls',
+    tip:'笔开：一指书写，两指滚动或缩放。笔关：手指滚动翻页 · Pen on: one finger writes, two fingers scroll or zoom. Pen off: a finger scrolls'};
   const TIP_OPEN_MODE='打字的页面以文字打开，手写的页面以手写或选择打开 · A note opens in Text when its page is typed, in Draw or Select when it is ink';   // TODO(R4 seam): first-use tip text (ADR 0030)
   function Note(host, opts){
     const PAGES=!!opts.pages;
@@ -1515,6 +1519,8 @@
         '<div class="pan-gutter pan-gutterL" aria-hidden="true"></div><div class="pan-gutter pan-gutterR" aria-hidden="true"></div></div>'+
       '<div class="pan-bar pan-tools">'+   /* tool bar opens DOCKED + expanded (dockTools() on boot) */
         '<button class="pan-grip" title="Drag to move · tap to collapse" aria-label="Move or collapse toolbar">'+ico('grip')+'</button>'+
+        /* The phone's pen toggle (web/note-phone.inline.html): display:none unless .pan-phone. */
+        '<button class="pan-tbtn pan-fingerbtn" aria-pressed="false" title="'+FINGER_TXT.off+'" aria-label="'+FINGER_TXT.off+'">'+ico('pen','pan-fon')+ico('hand','pan-foff')+'</button>'+
         /* T is PROMOTED to the header as the Text tab when there is a header to hold it; in mount
            mode (no .pan-top) there is nowhere to promote it to, so it stays in the row. */
         TOOLS.filter(t=>!(hasTop&&t[0]==='text')).map(t=>'<button class="pan-tbtn pan-tool" data-tool="'+t[0]+'" title="'+t[2]+'" aria-label="'+t[2]+'">'+(ICON[t[1]]?ico(t[1]):t[1])+'</button>').join('')+
@@ -1537,7 +1543,7 @@
           '<input type="range" class="pan-sizerange" min="'+SIZE_MIN+'" max="'+SIZE_MAX+'" step="0.5" value="'+SIZE_DEF+'">'+
           '<div class="pan-sizeends"><span>Fine</span><span>Thick</span></div>'+
         '</div>'+
-        '<label class="pan-poprow" style="cursor:pointer;user-select:none;gap:8px;align-items:center">'+
+        '<label class="pan-poprow pan-fingerrow" style="cursor:pointer;user-select:none;gap:8px;align-items:center">'+
           '<input type="checkbox" class="pan-fingercb" style="width:16px;height:16px;accent-color:var(--accent,#0a7a5a)">'+
           '<span style="font-size:13px">允许手指 · Allow finger drawing</span>'+
         '</label>'+
@@ -1716,8 +1722,27 @@
     // {pa:'prefs'} message on iframe load — so all pads (Bible, Journal, …) share one setting.
     // (PANote's DOCUMENT data still flows only through opts.load/save; this is a UI pref ping,
     //  the mirror of the prefs push it already receives.)
-    if(fingerCb) fingerCb.addEventListener('change',()=>{ fingerDraw=fingerCb.checked; syncPan();
-      try{ parent.postMessage({pa:'req',id:'panpref',kind:'pref',fingerDraw},'*'); }catch(_){ /* no shell (standalone/harness): the toggle still works for this session */ } });
+    // PHONE MODE (PANotePhone): the same setting as a 44px toggle in the tool row. A phone whose
+    // device never stored a choice (prefs.fingerDrawSet===false) and has seen no pen inks with the
+    // finger by default; the first pen pointer hands it back to the stored off (an iPad in Split View).
+    const fingerBtn=q('.pan-fingerbtn');
+    let fingerDefaulted=false, penSeen=false;
+    // Pinch zoom per note, per device (the shell's pa_notezoom, pushed as prefs.noteZoom {id: z}).
+    // 1 = fit; only phone mode ever changes it, so k is unchanged on an iPad or a desktop.
+    let noteZooms=new Map(), liveZoom=0;   // liveZoom: the zoom while a pinch runs (0 = none)
+    const zoomNow=()=>{ if(liveZoom) return liveZoom; if(!phoneOn()||!window.PANotePhone) return 1;
+      return window.PANotePhone.clampZoom(Number(noteZooms.get(NB&&NB.id))||1); };
+    function showFinger(){ if(fingerCb) fingerCb.checked=fingerDraw;
+      if(fingerBtn){ fingerBtn.classList.toggle('on',fingerDraw); fingerBtn.setAttribute('aria-pressed',String(fingerDraw));
+        const t=fingerDraw?FINGER_TXT.on:FINGER_TXT.off; fingerBtn.title=t; fingerBtn.setAttribute('aria-label',t); } }
+    function setFingerDraw(v){ fingerDraw=v; fingerDefaulted=false; showFinger(); syncPan();
+      try{ parent.postMessage({pa:'req',id:'panpref',kind:'pref',fingerDraw},'*'); }catch(_){ /* no shell (standalone/harness): the toggle still works for this session */ } }
+    if(fingerCb) fingerCb.addEventListener('change',()=>setFingerDraw(fingerCb.checked));
+    if(fingerBtn) fingerBtn.addEventListener('click',()=>setFingerDraw(!fingerDraw));
+    const phoneOn=()=>!!(window.PANotePhone&&window.PANotePhone.isPhone());
+    host.addEventListener('pointerdown',e=>{ if(e.pointerType!=='pen'||penSeen) return; penSeen=true;
+      if(fingerDefaulted){ fingerDraw=false; fingerDefaulted=false; showFinger(); syncPan(); } },{capture:true});
+    if(window.PATips&&fingerBtn) window.PATips.register({id:'note-finger-pen',anchor:()=>fingerBtn,text:FINGER_TXT.tip,when:phoneOn});
     // Print-on-white. DEFAULTS TO TRUE, so an unset preference means ink-only — the opposite of
     // fingerDraw, whose safe default is off. Whoever reads localStorage must use !=='0', never
     // ==='1', or the default silently inverts.
@@ -1746,7 +1771,9 @@
     const onPrefs=(e)=>{ const m=e.data;
       if(m&&m.pa==='prefs'&&!SEAMLESS_WITHDRAWN&&typeof m.seamless==='boolean'&&m.seamless!==seamless){ seamless=m.seamless; syncPaperPickers(); onResize(); }
       if(m&&m.pa==='prefs'&&typeof m.printInk==='boolean'){ printInk=m.printInk; if(inkCb) inkCb.checked=m.printInk; }
-      if(m&&m.pa==='prefs'&&typeof m.fingerDraw==='boolean'){ fingerDraw=m.fingerDraw; if(fingerCb) fingerCb.checked=m.fingerDraw; syncPan(); }
+      if(m&&m.pa==='prefs'&&typeof m.fingerDraw==='boolean'){ fingerDefaulted=m.fingerDrawSet===false&&!m.fingerDraw&&!penSeen&&phoneOn();
+        fingerDraw=m.fingerDraw||fingerDefaulted; showFinger(); syncPan(); }
+      if(m&&m.pa==='prefs'&&m.noteZoom&&typeof m.noteZoom==='object') noteZooms=new Map(Object.entries(m.noteZoom));
       if(m&&m.pa==='prefs'&&typeof m.noFlip==='boolean'){ noFlip=m.noFlip; if(noFlipCb) noFlipCb.checked=m.noFlip; }
       if(m&&m.pa==='res'&&m.id===LINK_REQ&&m.ok===false) flash(m.text||m.error||LINK_TXT.failed); };   // the shell refused to open a link
     window.addEventListener('message',onPrefs);
@@ -1761,7 +1788,7 @@
       const pg=page(), bare=!(pg&&(hasRealInk(pg)||(pg.images||[]).length));
       const narrow=bare&&viewW>0&&viewW<W;
       textLayer.style.right=narrow?Math.round(W-viewW)+'px':'';
-      if(narrow&&stage.scrollLeft) stage.scrollLeft=0;
+      if(narrow&&stage.scrollLeft&&zoomNow()===1) stage.scrollLeft=0;   // zoomed in (phone): the user panned there
     }
 
     // ── Notebook state ──
@@ -1803,8 +1830,8 @@
       // landscape iPad that meant a narrow page stranded between two wide grey margins — the
       // screen-waste report again, in the other orientation. A document viewer fills the width and
       // scrolls; that is what Notability does and what was asked for.
-      const k=Math.max(MIN_PAGE_W/PAGE_W, r.width/PAGE_W);
-      viewW=r.width/k;
+      const kFit=Math.max(MIN_PAGE_W/PAGE_W, r.width/PAGE_W), k=kFit*zoomNow();   // zoomNow() is 1 off a phone
+      viewW=r.width/kFit;                                      // the fit width: a pinch never re-wraps the text
       const tail=seamless?Math.max(PAGE_TAIL_PX,Math.round(r.height/k)):PAGE_TAIL_PX;
       const want=Math.ceil(pageExtent(page())*W)+tail;
       // SEAMLESS ROUNDS UP TO WHOLE SHEETS, and never gives fewer than two.
@@ -2544,6 +2571,7 @@
       textLayer.classList.remove('pan-txted'); textLayer.contentEditable='false'; textLayer.removeAttribute('data-ph');
       txtEdit=null; savedRange=null; hideFmt();
       syncGuard();                                             // drawing tools: the stage guard is on again
+      if(window.PATips&&phoneOn()) setTimeout(()=>window.PATips.check(),300);   // the pen toggle's tip: its row is on screen now
     }
 
     // ── Formatting bar (rich-text commands via execCommand, like the Journal app) ──
@@ -3481,6 +3509,39 @@
     const onPenLift=e=>{ if(e.pointerType==='pen'){ penUpAt=Date.now(); syncPan(); syncPanAfterGrace(); } };
     host.addEventListener('pointerup',onPenLift,{capture:true});
     host.addEventListener('pointercancel',onPenLift,{capture:true});
+    // ── PHONE MODE: TWO FINGERS PAN AND PINCH（两指滚动与缩放）── web/note-phone.inline.html tracks the
+    // touches; this block only says what a gesture does to the pad. allowed() is false off a phone, so
+    // on an iPad or a desktop every handler returns false and the routing below runs exactly as before.
+    // A second finger drops whatever the first one started (a stroke is discarded, never saved).
+    // TODO(R4): grows this over-budget file; the split seam is the routing block (see PA_PENCIL_LOG).
+    function cancelStroke(){ if(!drawing) return; drawing=false; strokePtr=null; curPts=[];
+      if(rafId){ cancelAnimationFrame(rafId); rafId=0; } redrawPage(); }
+    function applyZoomLive(z,cx,cy){                           // CSS zoom only; setupCanvases re-renders at the end
+      const r=stage.getBoundingClientRect(), k0=pageK()||1, k1=Math.max(MIN_PAGE_W/PAGE_W,r.width/PAGE_W)*z;
+      const px=stage.scrollLeft+(cx-r.left), py=stage.scrollTop+(cy-r.top);
+      liveZoom=z;
+      for(const el of [pageInner,flip]){ el.style.zoom=k1; el.style.left='0px'; }
+      syncStageClear();
+      const f=k1/k0; stage.scrollLeft=px*f-(cx-r.left); stage.scrollTop=py*f-(cy-r.top);
+    }
+    function endZoom(){
+      if(!liveZoom) return;
+      const z=liveZoom, sl=stage.scrollLeft, st=stage.scrollTop, id=NB&&NB.id;
+      if(typeof id==='string') noteZooms.set(id,z);
+      liveZoom=0; setupCanvases(); stage.scrollLeft=sl; stage.scrollTop=st;
+      if(typeof id==='string') try{ parent.postMessage({pa:'req',id:'panzoompref',kind:'pref',noteZoom:{id,z}},'*'); }catch(_){ /* no shell (standalone/harness): the zoom holds for this session */ }
+    }
+    const phoneGest=window.PANotePhone?window.PANotePhone.gesture({
+      allowed:()=>phoneOn()&&!txtEdit&&tool!=='select'&&penId===null&&!flipping&&!(flipTouch&&flipTouch.started),
+      begin:()=>{ cancelStroke(); flipTouch=null; scrollTouch=null; pdec('two-finger'); return true; },
+      zoomNow,
+      pan:(dx,dy)=>{ stage.scrollLeft+=dx; stage.scrollTop+=dy; },
+      zoom:applyZoomLive,
+      end:endZoom,
+    }):null;
+    // .pan-phone on the pad (the toggle's CSS reads it); crossing the breakpoint re-fits the page, since
+    // zoomNow() is 1 off a phone. The first call is the attach itself: nothing to re-fit yet.
+    { let first=true; if(window.PANotePhone) window.PANotePhone.watch(host,()=>{ if(first){ first=false; return; } if(W) setupCanvases(); },listenG); }
     function onDown(e){
       if(flipping){ pdec('refused-flipping',e); return; }
       // (No closePops here: with a popover open, the outside tap is swallowed by onPopOutside
@@ -3499,6 +3560,7 @@
         pdec('select',e); selDown(e); return;
       }
       if(e.pointerType==='touch'){
+        if(phoneGest&&phoneGest.down(e)){ e.preventDefault(); return; }   // phone: a second finger pans/zooms
         // Palm rejection, but the GRACE WINDOW is a flip guard, not a drawing guard.
         //
         // penNear() is true while the pen is down AND for PEN_GRACE_MS after it lifts. That tail
@@ -3537,6 +3599,7 @@
       // A finger in a drawing tool drives the live edge-swipe flip — routed BEFORE the `flipping`
       // guard so the drag keeps updating once it has begun (select mode keeps its own finger path).
       if(e.pointerType==='touch' && tool!=='select'){
+        if(phoneGest&&phoneGest.move(e)) return;
         if(fingerDraw){                                         // finger draw mode: extend the stroke this finger OWNS
           if(drawing&&strokePtr===e.pointerId){ pdec('finger-extend',e); extendStroke(e); } else pdec('touch-not-owner',e);
           return; }
@@ -3564,6 +3627,7 @@
         pdec('select-up',e); selUp(e); return;
       }
       if(e.pointerType==='touch'){                              // settle/snap the edge-swipe (pointercancel → snap back)
+        if(phoneGest&&phoneGest.up(e)) return;
         if(fingerDraw){ if(strokePtr===e.pointerId){ pdec('finger-end',e); inkEnd(); } else pdec('touch-not-owner',e); return; }
         fingerFlipEnd(e); return; }
       if(penId!==null && e.pointerId!==penId && e.pointerType==='pen'){ pdec('other-pen',e); return; }
@@ -4664,4 +4728,5 @@
 <!--PA_SCAN_UI-->
 <!--PA_PENCIL_LOG_UI-->
 <!--PA_NOTE_REVEAL_UI-->
+<!--PA_NOTE_PHONE_UI-->
 <!--PA_NOTE_TEXT_UI-->
