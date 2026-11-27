@@ -800,7 +800,7 @@ async function ensureToken(){
   }
   $('#dot').classList.add('ok');
 }
-async function logout(){ try{ await api('/api/logout',{method:'POST'}); }catch{} try{ await swSignedOut(window.caches,(u)=>fetch(u,{method:'POST',credentials:'same-origin'})); }catch(err){ alert('未能清除已保存的应用页面 · Could not clear saved app pages — '+(err&&err.message||err)); } localStorage.removeItem('pa_session'); try{ localStorage.removeItem(SW_FAMILY_KEY); }catch{ /* blocked storage: nothing was kept */ } location.reload(); }
+async function logout(){ try{ await api('/api/logout',{method:'POST'}); }catch{} try{ await swSignedOut(window.caches,(u)=>fetch(u,{method:'POST',credentials:'same-origin'})); }catch(err){ alert('未能清除已保存的应用页面 · Could not clear saved app pages — '+(err&&err.message||err)); } localStorage.removeItem('pa_session'); try{ localStorage.removeItem(SW_FAMILY_KEY); localStorage.removeItem('pa_lang'); }catch{ /* blocked storage: nothing was kept */ } location.reload(); }   // pa_lang: web/lang.js KEY — the next account starts from its own choice
 
 /* ── New-feature key registry: maps feature-key → version added ── */
 // Update this when shipping new UI features; markNew() + PANewDot.mark() use these keys.

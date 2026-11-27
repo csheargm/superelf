@@ -154,6 +154,39 @@ test('the AI turn carries the language line; a bilingual app keeps following the
   assert.ok(systems[m].includes(REPLY_LANGUAGE_RULE) && !systems[m].includes(REPLY_IN.en), 'Bible: the follow-the-writer rule, not the setting');
 });
 
+test('GPT review fixes: control attributes, the 中文 date, a note text layer, ordered saves, sign-out', { skip, timeout: 120000 }, async () => {
+  await profile({ lang: 'zh' });
+  const { c, page } = await open('en-US');
+  try {
+    await waitFor(async () => (await lang(page)) === 'zh', 'the account says 中文');
+    const phs = await page.evaluate(() => [...document.querySelectorAll('input[placeholder],textarea[placeholder]')].map((e) => e.placeholder).filter((v) => / · /.test(v) && /[一-鿿]/.test(v) && /[A-Za-z]/.test(v)));
+    assert.deepEqual(phs, [], 'no "中文 · English" placeholder left on an input: ' + JSON.stringify(phs));
+    assert.equal(await page.getAttribute('#csInp', 'placeholder'), '搜索对话', 'the drawer search placeholder');
+    const date = await page.evaluate(() => { const e = document.querySelector('#hHello .en'); return e ? getComputedStyle(e).display !== 'none' && e.innerText.trim() : false; });
+    assert.ok(date && /[一-鿿]/.test(date), '中文 mode: the 中文 date line is visible, not hidden as English: ' + date);
+    // A text layer outside the T tool (contenteditable=false) holds what the person wrote: never switched.
+    const kept = await page.evaluate(async () => { const d = document.createElement('div'); d.className = 'pan-textlayer'; d.contentEditable = 'false';
+      d.textContent = '我的笔记 · My note'; document.body.append(d); await new Promise((r) => setTimeout(r, 50)); const v = d.textContent; d.remove(); return v; });
+    assert.equal(kept, '我的笔记 · My note', 'note text is the person\'s, untouched');
+    // Two quick choices: the account ends on the LAST one even when the first PUT is slow.
+    await page.route('**/api/profile', async (route) => { const b = route.request().postData() || ''; if (route.request().method() === 'PUT' && b.includes('"en"')) await new Promise((r) => setTimeout(r, 600)); await route.continue(); });
+    await page.evaluate(() => { PALangSwitch.choose('en'); PALangSwitch.choose('zh'); });
+    await page.waitForTimeout(1200);
+    assert.equal((await profile()).lang, 'zh', 'saves run in tap order');
+    await page.unroute('**/api/profile');
+    // Sign-out leaves no language behind for the next account on this browser.
+    await Promise.all([page.waitForEvent('load'), page.evaluate(() => { logout(); })]);
+    assert.equal(await page.evaluate(() => localStorage.getItem('pa_lang')), null, 'sign-out clears the device copy');
+  } finally { await c.close(); }
+  // An account with no choice yet adopts the one made on this device (before sign-in).
+  await profile({ lang: '' });
+  const pre = await open('en-US');
+  try {
+    await pre.page.evaluate(() => { localStorage.setItem('pa_lang', 'zh'); }); await pre.page.reload(); await pre.page.waitForSelector('#hStart .st');
+    await waitFor(async () => (await profile()).lang === 'zh', 'the device choice reaches the account');
+  } finally { await pre.c.close(); }
+});
+
 test('the account refuses a junk language loudly and "" goes back to the device', async () => {
   const bad = await fetch(`http://127.0.0.1:${port}/api/profile`, { method: 'PUT', headers: { authorization: `Bearer ${OWNER_TOKEN}`, 'content-type': 'application/json' }, body: JSON.stringify({ lang: 'fr' }) });
   assert.equal(bad.status, 400);

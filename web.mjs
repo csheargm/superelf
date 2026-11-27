@@ -1047,7 +1047,7 @@ function listFamilyApps() {
         let meta = {};
         try { const m = JSON.parse(fs.readFileSync(path.join(dir, d.name, 'meta.json'), 'utf8')); if (m && typeof m === 'object') meta = m; } catch {}
         if (!meta.shared) return;
-        result.push({ uid: u.id, slug: d.name, title: String(meta.title || d.name), desc: String(meta.desc || ''), author: displayName(u) });
+        result.push({ uid: u.id, slug: d.name, title: String(meta.title || d.name), desc: String(meta.desc || ''), author: displayName(u), bilingual: appIsBilingual(dir, d.name) });
       });
   }
   return result;
@@ -2035,7 +2035,7 @@ const server = http.createServer(async (req, res) => {
       const promotedNames = new Set(promoted.map((a) => a.name));
       const family = listFamilyApps()
         .filter((a) => a.uid !== user.id && !ownNames.has(a.slug) && !promotedNames.has(a.slug))
-        .map((a) => ({ name: a.slug, title: a.title, desc: a.desc, uid: a.uid, fromFamily: true }));
+        .map((a) => ({ name: a.slug, title: a.title, desc: a.desc, uid: a.uid, fromFamily: true, bilingual: a.bilingual }));   // bilingual: frameLang sends 'both' for it
       return send(res, 200, 'application/json', JSON.stringify([...own, ...promoted, ...family]));
     }
     if (req.method === 'POST' && p === '/api/apps/fork') {

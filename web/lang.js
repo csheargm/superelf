@@ -13,9 +13,9 @@
        - text nodes and title / aria-label / placeholder / alt of the form "中文 · English" (the house style)
          are switched in place, and switched back on a flip; new nodes are switched as they arrive;
        - in the shell only (pairClass), a <span class="en"> after its 中文 sibling is the English half.
-       Never switched: inputs' values, textareas, contenteditable, scripts, the chat logs (#log, .pac-log:
+       Never switched: inputs' values, textareas' text (their title/placeholder/aria-label are), contenteditable in any state, the note text layer, scripts, the chat logs (#log, .pac-log:
        what people wrote and what the AI said) and anything inside [data-pa-lang-skip].
-     PALang.get() → 'zh' | 'en' | 'both'; choice() → 'zh' | 'en'; set(l) → applied now, kept on this device;
+     PALang.get() → 'zh' | 'en' | 'both'; choice() → 'zh' | 'en'; stored() → this device's saved choice or ''; set(l) → applied now, kept on this device;
      bilingual(on); on(fn) → called on every change; device() → the device's default.
      Driven by test/lang.test.mjs (unit, over this file in a vm) and test/lang-e2e.test.mjs (browsers).
    (The shell pairing CSS lives in web/shell-look.css.) */
@@ -24,7 +24,10 @@
   const KEY='pa_lang', SEP=' · ';
   const CJK=/[　-〿㐀-鿿豈-﫿＀-￯]/, LATIN=/[A-Za-z]/;
   const ATTRS=['title','aria-label','placeholder','alt'];
-  const SKIP='script,style,textarea,input,select,[contenteditable=""],[contenteditable="true"],#log,.pac-log,[data-pa-lang-skip]';
+  // contenteditable in ANY state (the note's text layer is contenteditable=false outside the T tool, and its
+  // HTML is committed on the next edit: switching it would rewrite saved notes) and the note text layer itself.
+  const SKIP='script,style,[contenteditable],.pan-textlayer,#log,.pac-log,[data-pa-lang-skip]';
+  const FORM='textarea,input,select';   // their values / text are the person's; their title, placeholder, aria-label are ours
   const norm=(v)=>(v==='zh'||v==='en'?v:'');
   function device(){ try{ const l=String((navigator.languages&&navigator.languages[0])||navigator.language||''); return /^zh/i.test(l)?'zh':'en'; }catch(_){ return 'en'; } }
   function stored(){ try{ return norm(localStorage.getItem(KEY)); }catch(_){ return ''; } }   // an opaque app frame: storage throws; the shell's prefs bring the choice (R5 case c)
@@ -79,7 +82,8 @@
     if(root.nodeType===3){ if(!skipped(root.parentElement)) text(root); return; }
     if(root.nodeType!==1&&root.nodeType!==9&&root.nodeType!==11) return;
     if(root.nodeType===1&&skipped(root)) return;
-    const tw=document.createTreeWalker(root,5,{acceptNode:(n)=>(n.nodeType===1&&n.matches(SKIP)?2:1)});   // SHOW_ELEMENT|SHOW_TEXT; REJECT a skipped subtree
+    if(root.nodeType===1&&root.matches(FORM)){ attrs(root); return; }
+    const tw=document.createTreeWalker(root,5,{acceptNode:(n)=>{ if(n.nodeType!==1) return 1; if(n.matches(SKIP)) return 2; if(n.matches(FORM)){ attrs(n); return 2; } return 1; }});   // SHOW_ELEMENT|SHOW_TEXT; REJECT a skipped subtree (a form control: its attributes only)
     if(root.nodeType===1){ attrs(root); pair(root); }
     for(let n=tw.nextNode();n;n=tw.nextNode()){ if(n.nodeType===3) text(n); else { attrs(n); pair(n); } }
   }
@@ -106,7 +110,7 @@
   // The shell → this app page: {pa:'prefs', lang:'zh'|'en'|'both'} (web/index.html sendAppPrefs). Only the parent counts.
   addEventListener('message',(e)=>{ const m=e&&e.data; if(!m||m.pa!=='prefs'||typeof m.lang!=='string'||e.source!==window.parent||window.parent===window) return;
     if(m.lang==='both') bilingual(true); else { if(both&&!/*PA_LANG_BOTH*/false) bilingual(false); set(m.lang); } });
-  window.PALang={get,choice:()=>chosen,t,split,set,bilingual,device,apply,
+  window.PALang={get,choice:()=>chosen,t,split,set,bilingual,device,apply,stored,
     on:(f)=>{ subs.add(f); return ()=>subs.delete(f); },
     pairClass:(c)=>{ pairs=String(c||''); if(document.documentElement) document.documentElement.toggleAttribute('data-pa-pairs',!!pairs); apply(); }};
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',apply,{once:true}); else apply();

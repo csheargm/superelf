@@ -87,7 +87,7 @@ const PAHome=(function(){
     if(g) return l==='en'?`<span class="grad">${T.guestHi[2]}</span>`:`${T.guestHi[0]}<span class="grad">${T.guestHi[1]}</span>${l==='both'?`<span class="en">${T.guestHi[2]}</span>`:''}`;
     const nm=`<span class="grad">${esc(NAME||'')}</span>`;
     if(l==='en') return `${esc(ge)}, ${nm}<span class="en">${esc(de)}</span>`;
-    if(l==='zh') return `${esc(gz)}，${nm}<span class="en">${esc(dz)}</span>`;
+    if(l==='zh') return `${esc(gz)}，${nm}<span class="en pa-keep">${esc(dz)}</span>`;
     return `${esc(gz)}，${nm}<span class="en">${esc(ge)} · ${esc(dz)} · ${esc(de)}</span>`; }
   function render(args){
     LAST=args; const {own,shelf,uid,esc}=args;

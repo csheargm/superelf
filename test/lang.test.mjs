@@ -84,6 +84,11 @@ test('server: profile values, bilingual apps, the reply rule', () => {
     assert.equal(appIsBilingual(dir, 'tasks'), false);
     assert.equal(appIsBilingual(dir, '../x'), false);
     assert.equal(appIsBilingual(dir, undefined), false);
+    assert.equal(appIsBilingual(dir, 'Study'), false, 'not a canonical slug (slugOk)');
+    fs.mkdirSync(path.join(dir, 'linked')); fs.symlinkSync(path.join(dir, 'study', 'meta.json'), path.join(dir, 'linked', 'meta.json'));
+    assert.equal(appIsBilingual(dir, 'linked'), false, 'a symlinked meta.json is not followed');
+    fs.mkdirSync(path.join(dir, 'huge')); fs.writeFileSync(path.join(dir, 'huge', 'meta.json'), '{"bilingual":true,"x":"' + 'a'.repeat(70 * 1024) + '"}');
+    assert.equal(appIsBilingual(dir, 'huge'), false, 'an oversized meta.json is not read');
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 

@@ -12,7 +12,10 @@ const PALangSwitch=(()=>{
   function toast(msg){ const t=document.getElementById('fsToast'); if(!t) return; t.textContent=msg; t.classList.add('on'); setTimeout(()=>t.classList.remove('on'),TOAST_MS); }
   function paint(){ if(!btn) return; const l=PALang.choice(), both=PALang.get()==='both';
     for(const s of btn.querySelectorAll('[data-l]')) s.classList.toggle('on',!both&&s.dataset.l===l); }
-  async function save(l){
+  // Saves run one at a time, in tap order, so the account ends on the LAST tap (a slow first PUT can't win).
+  let saving=Promise.resolve();
+  function save(l){ saving=saving.then(()=>put(l)); return saving; }
+  async function put(l){
     try{ const r=await api('/api/profile',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({lang:l})});
       if(!r.ok) throw new Error('HTTP '+r.status);
       if(ME&&typeof ME==='object') ME.lang=l; }
@@ -35,6 +38,12 @@ const PALangSwitch=(()=>{
     document.addEventListener('DOMContentLoaded',()=>PATipsShell.tip(TIP,'#langSw',TIP_TEXT));
   }
   // The account's choice wins over this device's copy (a choice made on the iPad reaches the iPhone).
-  function fromProfile(){ if(ME&&(ME.lang==='zh'||ME.lang==='en')) PALang.set(ME.lang); paint(); }
+  // An account with no choice yet (a loaded profile: it has a role) adopts a choice made on this device before
+  // sign-in. Sign-out clears the device copy (web/index.html logout), so a shared browser never hands one
+  // account's choice to the next.
+  function fromProfile(){ if(!ME||typeof ME!=='object') return paint();
+    if(ME.lang==='zh'||ME.lang==='en') PALang.set(ME.lang);
+    else if(ME.role&&PALang.stored()) save(PALang.stored());
+    paint(); }
   return {mount,fromProfile,choose};
 })();

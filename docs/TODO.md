@@ -877,3 +877,4 @@ user's app (not in the repo) has no "send my change to its author" path; the lin
 - 分享登录 · Share sign-in (GPT review r3, edge case): an email-link request finishing in ANOTHER tab while
   Google consent is open overwrites the shared verifier, so that Google return fails (the visitor signs in
   again). Same fix as above: one verifier per method.
+- Language switch (GPT review, not fixed): a chat sent from a held (background) app frame takes its bilingual flag from the ACTIVE frame (web/index.html frameLang); carry the requesting frame's app identity through the relay. Placeholder `data-ph` on the note text layer ("点按输入 · Tap to type") is not switched. A profile `lang: ''` reset made on another device does not clear a device copy on this one.

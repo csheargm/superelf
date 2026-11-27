@@ -620,7 +620,7 @@
       // "No matches" for the debounce + round trip (+ the first scan) made users close the drawer (R13 round 2 #3).
       if(!shown.length){ rows.innerHTML='<div class="pac-lempty">'+(f?(_pending?whereLabel('searching'):'No matches 无匹配'):'Nothing here yet 还没有内容')+'</div>'; return; }
       const rowHtml=it=>{
-        const menu=(it.onRename||it.onDelete||it.onDeleteAi||it.onPin)?'<button class="pac-lmenu" data-menu="'+esc(it.id)+'" aria-label="More 更多">⋯</button>':'';
+        const menu=(it.onRename||it.onDelete||it.onDeleteAi||it.onPin)?'<button class="pac-lmenu" data-menu="'+esc(it.id)+'" aria-label="更多 · More">⋯</button>':'';
         // A row with no onDelete cannot be bulk-deleted, so it gets no box — offering a tick
         // that would then be silently skipped is worse than not offering one.
         const box=(_multi&&it.onDelete)?'<div class="pac-lbox"></div>':'';
