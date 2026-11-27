@@ -54,7 +54,7 @@ test('the note is appended OUTSIDE the overridable prompt chain', () => {
   // (test/app-agent-confinement.test.mjs drives that over HTTP).
   // A oneShot turn (PAChat.complete) drops only the app contract; test/chat-one-shot.test.mjs
   // reads both prompts back from argv.
-  assert.match(WEB, /systemPrompt: agentSystemPrompt\(\[agentPrompts\.global, agentPrompts\.app, origin\.fromApp \? noChangeRule\(chatRole\) : null, coreOn \? MAIN_CHAT_RULE : null\], agentCapabilities\(laneRole\(user, origin\), oneShot \? null : APP_CONTRACT\), turnFacts\)/,
+  assert.match(WEB, /systemPrompt: agentSystemPrompt\(\[agentPrompts\.global, agentPrompts\.app, origin\.fromApp \? noChangeRule\(chatRole\) : null, coreOn \? MAIN_CHAT_RULE : null\], agentCapabilities\(laneRole\(user, origin\), oneShot \? null : APP_CONTRACT, langRule\), turnFacts\)/,
     'the chat agent lane appends it after the override chain');
   assert.match(WEB, /5 \* 60000, agentCapabilities\(laneRole\(user, origin\), APP_CONTRACT\)\)/,
     'and the app ask lane sends the same one');
@@ -140,7 +140,9 @@ test('the rule reaches the FAST lanes too, outside the override chain', () => {
   // after prompts.global, which a profile override REPLACES — being answered in your own language
   // must not be something a customised assistant can lose.
   const web = fs.readFileSync(path.join(ROOT, 'web.mjs'), 'utf8');
-  assert.match(web, /const sys = \[prompts\.global, prompts\.app, REPLY_LANGUAGE_RULE, origin\.fromApp \? noChangeRule\(chatRole\) : null, turnFacts\(\)\]/,
+  assert.match(web, /const sys = \[prompts\.global, prompts\.app, langRule, origin\.fromApp \? noChangeRule\(chatRole\) : null, turnFacts\(\)\]/,
     'the fast lane appends it after the overridable prompts');
-  assert.equal((web.match(/REPLY_LANGUAGE_RULE/g) || []).length, 2, 'imported once, used once — the agent lane gets it via agentCapabilities');
+  // langRule = the member's 中文/English line, else REPLY_LANGUAGE_RULE (lib/ui-lang.mjs replyLanguageRule): never both.
+  assert.match(web, /const langRule = replyLanguageRule\(turnLang\(/, 'one per turn');
+  assert.equal((web.match(/REPLY_LANGUAGE_RULE/g) || []).length, 0, 'web.mjs no longer names it: it arrives through replyLanguageRule');
 });

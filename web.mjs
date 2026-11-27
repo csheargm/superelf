@@ -17,7 +17,8 @@ import { handleSelfpubRoute, selfpubRoot } from './lib/selfpub/routes.mjs';
 import { coreChatTurn, coreDeps, coreRequestOf, endCore, markerRequest, ownerComposer, refuseCore, typedPublish, MAIN_CHAT_RULE } from './lib/selfpub/chat.mjs';
 import { handleAlertsRoute } from './lib/node-alerts.mjs';
 import { handleActivityRoute, refuseStaleUndo, newestEditVersion } from './lib/activity-view.mjs';
-import { loadConfig, configPath, fastLaneGuard, GUARD_DEFAULT_SURFACE, agentCapabilities, appContract, REPLY_LANGUAGE_RULE, OVERRIDABLE_PROMPT_MAX } from './lib/config.mjs';
+import { langOf, appIsBilingual, replyLanguageRule, turnLang, withLangDefault } from './lib/ui-lang.mjs';
+import { loadConfig, configPath, fastLaneGuard, GUARD_DEFAULT_SURFACE, agentCapabilities, appContract, OVERRIDABLE_PROMPT_MAX } from './lib/config.mjs';
 import { runClaude, APPEND_SYSTEM_PROMPT_MAX } from './lib/runner.mjs';
 import { agentAllowed, lanesFor, memberLane, NO_PLAIN_LANE_TEXT, AGENT_OFF_TEXT, PLAIN_LANE_STATUS } from './lib/member-lanes.mjs';
 import { cancelOnClose, createTurnCancel, createTurnStops, CANCELLED_TEXT } from './lib/turn-stop.mjs';
@@ -694,6 +695,8 @@ const PA_LEAVE_MARKER = '<!--PA_LEAVE_UI-->';
 const PA_BROKER_MARKER = '<!--PA_BROKER_UI-->';
 const PA_BUSY_MARKER = '<!--PA_BUSY_UI-->';
 const PA_SNAP_MARKER = '<!--PA_SNAP_UI-->';
+// PALang (web/lang.inline.html): the ONE 中文/English setting, on every app page ahead of its first script (lib/ui-lang.mjs).
+const PA_LANG_MARKER = '<!--PA_LANG_UI-->', PA_LANG_BOTH = '/*PA_LANG_BOTH*/false';
 // The shared palette (web/theme-tokens.css, also inlined into the shell): placed at the END of <head>, after the
 // app's own <style>, so every app that names --bg/--card/--text/--accent… gets the one look (no per-app fork).
 // Kept OUT of PA_COMPONENTS (that list is append-only and its order is pinned); it is in appStamp below.
@@ -817,6 +820,8 @@ const PA_COMPONENTS = [
   { marker: '<!--PA_NOTE_PHONE_UI-->', file: 'note-phone.inline.html' },
   // PAPhoneUI, the ONE phone bottom sheet and the phone list sizes (journal-iphone step 3): chat-ui carries its marker. Appended last.
   { marker: '<!--PA_PHONE_UI-->', file: 'phone-ui.inline.html' },
+  // PALang, the ONE language setting: sendAppHtml places its marker on EVERY app page, first. Appended last.
+  { marker: PA_LANG_MARKER, file: 'lang.inline.html' },
 ];
 // Injected into EVERY served app page, unconditionally. The shell broadcasts the user's A-/A+
 // scale to each app (sendAppPrefs -> pa:'prefs'), but only chat-ui.inline.html ever applied it,
@@ -858,8 +863,8 @@ function appStamp(file) {
   }
   return k;
 }
-function sendAppHtml(res, file, type, extra) {
-  const stamp = appStamp(file);
+function sendAppHtml(res, file, type, extra, bilingual = false) {
+  const s0 = appStamp(file), stamp = s0 && s0 + (bilingual ? '|both' : '') + (cfg.ui_lang_default === 'both' ? '|dboth' : '');   // either language input rebuilds the page
   const hit = stamp && APP_CACHE.get(file);
   if (hit && hit.stamp === stamp) return sendHtml(res, hit.html, extra, hit);
   fs.readFile(file, 'utf8', (err, html) => {
@@ -867,7 +872,7 @@ function sendAppHtml(res, file, type, extra) {
       const hasNote = html.includes(PA_NOTE_MARKER);   // decided BEFORE inlining replaces the marker
     // Before the first script, or at the end of <head>: whichever comes first. A page with neither
     // has no script element, so it gets none of PATwoTap, PAStore, PALeave and PA (ADR 0018 known gaps).
-    html = html.replace(/<\/head>|<script\b/i, (m) => PA_TWO_TAP_MARKER + PA_STORE_MARKER + PA_LEAVE_MARKER + PA_BROKER_MARKER + PA_BUSY_MARKER + PA_SNAP_MARKER + m);
+    html = html.replace(/<\/head>|<script\b/i, (m) => PA_LANG_MARKER + PA_TWO_TAP_MARKER + PA_STORE_MARKER + PA_LEAVE_MARKER + PA_BROKER_MARKER + PA_BUSY_MARKER + PA_SNAP_MARKER + m);
     let theme = '';
     try { theme = [PA_THEME_FILE, PA_TOUCH_FILE].map((f) => fs.readFileSync(path.join(ROOT, 'web', f), 'utf8')).join('\n'); }
     catch (e) { return send(res, 500, 'text/plain', 'component unavailable'); }   // fail loud, like a missing component (R5)
@@ -894,6 +899,7 @@ function sendAppHtml(res, file, type, extra) {
       catch { return send(res, 500, 'text/plain', 'component unavailable'); }   // fail loud, as for any component (R5)
       html = html.split(PA_REPLY_CLEAN_MARKER).join(rc);
     }
+    html = withLangDefault(html.split(PA_LANG_BOTH).join(bilingual ? 'true' : 'false'), cfg);   // a bilingual app (lib/ui-lang.mjs) keeps both languages
     html = html.split(BUILD_MARKER).join(buildId());   // the Pencil recorder's log header names this build
     // The same CSP inside the page, for the shell's srcdoc route (lib/offline.mjs; no header reaches a srcdoc document).
     html = withCspMeta(html, extra && extra['content-security-policy']);
@@ -996,7 +1002,7 @@ function listApps(u) {
           else if (ff.hash) { const cur = appHash(srcDir); if (cur && cur !== ff.hash) hasUpdate = true; }
         }
       }
-      return { name: d.name, title: String(meta.title || d.name), desc: String(meta.desc || ''), shared: !!meta.shared, version: meta.version || null, forkedFrom: meta.forkedFrom || null, hasUpdate, face: readFace(u, d.name, meta), ownBar: !!meta.ownBar };
+      return { name: d.name, title: String(meta.title || d.name), desc: String(meta.desc || ''), shared: !!meta.shared, version: meta.version || null, forkedFrom: meta.forkedFrom || null, hasUpdate, face: readFace(u, d.name, meta), ownBar: !!meta.ownBar, bilingual: appIsBilingual(dir, d.name) };
     });
 }
 
@@ -1383,6 +1389,8 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
   // the prompt names the button only when the server will send it (GPT review).
   const canEditHere = user.role === 'owner' && typeof app === 'string' && slugOk(app) && appEditable(appsDir(user), app);
   const chatRole = user.role !== 'owner' ? 'member' : canEditHere ? 'owner' : 'ownerShared';
+  // The member's 中文/English setting (lib/ui-lang.mjs): the page's word, else the account's; a bilingual app keeps both.
+  const langRule = replyLanguageRule(turnLang({ sent: body.lang, saved: (loadProfile(wsDir(user)) || {}).lang, bilingual: appIsBilingual(appsDir(user), edit ? edit.slug : app) }));
   // A oneShot caller that left while this turn was queued: nothing is saved, nothing spawns.
   if (cancel && cancel.signal.aborted) { audit('chat-cancelled', { who: user.id, convo: convoId || '', queued: true }); if (!res.writableEnded) res.end(); return; }
   // Decided ONCE per turn, from the shell relay's header OR the app slug (lib/agent-origin.mjs),
@@ -1513,7 +1521,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
       // lane: prompts.global is replaceable by a profile override, and being answered in your own
       // language must not be something a customised assistant can lose. It matters most here —
       // most fast lanes are Chinese-trained models.
-      const sys = [prompts.global, prompts.app, REPLY_LANGUAGE_RULE, origin.fromApp ? noChangeRule(chatRole) : null, turnFacts()]   // each piece capped by resolveSystemPrompts
+      const sys = [prompts.global, prompts.app, langRule, origin.fromApp ? noChangeRule(chatRole) : null, turnFacts()]   // each piece capped by resolveSystemPrompts
         .filter(Boolean).map((c) => ({ role: 'system', content: c }));
       const history = [...sys, ...convo.messages.slice(-20).filter((m) => !m.failed)   // a stored lane failure is not an answer to learn from
         .map((m) => ({ role: m.role === 'md' ? 'assistant' : 'user', content: String(m.text || '') }))
@@ -1604,7 +1612,7 @@ async function chatTurn(req, res, user, body, hold, cancel = null) {
           // override replaces the guard above, and a capability list it could delete is not one
           // any app author could rely on. A oneShot turn builds no app, so it skips the ~3.7k-char
           // app contract; the language rule and the confined note still ride.
-          systemPrompt: agentSystemPrompt([agentPrompts.global, agentPrompts.app, origin.fromApp ? noChangeRule(chatRole) : null, coreOn ? MAIN_CHAT_RULE : null], agentCapabilities(laneRole(user, origin), oneShot ? null : APP_CONTRACT), turnFacts),
+          systemPrompt: agentSystemPrompt([agentPrompts.global, agentPrompts.app, origin.fromApp ? noChangeRule(chatRole) : null, coreOn ? MAIN_CHAT_RULE : null], agentCapabilities(laneRole(user, origin), oneShot ? null : APP_CONTRACT, langRule), turnFacts),
         resumeId, timeoutMs: cfg.task_timeout_minutes * 60000, onChild: cancel ? cancel.onChild : undefined,
         onDelta: (t) => (live ? live.push(t) : line({ type: 'delta', text: t })), onTool: (n, b, input) => { if (jailed) editCtx.jail.onTool(n, b, input); const shown = appCwd ? editToolBrief(input, wsDir(user)) : b; line({ type: 'status', text: `${n}${shown ? ` — ${shown}` : ''}` }); } };
       try { r = await enqueue(async () => {
@@ -1771,7 +1779,8 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && (p === '/' || p === '/index.html')) {
       const html = fillShellMarkers(readShell(ROOT), { version: appVersion(), vtime: appVTime(), vdate: buildId.date(),   // release time, else the commit date (lib/version-time.mjs)
         notes: embedInTemplateLiteral(appNotesJson(ROOT, undefined, buildId.head())) });
-      return sendHtml(res, demoOn(cfg) ? injectDemoBoot(html, cfg) : html);
+      const shell = withLangDefault(html, cfg);   // the node's both-at-once default, if set (lib/ui-lang.mjs)
+      return sendHtml(res, demoOn(cfg) ? injectDemoBoot(shell, cfg) : shell);
     }
     // The service worker (offline-first, lib/offline.mjs): unauthenticated like the shell, scope /, revalidated like HTML.
     // TODO(R4 seam): this and /api/offline-config below belong with the shell routes in lib/version-routes.mjs.
@@ -1912,7 +1921,7 @@ const server = http.createServer(async (req, res) => {
       // HTML: inline the shared PAChat component wherever <!--PA_CHAT_UI--> appears.
       // The sandbox CSP forbids <script src> (no 'self'), so one canonical file
       // injected at serve time is the only way to single-source the app chat UI.
-      if (type.startsWith('text/html')) return sendAppHtml(res, f, type, extra);
+      if (type.startsWith('text/html')) return sendAppHtml(res, f, type, extra, appIsBilingual(base, slug));
       return sendFile(res, f, { type, extra });
     }
 
@@ -2666,6 +2675,7 @@ const server = http.createServer(async (req, res) => {
         // ☰ drawer sections the member opened or closed（侧栏分组的展开状态）: {secId: true|false}. On the
         // account so a phone and a Mac open the same way; only taps are stored, the shell owns the defaults.
         drawerOpen: drawerOpenOf(prof.drawerOpen),
+        lang: langOf(prof.lang),   // 界面语言: '' = follow the device (lib/ui-lang.mjs)
         tipsSeen: tipsSeenOf(prof.tipsSeen),   // the shell's dismissed first-use tips (lib/tips-seen.mjs)
         autoUpdateApps: !!prof.autoUpdateApps }));
       if (req.method === 'PUT') {
@@ -2785,6 +2795,12 @@ const server = http.createServer(async (req, res) => {
           else return send(res, 400, 'application/json', JSON.stringify({ error: 'Invalid country code · 国家代码无效 (e.g. US, CN, GB)' }));
         }
         if (typeof b.autoUpdateApps === 'boolean') prof.autoUpdateApps = b.autoUpdateApps;
+        // 界面语言 · the ONE language setting (lib/ui-lang.mjs): '' = follow the device again; junk is refused loudly (R5).
+        if (b.lang !== undefined) {
+          if (b.lang === '') delete prof.lang;
+          else if (langOf(b.lang)) prof.lang = b.lang;
+          else return send(res, 400, 'application/json', JSON.stringify({ error: 'Invalid language · 语言无效 (zh or en)' }));
+        }
         // MERGED, not replaced: the shell sends only the section tapped, so a tap on the phone never undoes one made on the Mac.
         if (b.drawerOpen !== undefined) prof.drawerOpen = drawerOpenOf({ ...drawerOpenOf(prof.drawerOpen), ...drawerOpenOf(b.drawerOpen) });
         // UNION with the stored list, so two devices never undo each other's dismissals; [] clears (Show tips again).
