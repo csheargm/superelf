@@ -1,5 +1,7 @@
-// Journal print in a REAL browser (R6): the real web.mjs on a throwaway root, the real shell and the
-// shipped Journal (workspace/apps/notes), a SYNTHETIC two-page note (no real journal content). The
+// Note print in a REAL browser (R6): the real web.mjs on a throwaway root, the real shell and BOTH
+// shipped apps that mount the shared PANote — the Journal (workspace/apps/notes, fullscreen pad) and
+// the Bible app (workspace/apps/bible, the pad docked in the PASplit rail on an iPad) — each with a
+// SYNTHETIC two-page note (no real content). One print path serves both (owner 2026-11-27). The
 // same note is opened from a 12.9in and an 11in iPad viewport and printed on Letter and A4.
 // Owner 2026-11-25: print must look like a real journal page — full sheet, centred, aligned, only a
 // page number — and must not depend on which iPad wrote the page.
@@ -45,6 +47,12 @@ before(async () => {
   const t = Date.now();
   fs.writeFileSync(path.join(dd, 'journal.json'), JSON.stringify({ v: 1, entries: [{ id: 'syn1', created: t, updated: t, title: 'Synthetic' }] }));
   fs.writeFileSync(path.join(dd, 'entry-syn1.json'), JSON.stringify(syntheticNote()));
+  fs.symlinkSync(path.join(ROOT, 'bible-data'), path.join(root, 'bible-data'));
+  const bd = path.join(root, 'workspace', 'apps', 'bible'); fs.mkdirSync(bd, { recursive: true });
+  for (const f of ['index.html', 'meta.json']) fs.copyFileSync(path.join(ROOT, 'workspace', 'apps', 'bible', f), path.join(bd, f));
+  const bn = path.join(root, 'workspace', 'data', 'bible', 'notes'); fs.mkdirSync(bn, { recursive: true });
+  // John 3 (the app's first chapter), the chapter-wide note: the same synthetic notebook.
+  fs.writeFileSync(path.join(bn, '43-3.json'), JSON.stringify({ notes: {}, draws: { general: syntheticNote() }, chat: {}, titles: {}, pins: {} }));
   web = startWeb(root); await waitReady(port);
   browser = await chromium.launch();
 });
@@ -54,14 +62,28 @@ after(async () => {
   if (root) fs.rmSync(root, { recursive: true, force: true });
 });
 
-async function printFrom(device, paper) {
+// How each app opens the note: Journal opens it on boot; Bible opens the chapter note in its rail.
+const APPS = {
+  journal: { slug: 'notes', open: async () => {} },
+  bible: { slug: 'bible', open: async (fr) => {
+    await fr.waitForFunction(() => typeof openDrawFull === 'function' && typeof drawPad !== 'undefined' && drawPad, null, { timeout: 30000 });
+    await fr.waitForFunction(() => document.querySelector('.v, #verses *'), null, { timeout: 30000 });
+    await fr.evaluate(() => openDrawFull());
+    // An iPad is wide: the pad is docked in the rail (PANote.panel), not the Journal's fullscreen.
+    assert.ok(await fr.evaluate(() => !!rail && !!document.querySelector('.pan-hprint')), 'bible: note open in the rail');
+  } },
+};
+const SHOTS = process.env.PA_PRINT_SHOTS || '';
+
+async function printFrom(app, device, paper) {
   const ctx = await browser.newContext({ viewport: DEVICES[device], deviceScaleFactor: 1, locale: PAPERS[paper].locale });
   await ctx.addInitScript((tk) => { try { localStorage.setItem('pa_session', tk); } catch { /* blocked storage: sign-in fails loudly below */ } }, OWNER_TOKEN);
   const page = await ctx.newPage(); await page.goto(`http://127.0.0.1:${port}/`);
   await page.waitForFunction(() => typeof openApp === 'function' && document.querySelector('#dot.ok'));
-  await page.evaluate(() => { window.print = () => {}; openApp(UID, 'notes', 'notes'); });
-  let fr = null; for (let i = 0; i < 200 && !fr; i++) { fr = page.frames().find((f) => f.url().includes('/app/owner/notes/')) || null; if (!fr) await page.waitForTimeout(50); }
-  assert.ok(fr, 'the journal opened');
+  await page.evaluate((s) => { window.print = () => {}; openApp(UID, s, s); }, APPS[app].slug);
+  let fr = null; for (let i = 0; i < 200 && !fr; i++) { fr = page.frames().find((f) => f.url().includes('/app/owner/' + APPS[app].slug + '/')) || null; if (!fr) await page.waitForTimeout(50); }
+  assert.ok(fr, `${app} opened`);
+  await APPS[app].open(fr);
   await fr.waitForFunction(() => window.PAPrint && document.querySelector('.pan-hprint'), null, { timeout: 30000 });
   await page.waitForTimeout(1000);
   await fr.evaluate(() => document.querySelector('.pan-hprint').click());
@@ -80,6 +102,7 @@ async function printFrom(device, paper) {
   await page.emulateMedia({ media: 'print' });
   const pdf = await page.pdf({ format: paper });
   await page.setViewportSize({ width: PAPERS[paper].wPx, height: 1100 });
+  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `${app}-${paper}-${device}.png`), fullPage: true });
   const layout = await page.evaluate(() => [...document.querySelectorAll('#printRoot .pr-sheet')].map((s) => {
     const a = s.getBoundingClientRect(), b = s.querySelector('img').getBoundingClientRect();
     return { left: b.left - a.left, right: a.right - b.right, top: b.top - a.top, bottom: a.bottom - b.bottom };
@@ -89,9 +112,9 @@ async function printFrom(device, paper) {
   return { marks, sheets, layout };
 }
 
-test('journal prints one centred, device-independent sheet per page on Letter and A4', { skip, timeout: 240000 }, async () => {
+for (const app of Object.keys(APPS)) test(`${app} prints one centred, device-independent sheet per page on Letter and A4`, { skip, timeout: 240000 }, async () => {
   const out = {};
-  for (const paper of Object.keys(PAPERS)) for (const dev of Object.keys(DEVICES)) out[paper + dev] = await printFrom(dev, paper);
+  for (const paper of Object.keys(PAPERS)) for (const dev of Object.keys(DEVICES)) out[paper + dev] = await printFrom(app, dev, paper);
   for (const [key, r] of Object.entries(out)) {
     assert.equal(r.sheets, 2, `${key}: a two-page note prints two sheets`);
     assert.equal(r.marks.length, 2, `${key}: two page images`);
