@@ -1,4 +1,13 @@
 {
+  "v5.38.0": {
+    "date": "2026-11-26",
+    "time": "2026-11-27T06:29:12.909Z",
+    "features": [
+      "合并：全应用一个语言开关（中文/English）· Merge: one language switch for all of superelf"
+    ],
+    "fixes": [],
+    "through": "cf19a5a267ce61d66f69af92ba0854a9cf28957d"
+  },
   "v5.37.3": {
     "date": "2026-11-26",
     "time": "2026-11-27T04:51:40.912Z",
