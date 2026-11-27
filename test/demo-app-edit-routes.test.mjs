@@ -31,6 +31,7 @@ function startOllamaStub() {
       const searched = msgs.some((m) => m.role === 'system' && (m.content.startsWith('Web search results') || m.content.startsWith('Web search is not available')));
       const text = (mode === 'search' || mode === 'search-plan') && !apply ? (!searched ? `${SEARCH_MARKER} weather today` : mode === 'search' ? 'The weather answer from search.' : `I will show today's weather in the header.\n${PLAN_MARKER}`)
         : mode === 'search-empty' && !apply ? `${SEARCH_MARKER} weather today`
+        : mode === 'search-apply-only' && !apply ? (searched ? PLAN_MARKER : `${SEARCH_MARKER} weather today`)
         : apply && mode === 'bad' ? 'no page blocks here'
         : apply && (mode === 'same' || mode === 'verbatim') ? `Kept it.\n\n\`\`\`html\n${mode === 'same' ? PAGE : withOwnPolicy(ensureAskAi(PAGE, 'Calendar Planner'))}\n\`\`\`` : mode === 'marker' && !apply ? `${APP_MARKER} {"edit":"calendar-planner","title":"Calendar Planner","request":"make the title red"}`
         : apply ? `I added it.\n\n\`\`\`html\n${pageWith(nextExtra)}\n\`\`\`\n\n\`\`\`json\n{"title":"Calendar Planner"}\n\`\`\``
@@ -155,7 +156,8 @@ test('an ordinary question in the guest\'s own app chat gets the web search step
   assert.ok(ev.some((e) => e.type === 'status'), 'the search step is said');
   const t = done(ev).text;
   assert.ok(t.includes('The weather answer from search.') && t.includes('https://weather.example/today') && !t.includes(SEARCH_MARKER), t);
-  assert.equal(t.split('weather.example/today').length, 2, 'the sources footer is shown once');
+  assert.equal(t.split('weather.example/today').length, 2, 'the sources footer is stored once');
+  assert.equal(ev.filter((e) => e.type === 'delta').map((e) => e.text).join('').split('weather.example/today').length, 2, 'and streamed once');
   const q = quota(v);
   assert.equal(q[`user:${v.uid}`], 2, `the chat call and the answer call are both charged: ${JSON.stringify(q)}`);
   assert.ok(Object.entries(q).some(([k, n]) => k !== `user:${v.uid}` && n === 1), `the search is charged: ${JSON.stringify(q)}`);
@@ -176,6 +178,9 @@ test('GPT review: an answer that is only another search marker is a failed turn,
   const ev = await chat(v, { message: 'what is the weather today?' });
   assert.ok(!done(ev) || done(ev).ok === false, JSON.stringify(ev));
   assert.ok(ev.some((e) => e.type === 'error'), 'the failure is said');
+  mode = 'search-apply-only';
+  const ev2 = await chat(v, { message: 'show the weather' });
+  assert.ok(!confirmOf(ev2) && ev2.some((e) => e.type === 'error'), `a bare Apply marker after a search offers no Apply: ${JSON.stringify(ev2)}`);
   mode = 'plan';
 });
 
