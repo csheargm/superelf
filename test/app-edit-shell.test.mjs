@@ -26,7 +26,7 @@ test('the panel is the only window whose chat skips the app-origin header, and i
 
 test('PASnap rides on every served app page, after PABusy', () => {
   assert.match(WEB, /PA_BROKER_MARKER \+ PA_BUSY_MARKER \+ PA_SNAP_MARKER \+ m\)/);
-  assert.match(WEB, /\{ marker: PA_SNAP_MARKER, file: 'snap\.inline\.html' \},\n\];/, 'registered last (the append-only rule)');
+  assert.match(WEB, /\{ marker: PA_SNAP_MARKER, file: 'snap\.inline\.html' \},\n(?:  \/\/[^\n]*\n  \{ marker: '[^']+', file: '[^']+' \},\n)*\];/, 'registered in order; only later components follow it (the append-only rule)');
 });
 
 test('the edit tag the shell lists by is the one the server writes (R3)', async () => {

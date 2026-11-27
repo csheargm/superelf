@@ -968,10 +968,10 @@ function sendAppPrefs(withModels=true){ const fw=$('#fr').contentWindow; if(!(fw
   if(withModels) Object.assign(m,{models:CHAT_MODELS,wantModel:appModel(frameSlug()),newFeatureKeys:Object.keys(window._PA_NEW_KEYS||{}).filter(k=>!_SEEN.has(k))});
   fw.postMessage(m,'*'); }
 // Per-note pinch zoom, per device: pa_notezoom = {"<slug>\n<note id>": z}, the newest NOTE_ZOOM_MAX kept.
-const NOTE_ZOOM_KEY='pa_notezoom', NOTE_ZOOM_MAX=200;
+const NOTE_ZOOM_KEY='pa_notezoom', NOTE_ZOOM_MAX=200, NOTE_ID_MAX=200;
 function noteZoomMap(){ try{ const o=JSON.parse(localStorage.getItem(NOTE_ZOOM_KEY)||'{}'); return o&&typeof o==='object'&&!Array.isArray(o)?o:{}; }
   catch(_){ return {}; /* unreadable: every note opens at fit, the safe default */ } }
-function noteZoomsOf(slug){ const out={}, pre=slug+'\n'; for(const [k,z] of Object.entries(noteZoomMap())) if(k.startsWith(pre)&&Number.isFinite(z)) out[k.slice(pre.length)]=z; return out; }
+function noteZoomsOf(slug){ const out=Object.create(null), pre=slug+'\n'; for(const [k,z] of Object.entries(noteZoomMap())) if(k.startsWith(pre)&&Number.isFinite(z)) out[k.slice(pre.length)]=z; return out; }
 function saveNoteZoom(slug,id,z){ const o=noteZoomMap(), k=slug+'\n'+id; delete o[k]; o[k]=Math.round(z*100)/100;
   const keys=Object.keys(o); for(const x of keys.slice(0,Math.max(0,keys.length-NOTE_ZOOM_MAX))) delete o[x];
   localStorage.setItem(NOTE_ZOOM_KEY,JSON.stringify(o)); }
@@ -1986,7 +1986,7 @@ window.addEventListener('message',async(e)=>{
       if(typeof m.seamless==='boolean') localStorage.setItem('pa_seamless', m.seamless?'1':'0');
       if(typeof m.noFlip==='boolean') localStorage.setItem('pa_noflip', m.noFlip?'1':'0');
       // A note's pinch zoom on THIS device (PANote phone mode): {id, z} for the frame's app.
-      if(m.noteZoom&&typeof m.noteZoom.id==='string'&&Number.isFinite(m.noteZoom.z)) saveNoteZoom(frameSlug(),m.noteZoom.id,m.noteZoom.z);
+      if(m.noteZoom&&typeof m.noteZoom.id==='string'&&m.noteZoom.id.length<=NOTE_ID_MAX&&Number.isFinite(m.noteZoom.z)) saveNoteZoom(frameSlug(),m.noteZoom.id,m.noteZoom.z);
       // TODO(R4 seam): the pref store + sendAppPrefs push is one block to lift out of the broker.
       // (openAi used to live here, per device. It is the app pref appPrefs[slug].openAi now, set in
       // the app's Settings dialog — one place, on the account — and pushed by sendAppPrefs.)

@@ -113,8 +113,8 @@ test('iPhone: two fingers pan with no new ink; a pinch zooms, is clamped to 3x a
   assert.equal(strokesOnDisk('phoneA'), n0, 'no ink from the two-finger move (nor from the finger left down)');
   assert.equal(s1.zoom, s0.zoom, 'a parallel move does not zoom');
   // Pinch out 2x.
-  await touches(frame, [['pointerdown', 31, 180, 400, true], ['pointerdown', 32, 220, 400], ['pointermove', 31, 170, 400], ['pointermove', 32, 245, 400],
-    ['pointermove', 31, 120, 400], ['pointermove', 32, 300, 400], ['pointerup', 31, 120, 400], ['pointerup', 32, 300, 400]]);
+  const spread = []; for (let d = 2; d <= 100; d += 2) spread.push(['pointermove', 31, 190 - d, 400], ['pointermove', 32, 210 + d, 400]);   // 20px → 220px apart
+  await touches(frame, [['pointerdown', 31, 190, 400, true], ['pointerdown', 32, 210, 400], ...spread, ['pointerup', 31, 90, 400], ['pointerup', 32, 310, 400]]);
   await page.waitForTimeout(300);
   const s2 = await state(frame);
   assert.ok(Math.abs(s2.zoom / s0.zoom - 3) < 0.05, `the pinch zoomed in, clamped at 3x (${s0.zoom} → ${s2.zoom})`);
@@ -126,8 +126,8 @@ test('iPhone: two fingers pan with no new ink; a pinch zooms, is clamped to 3x a
   await page.waitForTimeout(300);
   assert.ok(Math.abs((await state(frame)).zoom - s0.zoom) < 1e-3, 'a pinch in stops at fit');
   // Zoom in again (the first 12% of the spread is slop), switch notes, come back: the zoom is locked to the note.
-  await touches(frame, [['pointerdown', 51, 150, 400, true], ['pointerdown', 52, 250, 400], ['pointermove', 51, 100, 400], ['pointermove', 52, 300, 400],
-    ['pointerup', 51, 100, 400], ['pointerup', 52, 300, 400]]);
+  const out = []; for (let d = 2; d <= 50; d += 2) out.push(['pointermove', 51, 150 - d, 400], ['pointermove', 52, 250 + d, 400]);   // 100px → 200px apart
+  await touches(frame, [['pointerdown', 51, 150, 400, true], ['pointerdown', 52, 250, 400], ...out, ['pointerup', 51, 100, 400], ['pointerup', 52, 300, 400]]);
   await page.waitForTimeout(300);
   const z2 = (await state(frame)).zoom;
   assert.ok(z2 / s0.zoom > 1.2 && z2 / s0.zoom < 2.01, `zoomed in (${z2 / s0.zoom}x)`);

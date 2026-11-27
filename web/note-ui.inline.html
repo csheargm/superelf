@@ -1729,8 +1729,9 @@
     let fingerDefaulted=false, penSeen=false;
     // Pinch zoom per note, per device (the shell's pa_notezoom, pushed as prefs.noteZoom {id: z}).
     // 1 = fit; only phone mode ever changes it, so k is unchanged on an iPad or a desktop.
-    let noteZooms=new Map(), liveZoom=0;   // liveZoom: the zoom while a pinch runs (0 = none)
-    const zoomNow=()=>{ if(liveZoom) return liveZoom; if(!phoneOn()||!window.PANotePhone) return 1;
+    let noteZooms=new Map(), liveZoom=0, zoomId=null;   // liveZoom: the zoom while a pinch on note zoomId runs (0 = none)
+    const zoomNow=()=>{ if(!phoneOn()||!window.PANotePhone) return 1;
+      if(liveZoom&&NB&&NB.id===zoomId) return liveZoom;
       return window.PANotePhone.clampZoom(Number(noteZooms.get(NB&&NB.id))||1); };
     function showFinger(){ if(fingerCb) fingerCb.checked=fingerDraw;
       if(fingerBtn){ fingerBtn.classList.toggle('on',fingerDraw); fingerBtn.setAttribute('aria-pressed',String(fingerDraw));
@@ -3526,22 +3527,26 @@
     }
     function endZoom(){
       if(!liveZoom) return;
-      const z=liveZoom, sl=stage.scrollLeft, st=stage.scrollTop, id=NB&&NB.id;
+      const z=liveZoom, sl=stage.scrollLeft, st=stage.scrollTop, id=zoomId;
+      if(!NB||NB.id!==id){ liveZoom=0; return; }               // another note opened mid-pinch: its zoom is its own
       if(typeof id==='string') noteZooms.set(id,z);
       liveZoom=0; setupCanvases(); stage.scrollLeft=sl; stage.scrollTop=st;
       if(typeof id==='string') try{ parent.postMessage({pa:'req',id:'panzoompref',kind:'pref',noteZoom:{id,z}},'*'); }catch(_){ /* no shell (standalone/harness): the zoom holds for this session */ }
     }
     const phoneGest=window.PANotePhone?window.PANotePhone.gesture({
       allowed:()=>phoneOn()&&!txtEdit&&tool!=='select'&&penId===null&&!flipping&&!(flipTouch&&flipTouch.started),
-      begin:()=>{ cancelStroke(); flipTouch=null; scrollTouch=null; pdec('two-finger'); return true; },
+      begin:()=>{ cancelStroke(); flipTouch=null; scrollTouch=null; zoomId=NB&&NB.id; pdec('two-finger'); return true; },
       zoomNow,
-      pan:(dx,dy)=>{ stage.scrollLeft+=dx; stage.scrollTop+=dy; },
-      zoom:applyZoomLive,
+      // A pen that lands mid-gesture owns the page: the fingers stop moving it (its stroke's transform).
+      pan:(dx,dy)=>{ if(penId!==null) return; stage.scrollLeft+=dx; stage.scrollTop+=dy; },
+      zoom:(z,cx,cy)=>{ if(penId!==null||!NB||NB.id!==zoomId) return; applyZoomLive(z,cx,cy); },
       end:endZoom,
     }):null;
     // .pan-phone on the pad (the toggle's CSS reads it); crossing the breakpoint re-fits the page, since
     // zoomNow() is 1 off a phone. The first call is the attach itself: nothing to re-fit yet.
-    { let first=true; if(window.PANotePhone) window.PANotePhone.watch(host,()=>{ if(first){ first=false; return; } if(W) setupCanvases(); },listenG); }
+    { let first=true; if(window.PANotePhone) window.PANotePhone.watch(host,on=>{ if(first){ first=false; return; }
+      if(!on&&fingerDefaulted){ fingerDraw=false; fingerDefaulted=false; showFinger(); syncPan(); }   // the phone default leaves with the phone
+      if(W) setupCanvases(); },listenG); }
     function onDown(e){
       if(flipping){ pdec('refused-flipping',e); return; }
       // (No closePops here: with a popover open, the outside tap is swallowed by onPopOutside
@@ -3619,6 +3624,7 @@
       pdec('extend',e); extendStroke(e);
     }
     function onUp(e){
+      const gestUp=e.pointerType==='touch'&&!!phoneGest&&phoneGest.up(e);   // every touch lift reaches the tracker (a tool switch mid-gesture too)
       if(tool==='select'){
         if(e.pointerType==='pen'&&penId===e.pointerId){ try{ ink.releasePointerCapture(e.pointerId); }catch(_){ /* harmless */ } penId=null; }
         // A stroke begun BEFORE a switch to Select ends with its own lift. It used to be skipped
@@ -3627,7 +3633,7 @@
         pdec('select-up',e); selUp(e); return;
       }
       if(e.pointerType==='touch'){                              // settle/snap the edge-swipe (pointercancel → snap back)
-        if(phoneGest&&phoneGest.up(e)) return;
+        if(gestUp) return;
         if(fingerDraw){ if(strokePtr===e.pointerId){ pdec('finger-end',e); inkEnd(); } else pdec('touch-not-owner',e); return; }
         fingerFlipEnd(e); return; }
       if(penId!==null && e.pointerId!==penId && e.pointerType==='pen'){ pdec('other-pen',e); return; }

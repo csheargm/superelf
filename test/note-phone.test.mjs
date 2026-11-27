@@ -76,9 +76,25 @@ test('note-ui wires it: the routing asks the tracker first, and k carries the zo
   assert.match(NU, /<!--PA_NOTE_PHONE_UI-->/, 'note-ui carries the marker');
   assert.match(NU, /if\(phoneGest&&phoneGest\.down\(e\)\)\{ e\.preventDefault\(\); return; \}/);
   assert.match(NU, /if\(phoneGest&&phoneGest\.move\(e\)\) return;/);
-  assert.match(NU, /if\(phoneGest&&phoneGest\.up\(e\)\) return;/);
+  assert.match(NU, /if\(gestUp\) return;/);
   assert.match(NU, /k=kFit\*zoomNow\(\)/);
   assert.match(NU, /if\(!phoneOn\(\)\|\|!window\.PANotePhone\) return 1;/, 'off a phone the zoom is always 1');
   const WEB = fs.readFileSync(new URL('../web.mjs', import.meta.url), 'utf8');
   assert.match(WEB, /\{ marker: '<!--PA_NOTE_PHONE_UI-->', file: 'note-phone\.inline\.html' \}/);
+});
+
+test('GPT r1: the order two parallel moves arrive in never reads as a pinch', () => {
+  const { g, log } = rig(load(true));
+  g.down(ev('pointerdown', 1, 100, 300, true)); g.down(ev('pointerdown', 2, 200, 300));
+  for (let y = 240; y >= 0; y -= 60) { g.move(ev('pointermove', 1, 100, y)); g.move(ev('pointermove', 2, 200, y)); }
+  assert.deepEqual(log.zoom, [], 'one finger 60px ahead of the other is not a change of spread');
+  assert.ok(log.pan[1] > 200, 'it is a scroll');
+});
+
+test('GPT r1: a pinch belongs to the note it started on; a pen mid-gesture freezes the page', () => {
+  const NU = fs.readFileSync(new URL('../web/note-ui.inline.html', import.meta.url), 'utf8');
+  assert.match(NU, /if\(!NB\|\|NB\.id!==id\)\{ liveZoom=0; return; \}/, 'endZoom drops a pinch whose note was replaced');
+  assert.match(NU, /pan:\(dx,dy\)=>\{ if\(penId!==null\) return;/);
+  assert.match(NU, /zoom:\(z,cx,cy\)=>\{ if\(penId!==null\|\|!NB\|\|NB\.id!==zoomId\) return;/);
+  assert.match(NU, /const gestUp=e\.pointerType==='touch'&&!!phoneGest&&phoneGest\.up\(e\);[^\n]*\n\s+if\(tool==='select'\)\{/, 'a lift in Select still reaches the tracker');
 });
