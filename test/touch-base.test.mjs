@@ -35,10 +35,10 @@ test('the shell inlines the touch base too', () => {
   assert.ok(!html.includes('/* PA_TOUCH_BASE_CSS */'), 'marker replaced');
 });
 
-test('#13 the home date is short under 480px (no year), full on a wide screen', () => {
+test('the home date carries the year on every width (owner 2026-11-27, replaces the #13 short form)', () => {
   const src = fs.readFileSync(path.join(ROOT, 'web/home-look.js'), 'utf8');
   const NOW = new Date(2026, 10, 24, 20);
-  for (const [w, want] of [[390, ['11月24日 周二', 'Tue, Nov 24']], [1024, ['2026年11月24日 周二', 'Tue, Nov 24, 2026']]]) {
+  for (const [w, want] of [[390, ['2026年11月24日 周二', 'Tue, Nov 24, 2026']], [1024, ['2026年11月24日 周二', 'Tue, Nov 24, 2026']]]) {
     const ctx = { window: { innerWidth: w }, document: {}, Intl, Date };
     vm.runInNewContext(src + ';this.L=PAHomeLook;', ctx);
     assert.deepEqual([...ctx.L.dateLine(NOW)], want, `${w}px`);

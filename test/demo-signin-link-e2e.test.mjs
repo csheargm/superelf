@@ -94,7 +94,7 @@ test('asking for a link: 429 says "too many, about an hour"; success says open i
   await shot(page, 'rate-limit.png');
   sb.replies['/auth/v1/otp'] = () => ({ status: 500, body: {} });
   await page.click('#demoAuth button[type=submit]');
-  await waitFor(async () => (await noteText(page)) === SIGNIN_LABELS.fail, 'the generic line for an unknown error');
+  await waitFor(async () => (await noteText(page)) === zh(SIGNIN_LABELS.fail), 'the generic line for an unknown error');
   delete sb.replies['/auth/v1/otp'];
   await page.click('#demoAuth button[type=submit]');
   await page.locator('#demoAuthSame').waitFor();

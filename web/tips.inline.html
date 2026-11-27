@@ -34,7 +34,7 @@
   background:var(--card,#fff);color:var(--ink,#1d2321);border:1px solid var(--accent,#0f6355);
   box-shadow:0 4px 14px rgba(0,0,0,.18);opacity:0;transition:opacity .15s ease;cursor:pointer}
 .pat-tip.on{opacity:1}
-.pat-tip>span{align-self:center}
+.pat-tip>span{align-self:center;flex:1 1 auto;min-width:0;white-space:normal;overflow-wrap:anywhere;text-overflow:clip}
 .pat-x{flex:none;box-sizing:border-box;width:44px;height:44px;margin:-8px -10px -8px 0;border:none;background:none;color:var(--muted,#6b7370);font-size:16px;padding:0;cursor:pointer;font-family:inherit}
 @media(prefers-color-scheme:dark){.pat-tip{background:var(--card,#1c2321);color:var(--ink,#e8ecea);box-shadow:0 4px 14px rgba(0,0,0,.5)}}
 @media(prefers-reduced-motion:reduce){.pat-tip{transition:none}}
@@ -152,7 +152,8 @@
   // lives on <html> (outside that selector), has an explicit width, and any remaining offset of its containing
   // block is read back from a probe position and subtracted.
   function place(tip,el){
-    const W=window.innerWidth||0, H=window.innerHeight||0, w=Math.max(0,Math.min(MAX_W_PX,W-2*EDGE_PX));
+    // W: the layout viewport WITHOUT a desktop scrollbar (innerWidth counts it: a right-edge tip ran under it).
+    const W=(document.documentElement&&document.documentElement.clientWidth)||window.innerWidth||0, H=window.innerHeight||0, w=Math.max(0,Math.min(MAX_W_PX,W-2*EDGE_PX));
     tip.style.width=w+'px'; tip.style.maxWidth=w+'px'; tip.style.left=EDGE_PX+'px'; tip.style.top=EDGE_PX+'px';
     const a=el.getBoundingClientRect(), b=tip.getBoundingClientRect(), h=b.height||0;
     const bar=typeof el.closest==='function'?el.closest(BAR_SEL):null, v=bar?bar.getBoundingClientRect():a;   // vertical: the bar's edges; horizontal: the control's
@@ -162,7 +163,8 @@
     // Candidates in order of preference; the first one that covers no control wins, else the one covering fewest.
     const tops=[v.bottom+GAP_PX,v.top-GAP_PX-h,a.bottom+GAP_PX,a.top-GAP_PX-h].filter(fits);
     if(!tops.length) tops.push(H-v.bottom>v.top?H-EDGE_PX-h:EDGE_PX);
-    const lefts=[clampL(a.left),clampL(a.right-w)];
+    // An anchor in the right third (the home ⋯) aligns the tip's RIGHT edge with it, so the box grows inward, not off the page.
+    const RIGHT_THIRD=2/3, lefts=(a.left+a.right)/2>W*RIGHT_THIRD?[clampL(a.right-w),clampL(a.left)]:[clampL(a.left),clampL(a.right-w)];
     const ctrls=controls(tip,el);
     let best=null;
     // Then, if every spot beside the bar covers something, the nearest free band in the viewport (SCAN_PX steps).

@@ -35,11 +35,16 @@
   if(!chosen) chosen=device();
   const subs=new Set();
   const get=()=>(both?'both':chosen);
-  // "中文 · English" → ['中文','English']: the 中文 parts first, then the parts with no 中文 at all. Else null.
+  // "中文 · English" (or "English · 中文") → ['中文','English']: the 中文 parts and the parts with no 中文 at all, either order. Else null.
   function split(s){
     const parts=String(s).split(SEP); if(parts.length<2) return null;
     let k=0; while(k<parts.length&&CJK.test(parts[k])) k++;
-    if(k<1||k>=parts.length) return null;
+    if(k<1){ // English first (the live demo notice puts its English half first): the same split, mirrored
+      while(k<parts.length&&!CJK.test(parts[k])) k++;
+      const en=parts.slice(0,k), zh=parts.slice(k);
+      if(!zh.length||zh.some((p)=>!CJK.test(p))||!en.some((p)=>LATIN.test(p))) return null;
+      return [zh.join(SEP),en.join(SEP)]; }
+    if(k>=parts.length) return null;
     const rest=parts.slice(k); if(rest.some((p)=>CJK.test(p))||!rest.some((p)=>LATIN.test(p))) return null;
     return [parts.slice(0,k).join(SEP),rest.join(SEP)];
   }
