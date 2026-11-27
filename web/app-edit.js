@@ -69,7 +69,7 @@ const PAAppEdit=(()=>{
   function build(slug,title){
     if(!$('#aeStyle')){ const st=document.createElement('style'); st.id='aeStyle'; st.textContent=CSS; document.head.appendChild(st); }
     const el=document.createElement('div'); el.id='aePanel';
-    el.innerHTML='<div class="ae-h"><b id="aeTitle"></b><button class="plain" id="aeUndo" style="display:none">撤销 · Undo</button><button class="plain" id="aeClose" title="关闭 · Close" aria-label="Close">✕</button></div>';
+    el.innerHTML='<div class="ae-h"><b id="aeTitle"></b><button class="plain" id="aeUndo" style="display:none">撤销 · Undo</button><button class="plain" id="aeClose" title="关闭 · Close" aria-label="关闭 · Close">✕</button></div>';
     el.querySelector('#aeTitle').textContent=title;
     const fr=document.createElement('iframe'); fr.id='aefr'; fr.setAttribute('sandbox','allow-scripts'); el.appendChild(fr);
     document.body.appendChild(el);
