@@ -17,6 +17,12 @@ const serverRoot = () => { const pid = execSync(`lsof -nP -iTCP:${port} -sTCP:LI
 const PHONE = { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 };
 const IPAD = { viewport: { width: 820, height: 1180 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 };
 const TOP_INK = { p: [[0.1, 0.004, 0.5], [0.4, 0.008, 0.5]], c: '#1c1e1d', w: 0.004, t: 'pen' };
+// A dot far down the page: the page grows to its ink (note-ui pageExtent), so the stage always has
+// far more scroll room than the pan below travels. Without it the room was only the page's tail
+// past the viewport — 61px to 151px depending on the bar's measured clearance — and a correct pan
+// was clamped below the 100px the test asked for (CI flake, v5.37.0).
+const DEEP_INK = { p: [[0.5, 5, 0.5], [0.502, 5.002, 0.5]], c: '#1c1e1d', w: 0.004, t: 'pen' };
+const PAN_TRAVEL = 295;   // the two-finger centre moves 595 → 300 while both are down
 const IDS = ['phoneA', 'phoneB'];
 let root;
 const notePath = (id) => path.join(root, 'workspace', 'data', 'notes', `entry-${id}.json`);
@@ -26,7 +32,7 @@ function seed() {
   const d = path.join(root, 'workspace', 'data', 'notes'); fs.mkdirSync(d, { recursive: true });
   const t = Date.now();
   IDS.forEach((id) => fs.writeFileSync(notePath(id), JSON.stringify({ v: 2, id, created: t, updated: t, template: 'plain',
-    pages: [{ id: 'p' + id, created: t, updated: t, strokes: [TOP_INK], pageHtml: '', images: [] }] })));
+    pages: [{ id: 'p' + id, created: t, updated: t, strokes: [TOP_INK, DEEP_INK], pageHtml: '', images: [] }] })));
   fs.writeFileSync(path.join(d, 'journal.json'), JSON.stringify({ v: 1, entries: IDS.map((id, i) => ({ id, title: id, created: t - i, updated: t - i, preview: '' })) }));
 }
 const open = async (page, frame, id) => { await frame.evaluate((i) => openEntry(i), id); await page.waitForTimeout(500); };
@@ -109,13 +115,15 @@ test('iPhone: two fingers pan with no new ink; a pinch zooms, is clamped to 3x a
   await open(page, frame, 'phoneA');
   const n0 = strokesOnDisk('phoneA');
   const s0 = await state(frame);
+  const room = await frame.evaluate(() => { const st = document.querySelector('.pan-stage'); return st.scrollHeight - st.clientHeight - st.scrollTop; });
+  assert.ok(room > PAN_TRAVEL, `precondition: the page has room to pan ${PAN_TRAVEL}px (has ${room})`);
   // First finger starts (it would ink), second lands: the stroke is dropped and both fingers move up.
   await touches(frame, [['pointerdown', 21, 150, 600, true], ['pointermove', 21, 152, 590], ['pointerdown', 22, 250, 600],
     ['pointermove', 21, 150, 450], ['pointermove', 22, 250, 450], ['pointermove', 21, 150, 300], ['pointermove', 22, 250, 300],
     ['pointerup', 22, 250, 300], ['pointermove', 21, 150, 200], ['pointerup', 21, 150, 200]]);
   await settle(page);
   const s1 = await state(frame);
-  assert.ok(s1.top > s0.top + 100, `two fingers scrolled the page (${s0.top} → ${s1.top})`);
+  assert.ok(Math.abs(s1.top - s0.top - PAN_TRAVEL) <= 1, `two fingers scrolled the page by their travel, ${PAN_TRAVEL}px (${s0.top} → ${s1.top})`);
   assert.equal(strokesOnDisk('phoneA'), n0, 'no ink from the two-finger move (nor from the finger left down)');
   assert.equal(s1.zoom, s0.zoom, 'a parallel move does not zoom');
   // Pinch out 2x.

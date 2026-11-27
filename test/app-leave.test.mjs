@@ -230,18 +230,20 @@ test('USER FLOW (the shell\'s own markup): open Notes, ← Home, open Bible — 
   assert.equal(fresh.parent.children.indexOf(fresh) + 1, fresh.parent.children.indexOf(notes), 'and the fresh one sits just before it');
   assert.equal(notes.style.display, 'none');
   assert.match(notes.src, /\/app\/u1\/notes\/$/, 'not navigated');
-  assert.deepEqual(s.posted.map((p) => p.m), [{ pa: 'leaving' }], 'Notes was told it is leaving');
+  assert.deepEqual(notes.posted.map((p) => p.m), [{ pa: 'leaving' }], 'Notes was told it is leaving');
   s.openApp('u1', 'bible', 'Bible');
-  assert.equal(s.byId('fr'), fresh, 'the next app loads into the fresh frame');
-  assert.match(fresh.src, /\/app\/u1\/bible\/$/);
+  const bible = s.byId('fr');
+  assert.equal(fresh.parent, null, 'the next app replaces the src-less frame Home left');
+  assert.equal(bible.parent.children.indexOf(bible) + 1, bible.parent.children.indexOf(notes), 'in its place, just before the held Notes');
+  assert.match(bible.srcAtInsert, /\/app\/u1\/bible\/$/, 'its src set BEFORE it was inserted: a first load, never a Back entry (even when the browser restored #fr)');
   assert.equal(s.held.size, 1, 'while Notes is still held');
   for (const fn of s.messages) fn({ source: notes.contentWindow, data: { pa: 'left' } });
   s.clock.advance(QUIET);
   assert.equal(s.held.size, 0);
   assert.equal(notes.parent, null, 'then Notes is removed from the page');
-  boots(fresh);
+  boots(bible);
   s.goHome();
-  assert.deepEqual(fresh.posted.map((p) => p.m), [{ pa: 'leaving' }], 'and Home leaves Bible the same way');
+  assert.deepEqual(bible.posted.map((p) => p.m), [{ pa: 'leaving' }], 'and Home leaves Bible the same way');
 });
 
 test('a chat stream that outlives the leave keeps going to the page that asked, never to the next app', async () => {
@@ -287,6 +289,6 @@ test('openApp and goHome leave through appFrameLeave, and nothing else loads or 
   assert.match(home, /appFrameLeave\(\);/, 'goHome leaves');
   // Enumerated, not trusted: every assignment to a frame's src in the shell.
   const sets = [...code.matchAll(/(?:\$\('#fr'\)|\bnu|\bfr|\bel)\.src=[^;]*;/g)].map((m) => m[0]).sort();
-  assert.deepEqual(sets, ['fr.src=url;'],
-    'only PASW.frameLoad (openApp\'s one call) loads an app; the fresh frame has no src at all (about:blank would leave a Back entry)');
+  assert.deepEqual(sets, ['nu.src=url;'],
+    'only appFrameLoadSrc (PASW.frameLoad, openApp\'s one call) loads an app, into a clone before it is inserted; the fresh frame Home leaves has no src at all (about:blank would leave a Back entry)');
 });

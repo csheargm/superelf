@@ -44,6 +44,7 @@ export function node(tag, { id = '', className = '' } = {}, parent = null) {
       return c;
     },
     before: (n) => { n.srcAtInsert = n.src; n.parent = el.parent; el.parent.children.splice(el.parent.children.indexOf(el), 0, n); },   // an iframe loads its src when inserted
+    replaceWith: (n) => { n.srcAtInsert = n.src; n.parent = el.parent; el.parent.children.splice(el.parent.children.indexOf(el), 1, n); el.parent = null; },   // the app loads into a fresh frame (web/app-frame.js)
     remove: () => { if (el.parent) el.parent.children.splice(el.parent.children.indexOf(el), 1); el.parent = null; },
     blur: () => { el._blurred = (el._blurred || 0) + 1; if (el._doc && el._doc.activeElement === el) el._doc.activeElement = el._doc.body; },
   };
@@ -134,11 +135,13 @@ export function runShellNav(src = SHELL, clock = fakeClock()) {
   const { makeSwClient } = new Function(`${swBlock.slice(0, swBlock.indexOf('const PASW=makeSwClient('))}\nreturn { makeSwClient };`)();
   const PASW = makeSwClient({ sw: null, loaded: () => '', frame: () => s.$('#fr'), fetchText: async () => { throw new Error('no network in this harness'); },
     fetchJson: async () => { throw new Error('no network in this harness'); }, fetchBytes: async () => { throw new Error('no network in this harness'); },
+    loadSrc: (f, u) => run.appFrameLoadSrc(f, u), loadDoc: (f, h) => run.appFrameLoadDoc(f, h),
     probeFrame: () => ({ remove() {} }), onMessage: () => () => {}, storage: null, setTimeout: clock.setTimeout, clearTimeout: clock.clearTimeout });
   const names = ['$', 'window', 'setTimeout', 'clearTimeout', 'shellBehindApp', 'UID', 'promoteApp', 'closeDrawer', 'barHide',
     'setConvo', 'loadApps', 'loadConvos', 'showEmptyState', 'refreshChatModels', 'PASW'];
+  let run = null;
   // eslint-disable-next-line no-new-func
-  const run = new Function(...names, `${frameSlug[0]}\n${block}\n${open[0]}\n${home}\nreturn { openApp, goHome, held: appFramesHeld };`)(
+  run = new Function(...names, `${frameSlug[0]}\n${block}\n${open[0]}\n${home}\nreturn { openApp, goHome, held: appFramesHeld, appFrameLoadSrc, appFrameLoadDoc };`)(
     s.$, window, clock.setTimeout, clock.clearTimeout, s.shellBehindApp, 'u1', noop, noop, noop, noop, noop, noop, noop, noop, PASW);
   return { ...s, ...run, clock, messages, PASW };
 }

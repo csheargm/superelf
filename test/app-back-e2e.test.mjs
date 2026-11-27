@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT } from './helpers-app.mjs';
 import { skip, chromium } from './helpers-note-link.mjs';
-import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, OWNER_TOKEN } from './helpers-web.mjs';
+import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, waitFor, OWNER_TOKEN } from './helpers-web.mjs';
 
 const SHOTS = process.env.PA_BACK_SHOTS || '';
 let port, web, root;
@@ -114,6 +114,29 @@ for (const [label, engine, opts] of ENGINES) {
       await page.waitForTimeout(500);
       assert.ok(await page.evaluate(() => history.length) <= len, 'the srcdoc load added no history entry of the frame\'s own');
       await page.goBack({ waitUntil: 'commit' }).catch(() => {}); await homeShown(page);
+    } finally { await browser.close(); }
+  });
+
+  // CI flake v5.37.0 (desktop, chromium): Forward back onto the shell is a fresh load, and the browser
+  // RESTORES #fr to the app page it last held (frame history restoration) before any script runs. Loading
+  // the next app by setting src on that already-navigated frame added a history entry of the frame's own:
+  // Back then only stepped the hidden frame, the shell kept its app entry, and Home never showed. A
+  // different app than the restored one makes it certain (the same URL is folded into a replace).
+  test(`${label}: after Forward reloads the shell, the next app adds no frame entry — Back shows Home`, { skip, timeout: 90000 }, async () => {
+    const { browser, page } = await boot(engine, opts);
+    try {
+      await page.evaluate(() => openApp(UID, 'todo', 'Todo')); await frameApp(page, 'todo');
+      await page.goBack({ waitUntil: 'commit' }).catch(() => {}); await homeShown(page);
+      await page.goBack({ waitUntil: 'commit' }).catch(() => {});
+      await page.waitForURL(/\/blank-before$/, { timeout: 10000 });
+      await page.goForward({ waitUntil: 'commit' }).catch(() => {});
+      await page.waitForFunction(() => typeof openApp === 'function' && document.querySelector('#dot.ok'));
+      const len = await page.evaluate(() => history.length);
+      await page.evaluate(() => openApp(UID, 'sums', 'Sums')); await frameApp(page, 'sums');
+      // the page itself has loaded in a frame (src route: its URL; srcdoc route: its heading)
+      await waitFor(async () => { for (const f of page.frames()) if (f !== page.mainFrame() && await f.$eval('#h', (h) => h.textContent).catch(() => '') === 'Sums') return true; return false; }, 'the Sums page loaded', { timeoutMs: 10000 });
+      assert.equal(await page.evaluate(() => history.length), len, 'the app\'s load added no history entry of the frame\'s own');
+      await page.goBack({ waitUntil: 'commit', timeout: 10000 }).catch(() => {}); await homeShown(page);
     } finally { await browser.close(); }
   });
 
