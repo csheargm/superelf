@@ -6,12 +6,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { skip } from './helpers-note-link.mjs';
+import { skip, chromium } from './helpers-note-link.mjs';
 import { selfpubFixture, tgit } from './helpers-selfpub.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
 import { makeRenderer, playwrightPath, PHONE, NOT_VISIBLE, PREVIEW_MARKERS } from '../lib/selfpub/render.mjs';
 import { fillShellMarkers } from '../lib/shellhtml.mjs';
 import { writeVerLine } from './helpers-selfpub-verline.mjs';
+
+const REAL_WEB = new URL('../web/', import.meta.url).pathname;
 
 function checkout(fx) {
   const dir = path.join(fx.d, 'co'); tgit(fx.d, 'clone', '-q', fx.bare, dir); return dir;
@@ -67,4 +69,63 @@ test('fillShellMarkers: every build marker filled, a $ in a value kept literally
   assert.equal(html, 'v1 $&|t|d|{"a":1}');
   assert.doesNotMatch(fillShellMarkers('<!--APP_VERSION-->', PREVIEW_MARKERS), /<!--/);
   assert.doesNotMatch(fs.readFileSync(new URL('../web.mjs', import.meta.url), 'utf8'), /\.replace\('<!--APP_VERSION-->'/, 'web.mjs fills through the shared helper');
+});
+
+test('regression: a change that ADDS a shell part (its own web/shell-parts.json) is drawn in After (docs/adr/0049)', { skip, timeout: 120000 }, async () => {
+  const fx = selfpubFixture({ web: true });
+  try {
+    const dir = checkout(fx), render = makeRenderer({ shotsDir: path.join(fx.d, 'shots') });
+    fs.writeFileSync(path.join(dir, 'web', 'skin.js'), "addEventListener('DOMContentLoaded',()=>{ const d=document.createElement('div'); d.textContent='SKIN'; d.style.cssText='position:fixed;left:0;right:0;top:0;height:60px;background:#c2185b;color:#fff'; document.body.appendChild(d); });\n");
+    const idx = path.join(dir, 'web', 'index.html'), list = path.join(dir, 'web', 'shell-parts.json');
+    fs.writeFileSync(idx, fs.readFileSync(idx, 'utf8').replace('/* PA_SELFPUB_JS */', '/* PA_SKIN_JS */\n/* PA_SELFPUB_JS */'));
+    fs.writeFileSync(list, JSON.stringify([...JSON.parse(fs.readFileSync(list, 'utf8')), { marker: '/* PA_SKIN_JS */', file: 'skin.js' }]));
+    const r = await render(dir, ['web/skin.js', 'web/shell-parts.json', 'web/index.html'], 'skin1');
+    assert.equal(r.ok, true, r.note);
+    assert.equal(r.same, false, 'the new part is drawn: the node\'s own parts list used to leave it out, so After equalled Before');
+    // Not just "some pixel differs" (R14, R13 review): the part's own band is in After, and not in Before.
+    const [before, afterPx] = await pixelsAt(r.shots, PHONE.width, 60);   // 2x shots: (195, 30) CSS px, inside the 60px band
+    assert.deepEqual(afterPx, SKIN_RGB, 'After shows the skin part\'s band'); assert.notDeepEqual(before, SKIN_RGB, 'Before does not');
+  } finally { rmTemp(fx.d); }
+});
+
+const SKIN_RGB = [0xc2, 0x18, 0x5b];
+// The colour at (x, y) of each PNG, read in a real browser (no PNG decoder in the repo).
+async function pixelsAt(pngs, x, y) {
+  const b = await chromium.launch();
+  try {
+    const pg = await b.newPage();
+    return await Promise.all(pngs.map((f) => pg.evaluate(async ([src, px, py]) => {
+      const i = new Image(); i.src = src; await i.decode();
+      const c = document.createElement('canvas'); c.width = i.width; c.height = i.height; const g = c.getContext('2d'); g.drawImage(i, 0, 0);
+      return [...g.getImageData(px, py, 1, 1).data].slice(0, 3);
+    }, [`data:image/png;base64,${fs.readFileSync(f).toString('base64')}`, x, y])));
+  } finally { await b.close(); }
+}
+
+test('GPT review: a Before from a tree with NO parts list (origin/main until 0049 merged) draws, from the frozen legacy list', { skip, timeout: 120000 }, async () => {
+  const fx = selfpubFixture({ web: true });
+  try {
+    const old = path.join(fx.d, 'old'); tgit(fx.d, 'clone', '-q', fx.bare, old);   // origin/main as it was: no web/shell-parts.json, no Try it part
+    fs.rmSync(path.join(old, 'web', 'shell-parts.json')); fs.rmSync(path.join(old, 'web', 'selfpub-try.js'));
+    const idx = path.join(old, 'web', 'index.html'); fs.writeFileSync(idx, fs.readFileSync(idx, 'utf8').replace(/^\/\* PA_SELFPUB_TRY_JS \*\/.*\n/m, ''));
+    tgit(old, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qam', 'legacy main'); tgit(old, 'push', '-q', 'origin', 'HEAD:main');
+    const dir = checkout(fx), render = makeRenderer({ shotsDir: path.join(fx.d, 'shots') });
+    fs.appendFileSync(path.join(dir, 'web', 'home-v2.css'), '\nheader h1{font-size:30px}\n');
+    const r = await render(dir, ['web/home-v2.css'], 'leg01');
+    assert.equal(r.ok, true, r.note); assert.equal(r.same, false);
+    assert.doesNotMatch(r.note, /Before page/, 'Before drew: the node\'s list (with PA_SELFPUB_TRY_JS) used to break it');
+  } finally { rmTemp(fx.d); }
+});
+
+test('a Before that does not draw is a failed check, never a pass by "the shots differ" (R14)', { skip, timeout: 120000 }, async () => {
+  const fx = selfpubFixture({ web: true });
+  try {
+    const old = path.join(fx.d, 'old'); tgit(fx.d, 'clone', '-q', fx.bare, old);   // a main whose shell cannot be built: a marker gone
+    const idx = path.join(old, 'web', 'index.html'); fs.writeFileSync(idx, fs.readFileSync(idx, 'utf8').replace('/* PA_HOME_V2_JS */', ''));
+    tgit(old, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qam', 'broken main'); tgit(old, 'push', '-q', 'origin', 'HEAD:main');
+    const dir = checkout(fx), render = makeRenderer({ shotsDir: path.join(fx.d, 'shots') });
+    fs.writeFileSync(path.join(dir, 'web', 'index.html'), fs.readFileSync(path.join(REAL_WEB, 'index.html')));   // the change repairs it
+    const r = await render(dir, ['web/index.html'], 'brk01');
+    assert.equal(r.ok, false); assert.match(r.note, /The Before page \(origin\/main\) did not draw/);
+  } finally { rmTemp(fx.d); }
 });

@@ -131,3 +131,8 @@ drew nothing; and the fake owner answered `{}` for every list, so Home had no ap
   ready and the reply and card say which file is missing. Known limits: a regex over prose; a path named
   only as context counts as a claim (safe side), an unnamed file is not seen.
 
+## Try it, and a copy's own parts list (2026-11-27)
+
+ADR 0049: the shell's parts list moved to data (`web/shell-parts.json`), so the render check draws a
+copy that adds a part; and the Publish sheet gained 试用 · Try it, the change's own shell in a walled
+preview (opaque-origin sandbox, CSP to the fake API only, owner-issued short-lived token).

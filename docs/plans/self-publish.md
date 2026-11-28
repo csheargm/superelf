@@ -18,6 +18,8 @@ ADR: docs/adr/0044-self-publish.md. Approved by the owner 2026-11-25.
 3. Agent turn with `coreJailArgs`, cwd = checkout. Backstop on tool calls.
 4. Server runs the affected tests and the iPhone render. Reply: server template, then the model's summary.
 5. Under the reply: 发布 · Publish (phase 2). Preview shows files, diff, scan; security-relevant paths flagged.
+   试用 · Try it in that sheet opens the change's own shell full screen with sample data, walled off from
+   the owner's session (ADR 0049); server changes are not run.
 6. Tap → PR → required checks → merge → release → self-deploy → "已上线 vX · Live".
 
 ## Phases (R2: one concern per session)
@@ -31,7 +33,9 @@ ADR: docs/adr/0044-self-publish.md. Approved by the owner 2026-11-25.
 
 `selfpub_root`, `selfpub_max_files` (40), `selfpub_max_diff_kb` (512), `selfpub_test_ms` (5 min),
 `selfpub_max_mb` (300), `selfpub_lock_max_ms` (30 min, floor 5 min: a lock that stopped heartbeating this
-long is reclaimed; lib/selfpub/lock.mjs). The token stays `github_publish_token`.
+long is reclaimed; lib/selfpub/lock.mjs), `selfpub_try_minutes` (30: how long a Try it preview link
+lives; lib/selfpub/try.mjs), `selfpub_try_snapshot_mb` (32: the cap on the frozen web/ copy a Try it tap makes;
+lib/selfpub/try-snapshot.mjs). The token stays `github_publish_token`.
 
 ## Owner decisions (2026-11-25): see ADR 0044 "Owner decisions". Earlier open items, for the record:
 

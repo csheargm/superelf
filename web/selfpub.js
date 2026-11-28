@@ -72,7 +72,7 @@ const PASelfPub=(()=>{
     const p=j.preview;
     if(p.hits.length) return PAPublish.sheet(PAPublish.hitsHtml(p.hits));
     const files=p.files.map(f=>`<li><code>${esc(f.path)}</code> (${f.bytes} B)${f.security?' <b>⚠ 安全相关 · security-relevant</b>':''}</li>`).join('')+p.deletes.map(d=>`<li><code>${esc(d)}</code> 删除 · deleted</li>`).join('');
-    const s=PAPublish.sheet(`<p id="spWhat"><b>发布这个 superelf 改动 · Publish this change to superelf</b></p><p id="spTitle">公开的 PR 标题 · Public PR title: <code>${esc(p.title||'')}</code></p>${checksHtml(p)}`
+    const s=PAPublish.sheet(`<p id="spWhat"><b>发布这个 superelf 改动 · Publish this change to superelf</b></p><p id="spTitle">公开的 PR 标题 · Public PR title: <code>${esc(p.title||'')}</code></p>${checksHtml(p)}${PASelfPubTry.button()}`   // Try it on screen as the sheet opens, never below the shots
       // Files and the diff BEFORE the shots: two tall phone shots pushed the list below the fold, so the card looked like one file (owner 2026-11-26).
       +`<p><b>改动的文件（${p.files.length+p.deletes.length}） · Files changed (${p.files.length+p.deletes.length})</b></p><ul id="spFiles">${files}</ul>`
       +(p.refused.length?`<p id="spRefused"><b>含不允许发布的文件 · Has files that are never published:</b> ${p.refused.map(x=>esc(x.file)).join(', ')}</p>`:'')
@@ -81,14 +81,16 @@ const PASelfPub=(()=>{
       p.ready&&!p.refused.length);
     // The handler goes on NOW, before any await: a later preview reuses the same sheet, and a stale one must never publish it (GPT review).
     const close=s.onclick; s.onclick=(e)=>{ if(mine!==openSeq) return close(e); if(e.target.closest('[data-pub="go"]')){ s.onclick=close; go(id,p.hash,s); }
+      else if(e.target.closest('[data-sp="try"]')) PASelfPubTry.open(id);   // 试用 · Try it (web/selfpub-try.js, docs/adr/0049)
       else if(e.target.closest('[data-sp="discard"]')){ s.remove(); discard(id); } else close(e); };
+    PASelfPubTry.armTip();
     const box=s.querySelector('#spShots');
     if(p.verify&&p.verify.render&&p.verify.render.same) return;   // pixel-identical shots prove nothing: the checks line says so, no pictures
     for(const n of [0,1]){ const u=await shotUrl(id,n); if(!u) continue; if(mine!==openSeq||!box.isConnected){ URL.revokeObjectURL(u); continue; } const f=document.createElement('figure'); f.style.cssText='margin:0;flex:1;min-width:0';
       f.innerHTML=`<img src="${u}" onload="URL.revokeObjectURL(this.src)" alt="" style="width:100%;border:1px solid currentColor;border-radius:8px"><figcaption style="font-size:11px;text-align:center">${n?'改后 · After':'改前 · Before'}</figcaption>`; box.appendChild(f); }
   }
   async function go(id,hash,s){
-    s.querySelectorAll('#pubGo,[data-sp="discard"]').forEach(b=>b.remove());
+    s.querySelectorAll('#pubGo,[data-sp="discard"],[data-sp="try"]').forEach(b=>b.remove());   // on its way: nothing left to try or drop
     const r=await post(id,'publish',{hash}); const j=await r.json().catch(()=>({error:'回复无效 · Bad answer'}));
     if(j.code==='TOKEN_MISSING') return PAPublish.tokenNeeded(j);
     const st=j.status||{state:'failed',step:'',error:j.error||String(r.status)};

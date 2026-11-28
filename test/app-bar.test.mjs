@@ -231,7 +231,7 @@ test('R3: ONE handle size for the shell and PAAppBar (web/bar-handle.css), inlin
   }
   assert.match(bar, /\.paab-handle\{[^}]*width:var\(--pa-handle-w\);height:var\(--pa-handle-h\)/);
   assert.match(shell, /#barpeek\{[^}]*width:var\(--pa-handle-w\); height:var\(--pa-handle-h\)/);
-  assert.match(read('lib/shellhtml.mjs'), /\['\/\* PA_BAR_HANDLE_CSS \*\/', 'bar-handle\.css'\]/);
+  assert.ok(JSON.parse(read('web/shell-parts.json')).some((e) => e.marker === '/* PA_BAR_HANDLE_CSS */' && e.file === 'bar-handle.css'), 'a shell part (web/shell-parts.json, docs/adr/0049)');
   assert.match(read('web.mjs'), /marker: '\/\* PA_BAR_HANDLE_CSS \*\/', file: 'bar-handle\.css'/);
 });
 
