@@ -1935,7 +1935,7 @@ const server = http.createServer(async (req, res) => {
       return sendFile(res, f, { type, extra });
     }
 
-    if (handleTryPage(req, res, p, { send, demo: demoOn(cfg) })) return;   // 试用 · Try it: the owner-issued preview token is the key, never the session (docs/adr/0049). TODO(R4 seam): with the selfpub routes into lib/publish-routes-table.mjs
+    if (handleTryPage(req, res, p, { send, demo: demoOn(cfg), alive: (sess) => userForToken(sess, req) })) return;   // 试用 · Try it: the owner-issued preview token is the key, never the session (docs/adr/0049). TODO(R4 seam): with the selfpub routes into lib/publish-routes-table.mjs
     if (p === SW_PROBE_PATH) { res.writeHead(204); return res.end(); }   // only the worker answers it; the node's empty 204 is the silence the probe waits out — no 401/404 noise per load (F4-4)
     const user = userFor(req);
     if (!user) return send(res, 401, 'application/json', cfg.sessions.wasRemoved(bearerOf(req), Date.now()) ? ACCOUNT_REMOVED_BODY : '{"error":"bad token"}');
@@ -1991,7 +1991,7 @@ const server = http.createServer(async (req, res) => {
     if (await handleAlertsRoute(req, res, p, { user, cfg, readBody: (r) => readBody(r, BODY_LIMITS.control), send, audit, demo: demoOn(cfg) })) return;   // owner alerts + host actions (docs/adr/0041)
     if (await handlePublishRoute(req, res, p, { user, cfg, root: ROOT, slugOk, ownAppDir, readBody: (r) => readBody(r, BODY_LIMITS.control), send, audit, demo: demoOn(cfg) })) return;   // owner-only Publish (docs/adr/0039)
     if (await handleOwnerShareRoute(req, res, p, { user, cfg, root: ROOT, ownAppDir, readBody: (r) => readBody(r, BODY_LIMITS.control), send, audit, mail: MAIL, demo: demoOn(cfg) })) return;   // 分享 · Share by link → the demo (lib/app-share-routes.mjs)
-    if (await handleSelfpubRoute(req, res, p, { user, cfg, root: ROOT, readBody: (r) => readBody(r, BODY_LIMITS.control), send, audit, demo: demoOn(cfg), version: appVersion, apiKey: apiKeyBlocked(req, user) })) return;   // version: a function, read only on a selfpub GET (it hashes files: never per request). owner-only core Publish (docs/adr/0044). TODO(R4 seam): the owner publish routes move to lib/publish-routes-table.mjs
+    if (await handleSelfpubRoute(req, res, p, { user, session: bearerOf(req), cfg, root: ROOT, readBody: (r) => readBody(r, BODY_LIMITS.control), send, audit, demo: demoOn(cfg), version: appVersion, apiKey: apiKeyBlocked(req, user) })) return;   // version: a function, read only on a selfpub GET (it hashes files: never per request). owner-only core Publish (docs/adr/0044). TODO(R4 seam): the owner publish routes move to lib/publish-routes-table.mjs
     // 改这个应用 · Change this app (lib/app-edit.mjs, ADR 0040): the panel page and its 撤销 · Undo. Owner only in Phase 1.
     if (req.method === 'GET' && p === '/api/app-edit/panel') {
       if (user.role !== 'owner' && user.role !== 'member') return send(res, 403, 'application/json', '{"error":"owner only","code":"edit_owner_only"}');   // members and demo guests: own apps only, the no-tools lane (ADR 0042)

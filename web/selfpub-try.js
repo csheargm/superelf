@@ -6,7 +6,9 @@
 const PASelfPubTry=(()=>{
   const TIP_KEY='tip:selfpub-try';
   const TIP='新：发布前先试用这个改动（示例数据） · New: try this change before publishing (sample data)';
-  const BANNER=['预览 — 示例数据，服务器改动不显示','Preview — sample data; server changes not shown'];
+  // The page is the agent's code and fills the screen: it could draw a fake sign-in. What is typed there could leave
+  // (WebRTC, DNS prefetch: outside the CSP, docs/adr/0049), so the banner says not to (R13, GPT review).
+  const BANNER=['预览 — 示例数据，服务器改动不显示；不要在这里输入密码','Preview — sample data; server changes not shown. Never type a password here'];
   const CLOSE='关闭预览 · Close preview';
   const t=(p)=>(window.PALang?PALang.t(p):p.join(' · '));
   const isOwner=()=>typeof ROLE!=='undefined'&&ROLE==='owner';
@@ -23,13 +25,16 @@ const PASelfPubTry=(()=>{
   function say(text){ const s=document.getElementById('pubSheet'); if(!s) return;
     let p=s.querySelector('#spTryErr'); if(!p){ p=document.createElement('p'); p.id='spTryErr'; const b=s.querySelector('#spTry'); if(b) b.before(p); else s.prepend(p); }
     p.textContent=text; }
+  // The tapped button still on screen, in the sheet of THIS change: a slow answer never opens (or reports on) another change's sheet (GPT review).
+  const still=(b,id)=>{ const st=b.isConnected&&b.closest('#pubSheet'), l=st&&st.querySelector('#spSheetState'); return !!(l&&l.getAttribute('data-id')===String(id)); };
   async function open(id){
     if(window.PATips&&window.PATips.current()) window.PATips.hide();
+    const b=document.getElementById('spTry'); if(!b) return;
     let j;
     try{ const r=await api('/api/selfpub/'+encodeURIComponent(id)+'/try',{method:'POST',headers:{'content-type':'application/json'},body:'{}'}); j=await r.json(); }
-    catch(e){ return say('无法打开预览 · Could not open the preview: '+((e&&e.message)||'')); }
+    catch(e){ if(still(b,id)) say('无法打开预览 · Could not open the preview: '+((e&&e.message)||'')); return; }
+    if(!still(b,id)) return;   // the sheet closed or moved on while the link was made: open nothing, say nothing there
     if(!j||typeof j.url!=='string'||!j.url.startsWith('/selfpub-try/')) return say((j&&j.error)||'无法打开预览 · Could not open the preview');
-    if(!document.getElementById('spTry')) return;   // the sheet closed (or moved on) while the link was made: open nothing
     show(j.url);
   }
   function show(url){

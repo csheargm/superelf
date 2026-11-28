@@ -30,7 +30,7 @@ const swEsc=(s)=>String(s).replace(/[&<>"]/g,(c)=>({'&':'&amp;','<':'&lt;','>':'
 // deps: sw → navigator.serviceWorker or null; loaded() → the footer line; frame() → #fr;
 // fetchText(url) → the HTML (any status, so the worker's offline page shows in the frame) or throws;
 // fetchJson(url) → parsed JSON (authenticated) or throws; fetchBytes(url) → byte count or throws;
-// probeFrame(url) → {remove()} a hidden sandboxed iframe; onMessage(fn) → unsubscribe;
+// probeFrame(url) → {remove(), contentWindow} a hidden sandboxed iframe; onMessage(fn(data, source)) → unsubscribe;
 // storage → localStorage or null; setTimeout/clearTimeout; metered() → true on Save-Data / cellular;
 // idle() → resolves when the page is idle; now() → ms (optional, tests).
 // The feature probe: does the worker serve a sandboxed iframe's navigation? A hidden frame
@@ -41,7 +41,7 @@ function swProbe(d){
     let done=false, off=()=>{}, fr=null;
     const settle=(served)=>{ if(done) return; done=true; d.clearTimeout(t); off(); if(fr) fr.remove(); resolve(served?SW_ROUTE_SRC:SW_ROUTE_SRCDOC); };
     const t=d.setTimeout(()=>settle(false),SW_PROBE_MS);
-    off=d.onMessage((m)=>{ if(m&&m.pa===SW_PROBE_KIND) settle(true); });
+    off=d.onMessage((m,src)=>{ if(m&&m.pa===SW_PROBE_KIND&&fr&&src===fr.contentWindow) settle(true); });   // only the probe frame: any other frame (an app, the Try it preview) could post this
     fr=d.probeFrame(SW_PROBE_URL);
   });
 }
@@ -186,7 +186,7 @@ const PASW=makeSwClient({
   fetchJson:async(u)=>{ const r=await api(u); if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); },
   fetchBytes:async(u)=>{ const r=await api(u); if(!r.ok) throw new Error('HTTP '+r.status); return (await r.arrayBuffer()).byteLength; },
   probeFrame:(u)=>{ const f=document.createElement('iframe'); f.setAttribute('sandbox','allow-scripts'); f.style.display='none'; f.src=u; document.body.appendChild(f); return f; },
-  onMessage:(fn)=>{ const h=(e)=>fn(e.data); window.addEventListener('message',h); return ()=>window.removeEventListener('message',h); },
+  onMessage:(fn)=>{ const h=(e)=>fn(e.data,e.source); window.addEventListener('message',h); return ()=>window.removeEventListener('message',h); },
   storage:(()=>{ try{ return window.localStorage; }catch(_){ return null; /* storage blocked: nothing remembered, nothing breaks */ } })(),
   setTimeout:(fn,ms)=>setTimeout(fn,ms), clearTimeout:(t)=>clearTimeout(t),
   // F3-15: the bulk corpus pass waits for an idle page and skips a metered link (Save-Data / cellular / 2g).

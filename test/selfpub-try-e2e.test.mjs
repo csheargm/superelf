@@ -21,6 +21,7 @@ import { rmTemp } from './helpers-tmp.mjs';
 import { hashPassword } from '../lib/auth.mjs';
 
 const SHOTS = process.env.PA_SHOTS || '';
+const TIP_GAP_MAX = 24;   // px: "beside" (PATips' GAP_PX is 8; a little slack for rounding)
 const SKIN = "addEventListener('DOMContentLoaded',()=>{ const d=document.createElement('div'); d.id='skinMark'; d.textContent='SKIN-PART-DRAWN'; d.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:5;padding:6px;background:#c2185b;color:#fff;text-align:center;font:600 13px system-ui'; document.body.appendChild(d); });\n";
 // Writes go through perms().write, so a write the real CLI would deny fails here too.
 const FAKE = `#!/usr/bin/env node
@@ -93,14 +94,35 @@ async function sheetWithTry() {
   await page.click('.sp-row .sp-go');
   await page.locator('#pubSheet #spTry').waitFor({ timeout: 30000 });
   assert.equal((await page.locator('#spTry').textContent()).trim(), '试用', 'PALang: 中文 here (the e2e locale), 试用 · Try it in the source');
-  await page.waitForFunction(() => { const t = document.querySelector('.pat-tip'); return t && /试用这个改动/.test(t.textContent); }, null, { timeout: 10000 });
+  // The shots arrive after the sheet opens and move its layout: the tip must still be BESIDE the button after
+  // that, and fully shown (.on: it fades in), not merely present (R13 review: it sat on the chat text).
+  await page.waitForFunction(() => document.querySelectorAll('#spShots figure img').length === 2 && [...document.querySelectorAll('#spShots img')].every((i) => i.complete), null, { timeout: 30000 });
+  await page.waitForFunction(() => { const t = document.querySelector('.pat-tip.on'); return t && /试用这个改动/.test(t.textContent) && getComputedStyle(t).opacity === '1'; }, null, { timeout: 10000 });
+  await page.waitForTimeout(300);   // a re-place is one frame behind a layout change
+  const near = await page.evaluate(() => { const t = document.querySelector('.pat-tip').getBoundingClientRect(), b = document.getElementById('spTry').getBoundingClientRect();
+    const gap = t.top >= b.bottom ? t.top - b.bottom : b.top >= t.bottom ? b.top - t.bottom : -1;
+    return { gap, across: t.left < b.right && b.left < t.right, tip: [t.top, t.bottom], btn: [b.top, b.bottom] }; });
+  assert.ok(near.gap >= 0 && near.gap <= TIP_GAP_MAX && near.across, `the tip touches its button, above or below, not over it (${JSON.stringify(near)})`);
   await assertFits(page, 'sheet + Try it tip @390');
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'try-sheet-390.png') });
+}
+// GPT review: a slow Try answer that comes back after the sheet moved on (re-opened, another change) opens nothing.
+async function staleAnswer() {
+  // Held in the page's own fetch: WebKit's service worker answers the shell's requests, which Playwright's route() never sees.
+  await page.evaluate(() => { const f0 = window.fetch; window.__f0 = f0; window.__held = 0; window.__hold = new Promise((r) => { window.__release = r; });
+    window.fetch = async (u, o) => { if (/\/api\/selfpub\/[a-z0-9]+\/try$/.test(String(u))) { window.__held++; await window.__hold; } return f0(u, o); }; });
+  await page.click('#pubSheet #spTry');
+  await page.evaluate((id) => { document.getElementById('spTry').dataset.tapped = '1'; PASelfPub.open(id); }, changeId);   // the sheet is drawn again: the tapped button is gone
+  await page.waitForFunction(() => { const b = document.querySelector('#pubSheet #spTry'); return b && !b.dataset.tapped && document.querySelectorAll('#spShots figure').length === 2; }, null, { timeout: 30000 });
+  assert.equal(await page.evaluate(() => window.__held), 1, 'the Try answer really was held (else this proves nothing, R14)');
+  await page.evaluate(() => { window.fetch = window.__f0; window.__release(); }); await page.waitForTimeout(1000);
+  assert.equal(await page.locator('#spTryView').count(), 0, 'the late answer opened nothing over the new sheet');
+  assert.equal(await page.locator('#spTryErr').count(), 0, 'and said nothing there');
 }
 // 2. Inside the preview: banner, sandbox, the new part, and moving around (Settings opens on the sample data).
 async function lookInside(f) {
   const banner = await page.locator('#spTryBanner').textContent();
-  assert.match(banner, /预览/); assert.match(banner, /示例数据，服务器改动不显示/);
+  assert.match(banner, /预览/); assert.match(banner, /示例数据，服务器改动不显示/); assert.match(banner, /不要在这里输入密码/, 'the page could draw a fake sign-in (R13)');
   assert.equal(await page.locator('#spTryFrame').getAttribute('sandbox'), 'allow-scripts', 'no allow-same-origin');
   assert.equal(await page.locator('.pat-tip').count(), 0, 'no shell tip over the preview (the page behind is inert)');
   assert.equal(await page.evaluate(() => document.getElementById('pubSheet').closest('[inert]') !== null), true);
@@ -156,9 +178,11 @@ async function visualCheck() {
 async function navigateAway(f) {
   // Last (it ends the page): the agent's page navigating its own frame to another host is refused.
   // Control first: the recorder does see a request to another host (else an empty list proves nothing, R14).
-  await page.evaluate(() => fetch('http://example.invalid/control').catch(() => { /* aborted by the test's route: expected */ }));
+  // From a page no service worker controls (WebKit's worker fetches past route(); the sandboxed preview has none either).
+  const ctl = await ctx.newPage(); await ctl.evaluate(() => fetch('http://example.invalid/control').catch(() => { /* aborted by the test's route: expected */ })); await ctl.close();
   assert.deepEqual(outside, ['http://example.invalid/control']); outside.length = 0;
-  const refused = []; const onLog = (m) => { if (/Framing 'http:\/\/example\.invalid\/' violates .*"frame-src [^"]*\/page\/"/.test(m.text())) refused.push(m.text()); }; page.on('console', onLog);
+  // Chromium logs "Framing … violates … frame-src"; WebKit "Refused to load … frame-src".
+  const refused = []; const onLog = (m) => { const t = m.text(); if (/example\.invalid/.test(t) && /frame-src/.test(t)) refused.push(t); }; page.on('console', onLog);
   await f.evaluate(() => { location.href = 'http://example.invalid/leak?x=1'; }).catch(() => { /* the frame went away mid-call */ });
   await page.waitForTimeout(1500); page.off('console', onLog);
   assert.deepEqual(outside, [], 'no request left for another host');
@@ -168,6 +192,7 @@ async function navigateAway(f) {
 
 test('owner: Publish sheet → 试用 · Try it (tip beside it) → full-screen preview of the change, walled off', { skip, timeout: 300000 }, async () => {
   await sheetWithTry();
+  await staleAnswer();
   const f = await openTry();
   await lookInside(f);
   await probeWall(f);

@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { validateShellParts, readShellParts, nodeShellParts, MAX_SHELL_PARTS, PARTS_FILE } from '../lib/shell-parts.mjs';
+import { validateShellParts, readShellParts, nodeShellParts, MAX_SHELL_PARTS, PARTS_FILE, LEGACY_SHELL_PARTS } from '../lib/shell-parts.mjs';
 import { readShell, SHELL_PARTS } from '../lib/shellhtml.mjs';
 import { previewAnswer } from '../lib/selfpub/preview-page.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
@@ -15,6 +15,7 @@ import { skipIf } from './helpers-skip.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ok = { marker: '/* PA_X_JS */', file: 'x.js' };
+const LEGACY_PARTS_COUNT = 34;   // lib/shellhtml.mjs SHELL_PARTS on origin/main before ADR 0049: a frozen record never grows
 
 // A copy of this repo's web/ in a temp tree: the same shape a self-publish checkout has.
 function copyTree() {
@@ -66,11 +67,17 @@ test('GPT review: an oversized parts file is refused before it is read; a parts-
   assert.deepEqual(asked, ['web/shell-parts.json']);
 });
 
-test('a copy with no parts file uses this node\'s list; a broken one throws (never read as empty)', () => {
+test('a copy with no parts file uses the FROZEN pre-manifest list, and assembles; a broken one throws (never read as empty)', () => {
   const d = copyTree();
   try {
-    fs.rmSync(path.join(d, 'web', PARTS_FILE));
-    assert.deepEqual(readShellParts(d), nodeShellParts());
+    fs.rmSync(path.join(d, 'web', PARTS_FILE)); fs.rmSync(path.join(d, 'web', 'selfpub-try.js'));   // a tree from before ADR 0049
+    const idx = path.join(d, 'web', 'index.html'); fs.writeFileSync(idx, fs.readFileSync(idx, 'utf8').replace(/^\/\* PA_SELFPUB_TRY_JS \*\/.*\n/m, ''));
+    assert.deepEqual(readShellParts(d), LEGACY_SHELL_PARTS);
+    assert.doesNotThrow(() => readShell(d), 'it assembles: the node list (with PA_SELFPUB_TRY_JS) threw "missing marker" (GPT, R13)');
+    assert.ok(!LEGACY_SHELL_PARTS.some(([m]) => m === '/* PA_SELFPUB_TRY_JS */'));
+    const node = nodeShellParts().map(([m]) => m);   // a record: every frozen entry is still a node part, in the same order
+    assert.deepEqual(LEGACY_SHELL_PARTS.map(([m]) => m), node.filter((m) => LEGACY_SHELL_PARTS.some(([x]) => x === m)));
+    assert.equal(LEGACY_SHELL_PARTS.length, LEGACY_PARTS_COUNT);
     fs.writeFileSync(path.join(d, 'web', PARTS_FILE), '[{"marker":"/* PA_X */","file":"../../config.json"}]');
     assert.throws(() => readShellParts(d), /bad file name/);
     assert.throws(() => readShell(d), /bad file name/);

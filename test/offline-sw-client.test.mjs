@@ -39,13 +39,13 @@ function harness({ sw = 'yes', waiting = false, controlled = true, config = null
     fetchText: async (u) => { log.fetched.push(u); if (!(u in pages)) throw new Error('HTTP 404'); return pages[u]; },
     fetchJson: async (u) => { log.fetched.push(u); if (!config) throw new Error('HTTP 503'); return config; },
     fetchBytes: async (u) => { log.fetched.push(u); if (chapterBytes instanceof Error) throw chapterBytes; return chapterBytes; },
-    probeFrame: (u) => { const p = { url: u, removed: 0, remove: () => { p.removed++; } }; log.probes.push(p); return p; },
+    probeFrame: (u) => { const p = { url: u, removed: 0, contentWindow: { probe: u }, remove: () => { p.removed++; } }; log.probes.push(p); return p; },
     onMessage: (fn) => { msgListeners.push(fn); return () => { msgListeners = msgListeners.filter((f) => f !== fn); }; },
     storage: storage ? { getItem: (k) => (storage.has(k) ? storage.get(k) : null), setItem: (k, v) => storage.set(k, v) } : null,
     setTimeout: clock.setTimeout, clearTimeout: clock.clearTimeout,
     metered: () => (typeof metered === 'function' ? metered() : metered), idle: async () => { log.idled = (log.idled || 0) + 1; }, now: () => now };
   const c = makeSwClient(d);
-  return { c, d, fr, log, clock, storage, setAnswer: (fn) => { answer = fn; }, probeArrives: () => msgListeners.forEach((f) => f({ pa: 'pa-sw-probe' })) };
+  return { c, d, fr, log, clock, storage, setAnswer: (fn) => { answer = fn; }, probeArrives: (src = log.probes.at(-1) && log.probes.at(-1).contentWindow) => msgListeners.forEach((f) => f({ pa: 'pa-sw-probe' }, src)) };
 }
 const settle = async (n = 8) => { for (let i = 0; i < n; i++) await Promise.resolve(); };
 // start() resolves only after the probe: the probe page arrives while it waits.
@@ -79,6 +79,14 @@ test('start: registers /sw.js at scope /, hands the footer build to the active w
   assert.equal(h.c.route(), 'src', 'the worker served the sandboxed iframe: the frame keeps its src');
   assert.equal(h.log.probes[0].removed, 1);
   assert.equal(h.c.status().bundle, 'ok');
+});
+
+test('GPT review: a probe answer from ANOTHER frame (an app, the Try it preview) is not the probe — the route stays srcdoc', async () => {
+  const h = harness();
+  const p = h.c.start(); await settle();
+  h.probeArrives({ some: 'other frame' }); h.probeArrives(null);
+  h.clock.advance(SW_PROBE_MS);
+  assert.equal(await p, 'ready'); assert.equal(h.c.route(), 'srcdoc', 'a forged "served" never flips the route');
 });
 
 test('probe silence by SW_PROBE_MS → the srcdoc route; a bundle failure is kept in status (R5), not swallowed', async () => {

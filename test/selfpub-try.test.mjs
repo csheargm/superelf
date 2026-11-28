@@ -9,7 +9,8 @@ import path from 'node:path';
 import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, OWNER_TOKEN } from './helpers-web.mjs';
 import { selfpubFixture, tgit } from './helpers-selfpub.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
-import { putChange } from '../lib/selfpub/state.mjs';
+import { putChange, PENDING } from '../lib/selfpub/state.mjs';
+import { takeSnapshot, snapshotMb, DEFAULT_TRY_SNAPSHOT_MB } from '../lib/selfpub/try-snapshot.mjs';
 import { treeHash } from '../lib/selfpub/checkout.mjs';
 import { issueTry, lookupTry, forgetTries, MAX_TRY_TOKENS, MAX_TRY_MINUTES, pageCsp, wrapperCsp, tryMinutes, DEFAULT_TRY_MINUTES } from '../lib/selfpub/try.mjs';
 import { FAKE_API } from '../lib/selfpub/preview-page.mjs';
@@ -51,7 +52,7 @@ test('the owner gets a token URL; the wrapper is sandboxed, script-free, and fra
   assert.equal(w.status, 200);
   const csp = w.headers.get('content-security-policy');
   assert.match(csp, /^sandbox allow-scripts;/); assert.match(csp, /script-src 'none'/); assert.match(csp, /frame-ancestors 'self'/);
-  assert.match(csp, new RegExp(`frame-src 127\\.0\\.0\\.1:${port}${j.url}page/;`));
+  assert.match(csp, new RegExp(`frame-src http://127\\.0\\.0\\.1:${port}${j.url}page/ https://127\\.0\\.0\\.1:${port}${j.url}page/;`), 'with schemes: WebKit matches a scheme-less source in an opaque document against nothing (R13 WebKit run)');
   const html = await w.text();
   assert.match(html, /<iframe sandbox="allow-scripts"/); assert.doesNotMatch(html, /allow-same-origin|<script/);
 });
@@ -61,7 +62,8 @@ test('the page: the copy\'s shell + preamble, CSP sandbox with connect-src = the
   const r = await call(`${url}page/`, { token: '' });
   assert.equal(r.status, 200);
   const csp = r.headers.get('content-security-policy'), connect = csp.split('; ').find((d) => d.startsWith('connect-src'));
-  assert.equal(connect, `connect-src 127.0.0.1:${port}${url}page/api/`);
+  assert.equal(connect, `connect-src http://127.0.0.1:${port}${url}page/api/ https://127.0.0.1:${port}${url}page/api/`);
+  assert.doesNotMatch(csp, /[ ;]127\.0\.0\.1:/, 'no scheme-less source anywhere (WebKit refuses them in an opaque document)');
   assert.match(csp, /^sandbox allow-scripts;/); assert.match(csp, /default-src 'none'/); assert.match(csp, /frame-src 'none'/); assert.match(csp, /form-action 'none'/);
   assert.doesNotMatch(csp, /'self'|\*|allow-same-origin/, 'no wildcard, no self: the real /api is not reachable');
   const html = await r.text();
@@ -106,8 +108,8 @@ test('tokens: short-lived, bounded in number, minutes from config', () => {
   for (let i = 0; i < MAX_TRY_TOKENS; i++) issueTry({ id: 'x', who: 'owner', sroot: '/x', minutes: 5, now: 0 });
   assert.equal(lookupTry(first, 1), null, 'the oldest goes past the cap');
   assert.equal(tryMinutes({ selfpub_try_minutes: 5 }), 5); assert.equal(tryMinutes({ selfpub_try_minutes: Infinity }), MAX_TRY_MINUTES); assert.equal(tryMinutes({}), DEFAULT_TRY_MINUTES); assert.equal(tryMinutes({ selfpub_try_minutes: -1 }), DEFAULT_TRY_MINUTES);
-  assert.match(pageCsp('h:1', 'a'.repeat(48)), /connect-src h:1\/selfpub-try\/a{48}\/page\/api\//);
-  assert.match(wrapperCsp('h:1', 'b'.repeat(48)), /frame-src h:1\/selfpub-try\/b{48}\/page\/;/);
+  assert.match(pageCsp('h:1', 'a'.repeat(48)), /connect-src http:\/\/h:1\/selfpub-try\/a{48}\/page\/api\/ https:\/\/h:1\/selfpub-try\/a{48}\/page\/api\/;/);
+  assert.match(wrapperCsp('h:1', 'b'.repeat(48)), /frame-src http:\/\/h:1\/selfpub-try\/b{48}\/page\/ https:\/\/h:1\/selfpub-try\/b{48}\/page\/;/);
   forgetTries();
 });
 
@@ -116,7 +118,7 @@ test('GPT review: every answer carries the sandbox CSP (an SVG is a document too
   putChange(sroot, ID, { verifiedHash: treeHash(repo) });
   const { url } = await (await issue()).json();
   const svg = await call(`${url}page/web/x.svg`, { token: '' });
-  assert.equal(svg.status, 200); assert.match(svg.headers.get('content-security-policy'), /^sandbox allow-scripts;.*script-src 'unsafe-inline' 127\.0\.0\.1/);
+  assert.equal(svg.status, 200); assert.match(svg.headers.get('content-security-policy'), /^sandbox allow-scripts;.*script-src 'unsafe-inline' http:\/\/127\.0\.0\.1/);
   for (const sub of ['', 'page/', 'page/web/x.svg'])
     assert.equal((await call(url + sub, { token: '', headers: { 'sec-fetch-dest': 'document' } })).status, 403, `top-level ${sub || 'wrapper'}`);
   assert.equal((await call(url, { token: '', headers: { 'sec-fetch-dest': 'iframe' } })).status, 200);
@@ -124,13 +126,44 @@ test('GPT review: every answer carries the sandbox CSP (an SVG is a document too
   assert.equal(v6, 400, 'an IPv6 Host cannot go in a CSP host-source');   // fetch() would not send this Host
 });
 
-test('GPT review: a preview never shows other bytes than the checks saw (a follow-up edit ends it)', async () => {
+test('GPT + R13 review: a preview serves only the frozen verified copy — a later edit, a new file, an ignored file never reach it', async () => {
   const { url } = await (await issue()).json();
-  assert.equal((await call(`${url}page/`, { token: '' })).status, 200);
-  fs.appendFileSync(path.join(repo, 'web', 'home-v2.css'), '\n/* follow-up edit in progress */\n');
+  const css = path.join(repo, 'web', 'home-v2.css'), was = fs.readFileSync(css);
+  fs.writeFileSync(path.join(repo, '.gitignore'), 'web/ignored.js\n'); fs.writeFileSync(path.join(repo, 'web', 'ignored.js'), 'x');
+  putChange(sroot, ID, { verifiedHash: treeHash(repo) });
+  const { url: url2 } = await (await issue()).json();
   try {
-    assert.equal((await call(`${url}page/`, { token: '' })).status, 404);
-    assert.equal((await call(url, { token: '' })).status, 404, 'and the token is gone');
-    assert.equal((await issue()).status, 409, 'no new token for moved bytes');
-  } finally { putChange(sroot, ID, { verifiedHash: treeHash(repo) }); }
+    assert.equal((await call(`${url2}page/web/ignored.js`, { token: '' })).status, 404, 'git-ignored: not part of the change, never served');
+    fs.appendFileSync(css, '\n/* follow-up edit in progress */\n'); fs.writeFileSync(path.join(repo, 'web', 'late.js'), 'late');
+    const page = await call(`${url2}page/`, { token: '' }), asset = await (await call(`${url2}page/web/home-v2.css`, { token: '' })).text();
+    assert.equal(page.status, 200); assert.doesNotMatch(await page.text(), /follow-up edit/, 'the page: the verified bytes');
+    assert.match(asset, new RegExp(MARK)); assert.doesNotMatch(asset, /follow-up edit/, 'an asset too, read after the edit');
+    assert.equal((await call(`${url2}page/web/late.js`, { token: '' })).status, 404, 'a file written after the tap is not served');
+    assert.equal((await call(url, { token: '' })).status, 404, 'a token from before the record changed is gone');
+    const again = await issue(); assert.equal(again.status, 409, 'no new token for moved bytes'); assert.equal((await again.json()).code, 'NOT_PENDING');
+  } finally {
+    fs.writeFileSync(css, was); for (const f of ['web/late.js', 'web/ignored.js', '.gitignore']) fs.rmSync(path.join(repo, f), { force: true });
+    putChange(sroot, ID, { verifiedHash: treeHash(repo) });
+  }
+});
+
+test('R13 review: the preview ends with the owner\'s session (sign-out), never only at its TTL', async () => {
+  const login = await fetch(`http://127.0.0.1:${port}/api/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: OWNER_TOKEN }) });   // a browser session (no PIN yet: the token signs in)
+  assert.equal(login.status, 200); const { token: sess } = await login.json();
+  const { url } = await (await issue(sess)).json();
+  assert.equal((await call(url, { token: '' })).status, 200);
+  assert.equal((await call('/api/logout', { method: 'POST', body: '{}', token: sess })).status, 200);
+  assert.equal((await call(url, { token: '' })).status, 404, 'signed out: the preview link is dead');
+});
+
+test('snapshots: bounded in bytes; dropped with their token', () => {
+  const dir = repo, h = treeHash(repo);
+  assert.throws(() => takeSnapshot(dir, sroot, h, { maxMb: 0.001 }), /over 0\.001 MB/);
+  assert.throws(() => takeSnapshot(dir, sroot, 'not-the-hash'), (e) => e.code === 'NOT_PENDING');
+  const snap = takeSnapshot(dir, sroot, h);
+  assert.ok(fs.existsSync(path.join(snap, 'web', 'index.html')));
+  forgetTries(); const t = issueTry({ id: ID, who: 'owner', sroot, snap, minutes: 1 }); forgetTries();
+  assert.equal(lookupTry(t), null); assert.equal(fs.existsSync(snap), false, 'the copy goes with the token');
+  assert.equal(snapshotMb({ selfpub_try_snapshot_mb: 4 }), 4); assert.equal(snapshotMb({}), DEFAULT_TRY_SNAPSHOT_MB); assert.equal(snapshotMb({ selfpub_try_snapshot_mb: Infinity }), DEFAULT_TRY_SNAPSHOT_MB);
+  assert.deepEqual(PENDING, ['ready', 'unverified'], 'one list of waiting states (R3), in lib/selfpub/state.mjs');
 });

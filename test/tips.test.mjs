@@ -20,9 +20,10 @@ const flush = async () => { for (let i = 0; i < 60; i++) await Promise.resolve()
 // One app page (an iframe) for an account `me`: PAAppPrefs + PATips, the shell answering each request on a microtask.
 function page(me, { width = 375, height = 812, refuseRead = false, tipsSrc = TIPS_SRC, raf = null, ro = null, mo = null, io = null, tipW = 220 } = {}) {
   const shell = loadShellAppSettings({ me });
-  const on = [], writes = [];
+  const on = [], writes = [], reads = { n: 0 };
   const deliver = (m) => {
     let r = { ok: true };
+    if (m.kind === 'app-settings') reads.n++;
     if (m.kind === 'app-settings') r = refuseRead ? { ok: false, error: 'offline' } : { ok: true, ...shell.appSettingsOf(SLUG) };
     if (m.kind === 'set-app-settings') { writes.push(m); r = null; }
     return Promise.resolve(r || shell.saveAppSettings(SLUG, m.prefs, m.systemPrompt)).then((x) => on.slice().forEach((f) => f({ data: { pa: 'res', id: m.id, ...x } })));
@@ -38,7 +39,7 @@ function page(me, { width = 375, height = 812, refuseRead = false, tipsSrc = TIP
   const run = (src) => new Function('window', 'document', 'parent', 'setTimeout', 'clearTimeout', src)(win, doc, parent, () => 0, () => {});   // eslint-disable-line no-new-func
   run(PREFS_SRC); run(tipsSrc);
   return { win, doc, body, writes, run, T: win.PATips, fireDoc: (t) => (dh[t] || []).forEach((f) => f({})), fireWin: (t) => (wh[t] || []).forEach((f) => f({})), tip: () => [...doc.documentElement.children, ...body.children].find((c) => c.classList.contains('pat-tip')),
-    push: () => on.slice().forEach((f) => f({ data: { pa: 'prefs' } })) };
+    reads, push: (source = parent) => on.slice().forEach((f) => f({ data: { pa: 'prefs' }, source })) };
 }
 const meWith = (prefs = {}) => ({ appPrefs: { [SLUG]: prefs }, systemPrompts: { apps: { [SLUG]: PROMPT } }, systemPromptDefaults: { apps: {} } });
 const anchorAt = (top, left = 20) => fakeEl('button', { top, left, width: 40, height: 30 });
@@ -49,6 +50,16 @@ test('served: chat-ui carries the tips marker after the app-prefs one; web.mjs r
   const web = read('web.mjs'), list = web.slice(web.indexOf('const PA_COMPONENTS = ['), web.indexOf('\n];', web.indexOf('const PA_COMPONENTS = [')));
   const files = [...list.matchAll(/file: '([^']+)'/g)].map((m) => m[1]);
   assert.deepEqual(files.slice(-9), ['tips.inline.html', 'panel-window.inline.html', 'app-bar.inline.html', 'bar-handle.css', 'reading-history.inline.html', 'ink-frame.inline.html', 'snap.inline.html', 'note-phone.inline.html', 'phone-ui.inline.html']);
+});
+
+test('GPT review: a prefs push re-reads the seen list only from the shell (the parent), never from another frame', async () => {
+  const p = page(meWith());
+  p.T.register({ id: 'x-push', anchor: anchorAt(100), text: 'push' }); await flush();
+  const n = p.reads.n; assert.ok(n >= 1, 'the first load read the list');
+  p.push({ other: 'frame' }); p.push(null); await flush();
+  assert.equal(p.reads.n, n, 'another frame (the Try it preview) triggers nothing');
+  p.push(); await flush();
+  assert.equal(p.reads.n, n + 1, 'the shell\'s push re-reads it');
 });
 
 test('first visit shows ONE tip beside the anchor, inside the viewport; dismiss stores the id and keeps the override', async () => {
