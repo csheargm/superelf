@@ -375,10 +375,14 @@ for (const app of ['bible (live)', 'bible (template)']) {
       const rel = 'notes/43-3.json';
       h.put(rel, { notes: { v16: 'a text note' }, draws: {}, chat: { v16: 'convo-1' },
         titles: { v16: 'My renamed note', general: 'Chapter thoughts' }, pins: { v16: true } });
-      const A = runApp(app, h.relay, ['DATA', 'loadAnn', 'saveAnn', 'get ANN(){return ANN}',
+      const A = runApp(app, h.relay, ['DATA', 'loadAnn', 'saveAnn', 'get ANN(){return ANN}', 'get booted(){return _booted}',
         'setCh:(b,c)=>{bookIdx=b;chapter=c;}'], { clampTimers: true });
+      // The app's own boot load() waits on the reading-history read, then calls loadAnn() itself.
+      // Under a loaded suite that came AFTER this test's read: it reset ANN to empty mid-test and
+      // the save wrote no titles (flaky on main). Let the boot load finish first.
+      await until(() => A.booted, 'the app finished its own boot chapter load');
       A.setCh(42, 3);
-      await A.loadAnn();
+      assert.equal(await A.loadAnn(), true, 'this read owns ANN (no newer read superseded it)');
       A.ANN.notes.v16 = 'the note, edited';                 // the user types — one ordinary save
       assert.equal((await A.saveAnn()).ok, true, 'the annotation save lands');
       const chapter = JSON.parse(fs.readFileSync(h.file(rel), 'utf8'));
