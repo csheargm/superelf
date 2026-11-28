@@ -2747,6 +2747,7 @@ scrollBtn.onclick=()=>{ logEl.scrollTo({top:logEl.scrollHeight,behavior:'smooth'
 // (full reload → new page boot → data loaded). Cleared once the boot loaders settle.
 $('#reload').onclick=()=>{ try{ sessionStorage.setItem('pa_refreshing','1'); }catch{} $('#reload').classList.add('spin'); location.reload(); };
 /* PA_PUBLISH_JS */
+/* PA_SELFPUB_TRY_JS */
 /* PA_SELFPUB_JS */
 /* PA_APP_SHARE_JS */
 /* PA_APP_EDIT_JS */

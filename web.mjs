@@ -14,6 +14,7 @@ import { makeDemoRoutes } from './lib/demo-routes.mjs';
 import { handlePublishRoute } from './lib/publish/routes.mjs';
 import { handleOwnerShareRoute } from './lib/app-share-routes.mjs';
 import { handleSelfpubRoute, selfpubRoot } from './lib/selfpub/routes.mjs';
+import { handleTryPage } from './lib/selfpub/try.mjs';
 import { coreChatTurn, coreDeps, coreRequestOf, endCore, markerRequest, ownerComposer, refuseCore, typedPublish, MAIN_CHAT_RULE } from './lib/selfpub/chat.mjs';
 import { handleAlertsRoute } from './lib/node-alerts.mjs';
 import { handleActivityRoute, refuseStaleUndo, newestEditVersion } from './lib/activity-view.mjs';
@@ -1934,6 +1935,7 @@ const server = http.createServer(async (req, res) => {
       return sendFile(res, f, { type, extra });
     }
 
+    if (handleTryPage(req, res, p, { send, demo: demoOn(cfg) })) return;   // 试用 · Try it: the owner-issued preview token is the key, never the session (docs/adr/0049). TODO(R4 seam): with the selfpub routes into lib/publish-routes-table.mjs
     if (p === SW_PROBE_PATH) { res.writeHead(204); return res.end(); }   // only the worker answers it; the node's empty 204 is the silence the probe waits out — no 401/404 noise per load (F4-4)
     const user = userFor(req);
     if (!user) return send(res, 401, 'application/json', cfg.sessions.wasRemoved(bearerOf(req), Date.now()) ? ACCOUNT_REMOVED_BODY : '{"error":"bad token"}');

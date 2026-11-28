@@ -68,3 +68,17 @@ test('fillShellMarkers: every build marker filled, a $ in a value kept literally
   assert.doesNotMatch(fillShellMarkers('<!--APP_VERSION-->', PREVIEW_MARKERS), /<!--/);
   assert.doesNotMatch(fs.readFileSync(new URL('../web.mjs', import.meta.url), 'utf8'), /\.replace\('<!--APP_VERSION-->'/, 'web.mjs fills through the shared helper');
 });
+
+test('regression: a change that ADDS a shell part (its own web/shell-parts.json) is drawn in After (docs/adr/0049)', { skip, timeout: 120000 }, async () => {
+  const fx = selfpubFixture({ web: true });
+  try {
+    const dir = checkout(fx), render = makeRenderer({ shotsDir: path.join(fx.d, 'shots') });
+    fs.writeFileSync(path.join(dir, 'web', 'skin.js'), "addEventListener('DOMContentLoaded',()=>{ const d=document.createElement('div'); d.textContent='SKIN'; d.style.cssText='position:fixed;left:0;right:0;top:0;height:60px;background:#c2185b;color:#fff'; document.body.appendChild(d); });\n");
+    const idx = path.join(dir, 'web', 'index.html'), list = path.join(dir, 'web', 'shell-parts.json');
+    fs.writeFileSync(idx, fs.readFileSync(idx, 'utf8').replace('/* PA_SELFPUB_JS */', '/* PA_SKIN_JS */\n/* PA_SELFPUB_JS */'));
+    fs.writeFileSync(list, JSON.stringify([...JSON.parse(fs.readFileSync(list, 'utf8')), { marker: '/* PA_SKIN_JS */', file: 'skin.js' }]));
+    const r = await render(dir, ['web/skin.js', 'web/shell-parts.json', 'web/index.html'], 'skin1');
+    assert.equal(r.ok, true, r.note);
+    assert.equal(r.same, false, 'the new part is drawn: the node\'s own parts list used to leave it out, so After equalled Before');
+  } finally { rmTemp(fx.d); }
+});
