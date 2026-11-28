@@ -1,4 +1,13 @@
 {
+  "v5.39.0": {
+    "date": "2026-11-27",
+    "time": "2026-11-28T05:50:39.136Z",
+    "features": [
+      "合并：自改预览「试用」 · Merge: Try-it preview for self-changes"
+    ],
+    "fixes": [],
+    "through": "3ea1d9bb212d0afa9b5c9b8b3915efee5922b370"
+  },
   "v5.38.12": {
     "date": "2026-11-27",
     "time": "2026-11-27T22:49:38.667Z",
