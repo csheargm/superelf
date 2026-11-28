@@ -29,6 +29,7 @@ const PASelfPubTry=(()=>{
     try{ const r=await api('/api/selfpub/'+encodeURIComponent(id)+'/try',{method:'POST',headers:{'content-type':'application/json'},body:'{}'}); j=await r.json(); }
     catch(e){ return say('无法打开预览 · Could not open the preview: '+((e&&e.message)||'')); }
     if(!j||typeof j.url!=='string'||!j.url.startsWith('/selfpub-try/')) return say((j&&j.error)||'无法打开预览 · Could not open the preview');
+    if(!document.getElementById('spTry')) return;   // the sheet closed (or moved on) while the link was made: open nothing
     show(j.url);
   }
   function show(url){

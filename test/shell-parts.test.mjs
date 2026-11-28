@@ -54,6 +54,18 @@ test('validation: names only under web/, allow-listed shapes, no traversal, no e
   assert.throws(() => validateShellParts(Array.from({ length: MAX_SHELL_PARTS + 1 }, (_, i) => ({ marker: `/* PA_X${i} */`, file: `x${i}.js` }))), /max/);
 });
 
+test('GPT review: an oversized parts file is refused before it is read; a parts-only change gets the render check', async () => {
+  const d = copyTree();
+  try {
+    fs.writeFileSync(path.join(d, 'web', PARTS_FILE), '[' + ' '.repeat(70 * 1024) + ']');
+    assert.throws(() => readShellParts(d), /at most/);
+  } finally { rmTemp(d); }
+  const { verifyChange } = await import('../lib/selfpub/verify.mjs');
+  let asked = null;
+  await verifyChange('/nowhere', ['web/shell-parts.json'], { ciOnly: 'ci', render: async (dir, pages) => { asked = pages; return { ok: true, shots: ['a', 'b'] }; } });
+  assert.deepEqual(asked, ['web/shell-parts.json']);
+});
+
 test('a copy with no parts file uses this node\'s list; a broken one throws (never read as empty)', () => {
   const d = copyTree();
   try {
@@ -88,5 +100,15 @@ test('a part that is a symlink out of web/ is refused', { skip: skipIf(process.p
     fs.rmSync(path.join(d, 'web', 'popover.js')); fs.symlinkSync(path.join(d, 'secret.txt'), path.join(d, 'web', 'popover.js'));
     assert.throws(() => readShell(d), /points outside web/);
     assert.doesNotMatch(previewAnswer(d, '/').body, /SECRET-OUTSIDE-WEB/);
+    fs.rmSync(path.join(d, 'web', 'popover.js')); fs.copyFileSync(path.join(ROOT, 'web', 'popover.js'), path.join(d, 'web', 'popover.js'));
+    // GPT review: the copy's entry points too — index.html, the parts list, web/ itself.
+    for (const name of ['index.html', PARTS_FILE]) {
+      const f = path.join(d, 'web', name), keep = fs.readFileSync(f);
+      fs.rmSync(f); fs.symlinkSync(path.join(d, 'secret.txt'), f);
+      const r = previewAnswer(d, '/'); assert.equal(r.status, 500, name); assert.doesNotMatch(r.body, /SECRET-OUTSIDE-WEB/);
+      fs.rmSync(f); fs.writeFileSync(f, keep);
+    }
+    const out = path.join(d, 'elsewhere'); fs.renameSync(path.join(d, 'web'), out); fs.symlinkSync(out, path.join(d, 'web'));
+    assert.match(previewAnswer(d, '/').body, /web\/ is a link/); assert.equal(previewAnswer(d, '/web/home-v2.css').status, 404);
   } finally { rmTemp(d); }
 });

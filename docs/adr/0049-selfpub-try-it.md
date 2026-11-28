@@ -74,9 +74,33 @@ page behind is inert (no shell tip over it, focus stays in). ✕ returns to the 
   test/selfpub-render.test.mjs (a new part is drawn in After) and test/selfpub-try-e2e.test.mjs (the owner's
   flow in Chromium, the wall probed from inside the page, a member sees nothing; 390/820/1280/1920).
 
+## GPT review round 1 (2026-11-27) — adopted
+- Every answer under the token carries the page CSP (an SVG or an HTML file of web/ is a document too), and
+  a request the browser marks `Sec-Fetch-Dest: document` (a top-level open, outside the wrapper's
+  navigation fence) is refused 403.
+- A copy's entry points must be plain: web/ not a link, web/index.html and web/shell-parts.json plain files;
+  the parts file is sized before it is read. Parts were already checked to resolve inside web/.
+- The preview is pinned to the bytes the checks saw: the token is tied to the change record's time, and
+  each document load re-hashes the checkout (`treeHash` = the change's `verifiedHash`); a follow-up edit
+  ends it. `selfpub_try_minutes` is capped at a day. IPv6 Host headers get a 400 (not in CSP's grammar).
+- A parts-only change (web/shell-parts.json) now gets the render check.
+- The UI opens nothing when the sheet closed while the link was being made.
+- Rejected as out of scope here, kept as limits below: WebRTC / DNS-prefetch egress, sender checks on the
+  shell's offline-probe and tips-prefs listeners, Escape from inside the frame, a broken Before shot.
+
 ## Known limits
 - Chromium only in the e2e; WebKit's handling of a CSP `sandbox` plus path-scoped `connect-src` is not
   exercised here.
 - `SW_PROBE` replies (web/sw-client.js `onMessage`) take any window message: a page could fake the offline
   probe's answer. Effect: the shell may think its worker answered; no data moves.
 - Tokens live in memory: a node restart ends every open preview (it shows 预览已过期 · expired).
+- CSP does not cover WebRTC or DNS prefetch. The preamble deletes the WebRTC constructors (best effort: a page
+  could find them in another realm), and `<link rel=dns-prefetch>` can leak bits through DNS. What could
+  leave: the sample data, the copy's own code (bound for a public repo) and this preview's token — never the
+  owner's session or real data, which the page cannot read.
+- web/tips.inline.html's `prefs` listener takes any window's message (a re-read of the tip list, no data).
+- Escape inside the preview frame does not reach the overlay (the ✕ does). A Before shot that failed to boot
+  is not itself checked (lib/selfpub/render.mjs). Behind a proxy that rewrites Host, the CSP host would not
+  match and the preview would not load (Caddy keeps Host).
+- A tree with no parts file falls back to this node's list, which may name markers the old index.html lacks:
+  that tree then fails to assemble (said on the page). origin/main carries the file from this change on.

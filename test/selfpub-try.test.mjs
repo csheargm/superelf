@@ -4,27 +4,29 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import http from 'node:http';
 import path from 'node:path';
 import { freePort, mkWebRoot, startWeb, waitReady, stopWeb, OWNER_TOKEN } from './helpers-web.mjs';
 import { selfpubFixture, tgit } from './helpers-selfpub.mjs';
 import { rmTemp } from './helpers-tmp.mjs';
 import { putChange } from '../lib/selfpub/state.mjs';
-import { issueTry, lookupTry, forgetTries, MAX_TRY_TOKENS, pageCsp, wrapperCsp, tryMinutes, DEFAULT_TRY_MINUTES } from '../lib/selfpub/try.mjs';
+import { treeHash } from '../lib/selfpub/checkout.mjs';
+import { issueTry, lookupTry, forgetTries, MAX_TRY_TOKENS, MAX_TRY_MINUTES, pageCsp, wrapperCsp, tryMinutes, DEFAULT_TRY_MINUTES } from '../lib/selfpub/try.mjs';
 import { FAKE_API } from '../lib/selfpub/preview-page.mjs';
 
 const MEMBER_TOKEN = 'test-member-token-0123456789abcdef';
 const ID = 'tryab1', BRANCH = `self/20261127-${ID}`, MARK = 'try-change-mark-1127';
-let port, root, web, fx, sroot;
+let port, root, web, fx, sroot, repo;
 const call = (p, { token = OWNER_TOKEN, ...o } = {}) => fetch(`http://127.0.0.1:${port}${p}`, { ...o, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}), ...(o.headers || {}) } });
 const issue = async (token = OWNER_TOKEN) => call(`/api/selfpub/${ID}/try`, { method: 'POST', body: '{}', token });
 const setState = (state) => putChange(sroot, ID, { state });
 
 before(async () => {
   fx = selfpubFixture({ web: true });
-  sroot = fx.root; const repo = path.join(sroot, 'repo');
+  sroot = fx.root; repo = path.join(sroot, 'repo');
   fs.mkdirSync(sroot, { recursive: true }); tgit(sroot, 'clone', '-q', fx.bare, repo); tgit(repo, 'checkout', '-qb', BRANCH);
   fs.appendFileSync(path.join(repo, 'web', 'home-v2.css'), `\n/* ${MARK} */\n`);
-  putChange(sroot, ID, { who: 'owner', convo: 'c1', state: 'ready', branch: BRANCH });
+  putChange(sroot, ID, { who: 'owner', convo: 'c1', state: 'ready', branch: BRANCH, verifiedHash: treeHash(repo) });
   port = await freePort();
   root = mkWebRoot({ port, extraConfig: { selfpub_root: sroot, users: [{ id: 'owner', name: 'Owner', role: 'owner', token: OWNER_TOKEN, workspace: 'workspace' },
     { id: 'kid', name: 'Kid', role: 'member', token: MEMBER_TOKEN, workspace: 'workspace-kid' }] } });
@@ -103,8 +105,32 @@ test('tokens: short-lived, bounded in number, minutes from config', () => {
   const first = issueTry({ id: 'x', who: 'owner', sroot: '/x', minutes: 5, now: 0 });
   for (let i = 0; i < MAX_TRY_TOKENS; i++) issueTry({ id: 'x', who: 'owner', sroot: '/x', minutes: 5, now: 0 });
   assert.equal(lookupTry(first, 1), null, 'the oldest goes past the cap');
-  assert.equal(tryMinutes({ selfpub_try_minutes: 5 }), 5); assert.equal(tryMinutes({}), DEFAULT_TRY_MINUTES); assert.equal(tryMinutes({ selfpub_try_minutes: -1 }), DEFAULT_TRY_MINUTES);
+  assert.equal(tryMinutes({ selfpub_try_minutes: 5 }), 5); assert.equal(tryMinutes({ selfpub_try_minutes: Infinity }), MAX_TRY_MINUTES); assert.equal(tryMinutes({}), DEFAULT_TRY_MINUTES); assert.equal(tryMinutes({ selfpub_try_minutes: -1 }), DEFAULT_TRY_MINUTES);
   assert.match(pageCsp('h:1', 'a'.repeat(48)), /connect-src h:1\/selfpub-try\/a{48}\/page\/api\//);
   assert.match(wrapperCsp('h:1', 'b'.repeat(48)), /frame-src h:1\/selfpub-try\/b{48}\/page\/;/);
   forgetTries();
+});
+
+test('GPT review: every answer carries the sandbox CSP (an SVG is a document too); a top-level open is refused', async () => {
+  fs.writeFileSync(path.join(repo, 'web', 'x.svg'), '<svg xmlns="http://www.w3.org/2000/svg"><script>parent.alert(1)</script></svg>');
+  putChange(sroot, ID, { verifiedHash: treeHash(repo) });
+  const { url } = await (await issue()).json();
+  const svg = await call(`${url}page/web/x.svg`, { token: '' });
+  assert.equal(svg.status, 200); assert.match(svg.headers.get('content-security-policy'), /^sandbox allow-scripts;.*script-src 'unsafe-inline' 127\.0\.0\.1/);
+  for (const sub of ['', 'page/', 'page/web/x.svg'])
+    assert.equal((await call(url + sub, { token: '', headers: { 'sec-fetch-dest': 'document' } })).status, 403, `top-level ${sub || 'wrapper'}`);
+  assert.equal((await call(url, { token: '', headers: { 'sec-fetch-dest': 'iframe' } })).status, 200);
+  const v6 = await new Promise((res, rej) => http.get({ host: '127.0.0.1', port, path: `${url}page/`, headers: { host: '[::1]:1' } }, (r) => { r.resume(); res(r.statusCode); }).on('error', rej));
+  assert.equal(v6, 400, 'an IPv6 Host cannot go in a CSP host-source');   // fetch() would not send this Host
+});
+
+test('GPT review: a preview never shows other bytes than the checks saw (a follow-up edit ends it)', async () => {
+  const { url } = await (await issue()).json();
+  assert.equal((await call(`${url}page/`, { token: '' })).status, 200);
+  fs.appendFileSync(path.join(repo, 'web', 'home-v2.css'), '\n/* follow-up edit in progress */\n');
+  try {
+    assert.equal((await call(`${url}page/`, { token: '' })).status, 404);
+    assert.equal((await call(url, { token: '' })).status, 404, 'and the token is gone');
+    assert.equal((await issue()).status, 409, 'no new token for moved bytes');
+  } finally { putChange(sroot, ID, { verifiedHash: treeHash(repo) }); }
 });

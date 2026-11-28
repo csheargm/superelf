@@ -844,7 +844,8 @@ user's app (not in the repo) has no "send my change to its author" path; the lin
 - The VM self-deploy timer (ops/private) is outside the public repo: its release-tip CI, revision, health and rollback checks are unreviewed here.
 - The render check draws Home only, with a fake empty owner (lib/selfpub/render.mjs): a change visible only inside an app or with real data is not seen. Seam: render the changed app page too. (A copy that adds a shell part IS drawn since ADR 0049; the owner can also open the change with 试用 · Try it.)
 - Try it (ADR 0049): the fake profile has no role, so the preview's Settings says 成员 · member; app tiles open nothing (frame-src 'none'). Seam: a fuller fake owner in lib/selfpub/preview-page.mjs, checked against the render check's pixels.
-- web/sw-client.js onMessage takes any window message for the offline probe answer: any frame (an app, the Try it preview) could fake it. Seam: check e.source against the probe frame.
+- web/sw-client.js onMessage takes any window message for the offline probe answer, and web/tips.inline.html's `prefs` listener any window's message: any frame (an app, the Try it preview) could send them. Seam: check e.source (the probe frame; the parent).
+- Try it egress outside CSP (ADR 0049): WebRTC from another realm, DNS prefetch. Seam: Chrome's `webrtc 'block'` once shipped; a per-preview subdomain.
 - Stale-lock reclaim is check-then-unlink: two processes that both judge the same lock stale can race (creation itself is atomic: write-then-link). The node runs one server process; a rename-based reclaim is the fix if that changes. Also: the heartbeat interval is set at acquire time, so lowering selfpub_lock_max_ms below a held lock's beat interval could let it expire (lib/selfpub/lock.mjs).
 - API-key refusal on /api/selfpub follows apiKeyBlocked (accounts with a PIN). An owner with no PIN signs in by that key, so it cannot be refused without locking them out; set a PIN to close it.
 
